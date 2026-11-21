@@ -1,0 +1,475 @@
+use std::marker::PhantomData;
+
+use api_models::enums::FrmSuggestion;
+use async_trait::async_trait;
+use common_utils::ext_traits::AsyncExt;
+use error_stack::ResultExt;
+use hyperswitch_domain_models::payment_method_data::ApiPaymentMethodDataMandateIds;
+use hyperswitch_interfaces::api::ConnectorSpecifications;
+use router_env::instrument;
+
+use super::{BoxedOperation, Domain, GetTracker, Operation, UpdateTracker, ValidateRequest};
+use crate::{
+    core::{
+        configs::dimension_state,
+        errors::{self, CustomResult, RouterResult, StorageErrorExt},
+        payments::{helpers, operations, CustomerDetails, PaymentData},
+    },
+    events::audit_events::{AuditEvent, AuditEventType},
+    routes::{app::ReqState, SessionState},
+    services,
+    types::{
+        self as core_types,
+        api::{self, PaymentIdTypeExt},
+        domain,
+        storage::{self, enums},
+    },
+    utils::OptionExt,
+};
+
+#[derive(Debug, Clone, Copy, router_derive::PaymentOperation)]
+#[operation(operations = "all", flow = "cancel")]
+pub struct PaymentCancel;
+
+type PaymentCancelOperation<'b, F> =
+    BoxedOperation<'b, F, api::PaymentsCancelRequest, PaymentData<F>>;
+
+#[async_trait]
+impl<F: Send + Clone + Sync> GetTracker<F, PaymentData<F>, api::PaymentsCancelRequest>
+    for PaymentCancel
+{
+    #[instrument(skip_all)]
+    async fn get_trackers<'a>(
+        &'a self,
+        state: &'a SessionState,
+        payment_id: &api::PaymentIdType,
+        request: &api::PaymentsCancelRequest,
+        platform: &domain::Platform,
+        _auth_flow: services::AuthFlow,
+        _flow_kind: operations::PaymentFlowKind,
+        _header_payload: &hyperswitch_domain_models::payments::HeaderPayload,
+        payment_method_fetch_data: operations::PaymentMethodFetchData,
+        _dimensions: &dimension_state::DimensionsWithProcessorAndProviderMerchantId,
+        _payment_pre_fetched_info: Option<operations::PaymentPreFetchedInformation>,
+        profile_id_from_auth_layer: Option<&common_utils::id_type::ProfileId>,
+    ) -> RouterResult<
+        operations::GetTrackerResponse<'a, F, api::PaymentsCancelRequest, PaymentData<F>>,
+    > {
+        let db = &*state.store;
+
+        let processor_merchant_id = platform.get_processor().get_processor_merchant_id();
+        let storage_scheme = platform.get_processor().get_storage_scheme();
+        let payment_id = payment_id
+            .get_payment_intent_id()
+            .change_context(errors::ApiErrorResponse::PaymentNotFound)?;
+
+        let payment_intent = helpers::find_payment_intent(
+            db,
+            &payment_id,
+            &processor_merchant_id,
+            platform.get_processor().get_key_store(),
+            storage_scheme,
+            profile_id_from_auth_layer,
+        )
+        .await
+        .to_not_found_response(errors::ApiErrorResponse::PaymentNotFound)?;
+
+        let mut payment_attempt = db
+            .find_payment_attempt_by_payment_id_processor_merchant_id_attempt_id(
+                &payment_intent.payment_id,
+                &processor_merchant_id,
+                payment_intent.active_attempt.get_id().as_str(),
+                storage_scheme,
+                platform.get_processor().get_key_store(),
+            )
+            .await
+            .to_not_found_response(errors::ApiErrorResponse::PaymentNotFound)?;
+
+        let supports_processing_pre_authorize_void = payment_intent.status
+            == enums::IntentStatus::Processing
+            && payment_attempt.payment_method_id.is_some()
+            && payment_attempt
+                .connector
+                .as_ref()
+                .and_then(|connector_name| {
+                    api::ConnectorData::get_connector_by_name(
+                        &state.conf.connectors,
+                        connector_name,
+                        api::GetToken::Connector,
+                        payment_attempt.merchant_connector_id.clone(),
+                    )
+                    .ok()
+                })
+                .is_some_and(|connector_data| {
+                    connector_data.connector.is_pre_authorize_cancel_supported(
+                        hyperswitch_interfaces::api::CurrentFlowInfo::PreAuthorizeVoid {
+                            payment_method_type: payment_attempt.payment_method_type,
+                            attempt_status: payment_attempt.status,
+                            is_mit_payment: true,
+                        },
+                    )
+                });
+
+        let mut not_allowed_statuses = vec![
+            enums::IntentStatus::Failed,
+            enums::IntentStatus::Succeeded,
+            enums::IntentStatus::Cancelled,
+            enums::IntentStatus::RequiresMerchantAction,
+            enums::IntentStatus::Review,
+        ];
+        if !supports_processing_pre_authorize_void {
+            not_allowed_statuses.push(enums::IntentStatus::Processing);
+        }
+        helpers::validate_payment_status_against_not_allowed_statuses(
+            payment_intent.status,
+            &not_allowed_statuses,
+            "cancel",
+        )?;
+
+        let shipping_address = helpers::get_address_by_id(
+            state,
+            payment_intent.shipping_address_id.clone(),
+            platform.get_processor().get_key_store(),
+            &payment_intent.payment_id,
+            &processor_merchant_id,
+            platform.get_processor().get_account().storage_scheme,
+        )
+        .await?;
+
+        let billing_address = helpers::get_address_by_id(
+            state,
+            payment_intent.billing_address_id.clone(),
+            platform.get_processor().get_key_store(),
+            &payment_intent.payment_id,
+            &processor_merchant_id,
+            platform.get_processor().get_account().storage_scheme,
+        )
+        .await?;
+
+        let payment_method_billing = helpers::get_address_by_id(
+            state,
+            payment_attempt.payment_method_billing_address_id.clone(),
+            platform.get_processor().get_key_store(),
+            &payment_intent.payment_id,
+            &processor_merchant_id,
+            platform.get_processor().get_account().storage_scheme,
+        )
+        .await?;
+
+        let currency = payment_attempt.currency.get_required_value("currency")?;
+        let amount = payment_attempt.get_total_amount().into();
+
+        payment_attempt
+            .cancellation_reason
+            .clone_from(&request.cancellation_reason);
+
+        let creds_identifier = request
+            .merchant_connector_details
+            .as_ref()
+            .map(|mcd| mcd.creds_identifier.to_owned());
+        request
+            .merchant_connector_details
+            .to_owned()
+            .async_map(|mcd| async {
+                helpers::insert_merchant_connector_creds_to_config(
+                    db,
+                    platform.get_processor(),
+                    mcd,
+                )
+                .await
+            })
+            .await
+            .transpose()?;
+
+        let profile_id = payment_intent
+            .profile_id
+            .as_ref()
+            .get_required_value("profile_id")
+            .change_context(errors::ApiErrorResponse::InternalServerError)
+            .attach_printable("'profile_id' not set in payment intent")?;
+
+        let business_profile = state
+            .accounts_store
+            .find_business_profile_by_profile_id(
+                platform.get_processor().get_key_store(),
+                profile_id,
+            )
+            .await
+            .to_not_found_response(errors::ApiErrorResponse::ProfileNotFound {
+                id: profile_id.get_string_repr().to_owned(),
+            })?;
+
+        let payment_method_data = payment_method_fetch_data
+            .payment_method_with_raw_data
+            .clone()
+            .and_then(|pm| pm.raw_payment_method_data)
+            .or(request
+                .payment_method_data
+                .clone()
+                .map(domain::PaymentMethodData::from));
+
+        let recurring_mandate_payment_data =
+            payment_attempt.payment_method_id.is_some().then(|| {
+                hyperswitch_domain_models::router_data::RecurringMandatePaymentData {
+                    payment_method_type: payment_attempt.payment_method_type,
+                    original_payment_authorized_amount: None,
+                    original_payment_authorized_currency: None,
+                    mandate_metadata: None,
+                }
+            });
+
+        let payment_data = PaymentData {
+            capture_feature_metadata: None,
+            flow: PhantomData,
+            previous_db_records: (payment_attempt.clone(), payment_intent.clone()),
+            payment_intent,
+            payment_attempt,
+            currency,
+            amount,
+            mandate_id: request
+                .payment_method_data
+                .as_ref()
+                .and_then(ApiPaymentMethodDataMandateIds::get_mandate_ids),
+            mandate_connector: None,
+            setup_mandate: None,
+            customer_acceptance: None,
+            token: None,
+            token_data: None,
+            address: core_types::PaymentAddress::new(
+                shipping_address.as_ref().map(From::from),
+                billing_address.as_ref().map(From::from),
+                payment_method_billing.as_ref().map(From::from),
+                business_profile.use_billing_as_payment_method_billing,
+            ),
+            confirm: None,
+            payment_method_data,
+            payment_method_token: None,
+            payment_method_info: None,
+            force_sync: None,
+            all_keys_required: None,
+            refunds: vec![],
+            disputes: vec![],
+            attempts: None,
+            sessions_token: vec![],
+            card_cvc: None,
+            creds_identifier,
+            pm_token: None,
+            connector_customer_id: None,
+            recurring_mandate_payment_data,
+            multiple_capture_data: None,
+            redirect_response: None,
+            surcharge_details: None,
+            frm_message: None,
+            payment_link_data: None,
+            incremental_authorization_details: None,
+            authorizations: vec![],
+            authentication: None,
+            recurring_details: None,
+            poll_config: None,
+            tax_data: None,
+            session_id: None,
+            service_details: None,
+            card_testing_guard_data: None,
+            vault_operation: None,
+            threeds_method_comp_ind: None,
+            whole_connector_response: None,
+            is_manual_retry_enabled: None,
+            is_l2_l3_enabled: false,
+            external_authentication_data: None,
+            client_session_id: None,
+            vault_session_details: None,
+            external_vault_pmd: None,
+            update_request_fields: None,
+        };
+
+        let get_trackers_response = operations::GetTrackerResponse {
+            operation: Box::new(self),
+            customer_details: None,
+            payment_data,
+            business_profile,
+            mandate_type: None,
+        };
+
+        Ok(get_trackers_response)
+    }
+}
+
+#[async_trait]
+impl<F: Clone + Sync> UpdateTracker<F, PaymentData<F>, api::PaymentsCancelRequest>
+    for PaymentCancel
+{
+    #[instrument(skip_all)]
+    async fn update_trackers<'b>(
+        &'b self,
+        state: &'b SessionState,
+        req_state: ReqState,
+        processor: &domain::Processor,
+        mut payment_data: PaymentData<F>,
+        _frm_suggestion: Option<FrmSuggestion>,
+        _header_payload: hyperswitch_domain_models::payments::HeaderPayload,
+        _dimensions: &dimension_state::DimensionsWithProcessorAndProviderMerchantId,
+    ) -> RouterResult<(PaymentCancelOperation<'b, F>, PaymentData<F>)>
+    where
+        F: 'b + Send,
+    {
+        let storage_scheme = processor.get_storage_scheme();
+        let key_store = processor.get_key_store();
+
+        let cancellation_reason = payment_data.payment_attempt.cancellation_reason.clone();
+        let (intent_status_update, attempt_status_update) =
+            if payment_data.payment_intent.status != enums::IntentStatus::RequiresCapture {
+                let payment_intent_update = storage::PaymentIntentUpdate::PGStatusUpdate {
+                    status: enums::IntentStatus::Cancelled,
+                    updated_by: storage_scheme.inner().to_string(),
+                    incremental_authorization_allowed: None,
+                    feature_metadata: payment_data.payment_intent.feature_metadata.clone(),
+                };
+                (Some(payment_intent_update), enums::AttemptStatus::Voided)
+            } else {
+                (None, enums::AttemptStatus::VoidInitiated)
+            };
+
+        if let Some(payment_intent_update) = intent_status_update {
+            payment_data.payment_intent = state
+                .store
+                .update_payment_intent(
+                    payment_data.payment_intent,
+                    payment_intent_update,
+                    key_store,
+                    storage_scheme,
+                )
+                .await
+                .to_not_found_response(errors::ApiErrorResponse::PaymentNotFound)?;
+        }
+
+        state
+            .store
+            .update_payment_attempt_with_attempt_id(
+                payment_data.payment_attempt.clone(),
+                storage::PaymentAttemptUpdate::VoidUpdate {
+                    status: attempt_status_update,
+                    cancellation_reason: cancellation_reason.clone(),
+                    updated_by: storage_scheme.inner().to_string(),
+                },
+                storage_scheme,
+                key_store,
+            )
+            .await
+            .to_not_found_response(errors::ApiErrorResponse::PaymentNotFound)?;
+        req_state
+            .event_context
+            .event(AuditEvent::new(AuditEventType::PaymentCancelled {
+                cancellation_reason,
+            }))
+            .with(payment_data.to_event())
+            .emit();
+        Ok((Box::new(self), payment_data))
+    }
+}
+
+impl<F: Send + Clone + Sync> ValidateRequest<F, api::PaymentsCancelRequest, PaymentData<F>>
+    for PaymentCancel
+{
+    #[instrument(skip_all)]
+    fn validate_request<'a, 'b>(
+        &'b self,
+        request: &api::PaymentsCancelRequest,
+        processor: &'a domain::Processor,
+    ) -> RouterResult<(PaymentCancelOperation<'b, F>, operations::ValidateResult)> {
+        Ok((
+            Box::new(self),
+            operations::ValidateResult {
+                merchant_id: processor.get_account().get_id().to_owned(),
+                payment_id: api::PaymentIdType::PaymentIntentId(request.payment_id.to_owned()),
+                storage_scheme: processor.get_account().storage_scheme,
+                requeue: false,
+            },
+        ))
+    }
+}
+
+#[async_trait]
+impl<F: Clone + Send + Sync> Domain<F, api::PaymentsCancelRequest, PaymentData<F>>
+    for PaymentCancel
+{
+    #[instrument(skip_all)]
+    #[cfg(feature = "v1")]
+    async fn get_or_create_customer_details<'a>(
+        &'a self,
+        _state: &SessionState,
+        _payment_data: &mut PaymentData<F>,
+        _request: Option<CustomerDetails>,
+        _provider: &domain::Provider,
+        _initiator: Option<&domain::Initiator>,
+        _dimensions: &dimension_state::DimensionsWithProcessorAndProviderMerchantIdAndProfileId,
+        _mandate_type: Option<api::MandateTransactionType>,
+    ) -> CustomResult<(PaymentCancelOperation<'a, F>, Option<domain::Customer>), errors::StorageError>
+    {
+        // We don't need to fetch customer here.
+        // Customer details have already been populated in the payment_intent during Confirm
+        // The customer returned from this method is only used for updating connector_customer_id
+        // which does not happen in case of Cancel
+
+        Ok((Box::new(self), None))
+    }
+
+    #[instrument(skip_all)]
+    #[cfg(feature = "v2")]
+    async fn get_customer_details<'a>(
+        &'a self,
+        _state: &SessionState,
+        _payment_data: &mut PaymentData<F>,
+        _merchant_key_store: &domain::MerchantKeyStore,
+        storage_scheme: enums::MerchantStorageScheme,
+    ) -> CustomResult<(PaymentCancelOperation<'a, F>, Option<domain::Customer>), errors::StorageError>
+    {
+        todo!()
+    }
+
+    #[instrument(skip_all)]
+    async fn make_pm_data<'a>(
+        &'a self,
+        state: &'a SessionState,
+        payment_data: &mut PaymentData<F>,
+        _storage_scheme: enums::MerchantStorageScheme,
+        platform: &domain::Platform,
+        _business_profile: &domain::Profile,
+        _should_retry_with_pan: bool,
+    ) -> RouterResult<(
+        PaymentCancelOperation<'a, F>,
+        Option<domain::PaymentMethodData>,
+        Option<String>,
+    )> {
+        let payment_method_data = operations::get_or_fetch_payment_method_data_for_operation(
+            state,
+            platform,
+            &payment_data.payment_attempt,
+            payment_data.payment_method_data.clone(),
+        )
+        .await;
+
+        Ok((Box::new(self), payment_method_data, None))
+    }
+
+    async fn get_connector<'a>(
+        &'a self,
+        _processor: &domain::Processor,
+        state: &SessionState,
+        _request: &api::PaymentsCancelRequest,
+        _payment_intent: &storage::PaymentIntent,
+    ) -> CustomResult<api::ConnectorChoice, errors::ApiErrorResponse> {
+        helpers::get_connector_default(state, None).await
+    }
+
+    #[instrument(skip_all)]
+    async fn guard_payment_against_blocklist<'a>(
+        &'a self,
+        _state: &SessionState,
+        _processor: &domain::Processor,
+        _dimensions: &dimension_state::DimensionsWithProcessorAndProviderMerchantId,
+        _payment_data: &mut PaymentData<F>,
+        _business_profile: &domain::Profile,
+    ) -> CustomResult<bool, errors::ApiErrorResponse> {
+        Ok(false)
+    }
+}

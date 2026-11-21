@@ -1,0 +1,279 @@
+use common_utils::types::MinorUnit;
+
+#[cfg(feature = "v2")]
+use crate::business_profile::Profile;
+use crate::errors;
+
+/// Amounts that make up a refund. Older refunds have no surcharge component.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RefundAmountDetails {
+    refund_amount: MinorUnit,
+    #[serde(default)]
+    refund_surcharge_amount: Option<MinorUnit>,
+}
+
+impl RefundAmountDetails {
+    pub fn new(refund_amount: MinorUnit, refund_surcharge_amount: Option<MinorUnit>) -> Self {
+        Self {
+            refund_amount,
+            refund_surcharge_amount,
+        }
+    }
+
+    pub fn get_refund_amount(&self) -> MinorUnit {
+        self.refund_amount
+    }
+
+    pub fn get_refund_surcharge_amount(&self) -> Option<MinorUnit> {
+        self.refund_surcharge_amount
+    }
+
+    pub fn get_net_refund_amount(&self) -> MinorUnit {
+        self.refund_amount + self.refund_surcharge_amount.unwrap_or_default()
+    }
+
+    /// Values for the flat amount columns in the Diesel refund model.
+    pub fn into_storage_amounts(self) -> (MinorUnit, Option<MinorUnit>, MinorUnit) {
+        (
+            self.refund_amount,
+            self.refund_surcharge_amount,
+            self.get_net_refund_amount(),
+        )
+    }
+
+    pub fn get_remaining_refundable_amount(
+        amount_captured: MinorUnit,
+        previous_refunds: impl IntoIterator<Item = (diesel_models::enums::RefundStatus, Self)>,
+    ) -> MinorUnit {
+        let total_refunded: MinorUnit = previous_refunds
+            .into_iter()
+            .filter(|(status, _)| {
+                !matches!(
+                    status,
+                    diesel_models::enums::RefundStatus::Failure
+                        | diesel_models::enums::RefundStatus::TransactionFailure
+                )
+            })
+            .map(|(_, amount_details)| amount_details.get_net_refund_amount())
+            .sum();
+
+        amount_captured - total_refunded
+    }
+
+    pub fn exceeds_remaining_refundable_amount(
+        &self,
+        amount_captured: MinorUnit,
+        previous_refunds: impl IntoIterator<Item = (diesel_models::enums::RefundStatus, Self)>,
+    ) -> bool {
+        self.get_net_refund_amount()
+            > Self::get_remaining_refundable_amount(amount_captured, previous_refunds)
+    }
+}
+
+impl From<MinorUnit> for RefundAmountDetails {
+    fn from(refund_amount: MinorUnit) -> Self {
+        Self::new(refund_amount, None)
+    }
+}
+
+impl From<&diesel_models::refund::Refund> for RefundAmountDetails {
+    fn from(refund: &diesel_models::refund::Refund) -> Self {
+        Self::new(refund.refund_amount, refund.refund_surcharge_amount)
+    }
+}
+
+#[cfg(feature = "v1")]
+pub struct RefundListConstraints {
+    pub payment_id: Option<common_utils::id_type::PaymentId>,
+    pub refund_id: Option<String>,
+    pub profile_id: Option<Vec<common_utils::id_type::ProfileId>>,
+    pub limit: common_utils::types::list::PageSize,
+    pub offset: common_utils::types::list::PageOffset,
+    pub time_range: Option<common_utils::types::TimeRange>,
+    pub amount_filter: Option<api_models::payments::AmountFilter>,
+    pub connector: Option<Vec<String>>,
+    pub merchant_connector_id: Option<Vec<common_utils::id_type::MerchantConnectorAccountId>>,
+    pub currency: Option<Vec<common_enums::Currency>>,
+    pub refund_status: Option<Vec<common_enums::RefundStatus>>,
+    pub processor_merchant_id: Option<common_utils::id_type::MerchantId>,
+}
+
+#[cfg(feature = "v2")]
+pub struct RefundListConstraints {
+    pub payment_id: Option<common_utils::id_type::GlobalPaymentId>,
+    pub refund_id: Option<common_utils::id_type::GlobalRefundId>,
+    pub profile_id: common_utils::id_type::ProfileId,
+    pub limit: common_utils::types::list::PageSize,
+    pub offset: common_utils::types::list::PageOffset,
+    pub time_range: Option<common_utils::types::TimeRange>,
+    pub amount_filter: Option<api_models::payments::AmountFilter>,
+    pub connector: Option<Vec<String>>,
+    pub connector_id_list: Option<Vec<common_utils::id_type::MerchantConnectorAccountId>>,
+    pub currency: Option<Vec<common_enums::Currency>>,
+    pub refund_status: Option<Vec<common_enums::RefundStatus>>,
+}
+
+#[cfg(feature = "v1")]
+impl
+    TryFrom<(
+        api_models::refunds::RefundListRequest,
+        Option<Vec<common_utils::id_type::ProfileId>>,
+    )> for RefundListConstraints
+{
+    type Error = error_stack::Report<errors::api_error_response::ApiErrorResponse>;
+
+    fn try_from(
+        (value, auth_profile_id_list): (
+            api_models::refunds::RefundListRequest,
+            Option<Vec<common_utils::id_type::ProfileId>>,
+        ),
+    ) -> Result<Self, Self::Error> {
+        let api_models::refunds::RefundListRequest {
+            connector,
+            currency,
+            refund_status,
+            payment_id,
+            refund_id,
+            profile_id,
+            limit,
+            offset,
+            time_range,
+            amount_filter,
+            merchant_connector_id,
+        } = value;
+        let profile_id_from_request_body = profile_id;
+        let profile_id_list = match (profile_id_from_request_body, auth_profile_id_list) {
+            (None, None) => None,
+            (None, Some(auth_profile_id_list)) => Some(auth_profile_id_list),
+            (Some(profile_id_from_request_body), None) => Some(vec![profile_id_from_request_body]),
+            (Some(profile_id_from_request_body), Some(auth_profile_id_list)) => {
+                let profile_id_from_request_body_is_available_in_auth_profile_id_list =
+                    auth_profile_id_list.contains(&profile_id_from_request_body);
+
+                if profile_id_from_request_body_is_available_in_auth_profile_id_list {
+                    Some(vec![profile_id_from_request_body])
+                } else {
+                    // This scenario is very unlikely to happen
+                    return Err(error_stack::Report::new(
+                        errors::api_error_response::ApiErrorResponse::PreconditionFailed {
+                            message: format!(
+                                "Access not available for the given profile_id {profile_id_from_request_body:?}",
+
+                            ),
+                        },
+                    ));
+                }
+            }
+        };
+        Ok(Self {
+            payment_id,
+            refund_id,
+            profile_id: profile_id_list,
+            limit: limit.unwrap_or_default(),
+            offset,
+            time_range,
+            amount_filter,
+            connector,
+            merchant_connector_id,
+            currency,
+            refund_status,
+            processor_merchant_id: None,
+        })
+    }
+}
+
+#[cfg(feature = "v1")]
+impl From<api_models::refunds::PlatformRefundListRequest> for RefundListConstraints {
+    fn from(value: api_models::refunds::PlatformRefundListRequest) -> Self {
+        let api_models::refunds::PlatformRefundListRequest {
+            processor_merchant_id,
+            payment_id,
+            refund_id,
+            profile_id,
+            limit,
+            offset,
+            time_range,
+            start_amount,
+            end_amount,
+            connector,
+            merchant_connector_id,
+            currency,
+            refund_status,
+        } = value;
+        Self {
+            payment_id,
+            refund_id,
+            profile_id: profile_id.map(|profile_id| vec![profile_id]),
+            limit: limit.unwrap_or_default(),
+            offset,
+            time_range,
+            amount_filter: (start_amount.is_some() || end_amount.is_some()).then_some(
+                api_models::payments::AmountFilter {
+                    start_amount,
+                    end_amount,
+                },
+            ),
+            connector,
+            merchant_connector_id,
+            currency,
+            refund_status,
+            processor_merchant_id,
+        }
+    }
+}
+
+#[cfg(feature = "v2")]
+impl From<(api_models::refunds::RefundListRequest, Profile)> for RefundListConstraints {
+    fn from((value, profile): (api_models::refunds::RefundListRequest, Profile)) -> Self {
+        let api_models::refunds::RefundListRequest {
+            payment_id,
+            refund_id,
+            connector,
+            currency,
+            refund_status,
+            limit,
+            offset,
+            time_range,
+            amount_filter,
+            connector_id_list,
+        } = value;
+
+        Self {
+            payment_id,
+            refund_id,
+            profile_id: profile.get_id().to_owned(),
+            limit,
+            offset,
+            time_range,
+            amount_filter,
+            connector,
+            connector_id_list,
+            currency,
+            refund_status,
+        }
+    }
+}
+
+pub fn validate_surcharge_order_amount(
+    original: i64,
+    remaining: i64,
+    requested: i64,
+) -> Result<(), error_stack::Report<errors::api_error_response::ApiErrorResponse>> {
+    if requested > original {
+        return Err(error_stack::Report::new(
+            errors::api_error_response::ApiErrorResponse::PreconditionFailed {
+                message: "Requested refund amount is greater than the original order amount."
+                    .to_string(),
+            },
+        ));
+    }
+    if requested > remaining {
+        return Err(error_stack::Report::new(
+            errors::api_error_response::ApiErrorResponse::PreconditionFailed {
+                message: "Requested refund amount exceeds the remaining refundable order amount."
+                    .to_string(),
+            },
+        ));
+    }
+    Ok(())
+}

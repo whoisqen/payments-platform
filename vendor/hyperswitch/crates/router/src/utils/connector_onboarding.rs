@@ -1,0 +1,154 @@
+use diesel_models::{ConfigNew, ConfigUpdate};
+use error_stack::ResultExt;
+
+use super::errors::StorageErrorExt;
+use crate::{
+    consts,
+    core::{
+        errors::{ApiErrorResponse, NotImplementedMessage, RouterResult},
+        utils::validate_profile_id_from_auth_layer,
+    },
+    routes::{app::settings, SessionState},
+    types::{self, api::enums},
+};
+
+pub mod paypal;
+
+pub fn get_connector_auth(
+    connector: enums::Connector,
+    connector_data: &settings::ConnectorOnboarding,
+) -> RouterResult<types::ConnectorAuthType> {
+    match connector {
+        enums::Connector::Paypal => Ok(types::ConnectorAuthType::BodyKey {
+            api_key: connector_data.paypal.client_secret.clone(),
+            key1: connector_data.paypal.client_id.clone(),
+        }),
+        _ => Err(ApiErrorResponse::NotImplemented {
+            message: NotImplementedMessage::Reason(format!(
+                "Onboarding is not implemented for {connector}",
+            )),
+        }
+        .into()),
+    }
+}
+
+pub fn is_enabled(
+    connector: types::Connector,
+    conf: &settings::ConnectorOnboarding,
+) -> Option<bool> {
+    match connector {
+        enums::Connector::Paypal => Some(conf.paypal.enabled),
+        _ => None,
+    }
+}
+
+pub async fn check_if_connector_exists(
+    state: &SessionState,
+    connector_id: &common_utils::id_type::MerchantConnectorAccountId,
+    merchant_id: &common_utils::id_type::MerchantId,
+    profile_id: Option<common_utils::id_type::ProfileId>,
+) -> RouterResult<()> {
+    let key_store_master_key = state.store.get_master_key().to_vec().into();
+    let key_store = state
+        .accounts_store
+        .get_merchant_key_store_by_merchant_id(merchant_id, &key_store_master_key)
+        .await
+        .to_not_found_response(ApiErrorResponse::MerchantAccountNotFound)?;
+
+    #[cfg(feature = "v1")]
+    {
+        let connector = state
+            .accounts_store
+            .find_by_merchant_connector_account_merchant_id_merchant_connector_id(
+                merchant_id,
+                connector_id,
+                &key_store,
+            )
+            .await
+            .to_not_found_response(ApiErrorResponse::MerchantConnectorAccountNotFound {
+                id: connector_id.get_string_repr().to_string(),
+            })?;
+        validate_profile_id_from_auth_layer(profile_id, &connector)?;
+    }
+
+    #[cfg(feature = "v2")]
+    {
+        let _ = connector_id;
+        let _ = key_store;
+        let _ = profile_id;
+        todo!()
+    };
+
+    Ok(())
+}
+
+pub async fn set_tracking_id_in_configs(
+    state: &SessionState,
+    connector_id: &common_utils::id_type::MerchantConnectorAccountId,
+    connector: enums::Connector,
+) -> RouterResult<()> {
+    let timestamp = common_utils::date_time::now_unix_timestamp().to_string();
+    let find_config = state
+        .store
+        .find_config_by_key_optional(&build_key(connector_id, connector))
+        .await
+        .change_context(ApiErrorResponse::InternalServerError)
+        .attach_printable("Error fetching data from configs table")?;
+
+    if find_config.is_some() {
+        state
+            .store
+            .update_config_by_key(
+                &build_key(connector_id, connector),
+                ConfigUpdate::Update {
+                    config: Some(timestamp),
+                },
+            )
+            .await
+            .change_context(ApiErrorResponse::InternalServerError)
+            .attach_printable("Error updating data in configs table")?;
+    } else {
+        state
+            .store
+            .insert_config(ConfigNew {
+                key: build_key(connector_id, connector),
+                config: timestamp,
+            })
+            .await
+            .change_context(ApiErrorResponse::InternalServerError)
+            .attach_printable("Error inserting data in configs table")?;
+    }
+
+    Ok(())
+}
+
+pub async fn get_tracking_id_from_configs(
+    state: &SessionState,
+    connector_id: &common_utils::id_type::MerchantConnectorAccountId,
+    connector: enums::Connector,
+) -> RouterResult<String> {
+    let timestamp = state
+        .store
+        .find_config_by_key_unwrap_or(
+            &build_key(connector_id, connector),
+            common_utils::date_time::now_unix_timestamp().to_string(),
+        )
+        .await
+        .change_context(ApiErrorResponse::InternalServerError)
+        .attach_printable("Error getting data from configs table")?
+        .config;
+
+    Ok(format!("{}_{}", connector_id.get_string_repr(), timestamp))
+}
+
+fn build_key(
+    connector_id: &common_utils::id_type::MerchantConnectorAccountId,
+    connector: enums::Connector,
+) -> String {
+    format!(
+        "{}_{}_{}",
+        consts::CONNECTOR_ONBOARDING_CONFIG_PREFIX,
+        connector,
+        connector_id.get_string_repr(),
+    )
+}

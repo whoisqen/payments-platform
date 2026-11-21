@@ -1,0 +1,200 @@
+use std::{collections::HashMap, str::FromStr};
+
+use api_models::enums as api_enums;
+use common_utils::link_utils::EnabledPaymentMethod;
+
+#[cfg(all(feature = "v1", feature = "olap"))]
+use crate::types::transformers::ForeignInto;
+#[cfg(feature = "olap")]
+use crate::types::{api::payments, domain, storage};
+use crate::{
+    settings::PayoutRequiredFields,
+    types::{api, transformers::ForeignFrom},
+};
+
+#[cfg(all(feature = "v2", feature = "olap"))]
+impl
+    ForeignFrom<(
+        storage::Payouts,
+        storage::PayoutAttempt,
+        Option<domain::Customer>,
+        Option<payments::Address>,
+    )> for api::PayoutCreateResponse
+{
+    fn foreign_from(
+        item: (
+            storage::Payouts,
+            storage::PayoutAttempt,
+            Option<domain::Customer>,
+            Option<payments::Address>,
+        ),
+    ) -> Self {
+        todo!()
+    }
+}
+
+#[cfg(all(feature = "v1", feature = "olap"))]
+impl
+    ForeignFrom<(
+        storage::Payouts,
+        storage::PayoutAttempt,
+        Option<domain::Customer>,
+        Option<payments::Address>,
+    )> for api::PayoutCreateResponse
+{
+    fn foreign_from(
+        item: (
+            storage::Payouts,
+            storage::PayoutAttempt,
+            Option<domain::Customer>,
+            Option<payments::Address>,
+        ),
+    ) -> Self {
+        let (payout, payout_attempt, customer, address) = item;
+        let attempt = api::PayoutAttemptResponse {
+            attempt_id: payout_attempt.payout_attempt_id,
+            status: payout_attempt.status,
+            amount: payout.amount,
+            currency: Some(payout.destination_currency),
+            connector: payout_attempt.connector.clone(),
+            error_code: payout_attempt.error_code.clone(),
+            error_message: payout_attempt.error_message.clone(),
+            payment_method: payout.payout_type,
+            payout_method_type: payout_attempt
+                .additional_payout_method_data
+                .as_ref()
+                .map(From::from),
+            connector_transaction_id: payout_attempt.connector_payout_id,
+            cancellation_reason: None,
+            unified_code: None,
+            unified_message: None,
+        };
+        let sender_details = payout.get_optional_sender_details().cloned();
+        Self {
+            payout_id: payout.payout_id,
+            merchant_id: payout.merchant_id,
+            merchant_connector_id: payout_attempt.merchant_connector_id,
+            merchant_order_reference_id: payout_attempt.merchant_order_reference_id.clone(),
+            amount: payout.amount,
+            currency: payout.destination_currency,
+            connector: payout_attempt.connector,
+            payout_type: payout.payout_type,
+            auto_fulfill: payout.auto_fulfill,
+            customer_id: customer.as_ref().map(|cust| cust.get_id().clone()),
+            customer: customer.as_ref().map(|cust| cust.foreign_into()),
+            return_url: payout.return_url,
+            business_country: payout_attempt.business_country,
+            business_label: payout_attempt.business_label,
+            description: payout.description,
+            billing_descriptor: payout.billing_descriptor,
+            entity_type: payout.entity_type,
+            recurring: payout.recurring,
+            metadata: payout.metadata,
+            funds_transfer_type: payout.funds_transfer_type,
+            purpose: payout.purpose,
+            sender_details,
+            status: payout_attempt.status,
+            error_message: payout_attempt.error_message,
+            error_code: payout_attempt.error_code,
+            frm_message: None,
+            profile_id: payout.profile_id,
+            created: Some(payout.created_at),
+            connector_transaction_id: attempt.connector_transaction_id.clone(),
+            connector_eligibility_reference_id: payout_attempt.connector_eligibility_reference_id,
+            priority: payout.priority,
+            billing: address,
+            payout_method_data: payout_attempt.additional_payout_method_data.map(From::from),
+            source_bank_data: payout_attempt.additional_source_bank_data,
+            client_secret: None,
+            payout_link: None,
+            unified_code: attempt.unified_code.clone(),
+            unified_message: attempt.unified_message.clone(),
+            attempts: Some(vec![attempt]),
+            email: customer
+                .as_ref()
+                .and_then(|customer| customer.email.clone()),
+            name: customer.as_ref().and_then(|customer| customer.name.clone()),
+            phone: customer
+                .as_ref()
+                .and_then(|customer| customer.phone.clone()),
+            phone_country_code: customer
+                .as_ref()
+                .and_then(|customer| customer.phone_country_code.clone()),
+            payout_method_id: payout.payout_method_id,
+        }
+    }
+}
+
+#[cfg(feature = "v1")]
+impl
+    ForeignFrom<(
+        &PayoutRequiredFields,
+        Vec<EnabledPaymentMethod>,
+        HashMap<(api_enums::PaymentMethod, api_enums::PaymentMethodType), Vec<String>>,
+        api::RequiredFieldsOverrideRequest,
+    )> for Vec<api::PayoutEnabledPaymentMethodsInfo>
+{
+    fn foreign_from(
+        (payout_required_fields, enabled_payout_methods, connector_per_pmt, value_overrides): (
+            &PayoutRequiredFields,
+            Vec<EnabledPaymentMethod>,
+            HashMap<(api_enums::PaymentMethod, api_enums::PaymentMethodType), Vec<String>>,
+            api::RequiredFieldsOverrideRequest,
+        ),
+    ) -> Self {
+        let value_overrides = value_overrides.flat_struct();
+
+        enabled_payout_methods
+            .into_iter()
+            .map(|enabled_payout_method| {
+                let payment_method = enabled_payout_method.payment_method;
+                let payment_method_types_info = enabled_payout_method
+                    .payment_method_types
+                    .into_iter()
+                    .map(|pmt| {
+                        let required_fields = payout_required_fields
+                            .0
+                            .get(&payment_method)
+                            .and_then(|pmt_info| pmt_info.0.get(&pmt))
+                            .map(|connector_fields| {
+                                let mut merged: HashMap<String, _> = HashMap::new();
+                                // Union required fields from all configured connectors for this PMT.
+                                // This ensures the SDK collects every field that any eligible
+                                // connector might need, regardless of which one routing picks.
+                                if let Some(connector_names) =
+                                    connector_per_pmt.get(&(payment_method, pmt))
+                                {
+                                    for name in connector_names {
+                                        if let Some(rff) = api_enums::Connector::from_str(name)
+                                            .ok()
+                                            .and_then(|c| connector_fields.fields.get(&c))
+                                        {
+                                            merged.extend(rff.common.clone());
+                                        }
+                                    }
+                                }
+                                for (key, value) in &value_overrides {
+                                    merged.entry(key.to_string()).and_modify(|rf| {
+                                        rf.value = Some(hyperswitch_masking::Secret::new(
+                                            value.to_string(),
+                                        ));
+                                    });
+                                }
+                                merged
+                            });
+
+                        api::PaymentMethodTypeInfo {
+                            payment_method_type: pmt,
+                            required_fields: required_fields.filter(|f| !f.is_empty()),
+                        }
+                    })
+                    .collect();
+
+                api::PayoutEnabledPaymentMethodsInfo {
+                    payment_method,
+                    payment_method_types_info,
+                }
+            })
+            .collect()
+    }
+}

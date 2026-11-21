@@ -1,0 +1,234 @@
+use josekit::{jwe, jws};
+
+use crate::{
+    crypto::encryption_manager::encryption_interface::Encryption,
+    error::{self, ContainerError},
+};
+
+/// Holds the RSA key material for the JWE/JWS envelope in its *parsed* form.
+///
+/// Deriving a signer/verifier/encrypter/decrypter from PEM costs a base64 decode, an
+/// ASN.1 parse and an RSA key setup each. Doing that per request dominated the envelope
+/// cost, so the four are derived once at construction and reused. This holds no key
+/// material the process was not already holding: the PEM itself lives for the same
+/// lifetime, and caching the parsed form means fewer copies on the heap, not more.
+pub struct JWEncryption {
+    signer: jws::alg::rsassa::RsassaJwsSigner,
+    verifier: jws::alg::rsassa::RsassaJwsVerifier,
+    encrypter: jwe::alg::rsaes::RsaesJweEncrypter,
+    decrypter: jwe::alg::rsaes::RsaesJweDecrypter,
+}
+
+impl JWEncryption {
+    /// Sign a payload without encrypting it, using the cached signing key.
+    pub fn sign(&self, payload: &[u8]) -> Result<JwsBody, ContainerError<error::CryptoError>> {
+        let encoded = jws_sign_payload(payload, &self.signer)?;
+        JwsBody::from_dotted_str(&encoded)
+            .ok_or_else(|| error::CryptoError::InvalidData("JWS encoded data is incomplete").into())
+    }
+
+    pub fn new(
+        private_key: String,
+        public_key: String,
+        enc_algo: jwe::alg::rsaes::RsaesJweAlgorithm,
+        dec_algo: jwe::alg::rsaes::RsaesJweAlgorithm,
+    ) -> Result<Self, error::CryptoError> {
+        Ok(Self {
+            signer: jws::RS256.signer_from_pem(private_key.as_bytes())?,
+            verifier: jws::RS256.verifier_from_pem(public_key.as_bytes())?,
+            encrypter: enc_algo.encrypter_from_pem(public_key.as_bytes())?,
+            decrypter: dec_algo.decrypter_from_pem(private_key.as_bytes())?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JwsBody {
+    pub header: String,
+    pub payload: String,
+    pub signature: String,
+}
+
+impl JwsBody {
+    fn from_dotted_str(input: &str) -> Option<Self> {
+        let mut data = input.split('.');
+        let header = data.next()?.to_string();
+        let payload = data.next()?.to_string();
+        let signature = data.next()?.to_string();
+        Some(Self {
+            header,
+            payload,
+            signature,
+        })
+    }
+
+    pub fn get_dotted_jws(self) -> String {
+        let header = self.header;
+        let payload = self.payload;
+        let signature = self.signature;
+        format!("{header}.{payload}.{signature}")
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct JweBody {
+    pub header: String,
+    pub iv: String,
+    pub encrypted_payload: String,
+    pub tag: String,
+    pub encrypted_key: String,
+}
+
+impl JweBody {
+    fn from_str(input: &str) -> Option<Self> {
+        let mut data = input.split('.');
+        let header = data.next()?.to_string();
+        let encrypted_key = data.next()?.to_string();
+        let iv = data.next()?.to_string();
+        let encrypted_payload = data.next()?.to_string();
+        let tag = data.next()?.to_string();
+        Some(Self {
+            header,
+            iv,
+            encrypted_payload,
+            tag,
+            encrypted_key,
+        })
+    }
+
+    pub fn get_dotted_jwe(self) -> String {
+        let header = self.header;
+        let encryption_key = self.encrypted_key;
+        let iv = self.iv;
+        let encryption_payload = self.encrypted_payload;
+        let tag = self.tag;
+        format!("{header}.{encryption_key}.{iv}.{encryption_payload}.{tag}")
+    }
+}
+
+impl Encryption<Vec<u8>, JweBody> for JWEncryption {
+    type ReturnType<'a, T> = Result<T, ContainerError<error::CryptoError>>;
+
+    fn encrypt(&self, input: Vec<u8>) -> Self::ReturnType<'_, JweBody> {
+        let jws_body = self.sign(&input)?;
+        let jws_payload = serde_json::to_vec(&jws_body).map_err(error::CryptoError::from)?;
+        let jwe_encrypted = encrypt_jwe(&jws_payload, &self.encrypter)?;
+        let jwe_body = JweBody::from_str(&jwe_encrypted)
+            .ok_or(error::CryptoError::InvalidData("JWE data incomplete"))?;
+        Ok(jwe_body)
+    }
+
+    fn decrypt(&self, input: JweBody) -> Self::ReturnType<'_, Vec<u8>> {
+        let jwe_encoded = input.get_dotted_jwe();
+        let jwe_decrypted = decrypt_jwe(&jwe_encoded, &self.decrypter)?;
+
+        let jws_parsed: JwsBody = serde_json::from_str(&jwe_decrypted)
+            .map_err(|_| error::CryptoError::InvalidData("Failed while extracting jws body"))?;
+
+        let jws_encoded = jws_parsed.get_dotted_jws();
+        let output = verify_sign(jws_encoded, &self.verifier)?;
+        Ok(output.as_bytes().to_vec())
+    }
+}
+
+pub fn jws_sign_payload(
+    payload: &[u8],
+    signer: &jws::alg::rsassa::RsassaJwsSigner,
+) -> Result<String, error::CryptoError> {
+    let src_header = jws::JwsHeader::new();
+    Ok(jws::serialize_compact(payload, &src_header, signer)?)
+}
+
+pub fn encrypt_jwe(
+    payload: &[u8],
+    encrypter: &jwe::alg::rsaes::RsaesJweEncrypter,
+) -> Result<String, error::CryptoError> {
+    let enc = "A256GCM";
+    let mut src_header = jwe::JweHeader::new();
+    src_header.set_content_encryption(enc);
+    src_header.set_token_type("JWT");
+
+    Ok(jwe::serialize_compact(payload, &src_header, encrypter)?)
+}
+
+pub fn decrypt_jwe(
+    jwt: &str,
+    decrypter: &jwe::alg::rsaes::RsaesJweDecrypter,
+) -> Result<String, error::CryptoError> {
+    let (dst_payload, _dst_header) = jwe::deserialize_compact(jwt, decrypter)?;
+
+    Ok(String::from_utf8(dst_payload)?)
+}
+
+pub fn verify_sign(
+    jws_body: String,
+    verifier: &jws::alg::rsassa::RsassaJwsVerifier,
+) -> Result<String, error::CryptoError> {
+    let input = jws_body.as_bytes();
+    let (dst_payload, _dst_header) = jws::deserialize_compact(input, verifier)?;
+    let resp = String::from_utf8(dst_payload)?;
+    Ok(resp)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use rand::rngs::OsRng;
+    use rsa::{
+        RsaPrivateKey, RsaPublicKey,
+        pkcs8::{EncodePrivateKey, EncodePublicKey},
+    };
+
+    use super::*;
+
+    fn generate_rsa_key_pair() -> (String, String) {
+        let mut rng = OsRng;
+        let bits = 2048;
+        let private_key =
+            RsaPrivateKey::new(&mut rng, bits).expect("Failed to generate RSA private key");
+        let public_key = RsaPublicKey::from(&private_key);
+
+        let private_key_pem = private_key
+            .to_pkcs8_pem(Default::default())
+            .expect("Failed to convert private key to PEM")
+            .to_string();
+        let public_key_pem = public_key
+            .to_public_key_pem(Default::default())
+            .expect("Failed to convert public key to PEM")
+            .to_string();
+
+        (private_key_pem, public_key_pem)
+    }
+
+    #[test]
+    fn test_jwe() {
+        let (private_key, public_key) = generate_rsa_key_pair();
+        let encrypter = jwe::RSA_OAEP
+            .encrypter_from_pem(public_key.as_bytes())
+            .expect("Failed to derive the JWE encrypter");
+        let decrypter = jwe::RSA_OAEP
+            .decrypter_from_pem(private_key.as_bytes())
+            .expect("Failed to derive the JWE decrypter");
+
+        let jwt = encrypt_jwe("request_payload".as_bytes(), &encrypter).unwrap();
+        let payload = decrypt_jwe(&jwt, &decrypter).unwrap();
+        assert_eq!("request_payload".to_string(), payload)
+    }
+
+    #[test]
+    fn test_jws() {
+        let (private_key, public_key) = generate_rsa_key_pair();
+        let signer = jws::RS256
+            .signer_from_pem(private_key.as_bytes())
+            .expect("Failed to derive the JWS signer");
+        let verifier = jws::RS256
+            .verifier_from_pem(public_key.as_bytes())
+            .expect("Failed to derive the JWS verifier");
+
+        let jwt = jws_sign_payload("jws payload".as_bytes(), &signer).unwrap();
+        let payload = verify_sign(jwt, &verifier).unwrap();
+        assert_eq!("jws payload".to_string(), payload)
+    }
+}

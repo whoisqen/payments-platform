@@ -1,0 +1,75 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "postgres://sam:damn@localhost/locker"
+
+[secrets]
+tenant = "hyperswitch"
+
+locker_private_key = ""
+
+[tenant_secrets]
+hyperswitch = { master_key = "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308", public_key = "", schema = "public", redis_key_prefix = "" }
+
+[secrets_management]
+secrets_manager = "no_encryption"
+
+[secrets_management.aws_kms]
+key_id = "us-west-2"
+region = "abc"
+
+[secrets_management.gcp_kms]
+project_id = "my-project"
+location_id = "global"
+key_ring_id = "my-key-ring"
+key_id = "my-key"
+
+[secrets_management.oci_kms]
+vault_crypto_endpoint = "https://my-vault-crypto.kms.ap-hyderabad-1.oci.oraclecloud.com"
+key_id = "ocid1.key.oc1.ap-hyderabad-1.my-key"
+
+[tls]
+certificate = "cert.pem"
+private_key = "key.pem"
+
+[api_client]
+client_idle_timeout = 90
+pool_max_idle_per_host = 10
+identity = ""
+
+[external_key_manager]
+mode = "disabled"
+url = "http://localhost:5000"
+cert = ""
+
+[redis]
+host = "127.0.0.1"
+port = 6379
+pool_size = 5
+reconnect_max_attempts = 0
+reconnect_delay = 200
+default_ttl = 300
+default_hash_ttl = 900
+use_legacy_version = false
+stream_read_count = 1
+auto_pipeline = true
+broadcast_channel_capacity = 32
+disable_auto_backpressure = false
+max_in_flight_commands = 5000
+default_command_timeout = 30
+unresponsive_timeout = 10
+unresponsive_check_interval = 2
+max_feed_count = 200
+max_failure_threshold_seconds = 5
+
+[kv]
+drainer_stream_suffix = "DRAINER_STREAM"
+drainer_num_partitions = 16
+ttl_for_kv = 900
+
+[metrics]
+mode = "prometheus"
+host = "0.0.0.0"
+port = 9090
