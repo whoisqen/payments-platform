@@ -1,0 +1,3 @@
+#!/bin/sh
+# Install once per clone: git config core.hooksPath tools/scripts/git-hooks
+exec python3 "$(git rev-parse --show-toplevel)/tools/lint/spec-gate" --msg "$1"

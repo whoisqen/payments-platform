@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Validate .claude/orchestration.yaml against the real file tree and the agent definitions."""
+import os
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude-hooks"))
+from _common import ROOT, matches, orchestration, owned  # noqa: E402
+
+strict = "--strict" in sys.argv
+errors, warnings = [], []
+cfg = orchestration()
+SKIP = {".git", "node_modules", "__pycache__"}
+
+files = []
+for d, dirs, names in os.walk(ROOT):
+    dirs[:] = [x for x in dirs if x not in SKIP]
+    for n in names:
+        files.append((Path(d) / n).relative_to(ROOT).as_posix())
+
+shared = ("humans_only", "ci_only", "integrator_only")
+for f in files:
+    owners = [a for a in cfg["agents"] if owned(cfg, a, f)]
+    groups = [g for g in shared if matches(f, cfg[g])]
+    if len(owners) > 1:
+        errors.append(f"{f}: owned by several agents {owners}")
+    # all three groups are carve-outs: the write hook checks them before owns
+    if groups:
+        owners = []
+    if not owners and not groups:
+        warnings.append(f"{f}: no owner and not in humans_only/ci_only/integrator_only")
+
+READ_ONLY = {"Read", "Grep", "Glob"}
+for kind, model in (("implement", "sonnet"), ("plan", "opus"), ("review", "opus")):
+    for p in sorted((ROOT / ".claude" / "agents" / kind).glob("*.md")):
+        text = p.read_text(encoding="utf-8")
+        name = re.search(r"^name:\s*(\S+)", text, re.M)
+        mod = re.search(r"^model:\s*(\S+)", text, re.M)
+        tools = re.search(r"^tools:\s*(.*)$", text, re.M)
+        if not name or name.group(1) != p.stem:
+            errors.append(f"{p.name}: frontmatter name must equal the file name")
+        if not mod or mod.group(1) != model:
+            errors.append(f"{p.name}: model must be {model}")
+        if kind == "review":
+            if not tools:
+                errors.append(f"{p.name}: reviewers must declare tools (a missing line inherits every tool)")
+            elif not {x.strip() for x in tools.group(1).split(",")} <= READ_ONLY:
+                errors.append(f"{p.name}: reviewers may only use {sorted(READ_ONLY)}")
+        if kind in ("implement", "plan") and p.stem not in cfg["agents"]:
+            errors.append(f"{p.name}: agent is not declared in orchestration.yaml")
+def probe(pattern):
+    return pattern.replace("**", "x").replace("*", "x")
+
+
+for a, ao in cfg["agents"].items():
+    for b, bo in cfg["agents"].items():
+        if a < b and ao and bo:
+            for pat in ao:
+                if owned(cfg, b, probe(pat)) and owned(cfg, a, probe(pat)):
+                    errors.append(f"owns overlap between {a} and {b} at `{pat}`")
+for a in cfg["agents"]:
+    if not list((ROOT / ".claude" / "agents").glob(f"*/{a}.md")):
+        errors.append(f"agent {a}: no definition under .claude/agents/")
+
+
+text = (ROOT / ".claude" / "orchestration.yaml").read_text(encoding="utf-8")
+names = {p.stem for p in (ROOT / ".claude" / "agents").glob("*/*.md")}
+for ref in sorted(set(re.findall(r"agent:\s*([\w-]+)", text))):
+    if ref not in names:
+        errors.append(f"pipeline references agent `{ref}` that has no definition under .claude/agents/")
+for cmd in ("spec", "implement", "review"):
+    if not (ROOT / ".claude" / "commands" / f"{cmd}.md").exists():
+        errors.append(f"missing command .claude/commands/{cmd}.md")
+for e in errors:
+    print("orchestration-lint: error:", e)
+for w in warnings[: (None if strict else 15)]:
+    print("orchestration-lint: " + ("error" if strict else "warning") + ":", w)
+if warnings and not strict:
+    print(f"orchestration-lint: {len(warnings)} unowned file(s) in total (use --strict to fail on them)")
+failed = bool(errors) or (strict and bool(warnings))
+print(f"orchestration-lint: {len(errors)} error(s), {len(warnings)} warning(s)")
+sys.exit(1 if failed else 0)

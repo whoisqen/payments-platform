@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""Spec gate for commits: Conventional Commits format plus a link to an approved specification task.
+
+  spec-gate --msg FILE      commit-msg hook: checks FILE against the staged files
+  spec-gate --range A..B    CI: checks every non-merge commit in the range
+"""
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude-hooks"))
+import _common  # noqa: E402
+from _common import matches  # noqa: E402
+
+ROOT = _common.ROOT
+TYPES = "feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+SCOPES = "router drainer scheduler locker control-center infra deploy policy observability docker ci claude docs vendor specs".split()
+EXEMPT = [".claude/**", ".mcp.json", "CLAUDE.md", "specs/_templates/**", "specs/README.md",
+          "policy/cde-paths.yaml", "README.md", "LICENSE", ".gitignore", "**/README.md"]
+AI = [r"co-authored-by:.*(claude|anthropic)", r"generated with .*claude", r"claude\.com/claude-code",
+      r"claude\.ai/code", r"noreply@anthropic\.com"]
+OPEN = ("approved", "in-progress")
+errors = []
+
+
+def git(*args):
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout
+
+
+def show(rev, path):
+    if rev is None:
+        f = ROOT / path
+        return f.read_text(encoding="utf-8") if f.is_file() else None
+    p = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT, capture_output=True, text=True)
+    return p.stdout if p.returncode == 0 else None
+
+
+def has_specs(rev):
+    if rev is None:
+        # The index decides: an untracked draft must not close the bootstrap window.
+        return bool(re.search(r"^specs/\d{3}-", git("ls-files", "--cached", "specs/"), re.M))
+    return bool(re.search(r"^\d{3}-", git("ls-tree", "--name-only", rev, "specs/").replace("specs/", ""), re.M))
+
+
+def cde_patterns(rev):
+    text = show(rev, "policy/cde-paths.yaml") or ""
+    return re.findall(r"^\s*-\s*([^\s#]+)\s*(?:#.*)?$", text, re.M)
+
+
+def task_issue(text, tid):
+    for blk in re.findall(r"```yaml\n(.*?)```", text, re.S):
+        for item in re.split(r"(?m)^- ", blk):
+            if re.match(rf"id:\s*{re.escape(tid)}\s*$", item, re.M):
+                m = re.search(r"^\s*issue:\s*(\S+)", item, re.M)
+                return m.group(1).strip("\"'") if m else ""
+    return ""
+
+
+def task_paths(text, tid):
+    for blk in re.findall(r"```yaml\n(.*?)```", text, re.S):
+        for item in re.split(r"(?m)^- ", blk):
+            if re.match(rf"id:\s*{re.escape(tid)}\s*$", item, re.M):
+                m = re.search(r"^\s*paths:\s*\[(.*?)\]", item, re.M | re.S)
+                return [x.strip().strip("\"'") for x in m.group(1).split(",") if x.strip()] if m else []
+    return None
+
+
+def trailers_of(msg):
+    return dict(re.findall(r"^([A-Z][\w-]*):\s*(.+)$", msg, re.M))
+
+
+def check(msg, files, rev, label):
+    def err(m):
+        errors.append(f"{label}: {m}")
+
+    # A baseline requirements file is changed only through an addendum.
+    old = "HEAD" if rev is None else f"{rev}^"
+    for f in files:
+        if re.fullmatch(r"docs/requirements/[^/]+\.md", f) and f != "docs/requirements/README.md":
+            before = show(old, f)
+            if before and re.search(r"^status:\s*baseline\s*$", before.split("\n---\n")[0], re.M):
+                err(f"{f} is a baseline; add an addendum in docs/requirements/addenda/ instead of editing it")
+
+    lines = [x for x in msg.splitlines() if not x.startswith("#")]
+    subject = lines[0] if lines else ""
+    if not re.fullmatch(rf"({TYPES})\(({'|'.join(SCOPES)})\)!?: [a-z].*", subject):
+        err(f"subject must be `type(scope): summary` with a scope from {SCOPES} and a summary starting with a lower-case letter")
+    if len(subject) > 72:
+        err("subject is longer than 72 characters")
+    if any(re.search(p, msg, re.I) for p in AI):
+        err("AI co-authorship marks are forbidden")
+    trailers = dict(re.findall(r"^([A-Z][\w-]*):\s*(.+)$", msg, re.M))
+    # The first baseline is confirmed by the gate; before it exists there are no addenda.
+    def is_baseline(body):
+        return bool(body and re.search(r"^status:\s*baseline\s*$", body.split("\n---\n")[0], re.M))
+
+    names = git("ls-tree", "--name-only", old, "docs/requirements/").split()
+    have_baseline = any(is_baseline(show(old, n)) for n in names if n.endswith(".md"))
+    for f in files:
+        if re.fullmatch(r"docs/requirements/[^/]+\.md", f) and is_baseline(show(rev, f)) and not is_baseline(show(old, f)):
+            if not re.fullmatch(r"specs/\d{3}-[a-z0-9-]+#T\d+", trailers_of(msg).get("Spec", "")):
+                err(f"{f} becomes a baseline: it needs `Spec: specs/NNN-slug#Tn` and no exemption")
+        if re.fullmatch(r"docs/requirements/addenda/\d{3}-[a-z0-9-]+\.md", f) and not have_baseline:
+            err(f"{f}: addenda start only after the first baseline of the SRS has passed the gate")
+
+    # Re-validation: an addendum that makes a cited requirement change must find its affected specifications re-validated.
+    if any(re.fullmatch(r"docs/requirements/addenda/\d{3}-[a-z0-9-]+\.md", f) for f in files) and rev is None:
+        r = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "srs-lint")], cwd=ROOT, capture_output=True,
+                           text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
+        if r.returncode:
+            err("srs-lint fails with this addendum:\n" + r.stdout.strip())
+
+    # An addendum enters the SRS only through a commit that passes the gate for its own specification.
+    for f in files:
+        if re.fullmatch(r"docs/requirements/addenda/\d{3}-[a-z0-9-]+\.md", f):
+            body = show(rev, f)
+            want = re.search(r"^spec:\s*(\S+)", body or "", re.M)
+            got = re.match(r"(specs/\d{3}-[a-z0-9-]+)#T\d+$", trailers.get("Spec", ""))
+            if body is not None and (not want or not got or got.group(1) != want.group(1)):
+                err(f"{f} needs `Spec: <its own spec>#Tn`; an addendum is never exempt from the gate")
+    def own_spec_file(f):
+        # The files of a draft or approved specification are edited through the human gate, not under a Spec trailer.
+        m = re.match(r"(specs/\d{3}-[a-z0-9-]+)/", f)
+        st = re.search(r"^status:\s*(\S+)", show(rev, f"{m.group(1)}/spec.md") or "", re.M) if m else None
+        return bool(st and st.group(1) in ("draft", "approved"))
+
+    gated = [f for f in files if not matches(f, EXEMPT) and not own_spec_file(f) and not re.fullmatch(r"specs/\d{3}-[a-z0-9-]+/progress/T\d+\.md", f)]
+    if any(matches(f, cde_patterns(rev)) for f in files) and trailers.get("PCI-Impact") not in ("none", "yes"):
+        err("a commit on a CDE path needs the trailer `PCI-Impact: none|yes`")
+    spec = trailers.get("Spec", "")
+    if not gated:
+        return
+    if spec == "none":
+        if trailers.get("Spec-Exempt") == "bootstrap" and not has_specs(rev):
+            return
+        if (trailers.get("Spec-Exempt") == "upstream-import" and subject.startswith("chore(vendor):")
+                and all(f.startswith("vendor/") for f in gated)):
+            return
+        err("`Spec: none` is allowed only with `Spec-Exempt: bootstrap` before the first specification exists, or `Spec-Exempt: upstream-import` on chore(vendor)")
+        return
+    m = re.fullmatch(r"(specs/\d{3}-[a-z0-9-]+)#(T\d+)", spec)
+    if not m:
+        err(f"non-exempt files changed ({gated[:3]}...): add the trailer `Spec: specs/NNN-slug#Tn`")
+        return
+    sdir, tid = m.groups()
+    text = show(rev, f"{sdir}/spec.md")
+    if text is None:
+        err(f"{sdir}/spec.md does not exist")
+        return
+    status = re.search(r"^status:\s*(\S+)", text, re.M)
+    if not status or status.group(1) not in OPEN:
+        err(f"{sdir} has status `{status.group(1) if status else '?'}`; it must be approved or in-progress")
+    tasks_text = show(rev, f"{sdir}/tasks.md") or ""
+    if not re.fullmatch(r"#[1-9]\d*", task_issue(tasks_text, tid)):
+        err(f"task {tid} has no GitHub issue yet; create the issues after the approval and fill `issue` before committing work")
+    pf = show(rev, f"{sdir}/progress/{tid}.md") or ""
+    ps = re.search(r"^status:\s*(\S+)", pf, re.M)
+    if not ps or ps.group(1) != "in-progress":
+        err(f"task {tid} is not in-progress: the agent takes the task (progress file and GitHub issue status) before the first commit")
+    paths = task_paths(tasks_text, tid)
+    if paths is None:
+        err(f"{sdir}/tasks.md has no task {tid}")
+    else:
+        out = [f for f in gated if not matches(f, paths)]
+        if out:
+            err(f"files outside the paths of {tid}: {out[:5]}")
+
+
+def main():
+    a = sys.argv[1:]
+    if len(a) == 2 and a[0] == "--msg":
+        files = [x for x in git("diff", "--cached", "--name-only", "-z", "--diff-filter=ACMRD").split("\0") if x]
+        check(Path(a[1]).read_text(encoding="utf-8"), files, None, "commit")
+    elif len(a) == 2 and a[0] == "--range":
+        for sha in git("rev-list", "--no-merges", "--reverse", a[1]).split():
+            files = [x for x in git("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--root", sha).split("\0") if x]
+            check(git("log", "-1", "--format=%B", sha), files, sha, sha[:8])
+    else:
+        print(__doc__)
+        sys.exit(2)
+    for e in errors:
+        print("spec-gate: error:", e, file=sys.stderr)
+    sys.exit(1 if errors else 0)
+
+
+main()

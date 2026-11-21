@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+"""Validate specs/NNN-<slug>/ against the spec-driven development rules.
+
+Usage: spec-lint [--write-index]
+
+The project root comes from CLAUDE_PROJECT_DIR (default: this repository).
+Offline: milestone and issue are format-checked only.
+"""
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude-hooks"))
+from _common import ROOT, matches, orchestration, owned  # noqa: E402
+
+FRONT = ["id", "status", "owner", "milestone", "issue", "pci-impact", "adr"]
+SPEC_SECTIONS = ["Problem", "Goals and non-goals", "Acceptance criteria", "Impact on SLO, PCI and cost", "Risks"]
+PLAN_SECTIONS = ["Components and boundaries", "Changes per domain", "ADRs", "Rollout and rollback", "Test plan",
+                 "Alerts and dashboards"]
+STATUSES = {"draft", "approved", "in-progress", "implemented", "superseded"}
+TASK_KEYS = ["id", "title", "agent", "paths", "depends_on", "provides", "requires", "acceptance", "issue"]
+INDEX_HEAD = "| Number | Title | Status | Milestone |\n|---|---|---|---|\n"
+errors, warnings = [], []
+
+
+def err(spec, msg):
+    errors.append(f"{spec}: {msg}")
+
+
+def warn(spec, msg):
+    warnings.append(f"{spec}: {msg}")
+
+
+def front_matter(text):
+    text = text.replace("\r\n", "\n")
+    m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        return None
+    out = {}
+    for line in m.group(1).splitlines():
+        k = re.match(r"([\w-]+):\s*(.*?)(?:\s+#.*)?$", line)
+        if k:
+            out[k.group(1)] = k.group(2)
+    return out
+
+
+def tasks(text):
+    items, cur, key = [], None, None
+    for block_ in re.findall(r"```yaml\n(.*?)```", text, re.S):
+        for line in block_.splitlines():
+            s = re.match(r"^- (\w+):\s*(.*)$", line)
+            k = re.match(r"^  (\w+):\s*(.*)$", line)
+            li = re.match(r"^\s+- (.+)$", line)
+            if s:
+                cur = {s.group(1): s.group(2)}
+                items.append(cur)
+                key = s.group(1)
+            elif k and cur is not None:
+                cur[k.group(1)] = k.group(2)
+                key = k.group(1)
+            elif li and cur is not None and key and cur.get(key, "x") == "":
+                cur[key] = "[" + li.group(1) + "]"
+            elif li and cur is not None and key and cur[key].startswith("[") and cur[key].endswith("]") and cur.get(key + "#block"):
+                cur[key] = cur[key][:-1] + ", " + li.group(1) + "]"
+            if k and cur is not None and k.group(2) == "":
+                cur[key + "#block"] = True
+    for i in items:
+        for k in [k for k in i if k.endswith("#block")]:
+            del i[k]
+    return items
+
+
+def issue_ok(v, status):
+    v = v.strip().strip("\"'")
+    return bool(re.fullmatch(r"#[1-9]\d*", v)) or (v == "none" and status in ("draft", "approved"))
+
+
+def inline_list(v):
+    return [x.strip().strip("\"'") for x in v.strip().strip("[]").split(",") if x.strip()]
+
+
+def prefix(p):
+    return re.split(r"[*\[]", p, 1)[0]
+
+
+def overlap(p, q):
+    a, b = prefix(p).rstrip("/").split("/"), prefix(q).rstrip("/").split("/")
+    n = min(len(a), len(b))
+    return a[:n] == b[:n]
+
+
+DENIED = ["deploy/envs/prod/**", "infra/live/cde-prod/**"]
+APPLY = re.compile(r"(terraform|terragrunt)\b.*\b(apply|destroy)\b|kubectl\s+(apply|delete|exec)", re.I)
+
+
+def section(text, name):
+    m = re.search(rf"^## {re.escape(name)}\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    return m.group(1) if m else ""
+
+
+def has_content(body):
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+    return bool(re.sub(r"[\s\-*>]|none\.?|todo|tbd", "", body, flags=re.I))
+
+
+def has_section(text, name):
+    return re.search(rf"^## {re.escape(name)}\s*$", text, re.M) is not None
+
+
+def cde_patterns():
+    f = ROOT / "policy" / "cde-paths.yaml"
+    return re.findall(r"^\s*-\s*([^\s#]+)\s*(?:#.*)?$", f.read_text(encoding="utf-8"), re.M) if f.exists() else []
+
+
+def forbidden_terms():
+    f = ROOT / "docs" / "glossary.md"
+    terms = set()
+    if f.exists():
+        for line in f.read_text(encoding="utf-8").splitlines():
+            cols = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cols) == 3 and cols[0] not in ("Term", "---") and not cols[0].startswith("-"):
+                for t in cols[2].split(","):
+                    t = re.sub(r"\(.*?\)| in resource names", "", t).strip().lower()
+                    if re.fullmatch(r"[a-z][a-z -]{2,}", t):
+                        terms.add(t)
+    return terms
+
+
+def strip_code(text):
+    text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.S)
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`[^`]*`", " ", text)
+    return re.sub(r'"[^"]*"', " ", text)
+
+
+def deps_closure(deps):
+    reach = {}
+    for t in deps:
+        seen, stack = set(), list(deps[t])
+        while stack:
+            d = stack.pop()
+            if d in seen or d not in deps:
+                continue
+            seen.add(d)
+            stack.extend(deps[d])
+        reach[t] = seen
+    return reach
+
+
+PROGRESS = {"todo", "in-progress", "done"}
+
+
+def check_progress(sp, n, items, deps):
+    # One file per task keeps parallel worktrees from conflicting; todo is the default when no file exists.
+    pdir = sp / "progress"
+    if not pdir.is_dir():
+        return
+    byid = {i.get("id"): i for i in items}
+    state = {}
+    files = sorted(pdir.glob("*.md"))
+    for f in files:
+        fm = front_matter(f.read_text(encoding="utf-8")) or {}
+        state[f.stem] = fm
+    for f in files:
+        fm, tid = state[f.stem], f.stem
+        w = f"progress/{f.name}"
+        if tid not in byid:
+            err(n, f"{w}: no task {tid} in tasks.md")
+            continue
+        if fm.get("task") != tid:
+            err(n, f"{w}: front matter `task` must be {tid}")
+        if fm.get("issue", "").strip('"\'') != byid[tid].get("issue", "").strip('"\''):
+            err(n, f"{w}: `issue` must equal the issue of the task in tasks.md")
+        status = fm.get("status")
+        if status not in PROGRESS:
+            err(n, f"{w}: status must be one of {sorted(PROGRESS)}")
+            continue
+        if status in ("in-progress", "done"):
+            if fm.get("agent") != byid[tid].get("agent"):
+                err(n, f"{w}: `agent` must be the task agent `{byid[tid].get('agent')}`")
+            if not re.fullmatch(r"#[1-9]\d*", byid[tid].get("issue", "").strip('"\'')):
+                err(n, f"{w}: a task without an issue number cannot be taken")
+            for d in deps.get(tid, []):
+                if state.get(d, {}).get("status") != "done":
+                    err(n, f"{w}: depends on {d}, which is not done")
+        if status == "done" and not re.fullmatch(r"#[1-9]\d*|https://\S+/pull/\d+", fm.get("pr", "").strip('"\'')):
+            err(n, f"{w}: a done task must name its pull request (`#N` or the URL)")
+
+
+def check_spec(sp, cfg, cde, bad_terms):
+    n = sp.name
+    if not (sp / "spec.md").exists():
+        err(n, "missing spec.md")
+        return None
+    text = (sp / "spec.md").read_text(encoding="utf-8")
+    fm = front_matter(text) or {}
+    draft_only = fm.get("status") == "draft" and not ((sp / "plan.md").exists() or (sp / "tasks.md").exists())
+    if not draft_only:
+        for f in ("plan.md", "tasks.md"):
+            if not (sp / f).exists():
+                err(n, f"missing {f}")
+        if not all((sp / f).exists() for f in ("plan.md", "tasks.md")):
+            return None
+    plan = (sp / "plan.md").read_text(encoding="utf-8") if (sp / "plan.md").exists() else ""
+    raw_tasks = (sp / "tasks.md").read_text(encoding="utf-8") if (sp / "tasks.md").exists() else ""
+    frozen = fm.get("status") in ("implemented", "superseded")
+    fm = front_matter(text)
+    info = {"title": "", "status": "", "milestone": ""}
+    if fm is None:
+        err(n, "spec.md has no front matter")
+        fm = {}
+    for k in FRONT:
+        if fm and (k not in fm or fm[k] == ""):
+            err(n, f"front matter field `{k}` is missing or empty")
+    if fm.get("id") != n:
+        err(n, f"front matter id `{fm.get('id')}` must equal the directory name")
+    if fm.get("status") not in STATUSES:
+        err(n, f"status must be one of {sorted(STATUSES)}")
+    if fm.get("milestone") != n:
+        err(n, "milestone must equal the specification name")
+    # Issues are created after the approval, so `none` is valid until the work starts.
+    if not issue_ok(fm.get("issue", ""), fm.get("status", "")):
+        err(n, 'issue must look like "#123" (`none` is allowed only while the status is draft or approved)')
+    if fm.get("pci-impact") not in ("none", "yes"):
+        err(n, "pci-impact must be `none` or `yes`")
+    for a in inline_list(fm.get("adr", "[]")):
+        if not list((ROOT / "docs" / "adr").glob(f"{a}-*.md")):
+            err(n, f"adr `{a}` has no docs/adr/{a}-*.md")
+    h1 = re.search(rf"^# {re.escape(n)}:\s*(.+)$", text, re.M)
+    if not h1:
+        err(n, f"spec.md needs the heading `# {n}: <title>`")
+    info.update(title=h1.group(1).strip() if h1 else "", status=fm.get("status", ""), milestone=fm.get("milestone", ""))
+    for s in SPEC_SECTIONS:
+        if not has_section(text, s):
+            err(n, f"spec.md lacks section `## {s}`")
+        elif not has_content(section(text, s)):
+            err(n, f"spec.md section `## {s}` is empty")
+    if "non-goal" not in section(text, "Goals and non-goals").lower():
+        err(n, "spec.md needs a `Non-goal:` line")
+    for key in ("SLO", "PCI", "Cost"):
+        if not re.search(rf"^\s*[-*]\s*{key}:\s*\S", section(text, "Impact on SLO, PCI and cost"), re.M | re.I):
+            err(n, f"spec.md impact section needs a `- {key}:` line with a value")
+    ac = re.search(r"^## Acceptance criteria\s*(.*?)(?=^## |\Z)", text, re.S | re.M)
+    if not ac or not re.search(r"- \[[ x]\]\s*\S", ac.group(1)):
+        err(n, "acceptance criteria are empty")
+    for s in PLAN_SECTIONS if not draft_only else []:
+        if not has_section(plan, s):
+            err(n, f"plan.md lacks section `## {s}`")
+        elif not has_content(section(plan, s)):
+            err(n, f"plan.md section `## {s}` is empty")
+    items = tasks(raw_tasks)
+    if not items and not draft_only:
+        err(n, "tasks.md has no tasks")
+    if draft_only:
+        return info
+    ids = [i.get("id") for i in items]
+    if len(set(ids)) != len(ids):
+        err(n, "task ids are not unique")
+    provides = {i.get("provides", "") for i in items}
+    deps, providers, requires = {}, {}, {}
+    all_paths = {}
+    for i in items:
+        tid = i.get("id", "?")
+        if not re.fullmatch(r"T\d+", tid):
+            err(n, f"task id `{tid}` must look like T1")
+        for k in TASK_KEYS:
+            if k not in i:
+                err(n, f"task {tid}: missing `{k}`")
+        if not issue_ok(i.get("issue", ""), fm.get("status", "")):
+            err(n, f'task {tid}: issue must look like "#123" (`none` is allowed only while the status is draft or approved)')
+        agent = i.get("agent")
+        paths = inline_list(i.get("paths", "[]"))
+        all_paths[tid] = paths
+        if not paths:
+            err(n, f"task {tid}: empty paths")
+        if agent not in cfg["agents"]:
+            err(n, f"task {tid}: unknown agent `{agent}`")
+        else:
+            owns = cfg["agents"][agent]
+            for p in paths:
+                probe = p.replace("**", "x").replace("*", "x")
+                if owns is not None and not frozen and not (owned(cfg, agent, probe) or owned(cfg, agent, p)):
+                    err(n, f"task {tid}: path `{p}` is outside the owns of {agent}")
+                if frozen:
+                    continue
+                for group in ("humans_only", "ci_only", "integrator_only"):
+                    if matches(probe, cfg[group]) or matches(p, cfg[group]) or any(prefix(g).startswith(prefix(p)) and prefix(p) for g in cfg[group]):
+                        err(n, f"task {tid}: path `{p}` is in or contains {group} files and cannot be assigned to an agent")
+                if any(overlap(p, d) for d in DENIED):
+                    err(n, f"task {tid}: path `{p}` is denied for agents (prod and cde-prod are human-only)")
+        if not i.get("acceptance"):
+            err(n, f"task {tid}: empty acceptance")
+        requires[tid] = inline_list(i.get("requires", "[]"))
+        deps[tid] = inline_list(i.get("depends_on", "[]"))
+        providers[tid] = i.get("provides", "")
+        if fm.get("pci-impact") != "yes" and any(overlap(p, c) for p in paths for c in cde):
+            err(n, f"task {tid}: touches a CDE path but pci-impact is not `yes`")
+        if APPLY.search(i.get("acceptance", "") + " " + i.get("title", "")):
+            err(n, f"task {tid}: agents never apply; the task must stop at plan or PR")
+    state = {}
+
+    def visit(t, stack):
+        if state.get(t) == 2:
+            return
+        if state.get(t) == 1:
+            err(n, f"depends_on cycle through {' -> '.join(stack + [t])}")
+            return
+        state[t] = 1
+        for d in deps.get(t, []):
+            if d not in deps:
+                err(n, f"task {t}: depends_on unknown task `{d}`")
+            else:
+                visit(d, stack + [t])
+        state[t] = 2
+
+    for t in deps:
+        visit(t, [])
+    if not any(e.startswith(n) and "cycle" in e for e in errors):
+        reach = deps_closure(deps)
+        for tid, reqs in requires.items():
+            for r in reqs:
+                makers = [m for m in providers if r in inline_list(providers[m]) or providers[m].strip('"') == r]
+                if not makers:
+                    err(n, f"task {tid}: requires `{r}` but no task provides it")
+                elif not any(m in reach.get(tid, set()) for m in makers):
+                    err(n, f"task {tid}: requires `{r}` but does not depend on the task that provides it")
+        tids = list(deps)
+        for x in range(len(tids)):
+            for y in range(x + 1, len(tids)):
+                a, b = tids[x], tids[y]
+                if b in reach[a] or a in reach[b]:
+                    continue
+                if any(overlap(p, q) for p in all_paths[a] for q in all_paths[b]):
+                    err(n, f"tasks {a} and {b} have overlapping paths and no depends_on between them")
+    check_progress(sp, n, items, deps)
+    hdir = sp / "handoffs"
+    if hdir.is_dir():
+        for h in sorted(hdir.glob("*.md")):
+            ok = any(h.name.startswith(a + "-") and h.name[len(a) + 1:-3] in cfg["agents"] for a in cfg["agents"])
+            if not ok:
+                err(n, f"handoff `{h.name}` must be named <from-agent>-<to-agent>.md")
+    for name, body in (("spec.md", text), ("plan.md", plan), ("tasks.md", raw_tasks)):
+        low = strip_code(body).lower()
+        for t in sorted(bad_terms):
+            if re.search(rf"(?<![\w-]){re.escape(t)}(?![\w-])", low):
+                warn(n, f"{name} uses `{t}`, which the glossary asks not to use")
+    return info
+
+
+def index_text(rows):
+    return INDEX_HEAD + "".join(f"| {n} | {r['title'].replace('|', '/')} | {r['status']} | {r['milestone']} |\n" for n, r in rows)
+
+
+def check_index(rows, write):
+    f = ROOT / "specs" / "README.md"
+    if not f.exists():
+        err("specs", "README.md is missing")
+        return
+    text = f.read_text(encoding="utf-8")
+    m = re.search(re.escape(INDEX_HEAD) + r"(?:\|.*\n?)*", text)
+    if not m:
+        err("specs", "README.md lacks the index table")
+        return
+    want = index_text(rows)
+    if m.group(0).rstrip("\n") != want.rstrip("\n"):
+        if write:
+            f.write_text(text[: m.start()] + want + text[m.end():], encoding="utf-8")
+            print("spec-lint: index rewritten")
+        else:
+            err("specs", "README.md index is out of date (run spec-lint --write-index)")
+
+
+def main():
+    write = "--write-index" in sys.argv
+    specs = sorted(p for p in (ROOT / "specs").glob("[0-9][0-9][0-9]-*") if p.is_dir())
+    for d in (ROOT / "specs").iterdir():
+        if d.is_dir() and not d.name.startswith("_") and not re.fullmatch(r"\d{3}-[a-z0-9]+(-[a-z0-9]+)*", d.name):
+            err("specs", f"directory `{d.name}` must be named NNN-kebab-case")
+    nums = [int(p.name[:3]) for p in specs]
+    if nums and nums != list(range(1, len(nums) + 1)):
+        err("specs", f"numbers must be 001..{len(nums):03d} without gaps or repeats, got {nums}")
+    cfg, cde, bad = orchestration(), cde_patterns(), forbidden_terms()
+    rows = []
+    for sp in specs:
+        info = check_spec(sp, cfg, cde, bad)
+        if info:
+            rows.append((sp.name[:3], info))
+    check_index(rows, write)
+    for w in warnings:
+        print("spec-lint: warning:", w)
+    for e in errors:
+        print("spec-lint: error:", e)
+    print(f"spec-lint: {len(specs)} specification(s), {len(errors)} error(s), {len(warnings)} warning(s)")
+    sys.exit(1 if errors else 0)
+
+
+main()

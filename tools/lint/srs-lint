@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Validate docs/requirements: requirement IDs, verification methods and addenda.
+
+The baseline files (front matter `status: baseline`) are changed only through addenda in
+docs/requirements/addenda/NNN-slug.md. `--effective` prints the effective requirement set
+(baseline plus approved and applied addenda).
+"""
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude-hooks"))
+from _common import ROOT  # noqa: E402
+
+DIR = ROOT / "docs" / "requirements"
+ID = re.compile(r"^(FR|NFR)-[A-Z]+-[0-9]+$")
+METHODS = {"test", "metric", "inspection", "analysis", "demonstration"}
+ADD_STATUS = {"draft", "approved", "applied"}
+errors = []
+
+
+def err(where, msg):
+    errors.append(f"{where}: {msg}")
+
+
+def front(text):
+    m = re.match(r"---\n(.*?)\n---\n", text.replace("\r\n", "\n"), re.S)
+    out = {}
+    for line in (m.group(1) if m else "").splitlines():
+        k = re.match(r"([\w-]+):\s*(.*?)(?:\s+#.*)?$", line)
+        if k:
+            out[k.group(1)] = k.group(2)
+    return out
+
+
+def rows(text, section=None):
+    if section:
+        m = re.search(rf"^## {section}\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+        text = m.group(1) if m else ""
+    out = []
+    for line in text.splitlines():
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if cells and re.match(r"^N?FR-", cells[0]):
+                out.append(cells)
+    return out
+
+
+def check_requirement(where, cells, require_source=True):
+    rid = cells[0]
+    if not ID.match(rid):
+        err(where, f"malformed ID `{rid}`")
+    if len(cells) < 5 or not all(cells[:5]):
+        err(where, f"{rid}: needs the five columns ID, Requirement, Verification, Implementation, Source")
+        return
+    if len(cells[1]) > 400 or len(cells[3]) > 300:
+        err(where, f"{rid}: requirement is limited to 400 characters and implementation to 300; split it or move detail to an ADR")
+    if "shall" not in cells[1].lower():
+        err(where, f"{rid}: the requirement must be a `shall` statement")
+    if cells[2].lower() not in METHODS:
+        err(where, f"{rid}: verification must be one of {sorted(METHODS)}")
+
+
+def spec_info(d):
+    text = "".join((d / n).read_text(encoding="utf-8") for n in ("spec.md", "plan.md", "tasks.md") if (d / n).is_file())
+    fm = front((d / "spec.md").read_text(encoding="utf-8")) if (d / "spec.md").is_file() else {}
+    return text, fm
+
+
+def revalidation(addenda):
+    # A live addendum that changes or withdraws a requirement a specification cites forces that specification to be re-validated.
+    for name, fm, text in addenda:
+        if fm.get("status") not in ("approved", "applied"):
+            continue
+        ids = {c[0] for sec in ("Changed", "Withdrawn") for c in rows(text, sec)}
+        if not ids:
+            continue
+        impacted_done = []
+        for d in sorted((ROOT / "specs").glob("[0-9][0-9][0-9]-*")):
+            if f"specs/{d.name}" == fm.get("spec"):
+                continue
+            body, sfm = spec_info(d)
+            hit = sorted(i for i in ids if re.search(rf"\b{re.escape(i)}\b", body))
+            if not hit:
+                continue
+            status = sfm.get("status")
+            if status in ("approved", "in-progress"):
+                done = [x.strip().strip("\"'") for x in sfm.get("revalidated", "[]").strip("[]").split(",") if x.strip()]
+                if name[:-3] not in done:
+                    err(f"addenda/{name}", f"{d.name} cites {hit} and is {status}: re-validate it and add `{name[:-3]}` to its `revalidated` list")
+            elif status == "implemented":
+                fu = fm.get("follow-up", "")
+                if not re.fullmatch(r"specs/\d{3}-[a-z0-9-]+", fu) or not (ROOT / fu).is_dir() or fu == f"specs/{d.name}":
+                    err(f"addenda/{name}", f"{d.name} is implemented and cites {hit}: the addendum needs `follow-up: specs/NNN-slug` naming a new specification")
+
+
+def main():
+    base = {}
+    for f in sorted(DIR.glob("*.md")):
+        if f.name in ("README.md",):
+            continue
+        text = f.read_text(encoding="utf-8")
+        fm = front(text)
+        if f.name != "traceability.md" and fm.get("status") not in ("draft", "baseline"):
+            err(f.name, "front matter `status` must be draft or baseline")
+        for cells in rows(text):
+            check_requirement(f.name, cells)
+            if cells[0] in base:
+                err(f.name, f"{cells[0]} is already defined in {base[cells[0]]}")
+            base[cells[0]] = f.name
+    trace = DIR / "traceability.md"
+    if trace.is_file():
+        cited = set(re.findall(r"\b(?:N?FR)-[A-Z]+-[0-9]+\b", trace.read_text(encoding="utf-8")))
+        for rid in sorted(base):
+            if rid not in cited:
+                err("traceability.md", f"{rid} is not traced to an architecture section")
+        for rid in sorted(cited - set(base)):
+            err("traceability.md", f"{rid} is cited but not defined in a requirements file")
+    added, withdrawn, effective = {}, set(), dict.fromkeys(base)
+    adds = sorted((DIR / "addenda").glob("[0-9][0-9][0-9]-*.md")) if (DIR / "addenda").is_dir() else []
+    for f in (DIR / "addenda").glob("*.md") if (DIR / "addenda").is_dir() else []:
+        if f.name not in {a.name for a in adds} and f.name not in ("README.md", "_template.md"):
+            err(f"addenda/{f.name}", "must be named NNN-kebab-case.md")
+    loaded = []
+    for f in adds:
+        w = f"addenda/{f.name}"
+        text = f.read_text(encoding="utf-8")
+        fm = front(text)
+        loaded.append((f.name, fm, text))
+        if fm.get("id") != f.stem:
+            err(w, "front matter id must equal the file name")
+        if fm.get("status") not in ADD_STATUS:
+            err(w, f"status must be one of {sorted(ADD_STATUS)}")
+        if not re.fullmatch(r"specs/\d{3}-[a-z0-9-]+", fm.get("spec", "")) or not (ROOT / fm.get("spec", "-")).is_dir():
+            err(w, "front matter `spec` must name an existing specs/NNN-slug directory")
+        live = fm.get("status") in ("approved", "applied")
+        sp = (ROOT / fm.get("spec", "-") / "spec.md")
+        sst = re.search(r"^status:\s*(\S+)", sp.read_text(encoding="utf-8"), re.M) if sp.is_file() else None
+        if live and (not sst or sst.group(1) not in ("approved", "in-progress", "implemented")):
+            err(w, f"status {fm.get('status')} needs its specification to be approved, in-progress or implemented")
+        for cells in rows(text, "Added"):
+            check_requirement(w, cells)
+            rid = cells[0]
+            if rid in base or rid in added or rid in withdrawn:
+                err(w, f"{rid} already exists or was withdrawn; IDs are never reused")
+            added[rid] = f.name
+            if live:
+                effective[rid] = f.name
+        for cells in rows(text, "Changed"):
+            check_requirement(w, cells)
+            if cells[0] not in effective and cells[0] not in added:
+                err(w, f"{cells[0]} is changed but does not exist")
+            if cells[0] in withdrawn:
+                err(w, f"{cells[0]} was withdrawn and cannot be changed")
+            if live:
+                effective[cells[0]] = f.name
+        for cells in rows(text, "Withdrawn"):
+            if len(cells) < 2 or not cells[1]:
+                err(w, f"{cells[0]}: a withdrawn requirement needs a reason")
+            if cells[0] not in effective and cells[0] not in added:
+                err(w, f"{cells[0]} is withdrawn but does not exist")
+            if live:
+                withdrawn.add(cells[0])
+                effective.pop(cells[0], None)
+        if not (rows(text, "Added") or rows(text, "Changed") or rows(text, "Withdrawn")):
+            err(w, "an addendum needs at least one Added, Changed or Withdrawn row")
+    revalidation(loaded)
+    if adds and not any(front((DIR / n).read_text(encoding="utf-8")).get("status") == "baseline" for n in set(base.values())):
+        err("addenda", "addenda are allowed only after the first baseline (status: baseline) of the SRS exists")
+    if "--effective" in sys.argv:
+        for rid in sorted(effective):
+            print(rid, effective[rid] or base[rid])
+    for e in errors:
+        print("srs-lint: error:", e)
+    print(f"srs-lint: {len(base)} baseline requirement(s), {len(adds)} addendum/addenda, {len(errors)} error(s)")
+    sys.exit(1 if errors else 0)
+
+
+main()
