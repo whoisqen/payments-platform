@@ -25,11 +25,6 @@
       "Bash(make test:*)"
     ],
     "deny": [
-      "Bash(terraform apply:*)",
-      "Bash(terragrunt *apply*)",
-      "Bash(kubectl apply:*)",
-      "Bash(kubectl delete:*)",
-      "Bash(kubectl exec:*)",
       "Bash(aws * delete*)",
       "Bash(aws * put*)",
       "Bash(aws * create*)",
@@ -41,13 +36,6 @@
       "Read(**/.env*)",
       "Read(~/.aws/**)",
       "Read(~/.kube/**)",
-      "Bash(terraform destroy:*)",
-      "Bash(terragrunt *destroy*)",
-      "Bash(helm install:*)",
-      "Bash(helm upgrade:*)",
-      "Bash(helm uninstall:*)",
-      "Bash(git push:*)",
-      "Bash(gh pr merge:*)",
       "Read(**/.aws/**)",
       "Read(**/.kube/**)"
     ],

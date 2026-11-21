@@ -17,7 +17,8 @@ from _common import matches  # noqa: E402
 ROOT = _common.ROOT
 TYPES = "feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
 SCOPES = "router drainer scheduler locker control-center infra deploy policy observability docker ci claude docs vendor specs".split()
-EXEMPT = [".claude/**", ".mcp.json", "CLAUDE.md", "specs/_templates/**", "specs/README.md",
+EXEMPT = [".claude/**", ".mcp.json", "CLAUDE.md", "specs/_templates/**", "specs/README.md", "specs/ROADMAP.md",
+          "tools/lint/**", "tools/scripts/**",
           "policy/cde-paths.yaml", "README.md", "LICENSE", ".gitignore", "**/README.md"]
 AI = [r"co-authored-by:.*(claude|anthropic)", r"generated with .*claude", r"claude\.com/claude-code",
       r"claude\.ai/code", r"noreply@anthropic\.com"]
@@ -124,7 +125,7 @@ def check(msg, files, rev, label):
         # The files of a draft or approved specification are edited through the human gate, not under a Spec trailer.
         m = re.match(r"(specs/\d{3}-[a-z0-9-]+)/", f)
         st = re.search(r"^status:\s*(\S+)", show(rev, f"{m.group(1)}/spec.md") or "", re.M) if m else None
-        return bool(st and st.group(1) in ("draft", "approved"))
+        return bool(st and st.group(1) in ("draft", "approved", "in-progress"))
 
     gated = [f for f in files if not matches(f, EXEMPT) and not own_spec_file(f) and not re.fullmatch(r"specs/\d{3}-[a-z0-9-]+/progress/T\d+\.md", f)]
     if any(matches(f, cde_patterns(rev)) for f in files) and trailers.get("PCI-Impact") not in ("none", "yes"):

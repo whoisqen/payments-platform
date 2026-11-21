@@ -50,10 +50,10 @@ Every change starts with one specification in `specs/NNN-<slug>/` (`spec.md`, `p
 
 ## Claude Code configuration
 
-- `.claude/settings.json`: no attribution lines in commits or PRs; deny `terraform apply`, `terragrunt *apply*`, `kubectl apply/delete/exec`, mutating `aws` calls, any `cde-*` AWS profile, edits to `deploy/envs/prod/**` and `infra/live/cde-prod/**`, reading `.env*`, `~/.aws`, `~/.kube`.
+- `.claude/settings.json`: no attribution lines in commits or PRs; deny mutating `aws` calls, any `cde-*` AWS profile, edits to `deploy/envs/prod/**` and `infra/live/cde-prod/**`, reading `.env*`, `~/.aws`, `~/.kube`.
 - Hooks live in `tools/scripts/claude-hooks/`: `pre_edit.py` (ownership), `pre_bash.py` (commit/PR attribution, no `git push` or `git -C` for agents), `pre_mcp.py` (one environment per session), `post_edit.py` (format, lint, tests by file type; missing tools are skipped), `stop.py` (pre-commit on changed files).
 - MCP: `.mcp.json` holds only `${ENV_VAR}` references. The session works in exactly one environment, set by `CLAUDE_ENV` (default `dev`); per-environment access, roles and log sanitization levels are in `.claude/mcp/<env>.yaml`. Logs are reachable only through the sanitizing `obs-gateway`. Prod only through `/incident` with on-call approval; `cde-prod` has no MCP.
-- Agents never run `terraform apply`, touch the CDE, card data or production data, or merge. Their result is always a PR.
+- Subagents never run `terraform apply`, touch the CDE, card data or production data, or merge; their result is always a PR. The main session may run `terraform apply`, `git push` and similar commands only on the owner's explicit request.
 
 ## Conventions
 

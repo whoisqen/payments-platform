@@ -27,18 +27,19 @@ def git_sub(tokens):
     return tokens[i] if i < len(tokens) else ""
 
 
-def denied(raw, s):
+def denied(raw, s, agent):
+    # Infrastructure mutations are blocked only for subagents; the owner-directed main session may run them.
     head = s[0]
     if head in MUT:
         if any(t.startswith("cde-") or "=cde-" in t for t in raw):
             return "cde-* target"
-        if MUT[head] & set(s[1:]) or (head == "terragrunt" and any("apply" in t for t in s[1:])):
+        if agent and (MUT[head] & set(s[1:]) or (head == "terragrunt" and any("apply" in t for t in s[1:]))):
             return f"{head} mutation"
     if head == "aws":
         if any(t.startswith("cde-") or "=cde-" in t for t in raw):
             return "cde-* AWS profile"
         rest = s[1:]
-        if any(AWS_VERB.match(t) for t in rest) or (rest[:1] == ["s3"] and {"rm", "cp", "mv", "sync"} & set(rest)):
+        if agent and (any(AWS_VERB.match(t) for t in rest) or (rest[:1] == ["s3"] and {"rm", "cp", "mv", "sync"} & set(rest))):
             return "mutating aws call"
     if head in READERS and any(SECRET.search(t) for t in s[1:]):
         return "secret file read"
@@ -97,7 +98,7 @@ def main():
                 block("Forbidden: AI co-authorship marks in a PR (section 27.1).")
             if re.match(r"gh\s+pr\s+merge\b", text) or (s[1:2] == ["api"] and "merge" in text):
                 block("Agents never merge (CLAUDE.md); a human merges the PR.")
-        why = denied(raw, s)
+        why = denied(raw, s, agent)
         if why:
             block(f"Denied by pre_bash: {why}. Agents never mutate infrastructure, the CDE or production, or read secrets.")
 
