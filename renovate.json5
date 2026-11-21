@@ -1,0 +1,19 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended", ":pinDigestsDisabled", "helpers:pinGitHubActionDigests"],
+  timezone: "Europe/Kyiv",
+  schedule: ["before 6am on monday"],
+  prConcurrentLimit: 5,
+  commitMessageLowerCase: "auto",
+  semanticCommits: "enabled",
+  semanticCommitType: "build",
+  semanticCommitScope: "ci",
+  ignorePaths: ["vendor/**"],
+  packageRules: [
+    { matchManagers: ["github-actions"], semanticCommitScope: "ci" },
+    { matchManagers: ["terraform"], semanticCommitScope: "infra" },
+    { matchManagers: ["helm-values", "helmv3", "kubernetes"], semanticCommitScope: "deploy" },
+    { matchManagers: ["dockerfile"], semanticCommitScope: "docker" },
+  ],
+  vulnerabilityAlerts: { labels: ["security"], schedule: ["at any time"] },
+}

@@ -1,0 +1,35 @@
+name: github-drift
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-drift
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TF_VAR_github_app_pem: ${{ secrets.CHANGEME_GITHUB_APP_PEM }}
+      TF_VAR_github_app_id: ${{ vars.CHANGEME_GITHUB_APP_ID }}
+      TF_VAR_github_app_installation_id: ${{ vars.CHANGEME_GITHUB_APP_INSTALLATION_ID }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - name: init
+        working-directory: infra/github
+        run: terraform init -input=false -backend-config=backend.hcl
+      - name: plan
+        working-directory: infra/github
+        run: |
+          set +e
+          terraform plan -input=false -detailed-exitcode
+          code=$?
+          if [ "$code" -eq 2 ]; then echo "::error::GitHub settings drifted from infra/github"; fi
+          exit "$code"
