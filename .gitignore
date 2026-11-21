@@ -1,0 +1,10 @@
+# Local tooling and build output
+target/
+node_modules/
+__pycache__/
+.terraform/
+.env
+.env.*
+*.tfstate
+*.tfstate.*
+.claude/settings.local.json
