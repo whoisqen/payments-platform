@@ -1,0 +1,6 @@
+# cde-prod: no MCP.
+env: cde-prod
+access: none
+logs: unavailable
+note: only aggregate metrics that are already exported outside the CDE are available
+servers: {}

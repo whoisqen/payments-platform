@@ -1,0 +1,17 @@
+# Environment prod (eu-west-1, eu-central-1): read only, and only inside the /incident command.
+env: prod
+role: claude-agent-read-prod
+access:
+  mode: incident-only
+  entry: /incident
+  approval: on-call
+  credentials_ttl: 1h          # after approval; the role then expires automatically
+logs:
+  sanitization: strict         # never lower than strict (checked by Conftest)
+  allowed_fields: [ts, level, service, trace_id, error_code, message_template]
+  drop_bodies: true
+  pseudonyms: hmac-session-key # the key lives for one session
+  max_lines: 500
+  window: 15m
+servers:
+  read: [aws-docs, aws-api, terraform-registry, kubernetes, github, obs-gateway, sentry, pagerduty]

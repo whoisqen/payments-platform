@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "env": {
+    "CLAUDE_ENV": "dev"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test:*)",
+      "Bash(terraform fmt:*)",
+      "Bash(terraform validate:*)",
+      "Bash(terraform plan:*)",
+      "Bash(terraform test:*)",
+      "Bash(helm template:*)",
+      "Bash(helm lint:*)",
+      "Bash(kubeconform:*)",
+      "Bash(opa:*)",
+      "Bash(conftest:*)",
+      "Bash(kyverno test:*)",
+      "Bash(make test:*)"
+    ],
+    "deny": [
+      "Bash(terraform apply:*)",
+      "Bash(terragrunt *apply*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(aws * delete*)",
+      "Bash(aws * put*)",
+      "Bash(aws * create*)",
+      "Bash(aws * --profile cde-*)",
+      "Bash(aws * --profile=cde-*)",
+      "Bash(AWS_PROFILE=cde-* *)",
+      "Edit(**/deploy/envs/prod/**)",
+      "Edit(**/infra/live/cde-prod/**)",
+      "Read(**/.env*)",
+      "Read(~/.aws/**)",
+      "Read(~/.kube/**)",
+      "Bash(terraform destroy:*)",
+      "Bash(terragrunt *destroy*)",
+      "Bash(helm install:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(helm uninstall:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)",
+      "Read(**/.aws/**)",
+      "Read(**/.kube/**)"
+    ],
+    "ask": [
+      "mcp__github-write__*"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/pre_edit.py\"",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/pre_bash.py\"",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/pre_mcp.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/post_edit.py\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/stop.py\"",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/scripts/claude-hooks/stop.py\"",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}

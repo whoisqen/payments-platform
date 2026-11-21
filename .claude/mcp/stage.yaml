@@ -1,0 +1,9 @@
+# Environment stage: read only.
+env: stage
+role: claude-agent-read-stage
+access: permanent
+logs:
+  sanitization: standard       # plus email, phones, tokens, IP; request bodies dropped
+servers:
+  read: [aws-docs, aws-api, aws-cost, terraform-registry, kubernetes, github, obs-gateway, sentry, pagerduty]
+  write: [github-write]

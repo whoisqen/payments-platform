@@ -1,0 +1,11 @@
+# Environment dev: Claude has a permanent read role.
+env: dev
+role: claude-agent-read-dev
+access: permanent
+logs:
+  sanitization: basic          # secrets and PAN
+servers:
+  read: [aws-docs, aws-api, aws-cost, terraform-registry, kubernetes, github, obs-gateway, sentry, pagerduty]
+  write: [github-write]        # only at the deliver step of the orchestration
+  ops:                         # non-CDE namespaces only
+    allow: [rollout-restart, scale]
