@@ -1,0 +1,13 @@
+# Paths that make touches_cde() true in .claude/orchestration.yaml and require PCI-Impact review.
+cde_paths:
+  - vendor/hyperswitch/crates/router/**
+  - vendor/hyperswitch/crates/drainer/**
+  - vendor/hyperswitch/crates/scheduler/**
+  - vendor/hyperswitch/crates/cards/**
+  - vendor/hyperswitch/crates/storage_impl/**
+  - vendor/hyperswitch/crates/redis_interface/**
+  - vendor/card-vault/**
+  - infra/live/cde-*/**
+  - deploy/envs/*/cde-*/**
+  - deploy/envs/*/*/cde-*/**
+  - policy/opa/cde/**
