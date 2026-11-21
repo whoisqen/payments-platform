@@ -2,8 +2,8 @@ locals {
   environments = {
     dev      = []
     stage    = []
-    prod     = [var.teams.sre]
-    cde-prod = [var.teams.sre, var.teams.security]
+    prod     = var.reviewers ? [var.teams.sre] : []
+    cde-prod = var.reviewers ? [var.teams.sre, var.teams.security] : []
   }
 }
 

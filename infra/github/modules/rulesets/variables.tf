@@ -10,7 +10,27 @@ variable "approvals" {
   type = number
 }
 
-variable "tagging_app_id" {
-  description = "Id of the GitHub App that runs the tagging workflow; the only actor allowed to create v* tags."
-  type        = number
+variable "tag_bypass" {
+  description = "Actor allowed to create v* tags."
+  type = object({
+    actor_id   = number
+    actor_type = string
+  })
+}
+
+variable "merge_queue" {
+  description = "Merge queue exists only for repositories owned by an organization."
+  type        = bool
+}
+
+variable "main_admin_bypass" {
+  description = "Let repository admins merge a pull request without the review rules (single maintainer)."
+  type        = bool
+  default     = false
+}
+
+variable "require_signatures" {
+  description = "Require signed commits on main; off until commit signing is set up."
+  type        = bool
+  default     = true
 }

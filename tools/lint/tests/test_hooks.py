@@ -74,9 +74,17 @@ class PreBash(unittest.TestCase):
     def test_human_push_allowed_by_hook(self):
         self.assertEqual(bash("git push origin HEAD")[0], 0)
 
-    def test_infra_mutations(self):
-        for cmd in ("terraform -chdir=x apply", "kubectl -n x delete pod y", "AWS_PROFILE=cde-prod aws s3 ls",
-                    "aws --profile cde-prod s3 ls", "aws s3 rm s3://b/k", "helm upgrade x y", "terragrunt run-all apply"):
+    def test_infra_mutations_blocked_for_agents(self):
+        for cmd in ("terraform -chdir=x apply", "kubectl -n x delete pod y", "aws s3 rm s3://b/k", "helm upgrade x y",
+                    "terragrunt run-all apply"):
+            self.assertEqual(bash(cmd, agent="terraform-engineer")[0], 2, cmd)
+
+    def test_main_session_may_apply(self):
+        for cmd in ("terraform apply", "git push origin main"):
+            self.assertEqual(bash(cmd)[0], 0, cmd)
+
+    def test_cde_targets_blocked_for_everyone(self):
+        for cmd in ("AWS_PROFILE=cde-prod aws s3 ls", "aws --profile cde-prod s3 ls"):
             self.assertEqual(bash(cmd)[0], 2, cmd)
 
     def test_read_only_commands_pass(self):

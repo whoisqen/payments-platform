@@ -11,11 +11,20 @@ resource "github_repository_ruleset" "main" {
     }
   }
 
+  dynamic "bypass_actors" {
+    for_each = var.main_admin_bypass ? [1] : []
+    content {
+      actor_id    = 5
+      actor_type  = "RepositoryRole"
+      bypass_mode = "pull_request"
+    }
+  }
+
   rules {
     deletion                = true
     non_fast_forward        = true
     required_linear_history = true
-    required_signatures     = true
+    required_signatures     = var.require_signatures
 
     pull_request {
       required_approving_review_count   = var.approvals
@@ -25,23 +34,29 @@ resource "github_repository_ruleset" "main" {
       required_review_thread_resolution = true
     }
 
-    merge_queue {
-      merge_method                      = "SQUASH"
-      grouping_strategy                 = "ALLGREEN"
-      min_entries_to_merge              = 1
-      max_entries_to_merge              = 5
-      min_entries_to_merge_wait_minutes = 5
-      max_entries_to_build              = 5
-      check_response_timeout_minutes    = 60
+    dynamic "merge_queue" {
+      for_each = var.merge_queue ? [1] : []
+      content {
+        merge_method                      = "SQUASH"
+        grouping_strategy                 = "ALLGREEN"
+        min_entries_to_merge              = 1
+        max_entries_to_merge              = 5
+        min_entries_to_merge_wait_minutes = 5
+        max_entries_to_build              = 5
+        check_response_timeout_minutes    = 60
+      }
     }
 
-    required_status_checks {
-      strict_required_status_checks_policy = true
+    dynamic "required_status_checks" {
+      for_each = length(var.required_checks) > 0 ? [1] : []
+      content {
+        strict_required_status_checks_policy = true
 
-      dynamic "required_check" {
-        for_each = var.required_checks
-        content {
-          context = required_check.value
+        dynamic "required_check" {
+          for_each = var.required_checks
+          content {
+            context = required_check.value
+          }
         }
       }
     }
@@ -63,8 +78,8 @@ resource "github_repository_ruleset" "version_tags" {
   }
 
   bypass_actors {
-    actor_id    = var.tagging_app_id
-    actor_type  = "Integration"
+    actor_id    = var.tag_bypass.actor_id
+    actor_type  = var.tag_bypass.actor_type
     bypass_mode = "always"
   }
 

@@ -12,13 +12,17 @@ terraform {
   backend "s3" {}
 }
 
-# The key is passed as TF_VAR_github_app_pem from the environment; it is never stored in the repository.
+# Authentication: a token (TF_VAR_github_token) when set, otherwise the GitHub App. Secrets come from the environment only.
 provider "github" {
   owner = var.organization
+  token = var.github_token
 
-  app_auth {
-    id              = var.github_app_id
-    installation_id = var.github_app_installation_id
-    pem_file        = var.github_app_pem
+  dynamic "app_auth" {
+    for_each = var.github_token == null ? [1] : []
+    content {
+      id              = var.github_app_id
+      installation_id = var.github_app_installation_id
+      pem_file        = var.github_app_pem
+    }
   }
 }

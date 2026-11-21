@@ -44,20 +44,15 @@ variable "allow_rebase_merge" {
   default = false
 }
 
+# Add "ci-gate" and "spec-gate" here once the CI workflows exist; an empty list lets PRs merge without checks.
 variable "required_checks" {
   type    = list(string)
-  default = ["ci-gate", "spec-gate"]
+  default = []
 }
 
 variable "main_approvals" {
   type    = number
   default = 2
-}
-
-variable "tagging_app_id" {
-  description = "Id of the GitHub App that runs the tagging workflow; the only actor allowed to create v* tags."
-  type        = number
-  default     = 0
 }
 
 variable "allowed_actions" {
@@ -114,4 +109,46 @@ variable "github_app_pem" {
   type        = string
   sensitive   = true
   default     = "CHANGEME"
+}
+
+variable "github_token" {
+  description = "Personal access token, from TF_VAR_github_token; when null the GitHub App is used."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "account_type" {
+  description = "organization or user: a user account has no organization settings, teams or merge queue."
+  type        = string
+  default     = "organization"
+
+  validation {
+    condition     = contains(["organization", "user"], var.account_type)
+    error_message = "account_type must be organization or user."
+  }
+}
+
+variable "tag_bypass" {
+  description = "Actor allowed to create v* tags; RepositoryRole 5 is the admin role."
+  type = object({
+    actor_id   = number
+    actor_type = string
+  })
+  default = {
+    actor_id   = 0
+    actor_type = "Integration"
+  }
+}
+
+variable "import_existing" {
+  description = "Adopt a repository that already exists instead of creating it."
+  type        = bool
+  default     = false
+}
+
+variable "require_signatures" {
+  description = "Require signed commits on main; false until commit signing is set up."
+  type        = bool
+  default     = false
 }

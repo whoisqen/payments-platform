@@ -15,3 +15,8 @@ variable "teams" {
     sre           = string
   })
 }
+
+variable "reviewers" {
+  description = "Teams as required reviewers; a user account has no teams."
+  type        = bool
+}
