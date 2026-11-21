@@ -1,6 +1,6 @@
 ---
 id: 001-devops-srs
-status: approved
+status: in-progress
 owner: platform
 milestone: 001-devops-srs
 issue: "#1"
