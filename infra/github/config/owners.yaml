@@ -1,0 +1,18 @@
+# Path to owning teams (keys of `teams` in variables.tf). Order is the CODEOWNERS order: the last match wins.
+rules:
+  - path: "*"
+    teams: [platform]
+  - path: "/vendor/hyperswitch/crates/router/**"
+    teams: [payments_core, security]
+  - path: "/vendor/card-vault/**"
+    teams: [payments_core, security]
+  - path: "/infra/live/cde-*/**"
+    teams: [platform, security]
+  - path: "/deploy/envs/*/cde-*/**"
+    teams: [platform, security]
+  - path: "/policy/**"
+    teams: [security]
+  - path: "/.claude/**"
+    teams: [platform]
+  - path: "/CLAUDE.md"
+    teams: [platform]

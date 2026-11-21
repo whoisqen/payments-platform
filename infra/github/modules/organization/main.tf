@@ -1,0 +1,7 @@
+resource "github_organization_settings" "this" {
+  billing_email                           = var.billing_email
+  default_repository_permission           = "none"
+  members_can_create_repositories         = false
+  members_can_create_public_repositories  = false
+  members_can_create_private_repositories = false
+}
