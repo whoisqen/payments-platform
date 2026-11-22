@@ -74,6 +74,7 @@ variable "instance_families" {
     workers  = ["m6g", "m7g", "m8g", "c7g", "c8g", "r7g", "m7i", "c7i"]
     ci       = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
     ci-prod  = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
+    ci-pr    = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
   }
 }
 
@@ -87,16 +88,17 @@ variable "cpu_limits" {
     workers  = 400
     ci       = 200
     ci-prod  = 100
+    ci-pr    = 100
   }
 }
 
 variable "enabled_pools" {
   type        = list(string)
-  description = "NodePools rendered for this cluster. Payments clusters keep the default; the shared-services cluster sets [\"ci\", \"ci-prod\"] so that CI pods never land on payments nodes and payment pools never exist next to runners."
+  description = "NodePools rendered for this cluster. Payments clusters keep the default; the shared-services cluster sets [\"ci\", \"ci-prod\", \"ci-pr\"] so that CI pods never land on payments nodes and payment pools never exist next to runners."
   default     = ["payments", "stateful", "cde", "workers"]
   validation {
-    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci", "ci-prod"], n)])
-    error_message = "enabled_pools may contain payments, stateful, cde, workers, ci and ci-prod only."
+    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci", "ci-prod", "ci-pr"], n)])
+    error_message = "enabled_pools may contain payments, stateful, cde, workers, ci, ci-prod and ci-pr only."
   }
   validation {
     condition     = !(anytrue([for n in var.enabled_pools : startswith(n, "ci")]) && anytrue([for n in var.enabled_pools : !startswith(n, "ci")]))

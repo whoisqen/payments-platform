@@ -27,6 +27,8 @@ locals {
     # Runner pods are never consolidated mid-job; ci-prod stays On-Demand so a release job is not lost to a Spot interruption.
     ci      = { taint = "ci", scope = "none", capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty" }
     ci-prod = { taint = "ci-prod", scope = "none", capacity = ["on-demand"], expire = "168h", grace = "1h", consolidation = "WhenEmpty" }
+    # Untrusted pull request code gets nodes of its own, never shared with ci-stage pods that hold IRSA tokens.
+    ci-pr = { taint = "ci-pr", scope = "none", capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty" }
   }
   pools = { for name, p in local.all_pools : name => merge({ scope = "cde" }, p) if contains(var.enabled_pools, name) }
 

@@ -145,12 +145,16 @@ run "ci_pools_in_shared_services" {
   command = plan
 
   variables {
-    enabled_pools = ["ci", "ci-prod"]
+    enabled_pools = ["ci", "ci-prod", "ci-pr"]
   }
 
   assert {
-    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 2 && !contains(keys(output.manifests), "nodepool-payments.yaml")
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 3 && !contains(keys(output.manifests), "nodepool-payments.yaml")
     error_message = "only the ci pools are rendered"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.template.spec.taints[0].value == "ci-pr" && yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.limits.cpu == "100"
+    error_message = "ci-pr has its own tainted pool"
   }
   assert {
     condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.spec.taints[0].value == "ci" && yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.template.spec.taints[0].value == "ci-prod"
