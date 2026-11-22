@@ -1,5 +1,6 @@
 # Differences of dev from the chart defaults; sizes are far below the production numbers of section 8
 global:
+  registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
   environment: dev
 
 router:

@@ -3,6 +3,7 @@ templates:
   - autoscaling.yaml
   - pdb.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: has a PodDisruptionBudget of 10 percent

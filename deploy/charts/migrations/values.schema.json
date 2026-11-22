@@ -11,7 +11,7 @@
       "additionalProperties": false,
       "required": ["repository", "digest"],
       "properties": {
-        "repository": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
         "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
       }

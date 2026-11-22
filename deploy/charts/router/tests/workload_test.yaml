@@ -2,6 +2,7 @@ suite: router workload
 templates:
   - workload.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: renders a canary Rollout pinned by digest
@@ -10,7 +11,7 @@ tests:
           of: Rollout
       - equal:
           path: spec.template.spec.containers[0].image
-          value: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/router@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          value: registry.example.test/acme/router@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - equal:
           path: spec.strategy.canary.steps[0].setWeight
           value: 1

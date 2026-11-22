@@ -5,6 +5,7 @@ templates:
   - networkpolicy.yaml
   - backfill-job.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   global.dataCidrs: ["10.0.0.0/16"]
   global.endpointCidrs: ["10.0.8.0/24"]

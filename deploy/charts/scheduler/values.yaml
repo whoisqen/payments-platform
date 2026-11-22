@@ -1,6 +1,6 @@
 # image.digest is supplied by deploy/envs/<env>/images.yaml (CI only); one image serves both flows
 image:
-  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/scheduler
+  repository: scheduler
   pullPolicy: IfNotPresent
 
 # Two producers at once are forbidden: Recreate plus the Lease and fencing inside the application

@@ -4,6 +4,7 @@ templates:
   - autoscaling.yaml
   - pdb.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: rolls with maxSurge 25 percent and no unavailable pod
