@@ -1,0 +1,20 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: dns-failure
+  namespace: payments
+  labels:
+    failure-mode: edge-dns-resolution-failure
+  annotations:
+    chaos.payments/hypothesis: "Name resolution of the MemoryDB endpoint fails for router: pooled connections keep serving, the DNS error alert fires and nothing is retried against a charge"
+    chaos.payments/stop-condition: "chaos-stop alarm, or confirm 5xx above 0.1% for 1 min"
+spec:
+  action: error
+  mode: all
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: router
+  patterns:
+    - "*.memorydb.eu-central-1.amazonaws.com"
+  duration: 5m

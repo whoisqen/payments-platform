@@ -1,0 +1,6 @@
+# Load forecast in TPS from section 1; min sizes for daily_peak, max for sale_peak.
+tps:
+  average: 160
+  daily_peak: 480
+  sale_peak: 1430
+  stress: 2860

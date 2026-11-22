@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: drainer-stall
+  namespace: payments
+  labels:
+    failure-mode: app-drainer-stall
+  annotations:
+    chaos.payments/hypothesis: "All drainer pods stall for 3 min: the Redis stream grows, the stream-length alert fires, after recovery drain lag returns below 5 s and INSERT ON CONFLICT leaves no duplicates"
+    chaos.payments/stop-condition: "chaos-stop alarm, or stream length above 50,000"
+spec:
+  action: pod-failure
+  mode: all
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: drainer
+  duration: 3m

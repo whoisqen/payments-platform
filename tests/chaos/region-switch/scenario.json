@@ -1,0 +1,48 @@
+{
+  "id": "region-switch-quarterly",
+  "decision": "D7",
+  "environment": "stage",
+  "target_region": "us-east-1",
+  "rto_target_min": 60,
+  "rpo": { "aurora_s": 10, "drain_lag_p99_s": 5, "psp_reconciliation_window_min": 5 },
+  "metrics": [
+    "aurora_global_lag_seconds",
+    "frankfurt_writes_per_s",
+    "writers_count",
+    "authorization_rate_delta_pp",
+    "platform_overhead_p99_ms",
+    "server_error_ratio",
+    "cache_warm_ratio",
+    "drain_lag_p99_s",
+    "unreconciled_charges"
+  ],
+  "preconditions": [
+    { "metric": "aurora_global_lag_seconds", "op": "<=", "value": 5 },
+    { "metric": "writers_count", "op": "==", "value": 1 }
+  ],
+  "steady_state": [
+    { "id": "S1", "hypothesis": "Test-merchant authorization rate is back within 2 pp of the baseline at the end of the RTO", "metric": "authorization_rate_delta_pp", "op": ">=", "value": -2 },
+    { "id": "S2", "hypothesis": "Platform overhead p99 meets the SLO after the switch", "metric": "platform_overhead_p99_ms", "op": "<", "value": 150 },
+    { "id": "S3", "hypothesis": "5xx on our side stays within the authorization SLO after the switch", "metric": "server_error_ratio", "op": "<", "value": 0.0001 },
+    { "id": "S4", "hypothesis": "Exactly one writer exists after the promotion", "metric": "writers_count", "op": "==", "value": 1 },
+    { "id": "S5", "hypothesis": "75% of the priority keys are warm before the cell takes traffic (D8)", "metric": "cache_warm_ratio", "op": ">=", "value": 0.75 },
+    { "id": "S6", "hypothesis": "Drain lag p99 is below 5 s once traffic runs", "metric": "drain_lag_p99_s", "op": "<", "value": 5 },
+    { "id": "S7", "hypothesis": "PSP reconciliation over the 5-minute window leaves no unrefunded duplicate charge", "metric": "unreconciled_charges", "op": "==", "value": 0 }
+  ],
+  "abort_conditions": [
+    { "id": "A1", "when_before": "promote-aurora", "metric": "frankfurt_writes_per_s", "op": ">", "value": 0, "reason": "Frankfurt is not fenced: promoting now would create two writers and a possible double charge" },
+    { "id": "A2", "when_before": "promote-aurora", "metric": "aurora_global_lag_seconds", "op": ">", "value": 10, "reason": "replication lag exceeds the 10 s RPO budget" },
+    { "id": "A3", "when_before": "traffic-switch", "metric": "authorization_rate_delta_pp", "op": "<", "value": -2, "reason": "test merchants outside the switched cell lost more than 2 pp of authorization rate" }
+  ],
+  "steps": [
+    { "id": "detect-confirm", "budget_min": 10, "after": [], "action": "alarm-quorum-and-oncall-confirmation" },
+    { "id": "fence-frankfurt", "budget_min": 2, "after": ["detect-confirm"], "action": "ssm:pay-dr-fence-frankfurt" },
+    { "id": "promote-aurora", "budget_min": 3, "after": ["fence-frankfurt"], "action": "ssm:pay-dr-promote-aurora", "point_of_no_return": true },
+    { "id": "create-aurora-instances", "budget_min": 12, "after": ["promote-aurora"], "action": "terragrunt:aurora-instances" },
+    { "id": "create-eks-base", "budget_min": 25, "after": ["fence-frankfurt"], "action": "terragrunt:eks-runners-vault-argocd" },
+    { "id": "create-memorydb", "budget_min": 15, "after": ["fence-frankfurt"], "action": "terragrunt:memorydb-from-aurora" },
+    { "id": "sync-cells-warmup", "budget_min": 15, "after": ["create-aurora-instances", "create-eks-base", "create-memorydb"], "action": "argocd:sync-cells-and-warm-cache" },
+    { "id": "traffic-switch", "budget_min": 2, "after": ["sync-cells-warmup"], "action": "global-accelerator:endpoint-weight" },
+    { "id": "verify-reconciliation", "budget_min": 5, "after": ["traffic-switch"], "action": "scheduler:psp-reconciliation", "post_rto": true }
+  ]
+}
