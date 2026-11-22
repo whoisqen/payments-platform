@@ -7,7 +7,7 @@ import yaml
 
 OBS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OBS / "coverage"))
-import coverage as cov  # noqa: E402
+import alert_coverage as cov  # noqa: E402
 
 CONFIG = yaml.safe_load((OBS / "alertmanager" / "alertmanager.yaml").read_text())
 ALERTS, _ = cov.load_rules([OBS / "alerts", OBS / "slo" / "generated"])

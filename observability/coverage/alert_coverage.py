@@ -109,7 +109,8 @@ def main(argv=None):
     metrics = set(json.loads((HERE / "metrics-catalog.json").read_text())["metrics"])
     targets = yaml.safe_load((HERE / "targets.yaml").read_text())["targets"]
     layers = compute(modes, alerts, recorded, metrics, targets)
-    unknown_alerts = sorted(set(alerts) - {m["alert"] for m in modes if m.get("alert")})
+    known = {m["id"] for m in modes}
+    unknown_alerts = sorted(n for n, r in alerts.items() if r.get("labels", {}).get("failure_mode") not in known)
     report = {"layers": layers, "alerts_without_failure_mode": unknown_alerts}
     Path(args.out).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     for name, layer in sorted(layers.items()):

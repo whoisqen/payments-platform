@@ -9,7 +9,7 @@ OBS = LIB.parent
 sys.path.insert(0, str(LIB))
 sys.path.insert(0, str(OBS / "coverage"))
 import build  # noqa: E402
-import coverage as cov  # noqa: E402
+import alert_coverage as cov  # noqa: E402
 
 FILES = sorted((OBS / "dashboards").rglob("*.json"))
 DOCS = {p: json.loads(p.read_text()) for p in FILES}

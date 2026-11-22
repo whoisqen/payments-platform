@@ -11,7 +11,7 @@ OBS = Path(__file__).resolve().parents[1]
 REPO = OBS.parent
 sys.path.insert(0, str(OBS / "coverage"))
 sys.path.insert(0, str(OBS / "lib"))
-import coverage as cov  # noqa: E402
+import alert_coverage as cov  # noqa: E402
 import thresholds  # noqa: E402
 
 ALERTS, RECORDED = cov.load_rules([OBS / "alerts", OBS / "slo" / "generated"])

@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "/data/vlad/portfolio/payments-platform/.claude/worktrees/agent-a1894cfe0c95fc100/observability/coverage")
-import coverage as cov  # noqa: E402
+import alert_coverage as cov  # noqa: E402
 
 OBS = Path("/data/vlad/portfolio/payments-platform/.claude/worktrees/agent-a1894cfe0c95fc100/observability")
 SOURCES = [
