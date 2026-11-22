@@ -460,6 +460,17 @@ class StructureLintTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("infra holds 11 files", out)
 
+    def test_root_allows_more_files(self):
+        root = Path(tempfile.mkdtemp(prefix="structure-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        for i in range(14):
+            (root / f"f{i}").write_text("x", encoding="utf-8")
+        self.assertEqual(run(REPO / "tools" / "lint" / "structure", root)[0], 0)
+        (root / "f14").write_text("x", encoding="utf-8")
+        code, out = run(REPO / "tools" / "lint" / "structure", root)
+        self.assertEqual(code, 1)
+        self.assertIn(". holds 15 files (limit 14)", out)
+
 
 SMALL = """---
 id: 001-example
