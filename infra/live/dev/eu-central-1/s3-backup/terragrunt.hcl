@@ -25,7 +25,7 @@ dependency "kms" {
       "spare"     = "arn:aws:kms:eu-central-1:000000000000:key/mrk-spare"
     }
   }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate"]
 }
 
 dependency "kms_use1" {
@@ -45,7 +45,7 @@ dependency "kms_use1" {
       "spare"     = "arn:aws:kms:us-east-1:000000000000:key/mrk-spare"
     }
   }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate"]
 }
 
 dependency "kms_use2" {
@@ -65,7 +65,7 @@ dependency "kms_use2" {
       "spare"     = "arn:aws:kms:us-east-2:000000000000:key/mrk-spare"
     }
   }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate"]
 }
 
 inputs = {

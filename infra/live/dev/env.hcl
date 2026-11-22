@@ -66,6 +66,15 @@ locals {
     }
   }
 
+  eks_log_retention_days = 30
+  # Pool CPU caps sized to the environment; the module default is prod-sized.
+  karpenter_cpu_limits = {
+    payments = 32
+    stateful = 16
+    cde      = 16
+    workers  = 32
+  }
+
   aurora_writer_class = "db.r7g.large"
   aurora_reader_class = "db.r7g.large"
   aurora_reader_count = 1

@@ -32,3 +32,8 @@ output "oidc_issuer" {
   value       = aws_iam_openid_connect_provider.this.url
   description = "Issuer URL without scheme."
 }
+
+output "locker_pod_security_group_id" {
+  value       = aws_security_group.locker_pod.id
+  description = "Pod security group of the locker pods; the only client the card-vault Aurora proxy admits."
+}

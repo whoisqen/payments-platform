@@ -18,7 +18,7 @@ locals {
     "vpc-cni" = {
       role_arn        = aws_iam_role.addon["vpc-cni"].arn
       service_account = "aws-node"
-      config          = jsonencode({ env = { ENABLE_PREFIX_DELEGATION = "true", WARM_PREFIX_TARGET = "1" } })
+      config          = jsonencode({ env = { ENABLE_PREFIX_DELEGATION = "true", WARM_PREFIX_TARGET = "1", ENABLE_POD_ENI = "true" } })
     }
   }
   after_compute = {
@@ -62,6 +62,12 @@ resource "aws_iam_role_policy_attachment" "cluster" {
 }
 
 # The key policy delegates to the account, so the cluster role gets its key rights on the IAM side.
+# Lets the VPC resource controller attach branch ENIs, which pod security groups (the locker pod group) need.
+resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
+  role       = aws_iam_role.cluster.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+}
+
 resource "aws_iam_role_policy" "cluster_secrets_key" {
   name = "secrets-encryption"
   role = aws_iam_role.cluster.id
@@ -81,7 +87,7 @@ resource "aws_eks_cluster" "this" {
   version                       = var.kubernetes_version
   enabled_cluster_log_types     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   bootstrap_self_managed_addons = false
-  deletion_protection           = var.environment == "prod"
+  deletion_protection           = var.environment != "dev"
 
   access_config {
     authentication_mode                         = "API"
@@ -149,6 +155,36 @@ resource "aws_security_group" "node" {
   description = "Nodes of ${local.name}; Karpenter selects it by id."
   vpc_id      = var.vpc_id
   tags        = merge(var.tags, { Name = "${local.name}-node" })
+}
+
+# Pod security group of the locker (card vault) pods, applied with a SecurityGroupPolicy in the locker namespace;
+# the card-vault Aurora proxy admits this group and no other group of the cluster.
+resource "aws_security_group" "locker_pod" {
+  name        = "${local.name}-locker-pod"
+  description = "Locker pods of ${local.name}; the only client group of the card-vault database proxy."
+  vpc_id      = var.vpc_id
+  tags        = merge(var.tags, { Name = "${local.name}-locker-pod" })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "locker_pod_from_node" {
+  security_group_id            = aws_security_group.locker_pod.id
+  referenced_security_group_id = aws_security_group.node.id
+  ip_protocol                  = "-1"
+  description                  = "Kubelet probes and mesh traffic from nodes"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "node_from_locker_pod" {
+  security_group_id            = aws_security_group.node.id
+  referenced_security_group_id = aws_security_group.locker_pod.id
+  ip_protocol                  = "-1"
+  description                  = "Locker pods to CoreDNS and cluster services"
+}
+
+resource "aws_vpc_security_group_egress_rule" "locker_pod_vpc" {
+  security_group_id = aws_security_group.locker_pod.id
+  cidr_ipv4         = var.vpc_cidr_block
+  ip_protocol       = "-1"
+  description       = "Inside the VPC"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "node_from_cluster" {
@@ -220,6 +256,11 @@ resource "aws_iam_role_policy_attachment" "bootstrap_node" {
 
 resource "aws_launch_template" "bootstrap" {
   name_prefix = "${local.name}-bootstrap-"
+
+  # The node group references the template by id and version, so a replacement needs the new one to exist first.
+  lifecycle {
+    create_before_destroy = true
+  }
 
   metadata_options {
     http_endpoint               = "enabled"
