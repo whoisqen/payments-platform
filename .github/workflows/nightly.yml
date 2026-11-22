@@ -1,0 +1,178 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "23 1 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  PLATFORMS: linux/arm64,linux/amd64
+
+jobs:
+  rebuild:
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [router, drainer, scheduler, locker, control-center]
+    env:
+      SERVICE: ${{ matrix.service }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: clean rebuild without any cache
+        run: |
+          # same inputs and settings as images.yml, so a graph that skipped a needed build shows up as a different digest
+          mapfile -t paths < <(python3 tools/ci/changed_images.py --paths "$SERVICE")
+          sha=$(git log -1 --format=%H -- "${paths[@]}")
+          epoch=$(git log -1 --format=%ct "$sha")
+          mapfile -t common < <(sed 's/^/--build-arg=/' docker/_common/build-args.env)
+          docker buildx build "${common[@]}" --no-cache \
+            --file "docker/${SERVICE}/Dockerfile" --platform "$PLATFORMS" \
+            --build-arg "SOURCE_DATE_EPOCH=${epoch}" --build-arg "REVISION=${sha}" \
+            --build-arg "CREATED=$(date -u -d "@${epoch}" +%Y-%m-%dT%H:%M:%SZ)" --build-arg "SOURCE_URL=${REPO_URL}" \
+            --output "type=oci,dest=${RUNNER_TEMP}/image.tar,rewrite-timestamp=true" \
+            --metadata-file "${RUNNER_TEMP}/meta.json" .
+          digest=$(python3 tools/ci/digest_compare.py metadata "${RUNNER_TEMP}/meta.json")
+          jq -n --arg s "$SERVICE" --arg d "$digest" --arg i "$sha" '{service: $s, digest: $d, sha: $i}' >"${RUNNER_TEMP}/rebuilt-${SERVICE}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rebuilt-${{ matrix.service }}
+          path: ${{ runner.temp }}/rebuilt-${{ matrix.service }}.json
+          retention-days: 14
+
+  compare:
+    needs: rebuild
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: rebuilt-*
+          merge-multiple: true
+          path: rebuilt
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ECR_READ }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: digests of the incremental builds
+        env:
+          PREFIX: ${{ vars.ECR_REPO_PREFIX }}
+        run: |
+          echo '{}' >reference.json
+          jq -s 'map({(.service): .digest}) | add' rebuilt/*.json >rebuilt.json
+          for f in rebuilt/*.json; do
+            svc=$(jq -r .service "$f")
+            sha=$(jq -r .sha "$f")
+            ref=$(aws ecr describe-images --repository-name "${PREFIX}/${svc}" --image-ids "imageTag=${sha}" \
+              --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)
+            if [[ $ref == sha256:* ]]; then jq --arg s "$svc" --arg d "$ref" '. + {($s): $d}' reference.json >tmp.json && mv tmp.json reference.json; fi
+          done
+      - run: python3 tools/ci/digest_compare.py compare --rebuilt rebuilt.json --reference reference.json
+
+  alert-graph:
+    needs: compare
+    if: failure()
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: the image graph missed a build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$REPO" --label incident --title "nightly: rebuilt digests differ from incremental builds" --body "See ${RUN_URL}."
+
+  discover:
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      dirs: ${{ steps.find.outputs.dirs }}
+      any: ${{ steps.find.outputs.any }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: find
+        run: |
+          # cde-* accounts are planned by their own Atlantis, never from this workflow
+          dirs='[]'
+          if [ -d infra/live ]; then
+            dirs=$(find infra/live -mindepth 4 -name terragrunt.hcl -not -path '*/_envcommon/*' -not -path '*/cde-*' -printf '%h\n' | sort | jq -R . | jq -sc .)
+          fi
+          echo "dirs=$dirs" >>"$GITHUB_OUTPUT"
+          echo "any=$(jq 'length > 0' <<<"$dirs")" >>"$GITHUB_OUTPUT"
+
+  drift:
+    needs: discover
+    if: needs.discover.outputs.any == 'true'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.dirs) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: terraform terragrunt
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TF_PLAN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: plan without apply
+        env:
+          DIR: ${{ matrix.dir }}
+        run: |
+          set +e
+          terragrunt run --non-interactive --working-dir "$DIR" -- plan -input=false -detailed-exitcode -lock=false
+          code=$?
+          if [ "$code" -eq 2 ]; then echo "::error::${DIR} drifted from its code"; fi
+          exit "$code"
+
+  alert-drift:
+    needs: drift
+    if: failure()
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$REPO" --label drift --title "nightly: infrastructure drift" --body "At least one component differs from infra/live; see ${RUN_URL}."
