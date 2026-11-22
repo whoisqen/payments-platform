@@ -1,0 +1,11 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-probes
+policies:
+  - require-probes.yaml
+resources:
+  - resources.yaml
+results:
+  - {policy: require-probes, isValidatingPolicy: true, kind: Pod, resources: [both-probes], result: pass}
+  - {policy: require-probes, isValidatingPolicy: true, kind: Pod, resources: [no-probes, readiness-only, second-container-bare], result: fail}

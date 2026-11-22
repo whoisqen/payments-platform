@@ -1,0 +1,11 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: restrict-registries
+policies:
+  - restrict-registries.yaml
+resources:
+  - resources.yaml
+results:
+  - {policy: restrict-registries, isValidatingPolicy: true, kind: Pod, resources: [own-ecr, recovery-region-ecr], result: pass}
+  - {policy: restrict-registries, isValidatingPolicy: true, kind: Pod, resources: [docker-hub, foreign-ecr, foreign-region, foreign-init], result: fail}

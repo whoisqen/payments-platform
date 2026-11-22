@@ -1,0 +1,27 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+# resource.List needs a live API server, so the offline test is policy/opa/kubernetes/require-pdb on rendered manifests.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-pdb
+  annotations:
+    policies.kyverno.io/title: Require PodDisruptionBudget
+    policies.kyverno.io/category: Reliability
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets]
+  matchConditions:
+    - name: more-than-one-replica
+      expression: "has(object.spec.replicas) && object.spec.replicas > 1"
+  variables:
+    - name: pdbs
+      expression: "resource.List('policy/v1', 'poddisruptionbudgets', object.metadata.namespace).items"
+  validations:
+    - expression: "dyn(variables.pdbs).exists(p, dyn(p.spec.selector.matchLabels).all(k, k in object.spec.template.metadata.labels && object.spec.template.metadata.labels[k] == p.spec.selector.matchLabels[k]))"
+      message: "A workload with more than one replica needs a PodDisruptionBudget that selects its pods."

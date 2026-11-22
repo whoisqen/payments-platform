@@ -1,0 +1,25 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+# The Kyverno CLI cannot evaluate CONNECT on a subresource, so its test has to be a chainsaw case in tests/nodes.
+# Time-boxed SRE-CDE access goes through a PolicyException with owner, reason and expiry, not through this policy.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: cde-no-exec
+  annotations:
+    policies.kyverno.io/title: No exec in the CDE
+    policies.kyverno.io/category: PCI DSS
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        pci-scope: cde
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CONNECT]
+        resources: [pods/exec, pods/attach]
+  validations:
+    - expression: "false"
+      message: "exec and attach into pods of the CDE are denied."

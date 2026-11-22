@@ -1,0 +1,26 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+# D3: the first init container takes the on-demand snapshot and waits until it is available, 35 days retention.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-migration-snapshot
+  annotations:
+    policies.kyverno.io/title: Require a snapshot before a migration
+    policies.kyverno.io/category: Backup
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs]
+  matchConditions:
+    - name: is-migration
+      expression: "object.?metadata.labels[?'app.kubernetes.io/component'].orValue('') == 'migration'"
+  validations:
+    - expression: "size(object.spec.template.spec.?initContainers.orValue([])) > 0 && object.spec.template.spec.initContainers[0].name == 'pre-migration-snapshot'"
+      message: "A migration Job must start with the pre-migration-snapshot init container that waits for an available snapshot."
+    - expression: "object.spec.template.spec.?initContainers.orValue([]).exists(c, c.name == 'pre-migration-snapshot' && c.env.exists(e, e.name == 'SNAPSHOT_RETENTION_DAYS' && e.value == '35'))"
+      message: "The pre-migration snapshot is kept 35 days (SNAPSHOT_RETENTION_DAYS=35)."

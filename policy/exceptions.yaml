@@ -1,0 +1,2 @@
+# Entry fields: rule (package name), resource (Terraform address or manifest name), owner (team), reason, expires (YYYY-MM-DD); an expired entry fails CI.
+exceptions: []

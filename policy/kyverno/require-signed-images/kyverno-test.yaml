@@ -1,0 +1,10 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-signed-images
+policies:
+  - require-signed-images.yaml
+resources:
+  - resources.yaml
+results:
+  - {policy: require-signed-images, isValidatingPolicy: true, kind: Pod, resources: [tag-without-digest, untagged], result: fail}

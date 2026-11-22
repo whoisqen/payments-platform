@@ -1,0 +1,96 @@
+{
+  "plans": {
+    "gold": {
+      "regions": {"@@assign": ["eu-central-1"]},
+      "rules": {
+        "hourly-35d": {
+          "schedule_expression": {"@@assign": "cron(0 * ? * * *)"},
+          "start_backup_window_minutes": {"@@assign": "60"},
+          "complete_backup_window_minutes": {"@@assign": "180"},
+          "enable_continuous_backup": {"@@assign": true},
+          "target_backup_vault_name": {"@@assign": "payments-backup"},
+          "lifecycle": {"delete_after_days": {"@@assign": "35"}},
+          "copy_actions": {
+            "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup": {
+              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup"},
+              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
+            },
+            "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup": {
+              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup"},
+              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
+            }
+          }
+        },
+        "monthly-7y": {
+          "schedule_expression": {"@@assign": "cron(0 3 1 * ? *)"},
+          "start_backup_window_minutes": {"@@assign": "60"},
+          "target_backup_vault_name": {"@@assign": "payments-backup"},
+          "lifecycle": {
+            "move_to_cold_storage_after_days": {"@@assign": "90"},
+            "delete_after_days": {"@@assign": "2555"}
+          }
+        }
+      },
+      "selections": {
+        "tags": {
+          "gold-resources": {
+            "iam_role_arn": {"@@assign": "arn:aws:iam::$account:role/aws-backup-service"},
+            "tag_key": {"@@assign": "backup-tier"},
+            "tag_value": {"@@assign": ["gold"]}
+          }
+        }
+      }
+    },
+    "silver": {
+      "regions": {"@@assign": ["eu-central-1"]},
+      "rules": {
+        "hourly-35d": {
+          "schedule_expression": {"@@assign": "cron(0 * ? * * *)"},
+          "start_backup_window_minutes": {"@@assign": "60"},
+          "complete_backup_window_minutes": {"@@assign": "180"},
+          "target_backup_vault_name": {"@@assign": "payments-backup"},
+          "lifecycle": {"delete_after_days": {"@@assign": "35"}},
+          "copy_actions": {
+            "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup": {
+              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup"},
+              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
+            },
+            "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup": {
+              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup"},
+              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
+            }
+          }
+        }
+      },
+      "selections": {
+        "tags": {
+          "silver-resources": {
+            "iam_role_arn": {"@@assign": "arn:aws:iam::$account:role/aws-backup-service"},
+            "tag_key": {"@@assign": "backup-tier"},
+            "tag_value": {"@@assign": ["silver"]}
+          }
+        }
+      }
+    },
+    "bronze": {
+      "regions": {"@@assign": ["eu-central-1"]},
+      "rules": {
+        "daily-14d": {
+          "schedule_expression": {"@@assign": "cron(0 2 * * ? *)"},
+          "start_backup_window_minutes": {"@@assign": "60"},
+          "target_backup_vault_name": {"@@assign": "payments-backup"},
+          "lifecycle": {"delete_after_days": {"@@assign": "14"}}
+        }
+      },
+      "selections": {
+        "tags": {
+          "bronze-resources": {
+            "iam_role_arn": {"@@assign": "arn:aws:iam::$account:role/aws-backup-service"},
+            "tag_key": {"@@assign": "backup-tier"},
+            "tag_value": {"@@assign": ["bronze"]}
+          }
+        }
+      }
+    }
+  }
+}

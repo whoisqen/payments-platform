@@ -1,0 +1,64 @@
+Resources:
+  TagSchema:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: platform-tag-schema
+      Description: Tag values follow policy/tagging/schema.yaml and the keys the managed REQUIRED_TAGS rule cannot hold are present.
+      Scope:
+        ComplianceResourceTypes: [AWS::RDS::DBCluster, AWS::RDS::DBInstance, AWS::DynamoDB::Table, AWS::S3::Bucket, AWS::EC2::Volume, AWS::EC2::Instance]
+      Source:
+        Owner: CUSTOM_POLICY
+        SourceDetails:
+          - {EventSource: aws.config, MessageType: ConfigurationItemChangeNotification}
+        CustomPolicyDetails:
+          PolicyRuntime: guard-2.x.x
+          EnableDebugLogDelivery: false
+          PolicyText: |
+            rule tag_schema {
+              tags.team exists
+              tags."cost-center" exists
+              tags.cell exists
+              tags.component exists
+              tags.repo exists
+              tags."environment" in ["dev", "stage", "prod"]
+              tags."pci-scope" in ["cde", "connected", "out-of-scope"]
+              tags."data-class" in ["card-data", "pii", "internal", "public"]
+              tags."backup-tier" in ["gold", "silver", "bronze", "none"]
+              tags."managed-by" in ["terraform", "argocd", "aft"]
+            }
+  GoldBucketObjectLock:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: platform-gold-bucket-object-lock
+      Description: A bucket tagged backup-tier gold has Object Lock enabled, also on the replicas in the recovery regions.
+      Scope:
+        ComplianceResourceTypes: [AWS::S3::Bucket]
+      Source:
+        Owner: CUSTOM_POLICY
+        SourceDetails:
+          - {EventSource: aws.config, MessageType: ConfigurationItemChangeNotification}
+        CustomPolicyDetails:
+          PolicyRuntime: guard-2.x.x
+          EnableDebugLogDelivery: false
+          PolicyText: |
+            rule gold_bucket_object_lock when tags."backup-tier" == "gold" {
+              supplementaryConfiguration.ObjectLockConfiguration.ObjectLockEnabled == "Enabled"
+            }
+  AuroraBackupRetention:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: platform-aurora-backup-retention
+      Description: An Aurora cluster keeps its continuous backup for 35 days (D2).
+      Scope:
+        ComplianceResourceTypes: [AWS::RDS::DBCluster]
+      Source:
+        Owner: CUSTOM_POLICY
+        SourceDetails:
+          - {EventSource: aws.config, MessageType: ConfigurationItemChangeNotification}
+        CustomPolicyDetails:
+          PolicyRuntime: guard-2.x.x
+          EnableDebugLogDelivery: false
+          PolicyText: |
+            rule aurora_backup_retention {
+              configuration.backupRetentionPeriod >= 35
+            }

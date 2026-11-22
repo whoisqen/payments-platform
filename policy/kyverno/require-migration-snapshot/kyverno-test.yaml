@@ -1,0 +1,11 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-migration-snapshot
+policies:
+  - require-migration-snapshot.yaml
+resources:
+  - resources.yaml
+results:
+  - {policy: require-migration-snapshot, isValidatingPolicy: true, kind: Job, resources: [migrate-with-snapshot], result: pass}
+  - {policy: require-migration-snapshot, isValidatingPolicy: true, kind: Job, resources: [migrate-no-snapshot, migrate-short-retention], result: fail}
