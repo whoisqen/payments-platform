@@ -56,10 +56,11 @@ generate "provider" {
 
 # Names that a module does not declare are ignored by Terraform, so one set of inputs serves every module.
 inputs = {
-  environment  = local.env
-  env          = local.env
-  region       = local.region
-  region_name  = local.region
-  region_short = local.region_short
-  account_id   = local.env_cfg.account_id
+  environment    = local.env
+  env            = local.env
+  region         = local.region
+  region_name    = local.region
+  region_short   = local.region_short
+  primary_region = local.cfg.regions.working
+  account_id     = local.env_cfg.account_id
 }

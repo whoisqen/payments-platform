@@ -67,7 +67,6 @@ variable "kms_key_arn" {
 variable "primary_region" {
   description = "Region of the writer cluster; source of the encrypted secondary clusters."
   type        = string
-  default     = "eu-central-1"
 }
 
 variable "engine_version" {
@@ -207,7 +206,6 @@ variable "lag_alarm_threshold_ms" {
 variable "region_name" {
   description = "AWS region of the provider; the key of the local parameter group and of a recovery cluster."
   type        = string
-  default     = "eu-central-1"
 }
 
 variable "proxy_secret_arn" {

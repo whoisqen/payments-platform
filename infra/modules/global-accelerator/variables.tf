@@ -31,8 +31,8 @@ variable "endpoint_groups" {
   description = "Endpoint group per region; only the writing region is active, recovery groups have weight 0 and dial 0 and usually no endpoints."
 
   validation {
-    condition     = alltrue([for r in keys(var.endpoint_groups) : contains(["eu-central-1", "us-east-1", "us-east-2"], r)])
-    error_message = "endpoint group regions must be eu-central-1, us-east-1 or us-east-2."
+    condition     = alltrue([for r in keys(var.endpoint_groups) : can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", r))])
+    error_message = "endpoint group keys must be AWS region names."
   }
 
   validation {

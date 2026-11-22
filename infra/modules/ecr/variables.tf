@@ -3,8 +3,8 @@ variable "region" {
   description = "Region of the provider this module instance runs in."
 
   validation {
-    condition     = contains(["eu-central-1", "us-east-1", "us-east-2"], var.region)
-    error_message = "region must be eu-central-1, us-east-1 or us-east-2."
+    condition     = can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", var.region))
+    error_message = "region must be an AWS region name such as eu-west-1."
   }
 }
 
@@ -51,8 +51,8 @@ variable "replication_regions" {
   description = "Recovery regions that receive every image; set only in the primary region, never to the region itself."
 
   validation {
-    condition     = alltrue([for r in var.replication_regions : contains(["us-east-1", "us-east-2"], r)]) && !contains(var.replication_regions, var.region)
-    error_message = "replication_regions may hold only us-east-1 and us-east-2, and not the module's own region."
+    condition     = alltrue([for r in var.replication_regions : can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", r))]) && !contains(var.replication_regions, var.region)
+    error_message = "replication_regions must be AWS region names and not the module's own region."
   }
 }
 

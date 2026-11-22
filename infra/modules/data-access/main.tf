@@ -1,5 +1,5 @@
 locals {
-  region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1", "us-east-2" = "use2" }[var.region]
+  region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   name         = "pay-${var.environment}-${local.region_short}-${var.component}"
 
   workload_sources = concat(
