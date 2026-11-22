@@ -87,7 +87,7 @@ jobs:
     if: needs.plan.outputs.hold != 'true'
     runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
     timeout-minutes: 15
-    # one environment changes at a time and a queued promotion is never dropped
+    # a running promotion is never cancelled; GitHub keeps only one pending run per group, see the report of the dev gap
     concurrency:
       group: promote-${{ needs.plan.outputs.env }}
       cancel-in-progress: false

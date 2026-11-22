@@ -45,6 +45,7 @@ jobs:
             --file "docker/${SERVICE}/Dockerfile" --platform "$PLATFORMS" \
             --build-arg "SOURCE_DATE_EPOCH=${epoch}" --build-arg "REVISION=${sha}" \
             --build-arg "CREATED=$(date -u -d "@${epoch}" +%Y-%m-%dT%H:%M:%SZ)" --build-arg "SOURCE_URL=${REPO_URL}" \
+            --provenance=false --sbom=false \
             --output "type=oci,dest=${RUNNER_TEMP}/image.tar,rewrite-timestamp=true" \
             --metadata-file "${RUNNER_TEMP}/meta.json" .
           digest=$(python3 tools/ci/digest_compare.py metadata "${RUNNER_TEMP}/meta.json")

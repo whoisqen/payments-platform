@@ -2,9 +2,13 @@
 FROM rust@sha256:6ae102bdbf528294bc79ad6e1fae682f6f7c2a6e6621506ba959f9685b308a55 AS tools
 ARG CHEF_VERSION=0.1.71
 ARG SCCACHE_VERSION=0.10.0
+ARG DEBIAN_SNAPSHOT=20261120T000000Z
+# a fixed snapshot keeps the apt libraries, and so the image digest, identical between builds
+RUN sed -i -e "s|http://deb.debian.org/debian-security|http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}|" \
+    -e "s|http://deb.debian.org/debian$|http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}|" /etc/apt/sources.list.d/debian.sources
 # protoc is needed by crates/external_services/build.rs, libpq by diesel
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends libpq-dev libssl-dev pkg-config protobuf-compiler
+    apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y --no-install-recommends libpq-dev libssl-dev pkg-config protobuf-compiler
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo install --locked cargo-chef --version "${CHEF_VERSION}" \
     && cargo install --locked sccache --version "${SCCACHE_VERSION}"
