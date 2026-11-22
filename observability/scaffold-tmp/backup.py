@@ -55,7 +55,7 @@ a(layer=L, group="restore", name="RestoreTestFailed", sev="critical", team=D, sv
   sym="The daily automatic restore into the scratch environment failed or its data check did not pass.",
   diag=["Read the restore automation log: restore, warm-up (pg_prewarm), row-count and checksum steps.", "Check quotas and KMS access of the restore role."],
   act=["Fix the cause and rerun the document `pay-runbook-restore-test-failed` for the store.", "Until it passes, take an extra on-demand backup and keep the previous passing one."],
-  esc="Escalate to the commander if the production restore path itself is broken.")
+  esc="Escalate to the commander if the prod restore path itself is broken.")
 
 a(layer=L, group="restore", name="RestoreDurationNearTarget", sev="warning", team=D, svc="restore-verifier", comp="restore-test", dash=BK,
   expr="max by (store) (backup_restore_duration_seconds) > 0.8 * max by (store) (backup_restore_target_seconds)", f="0m",

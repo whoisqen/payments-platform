@@ -1,0 +1,54 @@
+# kafka-exporter for consumer lag, then a PodMonitor for the MSK Open Monitoring JMX endpoint.
+kafkaServer:
+  - msk-bootstrap.kafka.internal:9094
+tls:
+  enabled: true
+  caSecret: {name: msk-exporter-tls, key: ca.crt}
+  certSecret: {name: msk-exporter-tls, key: tls.crt}
+  keySecret: {name: msk-exporter-tls, key: tls.key}
+extraArgs:
+  - --topic.filter=^(payment-events|payment-dlq|audit-events)$
+  - --group.filter=^(clickhouse-sink|s3-sink)$
+serviceMonitor:
+  enabled: false
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 128Mi}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kafka-exporter
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: prometheus-kafka-exporter}
+  endpoints:
+    - port: kafka-exporter
+      interval: 30s
+      relabelings:
+        - {action: replace, targetLabel: cluster, replacement: msk-main}
+      metricRelabelings:
+        - action: keep
+          sourceLabels: [__name__]
+          regex: kafka_(consumergroup_lag|brokers|topic_partitions)
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: msk-jmx
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: msk-jmx-proxy}
+  podMetricsEndpoints:
+    - port: jmx
+      interval: 60s
+      relabelings:
+        - {action: replace, targetLabel: cluster, replacement: msk-main}
+      metricRelabelings:
+        - action: keep
+          sourceLabels: [__name__]
+          regex: kafka_server_replicamanager_underreplicatedpartitions

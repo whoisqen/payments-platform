@@ -39,7 +39,7 @@ a(layer=L, group="certificates", name="CertificateExpiryCritical", sev="critical
   sum="A public endpoint certificate expires in less than 14 days",
   series=[('probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}', "864000x{n}", "5184000x{n}")],
   labels={"target": "api.payments.internal"},
-  failure="certificate about to expire", impact="clients and PSP webhooks reject the connection after expiry",
+  failure="certificate about to expire", impact="merchants and PSP webhooks reject the connection after expiry",
   sym="A certificate seen by the blackbox probes expires within 14 days; automatic renewal did not happen.",
   diag=["Check cert-manager `Certificate` and `CertificateRequest` status for the target.", "Check the ACME or ACM validation DNS records (Route 53).", "Check that the probe sees the same certificate from all three probe points."],
   act=["Force a renewal with the document step `renew-certificate` (cert-manager `cmctl renew` equivalent through the audited workflow).", "If validation fails, fix the DNS record in Terraform and re-run.", "Verify the new expiry from all probe points before closing."],
@@ -57,11 +57,11 @@ a(layer=L, group="edge", name="Route53HealthCheckFailing", sev="critical", team=
 
 a(layer=L, group="certificates", name="PspMtlsCertExpiring30d", sev="warning", team="platform", svc="egress", comp="psp-mtls", dash="edge",
   expr='min by (name) (certmanager_certificate_expiration_timestamp_seconds{name=~"psp-mtls-.*"}) - time() < 30 * 86400', f="10m",
-  sum="A PSP mTLS client certificate expires in less than 30 days",
+  sum="A PSP mTLS certificate expires in less than 30 days",
   series=[('certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}', "864000x{n}", "5184000x{n}")],
   labels={"name": "psp-mtls-acme"},
   failure="PSP mTLS certificate about to expire", impact="calls to that PSP are rejected after expiry",
-  sym="The mTLS client certificate used towards a PSP expires within 30 days.",
+  sym="The mTLS certificate we present to a PSP expires within 30 days.",
   diag=["Check the cert-manager `Certificate` for the PSP and its issuer.", "Check whether the PSP must register the new certificate first."],
   act=["Request the renewal; if the PSP needs a registration, open the ticket with the PSP contact from the connector record.", "Roll the secret through Vault and verify with a test call from stage."],
   esc="Raise to platform on-call when less than 7 days remain.")

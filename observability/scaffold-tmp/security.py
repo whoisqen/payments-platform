@@ -43,7 +43,7 @@ a(layer=L, group="detection", name="PanDetectedInLogs", sev="security", team=S, 
   esc="Open a security incident and a PCI-impact note; never paste the matched value into a ticket.")
 
 event("RootAccountLogin", "root_login", "cloudtrail", "iam", "An AWS root account login happened",
-      "root account login", "the root user bypasses every control; PCI DSS 8.2",
+      "root account login", "the root account bypasses every control; PCI DSS 8.2",
       "CloudTrail recorded a root console login or API call.",
       ["Read the event: source IP, MFA used, account.", "Check whether a break-glass procedure was opened for it."],
       ["If it is not an approved break-glass, reset the root credentials and MFA with the account owner and review all actions of the session."],

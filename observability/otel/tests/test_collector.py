@@ -73,10 +73,10 @@ class PanRedactionTest(unittest.TestCase):
 
 class SecretRedactionTest(unittest.TestCase):
     def test_tokens_keys_and_private_keys(self):
-        jwt = ".".join(base64.urlsafe_b64encode(part).decode().rstrip("=") for part in (b'{"alg":"none"}', b'{"sub":"user"}', b"signature-bytes"))
+        jwt = ".".join(base64.urlsafe_b64encode(part).decode().rstrip("=") for part in (b'{"alg":"none"}', b'{"sub":"svc"}', b"signature-bytes"))
         samples = [
             "Authorization: Bearer " + "x" * 24,
-            "Authorization: Basic " + base64.b64encode(b"user:passw0rd-demo").decode(),
+            "Authorization: Basic " + base64.b64encode(b"svc:passw0rd-demo").decode(),
             "key " + "AKIA" + "Q" * 16,
             "jwt " + jwt,
             "-----BEGIN " + "RSA PRIVATE KEY-----",

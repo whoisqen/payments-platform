@@ -80,7 +80,7 @@ a(layer=L, group="components", name="Router5xxRateHigh", sev="warning", team=T, 
   failure="router errors", impact="failed requests; the SLO burn alerts page when it burns the budget",
   sym="More than 1% of the responses of a cell are 5xx.",
   diag=["Split the errors by route and error source on the router dashboard.", "Check the last rollout of the cell."],
-  act=["Roll back the cell if the errors started with a rollout.", "Close the cell with document step `close-cell` only on the commander's order."],
+  act=["Roll back the cell if the errors started with a rollout.", "Close the cell with document step `close-cell` only on the commander's decision."],
   esc="Ticket to payments-core; the SLO burn alert is the page.")
 
 a(layer=L, group="components", name="LockerErrorRateHigh", sev="critical", team=T, svc="locker", comp="locker", dash="locker",

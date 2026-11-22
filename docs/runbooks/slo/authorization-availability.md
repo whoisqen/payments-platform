@@ -5,7 +5,7 @@ SLO 99.99% of `POST /payments/{id}/confirm` without a platform-side 5xx; the bud
 
 ## Symptom
 
-The router answers `confirm` with 5xx attributable to the platform (`fault="platform"`); PSP and bank declines are not counted. At 50x the whole monthly budget is gone in under an hour.
+The router answers `confirm` with 5xx attributable to the platform (`fault="platform"`); PSP errors and declines are not counted. At 50x the whole monthly budget is gone in under an hour.
 
 ## Diagnostics
 

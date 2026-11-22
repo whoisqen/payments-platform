@@ -29,8 +29,8 @@ a(layer=L, group="aurora", name="AuroraReplicaLagHigh", sev="warning", team="dat
   series=[('aws_rds_aurora_replica_lag_maximum{cell="cell-1"}', "2500x{n}", "20x{n}")],
   failure="reader replica lag", impact="stale reads; reader promotion would lose recent rows",
   sym="CloudWatch reports an in-cluster replica lag above 1000 ms (the metric is in milliseconds).",
-  diag=["Check write volume and long transactions in `pg_stat_activity`.", "Check the reader instance CPU and IOPS."],
-  act=["Cancel the long transaction if it is not a migration.", "Scale the reader up through Terraform if the load is sustained."],
+  diag=["Check write volume and long-running statements in `pg_stat_activity`.", "Check the reader instance CPU and IOPS."],
+  act=["Cancel the long-running statement if it is not a migration.", "Scale the reader up through Terraform if the load is sustained."],
   esc="Ticket to data-platform; page only through the writer alert.")
 
 a(layer=L, group="aurora", name="AuroraConnectionsHigh", sev="warning", team="data-platform", svc="aurora", comp="aurora", dash=DS,
@@ -58,7 +58,7 @@ a(layer=L, group="aurora", name="AuroraDeadlocks", sev="warning", team="data-pla
   expr="sum by (cell) (rate(pg_stat_database_deadlocks[5m])) > 0", f="5m",
   sum="Aurora reports deadlocks",
   series=[('pg_stat_database_deadlocks{cell="cell-1"}', "0+1x{n}", "0+0x{n}")],
-  failure="deadlocks", impact="failed transactions; the drainer retries the batch",
+  failure="deadlocks", impact="failed statements; the drainer retries the batch",
   sym="Deadlocks are counted continuously for 5 minutes.",
   diag=["Read the deadlock details in the Aurora log (pgaudit is not needed)."],
   act=["Fix the lock order in the code or the migration that causes it."],

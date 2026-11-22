@@ -51,7 +51,7 @@ dependencies:
     cap: 500ms
     jitter: full
     idempotent: true
-    notes: Reads and transactions safe to repeat (serialization failure); DDL is never retried.
+    notes: Reads and database commits safe to repeat (serialization failure); DDL is never retried.
   kafka-producer:
     kind: write
     timeout: 30s

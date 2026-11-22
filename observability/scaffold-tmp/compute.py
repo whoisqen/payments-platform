@@ -39,7 +39,7 @@ a(layer=L, group="workloads", name="PodOOMKilled", sev="warning", team="payments
   series=[('kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments-cell-1",pod="router-7c9",container="router"}', "1x{n}", "0x{n}"),
           ('kube_pod_container_status_restarts_total{namespace="payments-cell-1",pod="router-7c9",container="router"}', "0+1x{n}", "0+0x{n}")],
   labels={"namespace": "payments-cell-1", "pod": "router-7c9", "container": "router"},
-  failure="container killed for memory", impact="in-flight requests are lost and retried by the client; repeated kills reduce capacity",
+  failure="container killed for memory", impact="in-flight requests are lost and retried by the caller; repeated kills reduce capacity",
   sym="A container exceeded its memory limit and was killed within the last 10 minutes.",
   diag=["Compare memory working set with the limit over the last day on the service dashboard.", "Check for a leak after a new version: compare with the previous digest."],
   act=["Raise the limit through the chart values if the growth is legitimate.", "Roll back if a new version leaks memory."],
