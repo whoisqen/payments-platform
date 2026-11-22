@@ -53,7 +53,7 @@ run "recovery_region_holds_only_a_template" {
     replication_regions = []
 
     create_replica_template = true
-    replica_kms_key_arn = "arn:aws:kms:us-east-1:333333333333:key/mrk-0123456789abcdef0123456789abcdef"
+    replica_kms_key_arn     = "arn:aws:kms:us-east-1:333333333333:key/mrk-0123456789abcdef0123456789abcdef"
   }
 
   assert {
