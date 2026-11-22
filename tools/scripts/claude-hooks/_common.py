@@ -12,10 +12,10 @@ def payload():
         return {}
 
 
-def init_root(p):
-    # A task worktree lives outside the session root, so the root comes from the payload cwd.
+def init_root(p, path=None):
+    # A worktree is its own root: start from the edited file when there is one, else from the payload cwd.
     global ROOT
-    start = Path(p.get("cwd") or os.getcwd()).resolve()
+    start = Path(path).resolve().parent if path else Path(p.get("cwd") or os.getcwd()).resolve()
     for d in (start, *start.parents):
         if (d / ".claude" / "orchestration.yaml").is_file():
             ROOT = d

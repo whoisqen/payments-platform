@@ -187,6 +187,30 @@ def check_progress(sp, n, items, deps):
             err(n, f"{w}: a done task must name its pull request (`#N` or the URL)")
 
 
+def check_small(sp, n, text, fm, cfg, cde):
+    # A small spec is one file: goal, acceptance criteria and tasks; no plan.md or tasks.md.
+    body = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.S)
+    if len([x for x in body.splitlines() if x.strip()]) > 30:
+        err(n, "a small spec has at most 30 non-empty lines; use tier full")
+    for s in ("Goal", "Acceptance criteria", "Tasks"):
+        if not has_section(text, s):
+            err(n, f"small spec lacks section `## {s}`")
+    if fm.get("pci-impact") == "yes":
+        err(n, "a change with PCI impact needs tier full")
+    for f in ("plan.md", "tasks.md"):
+        if (sp / f).exists():
+            err(n, f"a small spec has no {f}")
+    for i in tasks(text):
+        paths = inline_list(i.get("paths", "[]"))
+        if any(overlap(x, c) for x in paths for c in cde):
+            err(n, f"task {i.get('id')}: a CDE path needs tier full")
+        agent = i.get("agent")
+        if agent not in cfg["agents"]:
+            err(n, f"task {i.get('id')}: unknown agent `{agent}`")
+    h1 = re.search(rf"^# {re.escape(n)}:\s*(.+)$", text, re.M)
+    return {"title": h1.group(1).strip() if h1 else "", "status": fm.get("status", ""), "milestone": fm.get("milestone", "")}
+
+
 def check_spec(sp, cfg, cde, bad_terms):
     n = sp.name
     if not (sp / "spec.md").exists():
@@ -194,6 +218,8 @@ def check_spec(sp, cfg, cde, bad_terms):
         return None
     text = (sp / "spec.md").read_text(encoding="utf-8")
     fm = front_matter(text) or {}
+    if fm.get("tier") == "small":
+        return check_small(sp, n, text, fm, cfg, cde)
     draft_only = fm.get("status") == "draft" and not ((sp / "plan.md").exists() or (sp / "tasks.md").exists())
     if not draft_only:
         for f in ("plan.md", "tasks.md"):

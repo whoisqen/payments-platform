@@ -1,0 +1,34 @@
+# Always read. The smallest picture of the platform; details live in the other manifests and one architecture section.
+project: payments-platform
+purpose: multi-tenant payment orchestrator on Hyperswitch (vendor/ is upstream code)
+components:
+  router: {lang: rust, role: public API, inbound PSP webhooks, cde: true}
+  locker: {lang: rust, role: card vault, only place PAN lives, shared by all cells, cde: true}
+  drainer: {lang: rust, role: Redis stream to Aurora write-behind, cde: true}
+  scheduler: {lang: rust, role: delayed jobs, PSP sync, outgoing webhooks, cde: connected}
+  control-center: {lang: typescript, role: merchant dashboard, cde: false}
+  analytics: {stores: [msk, clickhouse, opensearch], cde: false}
+cells: {working: [cell-0, cell-1, cell-2, cell-3], spare: spare, routing: DynamoDB map merchant_id -> cell}
+regions:
+  working: eu-central-1        # the only region that writes; 3 AZs
+  recovery: [us-east-1, us-east-2]  # data and backups only, compute created at the switch
+environments: [dev, stage, prod, cde-prod]   # sizes in manifests/environment.yaml
+accounts: [management, log-archive, audit, network, shared-services, backup, cde-dev, cde-stage, cde-prod, platform-dev, platform-stage, platform-prod]
+naming: "pay-<env>-<region-short>-<component>"   # region-short: euc1, use1, use2, glob
+tags: [environment, team, owner, cost-center, cell, component, pci-scope, data-class, backup-tier, managed-by, repo]
+delivery:
+  branches: one trunk `main`; short-lived `<type>/<n>-<slug>`; agents `agent/<area>-<slug>`
+  environments: directories, never branches (deploy/envs/<env>/..., infra/live/<env>/<region>/<component>)
+  apps: image built once per merge (digest, cosign, SBOM); promotion is a PR changing deploy/envs/<env>/images.yaml; dev automatic, stage approve, prod approve SRE and security with canary per cell
+  infra: PR runs terragrunt plan for changed infra/live/<env>/**; apply after merge per environment through GitHub Environments; prod and cde-prod need approval
+  tags: v* SemVer, created only by the tagging workflow after a prod rollout in all cells
+layout:
+  infra/modules/<name>: terraform modules (manifests/infrastructure.yaml)
+  infra/live/<env>/<region>/<component>: terragrunt stacks
+  infra/github: repository settings as code (applied)
+  deploy/charts, deploy/envs, deploy/platform, deploy/argocd: helm and argocd
+  policy/: scp, opa, kyverno, config, semgrep, tagging
+  observability/: slo, alerts, dashboards, exporters, otel
+  tests/: load, chaos, smoke, e2e, contracts
+  specs/: specifications (tiers in AGENTS.md); docs/requirements: SRS
+architecture_source: "~/.claude/projects/-data-vlad-portfolio-payments-platform/memory/architecture/README.md (index; read one section only)"

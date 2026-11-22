@@ -136,6 +136,12 @@ def check(msg, files, rev, label):
     if spec == "none":
         if trailers.get("Spec-Exempt") == "owner-directed":
             return
+        if trailers.get("Spec-Exempt") == "trivial":
+            domains = {f.split("/")[0] for f in gated}
+            if len(gated) <= 3 and len(domains) == 1 and not any(matches(f, cde_patterns(rev)) for f in files):
+                return
+            err("`Spec-Exempt: trivial` allows at most 3 files in one domain and no CDE path")
+            return
         if trailers.get("Spec-Exempt") == "bootstrap" and not has_specs(rev):
             return
         if (trailers.get("Spec-Exempt") == "upstream-import" and subject.startswith("chore(vendor):")
@@ -155,7 +161,7 @@ def check(msg, files, rev, label):
     status = re.search(r"^status:\s*(\S+)", text, re.M)
     if not status or status.group(1) not in OPEN:
         err(f"{sdir} has status `{status.group(1) if status else '?'}`; it must be approved or in-progress")
-    tasks_text = show(rev, f"{sdir}/tasks.md") or ""
+    tasks_text = show(rev, f"{sdir}/tasks.md") or show(rev, f"{sdir}/spec.md") or ""  # small specs keep tasks in spec.md
     if not re.fullmatch(r"#[1-9]\d*", task_issue(tasks_text, tid)):
         err(f"task {tid} has no GitHub issue yet; create the issues after the approval and fill `issue` before committing work")
     pf = show(rev, f"{sdir}/progress/{tid}.md") or ""

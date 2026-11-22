@@ -8,3 +8,5 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 .claude/settings.local.json
+.worktrees/
+.claude/worktrees/

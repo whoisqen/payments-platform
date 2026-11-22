@@ -132,6 +132,20 @@ class GateTest(unittest.TestCase):
         self.write("infra/a.tf")
         self.assertEqual(self.gate("feat(infra): add a\n\nSpec: none\nSpec-Exempt: owner-directed")[0], 0)
 
+    def test_trivial_exemption_within_limits(self):
+        self.write("infra/a.tf")
+        self.write("infra/b.tf")
+        self.assertEqual(self.gate("fix(infra): fix a\n\nSpec: none\nSpec-Exempt: trivial")[0], 0)
+
+    def test_trivial_exemption_rejects_two_domains_or_cde(self):
+        self.write("infra/a.tf")
+        self.write("deploy/b.yaml")
+        self.assertEqual(self.gate("fix(infra): fix a\n\nSpec: none\nSpec-Exempt: trivial")[0], 1)
+
+    def test_trivial_exemption_rejects_cde_path(self):
+        self.write("vendor/card-vault/src/x.rs")
+        self.assertEqual(self.gate("fix(locker): fix x\n\nSpec: none\nSpec-Exempt: trivial\nPCI-Impact: none")[0], 1)
+
     def test_unknown_task(self):
         self.approved_spec()
         self.write("infra/modules/x/main.tf")

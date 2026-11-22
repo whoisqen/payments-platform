@@ -56,6 +56,18 @@ class PreEdit(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class Worktree(unittest.TestCase):
+    def test_root_comes_from_the_edited_file(self):
+        import shutil, tempfile
+        wt = Path(tempfile.mkdtemp(prefix="wt-"))
+        self.addCleanup(shutil.rmtree, wt, True)
+        (wt / ".claude").mkdir()
+        shutil.copy(REPO / ".claude" / "orchestration.yaml", wt / ".claude" / "orchestration.yaml")
+        ok = hook("pre_edit.py", {"tool_input": {"file_path": str(wt / "infra" / "modules" / "x" / "main.tf")}, "agent_type": "terraform-engineer"})
+        bad = hook("pre_edit.py", {"tool_input": {"file_path": str(wt / "deploy" / "x.yaml")}, "agent_type": "terraform-engineer"})
+        self.assertEqual((ok[0], bad[0]), (0, 2))
+
+
 class PreBash(unittest.TestCase):
     def test_git_global_option_does_not_hide_commit(self):
         code, _ = bash("git -c user.name=a commit -m 'x Co-Authored-By: Claude <noreply@anthropic.com>'")

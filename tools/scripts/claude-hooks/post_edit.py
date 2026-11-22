@@ -6,10 +6,10 @@ import _common
 from _common import payload, block, init_root
 
 _p = payload()
-init_root(_p)
+path = (_p.get("tool_input") or {}).get("file_path")
+init_root(_p, path if isinstance(path, str) else None)
 ROOT = _common.ROOT
 
-path = (_p.get("tool_input") or {}).get("file_path")
 r = _common.rel(path) if path else None
 if not r or not (ROOT / r).is_file():
     raise SystemExit(0)

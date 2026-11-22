@@ -11,11 +11,11 @@ PROTECTED = ["tools/scripts/claude-hooks/**", "tools/lint/**", "policy/cde-paths
 
 def main():
     p = payload()
-    init_root(p)
     agent = agent_of(p)
     if not agent:
         raise SystemExit(0)
     path = (p.get("tool_input") or {}).get("file_path")
+    init_root(p, path if isinstance(path, str) else None)
     r = _common.rel(path) if path else None
     if r is None:
         block(f"agent {agent}: writing outside the repository is forbidden: {path}")

@@ -1,0 +1,30 @@
+# Read when sizing, scaling or choosing capacity types.
+dev:
+  scale: all workloads, minimum replicas (1-2), one working cell (cell-0) plus spare
+  eks_nodes: spot
+  aurora: {writer: db.r7g.large, readers: 0}
+  memorydb: {node_type: db.r7g.large, shards: 1, replicas_per_shard: 1}
+  msk: {brokers: 3, instance: kafka.m7g.large}
+  clickhouse: {shards: 1, replicas: 1}
+  recovery_regions: none
+stage:
+  scale: same as prod (4 cells plus spare, same replicas and instance classes)
+  eks_nodes: spot with interruption handling and PDB
+  recovery_regions: [us-east-1, us-east-2]
+prod:
+  scale: reference size of the architecture (section 5 and 8)
+  eks_nodes: on-demand, covered by Reserved Instances or Savings Plans (bought by FinOps, not by Terraform)
+  aurora: {writer: db.r7g.12xlarge, readers: 1 x db.r7g.4xlarge, io_optimized: true}
+  memorydb: {node_type: db.r7g.xlarge, shards: 2, replicas_per_shard: 2}
+  msk: {brokers: 9, instance: kafka.m7g.xlarge}
+  clickhouse: {shards: 4, replicas: 2}
+  recovery_regions: [us-east-1, us-east-2]
+cde-prod: same as prod, CDE accounts only
+rules:
+  - CDE node pools are never spot in any environment
+  - managed data stores have no spot; spot applies to EKS nodes only
+  - every environment runs every workload; only scale and capacity type differ
+ci_runners:
+  where: shared-services EKS cluster with Actions Runner Controller
+  scale_sets: {ci-prod: high PriorityClass with preemption, ci-stage: low PriorityClass, ci-pr: separate pool without write roles}
+  nodes: shared Karpenter NodePool; its limit caps the cost

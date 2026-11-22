@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude
 from _common import ROOT  # noqa: E402
 
 LIMIT = 10
-SKIP = {".git", ".terraform", "node_modules", "__pycache__", "vendor", ".claude"}
+SKIP = {".git", ".terraform", "node_modules", "__pycache__", "vendor", ".claude", ".worktrees"}
 bad = []
 for d, dirs, files in os.walk(ROOT):
     dirs[:] = [x for x in dirs if x not in SKIP]

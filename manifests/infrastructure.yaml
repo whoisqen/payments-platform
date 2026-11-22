@@ -1,0 +1,28 @@
+# Read when wiring Terraform. Modules live in infra/modules/<name>; each has tests/ with mock_provider "aws".
+known_inconsistency: data modules take env and region_short, foundation modules take environment and region; unify when touching a module
+modules:
+  kms: {purpose: CMK, multi-Region primary or replica, out: [key_arn, key_id, alias_name]}
+  vpc: {purpose: 3-AZ VPC with tiers and endpoints, out: [vpc_id, subnet_ids, private_route_table_ids, data_route_table_ids, endpoint_security_group_id]}
+  network-firewall: {purpose: egress allowlist, NAT, static EIPs for PSP allowlists, out: [firewall_arn, egress_public_ips, nat_gateway_ids]}
+  transit-gateway: {purpose: TGW, route tables, RAM, out: [transit_gateway_id, route_table_ids, attachment_ids]}
+  ecr: {purpose: repositories, replication to recovery regions, out: [repository_urls, repository_arns]}
+  global-accelerator: {purpose: static anycast IPs, endpoint groups (recovery weight 0), out: [static_ips, endpoint_group_arns]}
+  dns-certs: {purpose: Route 53 zone, ACM, out: [zone_id, certificate_arns]}
+  ci-oidc-roles: {purpose: GitHub OIDC, plan and apply roles, out: [plan_role_arn, apply_role_arns]}
+  aurora-global: {purpose: cell or locker cluster, RDS Proxy, headless secondaries, lag alarm, key_inputs: [region_role, recovery_regions, writer_instance_class, reader_count]}
+  memorydb: {purpose: cell hot state, out: [cluster_endpoint]}
+  dynamodb-global: {purpose: merchant to cell map, MREC replicas, out: [table_arn, deny_recovery_writes_policy_arn]}
+  msk: {purpose: event stream and S3 sink, out: [bootstrap_brokers_sasl_iam, sink_bucket_policy_statements]}
+  s3-backup: {purpose: locked backup buckets, RTC replication, lifecycle tiers, out: [bucket_arns]}
+  backup: {purpose: AWS Backup vaults, plans by backup-tier tag, copy actions, restore testing, out: [vault_arns, plan_ids]}
+  opensearch: {purpose: log search, out: [endpoint]}
+  secrets-replica: {purpose: Secrets Manager multi-Region replicas, out: [secret_arns]}
+stacks:
+  bootstrap: infra/bootstrap (state bucket, lockfile, KMS, CI roles; apply with local state first)
+  accounts: infra/aft-account-requests (one yaml per OU)
+  github: infra/github (applied to whoisqen/payments-platform in user-account mode)
+  live: infra/live/<env>/<region>/<component> (in progress on branch agent/infra-eks-live)
+in_progress_branches:
+  agent/infra-eks-live: eks, karpenter, iam-workloads, terragrunt live skeleton
+  agent/ci-pipelines: workflows, Dockerfiles, Makefile, failover runbook script
+  agent/observability: slo, alerts, dashboards, exporters, runbooks
