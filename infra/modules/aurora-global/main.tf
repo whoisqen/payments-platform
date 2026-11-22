@@ -25,7 +25,8 @@ locals {
     { name = "pgaudit.log", value = "ddl,role", apply_method = "immediate" },
   ]
 
-  proxy_enabled    = local.working || var.recovery_instance_count > 0
+  # A recovery region gets a proxy only once it serves reads and has a secret to read.
+  proxy_enabled    = local.working || (var.recovery_instance_count > 0 && var.proxy_secret_arn != null)
   proxy_cluster_id = local.working ? aws_rds_cluster.primary[0].id : aws_rds_cluster.secondary[var.region_name].id
   proxy_secret_arn = local.working ? aws_rds_cluster.primary[0].master_user_secret[0].secret_arn : var.proxy_secret_arn
 }
@@ -173,7 +174,7 @@ resource "aws_rds_cluster" "secondary" {
   tags = var.tags
 }
 
-# Instances appear in a recovery region only at the switch, through recovery_instance_count.
+# Readers of a warm-standby region; writes still go to the working region only.
 resource "aws_rds_cluster_instance" "recovery" {
   count = local.working ? 0 : var.recovery_instance_count
 
@@ -182,7 +183,7 @@ resource "aws_rds_cluster_instance" "recovery" {
   cluster_identifier              = aws_rds_cluster.secondary[var.region_name].id
   engine                          = aws_rds_cluster.secondary[var.region_name].engine
   engine_version                  = aws_rds_cluster.secondary[var.region_name].engine_version
-  instance_class                  = var.writer_instance_class
+  instance_class                  = coalesce(var.recovery_instance_class, var.reader_instance_class)
   availability_zone               = var.availability_zones[count.index % 3]
   promotion_tier                  = count.index == 0 ? 0 : 1
   performance_insights_enabled    = true

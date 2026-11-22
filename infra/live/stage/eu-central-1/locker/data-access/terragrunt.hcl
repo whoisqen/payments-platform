@@ -27,8 +27,8 @@ dependency "eks_cell_0" {
   config_path = "../../cell-0/eks"
 
   mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
@@ -38,8 +38,8 @@ dependency "eks_cell_1" {
   config_path = "../../cell-1/eks"
 
   mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
@@ -49,8 +49,8 @@ dependency "eks_cell_2" {
   config_path = "../../cell-2/eks"
 
   mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
@@ -60,8 +60,8 @@ dependency "eks_cell_3" {
   config_path = "../../cell-3/eks"
 
   mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
@@ -71,8 +71,8 @@ dependency "eks_spare" {
   config_path = "../../spare/eks"
 
   mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
@@ -90,7 +90,7 @@ inputs = {
     dependency.eks_spare.outputs.locker_pod_security_group_id,
   ]
   stores = {
-    aurora       = { port = 5432, clients = "aurora-proxy" }
+    aurora = { port = 5432, clients = "aurora-proxy" }
     # Clients are the locker pod security groups only (PCI DSS 1.4); no cell-wide node group is listed.
     aurora-proxy = { port = 5432, clients = "workload" }
   }
