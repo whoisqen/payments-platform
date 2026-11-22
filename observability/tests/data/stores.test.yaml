@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_dynamodb_throttled_requests_sum{table_name="merchant-cell-map"}
     values: 0+3x21
@@ -20,9 +23,12 @@ tests:
         table_name: merchant-cell-map
       exp_annotations:
         summary: DynamoDB throttles requests
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#dynamo-db-throttling
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#dynamo-db-throttling
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_dynamodb_throttled_requests_sum{table_name="merchant-cell-map"}
     values: 0+0x21
@@ -31,6 +37,9 @@ tests:
     alertname: DynamoDbThrottling
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
     values: 900x26
@@ -48,9 +57,12 @@ tests:
         cluster: analytics
       exp_annotations:
         summary: ClickHouse replication delay above 5 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-replication-lag
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#click-house-replication-lag
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
     values: 2x26
@@ -60,12 +72,18 @@ tests:
     alertname: ClickHouseReplicationLag
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
     values: 2x9 900x1 2x14
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
     values: 450x31
@@ -83,9 +101,12 @@ tests:
         cluster: analytics
       exp_annotations:
         summary: ClickHouse has too many parts per partition
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-merge-backlog
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#click-house-merge-backlog
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
     values: 20x31
@@ -95,12 +116,18 @@ tests:
     alertname: ClickHouseMergeBacklog
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
     values: 20x9 450x1 20x19
   alert_rule_test:
   - *id002
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
     values: 10x26
@@ -121,9 +148,12 @@ tests:
         instance: ch-1
       exp_annotations:
         summary: ClickHouse disk has less than 15% free
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-disk-low
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#click-house-disk-low
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
     values: 60x26
@@ -135,6 +165,9 @@ tests:
     alertname: ClickHouseDiskLow
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
     values: 60x9 10x1 60x14
@@ -143,6 +176,9 @@ tests:
   alert_rule_test:
   - *id003
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
     values: 1x21
@@ -160,9 +196,12 @@ tests:
         domain_name: audit
       exp_annotations:
         summary: OpenSearch domain status is red
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/open-search-cluster-red.md
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/open-search-cluster-red.md
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
     values: '0x21'
@@ -172,12 +211,18 @@ tests:
     alertname: OpenSearchClusterRed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
     values: 0x9 1x1 0x9
   alert_rule_test:
   - *id004
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_free_storage_space_minimum{domain_name="audit"}
     values: 10000x26
@@ -195,9 +240,12 @@ tests:
         domain_name: audit
       exp_annotations:
         summary: OpenSearch has less than 20 GiB free per node
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#open-search-disk-low
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#open-search-disk-low
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_free_storage_space_minimum{domain_name="audit"}
     values: 90000x26
@@ -207,6 +255,9 @@ tests:
     alertname: OpenSearchDiskLow
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_es_free_storage_space_minimum{domain_name="audit"}
     values: 90000x9 10000x1 90000x14

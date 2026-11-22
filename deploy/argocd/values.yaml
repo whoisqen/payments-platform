@@ -8,3 +8,5 @@ cluster:
   region: ""
 github:
   configUrl: ""
+observability:
+  grafanaUrl: ""

@@ -8,3 +8,5 @@ cluster:
   region: eu-central-1
 github:
   configUrl: https://git.example.test/acme
+observability:
+  grafanaUrl: https://grafana.example.test

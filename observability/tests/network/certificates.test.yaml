@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
     values: 864000x26
@@ -20,9 +23,12 @@ tests:
         target: api.payments.internal
       exp_annotations:
         summary: A public endpoint certificate expires in less than 14 days
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/certificate-expiry-critical.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/certificate-expiry-critical.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
     values: 5184000x26
@@ -32,12 +38,18 @@ tests:
     alertname: CertificateExpiryCritical
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
     values: 5184000x9 864000x1 5184000x14
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
     values: 864000x26
@@ -55,9 +67,12 @@ tests:
         name: psp-mtls-acme
       exp_annotations:
         summary: A PSP mTLS client certificate expires in less than 30 days
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#psp-mtls-cert-expiring30d
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/warnings.md#psp-mtls-cert-expiring30d
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
     values: 5184000x26
@@ -67,6 +82,9 @@ tests:
     alertname: PspMtlsCertExpiring30d
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
     values: 5184000x9 864000x1 5184000x14

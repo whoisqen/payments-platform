@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_up{role="writer",cell="cell-1"}
     values: '0x19'
@@ -21,9 +24,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: The Aurora writer of a cell does not answer
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-writer-unavailable.md
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/aurora-writer-unavailable.md
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_up{role="writer",cell="cell-1"}
     values: 1x19
@@ -32,6 +38,9 @@ tests:
     alertname: AuroraWriterUnavailable
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
     values: 20000000000x26
@@ -50,9 +59,12 @@ tests:
         slot_name: cdc_clickhouse
       exp_annotations:
         summary: A replication slot retains more than 10 GiB of WAL
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-replication-slot-lag-high.md
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/aurora-replication-slot-lag-high.md
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
     values: 1000x26
@@ -62,12 +74,18 @@ tests:
     alertname: AuroraReplicationSlotLagHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
     values: 1000x9 20000000000x1 1000x14
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
     values: 2500x21
@@ -85,9 +103,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Aurora replica lag is above 1 second
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-replica-lag-high
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#aurora-replica-lag-high
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
     values: 20x21
@@ -97,12 +118,18 @@ tests:
     alertname: AuroraReplicaLagHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
     values: 20x9 2500x1 20x9
   alert_rule_test:
   - *id002
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
     values: 900x21
@@ -123,9 +150,12 @@ tests:
         instance: writer
       exp_annotations:
         summary: Aurora connections exceed 80% of the limit
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-connections-high
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#aurora-connections-high
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
     values: 100x21
@@ -137,6 +167,9 @@ tests:
     alertname: AuroraConnectionsHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
     values: 100x9 900x1 100x9
@@ -145,6 +178,9 @@ tests:
   alert_rule_test:
   - *id003
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
     values: 92x31
@@ -163,9 +199,12 @@ tests:
         instance: writer
       exp_annotations:
         summary: Aurora CPU above 80% for 15 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-cpu-high
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#aurora-cpu-high
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
     values: 30x31
@@ -175,12 +214,18 @@ tests:
     alertname: AuroraCpuHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
     values: 30x9 92x1 30x19
   alert_rule_test:
   - *id004
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_stat_database_deadlocks{cell="cell-1"}
     values: 0+1x21
@@ -198,9 +243,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Aurora reports deadlocks
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-deadlocks
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#aurora-deadlocks
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_stat_database_deadlocks{cell="cell-1"}
     values: 0+0x21
@@ -209,6 +257,9 @@ tests:
     alertname: AuroraDeadlocks
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_table_size_bytes{cell="cell-1",relname="payment_attempt"}
     values: 100x1440 300x1514
@@ -227,9 +278,12 @@ tests:
         relname: payment_attempt
       exp_annotations:
         summary: A table grew more than 20% in a day
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-table-growth-fast
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#aurora-table-growth-fast
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pg_table_size_bytes{cell="cell-1",relname="payment_attempt"}
     values: 100x1514

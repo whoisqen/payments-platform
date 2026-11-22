@@ -29,6 +29,12 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/kube-prometheus/values.yaml
+            # Alert annotations build their links from these labels, see observability/alerts
+            parameters:
+              - name: prometheus.prometheusSpec.externalLabels.runbook_base_url
+                value: {{ printf "%s/blob/%s" .Values.repo.url .Values.repo.revision | quote }}
+              - name: prometheus.prometheusSpec.externalLabels.grafana_url
+                value: {{ .Values.observability.grafanaUrl | quote }}
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values

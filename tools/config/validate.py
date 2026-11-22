@@ -13,7 +13,7 @@ REQUIRED = {
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
     "accounts": ["shared_services", "dev", "stage"],
     "regions": ["working", "recovery"],
-    "dns": ["dev_zone", "stage_zone", "psp_domains"],
+    "dns": ["dev_zone", "stage_zone", "psp_domains", "grafana_url"],
     "storage": ["state_bucket_prefix"],
 }
 ACCOUNT = re.compile(r"^\d{12}$")

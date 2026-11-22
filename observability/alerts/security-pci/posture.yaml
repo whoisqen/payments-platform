@@ -22,8 +22,8 @@ spec:
         failure_mode: security-pci-kms-key-rotation-overdue
       annotations:
         summary: A KMS key is past its rotation date
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kms-key-rotation-overdue
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/security-pci/warnings.md#kms-key-rotation-overdue'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
     - alert: KyvernoAuditViolations
       expr: sum by (policy_name) (increase(kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit"}[1h])) > 0
       for: 10m
@@ -36,5 +36,5 @@ spec:
         failure_mode: security-pci-kyverno-audit-violations
       annotations:
         summary: Kyverno audit policies report violations
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kyverno-audit-violations
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/security-pci/warnings.md#kyverno-audit-violations'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'

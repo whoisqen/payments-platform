@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: http_server_requests_total{service="router",code="500",cell="cell-1"}
     values: 0+30x21
@@ -22,9 +25,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Router 5xx rate above 1% in a cell
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#router5xx-rate-high
-        dashboard_url: https://grafana.payments.internal/d/router
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#router5xx-rate-high
+        dashboard_url: https://grafana.example.test/d/router
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: http_server_requests_total{service="router",code="500",cell="cell-1"}
     values: 0+0x21
@@ -35,6 +41,9 @@ tests:
     alertname: Router5xxRateHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: http_server_requests_total{service="locker",code="500"}
     values: 0+10x21
@@ -53,9 +62,12 @@ tests:
         failure_mode: application-locker-error-rate-high
       exp_annotations:
         summary: Locker 5xx rate above 1%
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/locker-error-rate-high.md
-        dashboard_url: https://grafana.payments.internal/d/locker
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/locker-error-rate-high.md
+        dashboard_url: https://grafana.example.test/d/locker
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: http_server_requests_total{service="locker",code="500"}
     values: 0+0x21
@@ -66,6 +78,9 @@ tests:
     alertname: LockerErrorRateHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: drain_lag_seconds{cell="cell-1"}
     values: 20x21
@@ -83,9 +98,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Drain lag above 5 seconds
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/drain-lag-high.md
-        dashboard_url: https://grafana.payments.internal/d/drainer
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/drain-lag-high.md
+        dashboard_url: https://grafana.example.test/d/drainer
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: drain_lag_seconds{cell="cell-1"}
     values: 0.5x21
@@ -95,12 +113,18 @@ tests:
     alertname: DrainLagHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: drain_lag_seconds{cell="cell-1"}
     values: 0.5x9 20x1 0.5x9
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
     values: 80000x21
@@ -119,9 +143,12 @@ tests:
         stream: payments-drain
       exp_annotations:
         summary: A Redis stream holds more than 50000 entries
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/redis-stream-backlog.md
-        dashboard_url: https://grafana.payments.internal/d/drainer
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/redis-stream-backlog.md
+        dashboard_url: https://grafana.example.test/d/drainer
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
     values: 100x21
@@ -131,12 +158,18 @@ tests:
     alertname: RedisStreamBacklog
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
     values: 100x9 80000x1 100x9
   alert_rule_test:
   - *id002
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
     values: 900x21
@@ -154,9 +187,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: The oldest scheduler task waits more than 10 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/scheduler-queue-delay-high.md
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/scheduler-queue-delay-high.md
+        dashboard_url: https://grafana.example.test/d/scheduler
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
     values: 5x21
@@ -166,12 +202,18 @@ tests:
     alertname: SchedulerQueueDelayHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
     values: 5x9 900x1 5x9
   alert_rule_test:
   - *id003
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: dlq_depth{queue="webhooks"}
     values: 4x31
@@ -189,9 +231,12 @@ tests:
         queue: webhooks
       exp_annotations:
         summary: A dead-letter queue is not empty
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#dlq-not-empty
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#dlq-not-empty
+        dashboard_url: https://grafana.example.test/d/scheduler
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: dlq_depth{queue="webhooks"}
     values: '0x31'
@@ -201,12 +246,18 @@ tests:
     alertname: DlqNotEmpty
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: dlq_depth{queue="webhooks"}
     values: 0x9 4x1 0x19
   alert_rule_test:
   - *id004
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
     values: 700x26
@@ -224,9 +275,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Outgoing webhooks wait more than 5 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#webhook-backlog-old
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#webhook-backlog-old
+        dashboard_url: https://grafana.example.test/d/scheduler
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
     values: 5x26
@@ -236,12 +290,18 @@ tests:
     alertname: WebhookBacklogOld
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
     values: 5x9 700x1 5x14
   alert_rule_test:
   - *id005
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: reconciliation_amount_mismatch_total{psp="acme"}
     values: 0+1x26
@@ -259,9 +319,12 @@ tests:
         psp: acme
       exp_annotations:
         summary: Daily PSP reconciliation found amount mismatches
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#reconciliation-mismatch
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#reconciliation-mismatch
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: reconciliation_amount_mismatch_total{psp="acme"}
     values: 0+0x26
@@ -270,6 +333,9 @@ tests:
     alertname: ReconciliationMismatch
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kube_job_status_failed{job_name="migrate-router-20261120",namespace="payments-cell-1"}
     values: 1x19
@@ -288,9 +354,12 @@ tests:
         namespace: payments-cell-1
       exp_annotations:
         summary: A migration job failed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#migration-job-failed
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#migration-job-failed
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kube_job_status_failed{job_name="migrate-router-20261120",namespace="payments-cell-1"}
     values: '0x19'

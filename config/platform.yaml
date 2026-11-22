@@ -29,6 +29,7 @@ dns:
   dev_zone: dev.pay.example.com
   stage_zone: stage.pay.example.com
   psp_domains: [.psp-sandbox.example.com]
+  grafana_url: https://grafana.payments.internal
 
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>

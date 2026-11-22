@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: payments_unknown_state_stale{cell="cell-1"}
     values: 12x26
@@ -19,9 +22,12 @@ tests:
         failure_mode: application-unknown-state-payments-stale
       exp_annotations:
         summary: Payments stay in the unknown state for more than 15 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#unknown-state-payments-stale
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#unknown-state-payments-stale
+        dashboard_url: https://grafana.example.test/d/scheduler
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: payments_unknown_state_stale{cell="cell-1"}
     values: '0x26'
@@ -31,12 +37,18 @@ tests:
     alertname: UnknownStatePaymentsStale
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: payments_unknown_state_stale{cell="cell-1"}
     values: 0x9 12x1 0x14
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: synthetic_payment_success{probe_point="use1"}
     values: '0x19'
@@ -57,9 +69,12 @@ tests:
         failure_mode: application-synthetic-payment-failing
       exp_annotations:
         summary: Synthetic payment fails from at least two of three probe points
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/synthetic-payment-failing.md
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/synthetic-payment-failing.md
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: synthetic_payment_success{probe_point="use1"}
     values: 1x19

@@ -14,7 +14,7 @@ slos:
       labels: {service: router}
       annotations:
         summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/payment-status-read.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
       page_alert: {labels: {severity: critical}}
       ticket_alert: {labels: {severity: warning}}
