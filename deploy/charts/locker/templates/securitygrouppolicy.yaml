@@ -1,0 +1,15 @@
+{{- $cfg := .Values.securityGroupPolicy -}}
+{{- $ctx := dict "root" . "cfg" .Values "name" "locker" "component" "locker" -}}
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: locker
+  labels:
+    {{- include "platform-common.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" $ctx | nindent 6 }}
+  securityGroups:
+    groupIds:
+      {{- toYaml $cfg.securityGroupIds | nindent 6 }}

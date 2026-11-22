@@ -595,6 +595,23 @@
     },
     "platform-common": {
       "type": "object"
+    },
+    "securityGroupPolicy": {
+      "type": "object",
+      "properties": {
+        "securityGroupIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(sg-[0-9a-f]+|REPLACE_LOCKER_POD_SG_ID)$"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "securityGroupIds"
+      ]
     }
   },
   "additionalProperties": false,
@@ -608,6 +625,7 @@
     "autoscaling",
     "pdb",
     "networkPolicy",
-    "serviceAccount"
+    "serviceAccount",
+    "securityGroupPolicy"
   ]
 }
