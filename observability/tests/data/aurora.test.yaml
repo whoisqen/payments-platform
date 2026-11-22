@@ -1,0 +1,239 @@
+rule_files:
+- ../../alerts/data/aurora.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: pg_up{role="writer",cell="cell-1"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraWriterUnavailable
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-writer-unavailable
+        role: writer
+        cell: cell-1
+      exp_annotations:
+        summary: The Aurora writer of a cell does not answer
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-writer-unavailable.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: pg_up{role="writer",cell="cell-1"}
+    values: 1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraWriterUnavailable
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
+    values: 20000000000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: AuroraReplicationSlotLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-replication-slot-lag-high
+        cell: cell-1
+        slot_name: cdc_clickhouse
+      exp_annotations:
+        summary: A replication slot retains more than 10 GiB of WAL
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-replication-slot-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
+    values: 1000x26
+  alert_rule_test:
+  - &id001
+    eval_time: 22m
+    alertname: AuroraReplicationSlotLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: pg_replication_slots_wal_lag_bytes{cell="cell-1",slot_name="cdc_clickhouse"}
+    values: 1000x9 20000000000x1 1000x14
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
+    values: 2500x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AuroraReplicaLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-replica-lag-high
+        cell: cell-1
+      exp_annotations:
+        summary: Aurora replica lag is above 1 second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-replica-lag-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
+    values: 20x21
+  alert_rule_test:
+  - &id002
+    eval_time: 17m
+    alertname: AuroraReplicaLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_replica_lag_maximum{cell="cell-1"}
+    values: 20x9 2500x1 20x9
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
+    values: 900x21
+  - series: pg_settings_max_connections{cell="cell-1",instance="writer"}
+    values: 1000x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AuroraConnectionsHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-connections-high
+        cell: cell-1
+        instance: writer
+      exp_annotations:
+        summary: Aurora connections exceed 80% of the limit
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-connections-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
+    values: 100x21
+  - series: pg_settings_max_connections{cell="cell-1",instance="writer"}
+    values: 1000x21
+  alert_rule_test:
+  - &id003
+    eval_time: 17m
+    alertname: AuroraConnectionsHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: pg_stat_database_numbackends{cell="cell-1",instance="writer"}
+    values: 100x9 900x1 100x9
+  - series: pg_settings_max_connections{cell="cell-1",instance="writer"}
+    values: 1000x9 1000x1 1000x9
+  alert_rule_test:
+  - *id003
+- interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
+    values: 92x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: AuroraCpuHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-cpu-high
+        cell: cell-1
+        instance: writer
+      exp_annotations:
+        summary: Aurora CPU above 80% for 15 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-cpu-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
+    values: 30x31
+  alert_rule_test:
+  - &id004
+    eval_time: 27m
+    alertname: AuroraCpuHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_rds_cpuutilization_average{cell="cell-1",instance="writer"}
+    values: 30x9 92x1 30x19
+  alert_rule_test:
+  - *id004
+- interval: 1m
+  input_series:
+  - series: pg_stat_database_deadlocks{cell="cell-1"}
+    values: 0+1x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AuroraDeadlocks
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-deadlocks
+        cell: cell-1
+      exp_annotations:
+        summary: Aurora reports deadlocks
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-deadlocks
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: pg_stat_database_deadlocks{cell="cell-1"}
+    values: 0+0x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AuroraDeadlocks
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: pg_table_size_bytes{cell="cell-1",relname="payment_attempt"}
+    values: 100x1440 300x1514
+  alert_rule_test:
+  - eval_time: 1510m
+    alertname: AuroraTableGrowthFast
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-table-growth-fast
+        cell: cell-1
+        relname: payment_attempt
+      exp_annotations:
+        summary: A table grew more than 20% in a day
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-table-growth-fast
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: pg_table_size_bytes{cell="cell-1",relname="payment_attempt"}
+    values: 100x1514
+  alert_rule_test:
+  - eval_time: 1510m
+    alertname: AuroraTableGrowthFast
+    exp_alerts: []

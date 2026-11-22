@@ -1,0 +1,108 @@
+# Secrets are mounted as files by the external-secrets operator; no secret value lives in Git.
+global:
+  resolve_timeout: 5m
+
+templates:
+  - templates/*.tmpl
+
+route:
+  receiver: slack-payments-alerts
+  group_by: [alertname, region, psp]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - receiver: deadmans-switch
+      matchers: [alertname="Watchdog"]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+    - receiver: pagerduty-security
+      matchers: [severity="security"]
+      group_by: [alertname, region]
+      repeat_interval: 1h
+    - matchers: [severity="critical"]
+      group_by: [alertname, region, psp]
+      repeat_interval: 1h
+      receiver: pagerduty-payments-core
+      routes:
+        - receiver: pagerduty-platform
+          matchers: [team="platform"]
+        - receiver: pagerduty-data-platform
+          matchers: [team="data-platform"]
+        - receiver: pagerduty-security
+          matchers: [team="security"]
+        - receiver: pagerduty-observability
+          matchers: [team="observability"]
+    - receiver: slack-payments-alerts
+      matchers: [severity="warning"]
+
+receivers:
+  - name: pagerduty-payments-core
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty-payments-core
+        severity: critical
+        description: '{{ template "pd.description" . }}'
+        details:
+          runbook_url: '{{ .CommonAnnotations.runbook_url }}'
+          dashboard_url: '{{ .CommonAnnotations.dashboard_url }}'
+          failure_mode: '{{ .CommonLabels.failure_mode }}'
+  - name: pagerduty-platform
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty-platform
+        severity: critical
+        description: '{{ template "pd.description" . }}'
+        details: {runbook_url: '{{ .CommonAnnotations.runbook_url }}', dashboard_url: '{{ .CommonAnnotations.dashboard_url }}', failure_mode: '{{ .CommonLabels.failure_mode }}'}
+  - name: pagerduty-data-platform
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty-data-platform
+        severity: critical
+        description: '{{ template "pd.description" . }}'
+        details: {runbook_url: '{{ .CommonAnnotations.runbook_url }}', dashboard_url: '{{ .CommonAnnotations.dashboard_url }}', failure_mode: '{{ .CommonLabels.failure_mode }}'}
+  - name: pagerduty-observability
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty-observability
+        severity: critical
+        description: '{{ template "pd.description" . }}'
+        details: {runbook_url: '{{ .CommonAnnotations.runbook_url }}', dashboard_url: '{{ .CommonAnnotations.dashboard_url }}', failure_mode: '{{ .CommonLabels.failure_mode }}'}
+  - name: pagerduty-security
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty-security
+        severity: critical
+        description: '{{ template "pd.description" . }}'
+        details: {runbook_url: '{{ .CommonAnnotations.runbook_url }}', dashboard_url: '{{ .CommonAnnotations.dashboard_url }}', failure_mode: '{{ .CommonLabels.failure_mode }}'}
+  - name: slack-payments-alerts
+    slack_configs:
+      - api_url_file: /etc/alertmanager/secrets/slack-payments-alerts
+        channel: '#payments-alerts'
+        send_resolved: true
+        title: '{{ template "slack.title" . }}'
+        text: '{{ template "slack.text" . }}'
+  - name: deadmans-switch
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/deadmans-switch-url
+        send_resolved: false
+
+# A source silences only alerts of its own region, PSP, node or SLO, never security alerts.
+inhibit_rules:
+  - source_matchers: [alertname="RegionDown"]
+    target_matchers: [severity=~"critical|warning", alertname!="RegionDown"]
+    equal: [region]
+  - source_matchers: [alertname="PSPDegraded"]
+    target_matchers: ['alertname=~"AuthorizationRateDrop|PspLatencyP99High|PspCircuitBreakerOpen"']
+    equal: [psp]
+  - source_matchers: [alertname="NodeNotReady"]
+    target_matchers: ['alertname=~"CrashLoopBackOff"']
+    equal: [node]
+  - source_matchers: ['alertname=~".*BurnFast|.*BurnFastest"']
+    target_matchers: ['alertname=~".*BurnSlow|.*BurnTicket"']
+    equal: [slo]
+  - source_matchers: [alertname="AuroraGlobalLagRpoBudgetExceeded"]
+    target_matchers: [alertname="AuroraGlobalLagHigh"]
+    equal: [global_cluster, region]
+  - source_matchers: [alertname="RestoreTooSlow"]
+    target_matchers: [alertname="RestoreDurationNearTarget"]
+    equal: [store]
+  - source_matchers: [alertname="DrainLagHigh"]
+    target_matchers: [alertname="RedisStreamBacklog"]
+    equal: [cell]

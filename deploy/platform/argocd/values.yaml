@@ -1,0 +1,22 @@
+configs:
+  cm:
+    # Annotation tracking lets hook resources of the migrations chart coexist with Helm labels
+    application.resourceTrackingMethod: annotation
+  params:
+    # TLS ends at the load balancer in front of the UI
+    server.insecure: true
+
+controller:
+  metrics:
+    enabled: true
+
+server:
+  metrics:
+    enabled: true
+
+applicationSet:
+  metrics:
+    enabled: true
+
+redis-ha:
+  enabled: true

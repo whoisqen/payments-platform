@@ -1,0 +1,44 @@
+# Capacity of one pod; confirmed_per_pod is written from the last breakpoint run (tests/load/scenarios/breakpoint.js).
+target_utilization: 0.7
+max_headroom: 1.5
+cells: 4
+regression_threshold: 0.15
+components:
+  router:
+    unit: rps
+    scope: cell
+    # Baseline is the Hyperswitch reference; target needs the tuning confirmed by the breakpoint test.
+    baseline_per_pod: 15
+    target_per_pod: 60
+    confirmed_per_pod: null
+    load_per_tps: 7
+    min_floor: 3
+    ram_gb_per_pod: 3
+  locker:
+    unit: rps
+    scope: shared
+    baseline_per_pod: 300
+    target_per_pod: 300
+    confirmed_per_pod: null
+    load_per_tps: 2.4
+    min_floor: 3
+  drainer:
+    unit: rows_per_s
+    scope: cell
+    baseline_per_pod: 1500
+    target_per_pod: 1500
+    confirmed_per_pod: null
+    load_per_tps: 10
+    min_floor: 3
+  scheduler-consumer:
+    unit: tasks_per_s
+    scope: cell
+    baseline_per_pod: 200
+    target_per_pod: 200
+    confirmed_per_pod: null
+    load_per_tps: 3
+    min_floor: 3
+  scheduler-producer:
+    unit: none
+    scope: cell
+    fixed_replicas: 2

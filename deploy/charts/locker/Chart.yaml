@@ -1,0 +1,10 @@
+apiVersion: v2
+name: locker
+description: Card vault, the only place a PAN lives, canary-rolled by Istio weight
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

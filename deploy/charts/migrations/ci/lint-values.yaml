@@ -1,0 +1,3 @@
+# Offline lint and chart-testing only; real digests come from deploy/envs/<env>/images.yaml
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

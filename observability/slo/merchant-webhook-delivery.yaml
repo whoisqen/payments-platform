@@ -1,0 +1,20 @@
+version: prometheus/v1
+service: payments-webhooks
+labels: {team: payments-core, owner: payments-core-oncall, layer: application}
+slos:
+  - name: delivery
+    objective: 99.9
+    description: Share of outgoing merchant webhooks delivered within 60 s of the event.
+    sli:
+      events:
+        error_query: sum(rate(webhook_events_total{service="scheduler"}[{{.window}}])) - sum(rate(webhook_delivery_seconds_bucket{service="scheduler",le="60"}[{{.window}}]))
+        total_query: sum(rate(webhook_events_total{service="scheduler"}[{{.window}}]))
+    alerting:
+      name: PaymentsWebhookDelivery
+      labels: {service: scheduler}
+      annotations:
+        summary: Webhook delivery within 60 s is burning the 99.9% error budget
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/merchant-webhook-delivery.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+      page_alert: {labels: {severity: critical}}
+      ticket_alert: {labels: {severity: warning}}

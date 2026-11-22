@@ -17,5 +17,12 @@ Use the canonical term. `/glossary-check` flags the terms in the last column whe
 | environment | dev, stage, prod, pr-N | staging, production in resource names |
 | promotion | Moving a digest to the next environment through a PR | release, deploy |
 | runbook | The instruction for an alert or an operation in `docs/runbooks/` | playbook (reserved for Ansible) |
+| cell | An independent copy of the stack (EKS cluster, router, drainer, scheduler, MemoryDB, Aurora) serving a share of the merchants; four working cells | |
+| spare cell | The fifth cell without merchants, kept in a minimal profile and raised to the prod profile to take a hot merchant | |
+| error budget | (1 - SLO) x 43,200 minutes over 30 days | |
+| write-behind | The router keeps payment state in key-value storage and the drainer writes it to PostgreSQL in batches; router never writes to PostgreSQL on the hot path | |
+| drain lag SLO | p99 of the drain lag under 5 s; alert when the Redis stream length exceeds 50,000 | |
+| working region | The only region that accepts writes: Frankfurt (eu-central-1) | |
+| recovery region | A region that receives data and backups continuously but runs no compute until the switch: us-east-1, and us-east-2 as the second | |
 
 Resource naming: `<domain>-<env>-<region-short>-<component>`, for example `pay-prod-euc1-router` or `pay-prod-euw1-aurora-payments`.

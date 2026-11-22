@@ -1,0 +1,53 @@
+{
+  "tags": {
+    "environment": {
+      "tag_key": {"@@assign": "environment"},
+      "tag_value": {"@@assign": ["dev", "stage", "prod"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "team": {
+      "tag_key": {"@@assign": "team"},
+      "tag_value": {"@@assign": ["payments-core", "platform", "security", "data"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "owner": {
+      "tag_key": {"@@assign": "owner"}
+    },
+    "cost-center": {
+      "tag_key": {"@@assign": "cost-center"}
+    },
+    "cell": {
+      "tag_key": {"@@assign": "cell"},
+      "tag_value": {"@@assign": ["cell-0", "cell-1", "cell-2", "cell-3", "spare", "shared"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "component": {
+      "tag_key": {"@@assign": "component"},
+      "tag_value": {"@@assign": ["router", "locker", "drainer", "scheduler", "control-center", "aurora", "dynamodb", "memorydb", "msk", "clickhouse", "opensearch", "vault", "eks", "network", "backup", "observability", "ci", "shared"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "pci-scope": {
+      "tag_key": {"@@assign": "pci-scope"},
+      "tag_value": {"@@assign": ["cde", "connected", "out-of-scope"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "data-class": {
+      "tag_key": {"@@assign": "data-class"},
+      "tag_value": {"@@assign": ["card-data", "pii", "internal", "public"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "backup-tier": {
+      "tag_key": {"@@assign": "backup-tier"},
+      "tag_value": {"@@assign": ["gold", "silver", "bronze", "none"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "managed-by": {
+      "tag_key": {"@@assign": "managed-by"},
+      "tag_value": {"@@assign": ["terraform", "argocd", "aft"]},
+      "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
+    },
+    "repo": {
+      "tag_key": {"@@assign": "repo"}
+    }
+  }
+}

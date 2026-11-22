@@ -1,0 +1,32 @@
+# Differences of dev from the chart defaults; sizes are far below the production numbers of section 8
+global:
+  environment: dev
+
+router:
+  container:
+    env:
+      RUN_ENV: development
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 6
+
+drainer:
+  container:
+    env:
+      RUN_ENV: development
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 3
+
+scheduler:
+  producer:
+    container:
+      env:
+        RUN_ENV: development
+  consumer:
+    container:
+      env:
+        RUN_ENV: development
+    autoscaling:
+      minReplicas: 3
+      maxReplicas: 6

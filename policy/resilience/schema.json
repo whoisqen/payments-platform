@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "resilience policy",
+  "type": "object",
+  "required": ["version", "defaults", "dependencies"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "enum": [1]},
+    "defaults": {
+      "type": "object",
+      "required": ["retry_budget_ratio", "request_deadline", "deadline_propagation"],
+      "additionalProperties": false,
+      "properties": {
+        "retry_budget_ratio": {"type": "number", "minimum": 0, "maximum": 0.1},
+        "request_deadline": {"$ref": "#/$defs/duration"},
+        "deadline_propagation": {"type": "boolean"}
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/dependency"}
+    }
+  },
+  "$defs": {
+    "duration": {"type": "string", "pattern": "^[0-9]+(ms|s|m|h)$"},
+    "dependency": {
+      "type": "object",
+      "required": ["kind", "timeout", "max_attempts", "base", "cap", "jitter", "idempotent"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"type": "string", "enum": ["charge", "read", "write", "delivery", "infra"]},
+        "timeout": {"type": "string", "pattern": "^([0-9]+(ms|s|m|h)|sdk-default)$"},
+        "max_attempts": {"anyOf": [{"type": "integer", "minimum": 0}, {"const": "unlimited"}]},
+        "bounded_by": {"type": "string", "enum": ["timeout"]},
+        "base": {"$ref": "#/$defs/duration"},
+        "cap": {"$ref": "#/$defs/duration"},
+        "jitter": {"type": "string", "enum": ["full"]},
+        "idempotent": {"type": "boolean"},
+        "retry_budget_ratio": {"type": "number", "minimum": 0, "maximum": 0.1},
+        "budget_alert": {"type": "string", "enum": ["critical", "warning"]},
+        "dlq": {"type": "boolean"},
+        "schedule": {"type": "array", "items": {"$ref": "#/$defs/duration"}},
+        "schedule_jitter_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

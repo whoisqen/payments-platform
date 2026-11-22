@@ -1,0 +1,34 @@
+mode: daemonset
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+
+# The chart needs an explicit command name for the k8s distribution
+command:
+  name: otelcol-k8s
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+  processors:
+    batch: {}
+    # Card data is masked here, in the CDE, before anything leaves the cluster (section 7)
+    redaction:
+      allow_all_keys: true
+      blocked_values:
+        - "\\b[0-9]{13,19}\\b"
+  exporters:
+    debug: {}
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [redaction, batch]
+        exporters: [debug]
+      metrics:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [debug]

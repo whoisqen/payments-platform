@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrations
+  labels:
+    {{- include "migrations.labels" . | nindent 4 }}
+  annotations:
+    {{- include "migrations.hook" (dict "weight" .Values.job.hookWeight) | nindent 4 }}
+spec:
+  # DDL is never repeated automatically; a retry is a new sync or a fix through a pull request
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "migrations.labels" . | nindent 8 }}
+      annotations:
+        # With a sidecar the Job never completes
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: false
+      {{- include "migrations.podSecurity" . | nindent 6 }}
+      {{- if .Values.snapshot.enabled }}
+      initContainers:
+        - name: snapshot
+          image: {{ include "migrations.image" . | quote }}
+          command:
+            {{- toYaml .Values.snapshot.command | nindent 12 }}
+          env:
+            {{- include "migrations.env" . | nindent 12 }}
+            - name: SNAPSHOT_STORE
+              value: {{ .Values.snapshot.store | quote }}
+            - name: SNAPSHOT_LABEL
+              value: {{ printf "%s-rev%d" .Release.Name .Release.Revision | quote }}
+            - name: SNAPSHOT_RETENTION_DAYS
+              value: {{ .Values.snapshot.retentionDays | quote }}
+            - name: SNAPSHOT_WAIT_TIMEOUT_SECONDS
+              value: {{ .Values.snapshot.waitTimeoutSeconds | quote }}
+          resources:
+            {{- toYaml .Values.job.resources | nindent 12 }}
+          {{- include "migrations.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "migrations.image" . | quote }}
+          command:
+            {{- toYaml .Values.migrate.command | nindent 12 }}
+          env:
+            {{- include "migrations.env" . | nindent 12 }}
+            - name: MIGRATION_MODE
+              value: {{ .Values.migrate.mode | quote }}
+            - name: PG_LOCK_TIMEOUT
+              value: {{ .Values.migrate.lockTimeout | quote }}
+            - name: PG_STATEMENT_TIMEOUT
+              value: {{ .Values.migrate.statementTimeout | quote }}
+          resources:
+            {{- toYaml .Values.job.resources | nindent 12 }}
+          {{- include "migrations.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

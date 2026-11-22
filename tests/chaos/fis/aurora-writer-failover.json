@@ -1,0 +1,23 @@
+{
+  "description": "Hypothesis: an Aurora writer failover is invisible on the hot path (write-behind), the Redis stream grows and returns below 5,000 within 2 min with no loss. Stop: chaos-stop alarm.",
+  "targets": {
+    "cell-aurora": {
+      "resourceType": "aws:rds:cluster",
+      "resourceTags": { "environment": "stage", "cell": "cell-1", "role": "payments" },
+      "selectionMode": "ALL"
+    }
+  },
+  "actions": {
+    "failover-writer": {
+      "actionId": "aws:rds:failover-db-cluster",
+      "description": "Promote a reader of the cell cluster to writer",
+      "targets": { "Clusters": "cell-aurora" }
+    }
+  },
+  "stopConditions": [
+    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:eu-central-1:${STAGE_ACCOUNT_ID}:alarm:pay-stage-euc1-chaos-stop" }
+  ],
+  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/pay-stage-euc1-fis-experiment",
+  "tags": { "Name": "chaos-aurora-writer-failover", "environment": "stage", "failure-mode": "data-aurora-writer-failover" },
+  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+}

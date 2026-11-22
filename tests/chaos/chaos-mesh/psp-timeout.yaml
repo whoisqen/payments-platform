@@ -1,0 +1,29 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: psp-timeout
+  namespace: payments
+  labels:
+    failure-mode: app-psp-timeout
+  annotations:
+    chaos.payments/hypothesis: "PSP answers after 20 s: the payment becomes the unknown state, scheduler runs sync, no second charge, other PSPs unaffected (bulkhead)"
+    chaos.payments/stop-condition: "chaos-stop alarm: burn rate 14.4 or authorization rate drop above 2 pp outside the delayed PSP"
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: router
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces: [payments-test]
+      labelSelectors:
+        app.kubernetes.io/name: mock-psp
+  delay:
+    latency: 20s
+    jitter: 500ms
+    correlation: "100"
+  duration: 10m

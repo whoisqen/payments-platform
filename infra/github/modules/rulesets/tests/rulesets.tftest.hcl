@@ -4,7 +4,11 @@ variables {
   repository      = "payments-platform"
   required_checks = ["ci-gate", "spec-gate"]
   approvals       = 2
-  tagging_app_id  = 1
+  tag_bypass = {
+    actor_id   = 1
+    actor_type = "Integration"
+  }
+  merge_queue = true
 }
 
 run "main" {

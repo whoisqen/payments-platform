@@ -1,0 +1,145 @@
+# Runs inside the CDE: card data and secrets are removed here, before telemetry leaves for the central stack.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        tls:
+          cert_file: /etc/otel/tls/tls.crt
+          key_file: /etc/otel/tls/tls.key
+          client_ca_file: /etc/otel/tls/ca.crt
+      http:
+        endpoint: 0.0.0.0:4318
+        tls:
+          cert_file: /etc/otel/tls/tls.crt
+          key_file: /etc/otel/tls/tls.key
+          client_ca_file: /etc/otel/tls/ca.crt
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Keys that must never travel, whatever their value looks like.
+  attributes/drop-secret-keys:
+    actions:
+      - {key: authorization, action: delete}
+      - {key: cookie, action: delete}
+      - {key: set-cookie, action: delete}
+      - {key: x-api-key, action: delete}
+      - {key: http.request.header.authorization, action: delete}
+      - {key: card_number, action: delete}
+      - {key: pan, action: delete}
+      - {key: cvv, action: delete}
+      - {key: cvc, action: delete}
+      - {key: card_expiry, action: delete}
+      - {key: password, action: delete}
+
+  # Patterns are RE2; a 13-digit epoch in milliseconds also matches the PAN pattern, which fails closed.
+  transform/redact:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'replace_pattern(body, "\\b(?:\\d[ -]?){12,18}\\d\\b", "[REDACTED-PAN]")'
+          - 'replace_pattern(body, "(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]{8,}", "[REDACTED-SECRET]")'
+          - 'replace_pattern(body, "(?i)\\bbasic\\s+[A-Za-z0-9+/=]{8,}", "[REDACTED-SECRET]")'
+          - 'replace_pattern(body, "\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b", "[REDACTED-SECRET]")'
+          - 'replace_pattern(body, "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]*", "[REDACTED-SECRET]")'
+          - 'replace_pattern(body, "-----BEGIN [A-Z ]*PRIVATE KEY-----", "[REDACTED-SECRET]")'
+          - 'replace_pattern(body, "(?i)(password|passwd|secret|api[_-]?key|token|cvv|cvc)[\"'']?\\s*[:=]\\s*[\"'']?[^\\s\"'',;&]+", "[REDACTED-SECRET]")'
+          - 'replace_all_patterns(attributes, "value", "\\b(?:\\d[ -]?){12,18}\\d\\b", "[REDACTED-PAN]")'
+    trace_statements:
+      - context: span
+        statements:
+          - 'replace_all_patterns(attributes, "value", "\\b(?:\\d[ -]?){12,18}\\d\\b", "[REDACTED-PAN]")'
+          - 'replace_all_patterns(attributes, "value", "(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]{8,}", "[REDACTED-SECRET]")'
+
+  # Second line of defence on attribute values of every signal.
+  redaction:
+    allow_all_keys: true
+    blocked_values:
+      - '\b(?:\d[ -]?){12,18}\d\b'
+      - '(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{8,}'
+      - '\b(?:AKIA|ASIA)[0-9A-Z]{16}\b'
+      - '\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*'
+      - '\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}\b'
+    summary: info
+
+  # Unbounded or sensitive identifiers must not become metric labels.
+  transform/metric-labels:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - 'delete_matching_keys(attributes, "(?i)^(payment_id|customer_id|merchant_id|idempotency_key|trace_id|card.*|pan|cvv|cvc|token|authorization)$")'
+
+  # Section 7: keep every failed or slow (>300 ms) trace and 2% of the rest.
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 200000
+    policies:
+      - {name: errors, type: status_code, status_code: {status_codes: [ERROR]}}
+      - {name: slow, type: latency, latency: {threshold_ms: 300}}
+      - {name: rest, type: probabilistic, probabilistic: {sampling_percentage: 2}}
+
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+connectors:
+  # Counts PAN patterns before redaction so a leak at the source raises PanDetectedInLogs.
+  count/pan:
+    logs:
+      pan_detected:
+        description: Log records that contained a PAN pattern before redaction
+        conditions:
+          - 'IsMatch(body, "\\b(?:\\d[ -]?){12,18}\\d\\b")'
+        attributes:
+          - key: source
+            default_value: logs
+
+exporters:
+  otlphttp/central-logs:
+    endpoint: ${env:CENTRAL_LOGS_OTLP_ENDPOINT}
+    tls: {ca_file: /etc/otel/tls/ca.crt, cert_file: /etc/otel/tls/tls.crt, key_file: /etc/otel/tls/tls.key}
+    sending_queue: {enabled: true, queue_size: 5000}
+    retry_on_failure: {enabled: true, initial_interval: 1s, max_interval: 30s, max_elapsed_time: 120s}
+  otlp/central-traces:
+    endpoint: ${env:CENTRAL_TRACES_OTLP_ENDPOINT}
+    tls: {ca_file: /etc/otel/tls/ca.crt, cert_file: /etc/otel/tls/tls.crt, key_file: /etc/otel/tls/tls.key}
+    retry_on_failure: {enabled: true, initial_interval: 1s, max_interval: 30s, max_elapsed_time: 120s}
+  prometheusremotewrite/central:
+    endpoint: ${env:CENTRAL_METRICS_REMOTE_WRITE_URL}
+    tls: {ca_file: /etc/otel/tls/ca.crt, cert_file: /etc/otel/tls/tls.crt, key_file: /etc/otel/tls/tls.key}
+    external_labels:
+      env: ${env:PLATFORM_ENV}
+      region: ${env:PLATFORM_REGION}
+    resource_to_telemetry_conversion: {enabled: false}
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics: {level: detailed, address: 0.0.0.0:8888}
+  pipelines:
+    logs/detect:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [count/pan]
+    logs/ship:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/drop-secret-keys, transform/redact, redaction, batch]
+      exporters: [otlphttp/central-logs]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/drop-secret-keys, transform/redact, redaction, tail_sampling, batch]
+      exporters: [otlp/central-traces]
+    metrics:
+      receivers: [otlp, count/pan]
+      processors: [memory_limiter, attributes/drop-secret-keys, transform/metric-labels, redaction, batch]
+      exporters: [prometheusremotewrite/central]

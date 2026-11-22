@@ -1,0 +1,133 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only); one image serves both flows
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/scheduler
+  pullPolicy: IfNotPresent
+
+# Two producers at once are forbidden: Recreate plus the Lease and fencing inside the application
+producer:
+  workload:
+    kind: Deployment
+    replicas: 2
+    minReadySeconds: 10
+    strategy:
+      type: Recreate
+  container:
+    port: 3000
+    env:
+      SCHEDULER_FLOW: producer
+      # The scheduler web server binds to 127.0.0.1 by default and the kubelet probe cannot reach it
+      ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+    envFromSecrets: []
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        memory: 512Mi
+  probes:
+    startup:
+      path: /health
+      periodSeconds: 5
+      failureThreshold: 36
+    liveness:
+      path: /health
+      periodSeconds: 10
+    readiness:
+      path: /health
+      periodSeconds: 5
+  lifecycle:
+    preStopSeconds: 15
+    terminationGracePeriodSeconds: 60
+  # A producer must not be interrupted, so it stays off Spot
+  scheduling:
+    nodePool: payments
+  service:
+    enabled: true
+    port: 3000
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: true
+    maxUnavailable: 10%
+  networkPolicy:
+    enabled: true
+    dataPorts: [5432, 6379]
+  serviceMonitor:
+    enabled: true
+    path: /metrics
+  serviceAccount:
+    create: true
+  istio:
+    inject: true
+
+consumer:
+  workload:
+    kind: Deployment
+    minReadySeconds: 10
+    strategy:
+      type: RollingUpdate
+      maxSurge: 25%
+      maxUnavailable: 0
+  container:
+    port: 3000
+    env:
+      SCHEDULER_FLOW: consumer
+      ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+      # Read by the KEDA trigger below, which runs outside the pod
+      REDIS_ADDRESS: memorydb.invalid:6379
+    envFromSecrets: []
+    # Sized below the 200 tasks/s per pod of section 8 with room for retries
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        memory: 512Mi
+  probes:
+    startup:
+      path: /health
+      periodSeconds: 5
+      failureThreshold: 36
+    liveness:
+      path: /health
+      periodSeconds: 10
+    readiness:
+      path: /health
+      periodSeconds: 5
+  lifecycle:
+    preStopSeconds: 15
+    terminationGracePeriodSeconds: 60
+  # Safe to restart, so Spot is acceptable on the workers pool
+  scheduling:
+    nodePool: workers
+  service:
+    enabled: true
+    port: 3000
+  autoscaling:
+    enabled: true
+    kind: keda
+    minReplicas: 3
+    maxReplicas: 12
+    triggers:
+      - type: redis-streams
+        metadata:
+          addressFromEnv: REDIS_ADDRESS
+          passwordFromEnv: REDIS_PASSWORD
+          enableTLS: "true"
+          stream: SCHEDULER_STREAM
+          consumerGroup: SCHEDULER_GROUP
+          # 200 tasks/s per pod, about 70% target over a 15 s poll
+          pendingEntriesCount: "2000"
+  pdb:
+    enabled: true
+    maxUnavailable: 10%
+  networkPolicy:
+    enabled: true
+    dataPorts: [5432, 6379]
+  serviceMonitor:
+    enabled: true
+    path: /metrics
+  serviceAccount:
+    create: true
+  istio:
+    inject: true

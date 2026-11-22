@@ -1,0 +1,43 @@
+rules:
+  - id: no-pan-logging
+    languages: [rust]
+    severity: ERROR
+    message: >-
+      A card field (PAN, CVV) is passed to a logging or formatting macro without a Secret wrapper;
+      wrap it in Secret::new(...) or log the token instead.
+    metadata:
+      pci-dss: ["3.3.1", "3.4.1", "10.2"]
+      cwe: CWE-532
+    patterns:
+      - pattern-either:
+          - pattern: trace!(..., $X.$F, ...)
+          - pattern: $P::trace!(..., $X.$F, ...)
+          - pattern: debug!(..., $X.$F, ...)
+          - pattern: $P::debug!(..., $X.$F, ...)
+          - pattern: info!(..., $X.$F, ...)
+          - pattern: $P::info!(..., $X.$F, ...)
+          - pattern: warn!(..., $X.$F, ...)
+          - pattern: $P::warn!(..., $X.$F, ...)
+          - pattern: error!(..., $X.$F, ...)
+          - pattern: $P::error!(..., $X.$F, ...)
+          - pattern: println!(..., $X.$F, ...)
+          - pattern: $P::println!(..., $X.$F, ...)
+          - pattern: eprintln!(..., $X.$F, ...)
+          - pattern: $P::eprintln!(..., $X.$F, ...)
+          - pattern: format!(..., $X.$F, ...)
+          - pattern: $P::format!(..., $X.$F, ...)
+          - pattern: panic!(..., $X.$F, ...)
+          - pattern: $P::panic!(..., $X.$F, ...)
+      - metavariable-regex:
+          metavariable: $F
+          regex: ^(card_number|card_no|pan|cvv|cvc|card_cvc|card_cvv|card_security_code)$
+  - id: no-pan-logging-exposed
+    languages: [rust]
+    severity: ERROR
+    message: >-
+      A card field is exposed (peek, expose) or passed by name inside a logging or formatting macro;
+      log the token instead.
+    metadata:
+      pci-dss: ["3.3.1", "3.4.1", "10.2"]
+      cwe: CWE-532
+    pattern-regex: \b(?:trace|debug|info|warn|error|println|eprintln|format|panic)!\([^;]*?\b(?:card_number|card_no|pan|cvv|cvc|card_cvc|card_cvv|card_security_code)\b(?:\s*=|\.(?:peek|expose)\()

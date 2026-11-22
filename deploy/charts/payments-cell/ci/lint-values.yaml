@@ -1,0 +1,19 @@
+# Offline lint and chart-testing only; real values come from deploy/envs/ and images.yaml
+global:
+  cell: cell-0
+  environment: dev
+  region: eu-central-1
+  dataCidrs: ["10.120.0.0/16"]
+  endpointCidrs: ["10.120.255.0/24"]
+router:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+drainer:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+scheduler:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+migrations:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-kube-prometheus
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/addons: enabled
+  template:
+    metadata:
+      name: 'kube-prometheus-{{ .name }}'
+      labels:
+        payments-platform/addon: kube-prometheus
+    spec:
+      project: platform
+      destination:
+        server: '{{ .server }}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: kube-prometheus-stack
+          targetRevision: 93.6.1
+          helm:
+            valueFiles:
+              - $values/deploy/platform/kube-prometheus/values.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # The CRDs exceed the client-side apply annotation limit
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

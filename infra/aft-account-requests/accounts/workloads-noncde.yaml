@@ -1,0 +1,31 @@
+ou: Workloads/NonCDE
+accounts:
+  - name: platform-dev
+    email: aws-pay-platform-dev@example.com
+    customizations: platform
+    sso_user: &sso { email: platform@example.com, first_name: Platform, last_name: Team }
+    tags: &platform
+      environment: dev
+      team: platform
+      owner: platform@example.com
+      cost-center: cc-300
+      cell: shared
+      pci-scope: connected
+      data-class: internal
+      backup-tier: bronze
+  - name: platform-stage
+    email: aws-pay-platform-stage@example.com
+    customizations: platform
+    sso_user: *sso
+    tags:
+      <<: *platform
+      environment: stage
+      backup-tier: silver
+  - name: platform-prod
+    email: aws-pay-platform-prod@example.com
+    customizations: platform
+    sso_user: *sso
+    tags:
+      <<: *platform
+      environment: prod
+      backup-tier: gold

@@ -1,0 +1,61 @@
+suite: payments-cell
+templates:
+  - charts/router/templates/workload.yaml
+  - charts/router/templates/pdb.yaml
+  - charts/drainer/templates/workload.yaml
+  - charts/migrations/templates/job.yaml
+set:
+  global.cell: cell-1
+  global.environment: dev
+  global.region: eu-central-1
+  global.dataCidrs: ["10.120.0.0/16"]
+  global.endpointCidrs: ["10.120.255.0/24"]
+  router.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  drainer.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  scheduler.image.digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  migrations.image.digest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+tests:
+  - it: labels every workload with the cell
+    template: charts/router/templates/workload.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["payments-platform/cell"]
+          value: cell-1
+  - it: has a PodDisruptionBudget for router
+    template: charts/router/templates/pdb.yaml
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+  - it: orders router after drainer by sync wave
+    templates:
+      - charts/router/templates/workload.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "1"
+  - it: pins each component to its own digest
+    template: charts/drainer/templates/workload.yaml
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "@sha256:b{64}$"
+  - it: runs the migrations Job with backoffLimit 0
+    template: charts/migrations/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+  - it: rejects a cell outside cell-0 to cell-3 and spare
+    template: charts/router/templates/workload.yaml
+    set:
+      global.cell: cell-7
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a maxReplicas below minReplicas
+    template: charts/router/templates/workload.yaml
+    set:
+      router.autoscaling.minReplicas: 30
+      router.autoscaling.maxReplicas: 10
+    asserts:
+      - failedTemplate:
+          errorPattern: maxReplicas must not be lower than minReplicas

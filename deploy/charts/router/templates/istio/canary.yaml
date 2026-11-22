@@ -1,0 +1,1 @@
+{{- include "platform-common.canary" (dict "root" . "cfg" .Values "name" "router" "component" "router") }}

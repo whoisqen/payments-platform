@@ -1,0 +1,76 @@
+suite: scheduler producer and consumer
+templates:
+  - producer/workload.yaml
+  - consumer/workload.yaml
+  - consumer/autoscaling.yaml
+  - producer/pdb.yaml
+  - consumer/pdb.yaml
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: runs two producers with Recreate and the producer flow
+    template: producer/workload.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.replicas
+          value: 2
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCHEDULER_FLOW
+            value: producer
+      - equal:
+          path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
+          value: payments
+  - it: rolls the consumer without losing a pod
+    template: consumer/workload.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 25%
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+      - notExists:
+          path: spec.replicas
+      - equal:
+          path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
+          value: workers
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCHEDULER_FLOW
+            value: consumer
+  - it: scales the consumer with KEDA between 3 and 12
+    template: consumer/autoscaling.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: scheduler-consumer
+      - equal:
+          path: spec.minReplicaCount
+          value: 3
+      - equal:
+          path: spec.maxReplicaCount
+          value: 12
+  - it: protects both flows with a PodDisruptionBudget
+    templates:
+      - producer/pdb.yaml
+      - consumer/pdb.yaml
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 10%
+  - it: rejects a tag instead of a digest
+    template: producer/workload.yaml
+    set:
+      image.tag: v1
+    asserts:
+      - failedTemplate: {}

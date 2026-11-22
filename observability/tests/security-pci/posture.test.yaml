@@ -1,0 +1,67 @@
+rule_files:
+- ../../alerts/security-pci/posture.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
+    values: 3600x46
+  alert_rule_test:
+  - eval_time: 42m
+    alertname: KmsKeyRotationOverdue
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: security
+        service: kms
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-kms-key-rotation-overdue
+        key_alias: locker-pan
+      exp_annotations:
+        summary: A KMS key is past its rotation date
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kms-key-rotation-overdue
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
+    values: '0x46'
+  alert_rule_test:
+  - &id001
+    eval_time: 42m
+    alertname: KmsKeyRotationOverdue
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
+    values: 0x9 3600x1 0x34
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit",policy_name="disallow-privileged"}
+    values: 0+1x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: KyvernoAuditViolations
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: security
+        service: kyverno
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-kyverno-audit-violations
+        policy_name: disallow-privileged
+      exp_annotations:
+        summary: Kyverno audit policies report violations
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kyverno-audit-violations
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit",policy_name="disallow-privileged"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: KyvernoAuditViolations
+    exp_alerts: []

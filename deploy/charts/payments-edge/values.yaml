@@ -1,0 +1,29 @@
+# Layers on top of these defaults: envs/<env>, envs/<env>/<region>, envs/<env>/<region>/edge
+global:
+  environment: ""
+  region: ""
+
+gateway:
+  # Labels of the Istio ingress gateway pods, deployed by the istio add-on
+  selector:
+    istio: ingressgateway
+  hosts: []
+  tlsCredentialName: payments-edge-tls
+
+certificate:
+  issuerName: payments-ca
+  issuerKind: ClusterIssuer
+  duration: 2160h
+  renewBefore: 720h
+
+routing:
+  # Set by the cell lookup (merchant to cell map) before the route match
+  cellHeader: x-payments-cell
+  timeout: 20s
+  cells: []
+
+# Load shedding above the capacity of the gateway pod: 2000 RPS (section 8)
+rateLimit:
+  maxTokens: 2000
+  tokensPerFill: 2000
+  fillInterval: 1s

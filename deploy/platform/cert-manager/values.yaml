@@ -1,0 +1,11 @@
+crds:
+  enabled: true
+  keep: true
+
+# Two replicas keep certificate renewal alive during a node replacement
+replicaCount: 2
+
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true

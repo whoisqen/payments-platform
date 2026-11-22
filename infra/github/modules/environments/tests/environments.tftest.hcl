@@ -9,6 +9,7 @@ mock_provider "github" {
 variables {
   repository = "payments-platform"
   branch     = "main"
+  reviewers  = true
   teams = {
     payments_core = "pc"
     security      = "sec"

@@ -1,0 +1,13 @@
+replicas: 2
+
+# The controller must not run on nodes that Karpenter itself provisions
+nodeSelector:
+  karpenter.sh/nodepool: system
+
+controller:
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 1Gi

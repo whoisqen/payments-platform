@@ -1,0 +1,50 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only); the migrator digest moves with the router digest
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/migrator
+  pullPolicy: IfNotPresent
+
+database:
+  # Writer endpoint of the cell Aurora, never RDS Proxy: the advisory lock needs one stable connection
+  host: writer.invalid
+  port: 5432
+  name: hyperswitch
+  # The only role with DDL rights, reached through EKS Pod Identity
+  user: hs_migrator
+
+# D3: the change starts only when the snapshot is available
+snapshot:
+  enabled: true
+  command: ["/opt/migrator/snapshot.sh"]
+  store: aurora
+  retentionDays: 35
+  waitTimeoutSeconds: 1200
+
+migrate:
+  command: ["/opt/migrator/migrate.sh"]
+  # Contract migrations go through a separate pull request with the contract-migration label
+  mode: expand-only
+  lockTimeout: 5s
+  statementTimeout: 10min
+
+job:
+  hookWeight: -10
+  # 900 s of migration (section 17) plus the snapshot wait
+  activeDeadlineSeconds: 2100
+  ttlSecondsAfterFinished: 86400
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
+
+# Backfill runs in batches outside the hook, so a deploy never waits for it
+backfill:
+  enabled: false
+  command: ["/opt/migrator/backfill.sh"]
+  batchSize: 10000
+  maxReplicaLagMs: 500
+
+serviceAccount:
+  name: migrator
+  annotations: {}

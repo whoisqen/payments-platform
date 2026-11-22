@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["global"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["cell", "environment", "region", "dataCidrs", "endpointCidrs"],
+      "properties": {
+        "cell": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" },
+        "environment": { "enum": ["dev", "stage", "prod"] },
+        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
+        "dataCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 },
+        "endpointCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 }
+      }
+    },
+    "router": { "type": "object" },
+    "drainer": { "type": "object" },
+    "scheduler": { "type": "object" },
+    "migrations": { "type": "object" }
+  }
+}

@@ -1,0 +1,12 @@
+# Offline lint and chart-testing only; real values come from deploy/envs/ and images.yaml
+global:
+  environment: dev
+  region: eu-central-1
+  dataCidrs: ["10.120.0.0/16"]
+  endpointCidrs: ["10.120.255.0/24"]
+locker:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+locker-migrations:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

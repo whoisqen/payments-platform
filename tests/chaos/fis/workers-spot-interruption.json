@@ -1,0 +1,24 @@
+{
+  "description": "Hypothesis: when every spot node of the workers pool in one AZ is interrupted, drainer and scheduler consumer move and drain lag stays below 30 s. Stop: chaos-stop alarm.",
+  "targets": {
+    "workers-spot-nodes": {
+      "resourceType": "aws:ec2:spot-instance",
+      "resourceTags": { "environment": "stage", "karpenter.sh/nodepool": "workers", "az": "euc1-az2" },
+      "selectionMode": "ALL"
+    }
+  },
+  "actions": {
+    "interrupt-spot": {
+      "actionId": "aws:ec2:send-spot-instance-interruptions",
+      "description": "Send the two-minute spot interruption notice to all workers nodes of one AZ",
+      "parameters": { "durationBeforeInterruption": "PT2M" },
+      "targets": { "SpotInstances": "workers-spot-nodes" }
+    }
+  },
+  "stopConditions": [
+    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:eu-central-1:${STAGE_ACCOUNT_ID}:alarm:pay-stage-euc1-chaos-stop" }
+  ],
+  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/pay-stage-euc1-fis-experiment",
+  "tags": { "Name": "chaos-workers-spot-interruption", "environment": "stage", "failure-mode": "compute-spot-interruption" },
+  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+}

@@ -1,0 +1,23 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require probes
+    policies.kyverno.io/category: Reliability
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: "object.spec.containers.all(c, has(c.readinessProbe) && has(c.livenessProbe))"
+      message: "Every container needs a readinessProbe and a livenessProbe."

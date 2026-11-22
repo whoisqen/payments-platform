@@ -1,0 +1,1 @@
+{{- include "platform-common.autoscaling" (dict "root" . "cfg" .Values.consumer "name" "scheduler-consumer" "component" "consumer") }}

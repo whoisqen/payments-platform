@@ -1,6 +1,6 @@
 version: 1
 defaults:
-  worktree_root: ../wt
+  worktree_root: .worktrees        # branch agent/<area>-<slug>
   branch_prefix: agent/
   base: phase_start_commit
   max_parallel: 4
@@ -32,7 +32,7 @@ agents:
   sre-oncall:             { owns: ["docs/postmortems/drafts/**"] }
   refactor-implementer:   { owns: from_task }
 
-humans_only: [".claude/**", "CLAUDE.md", ".mcp.json", "specs/_templates/**", "README.md", "LICENSE*",
+humans_only: [".claude/**", "CLAUDE.md", "AGENTS.md", "manifests/**", ".mcp.json", "specs/_templates/**", "README.md", "LICENSE*",
               ".gitignore", "vendor/README.md", "vendor/*/LICENSE*", "vendor/*/NOTICE*",
               "tools/scripts/claude-hooks/**", "tools/lint/**", "policy/cde-paths.yaml"]
 handoffs: { path: "specs/*/handoffs/{agent}-*.md", writers: all }

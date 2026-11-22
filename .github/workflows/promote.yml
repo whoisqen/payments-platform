@@ -1,0 +1,174 @@
+name: promote
+
+on:
+  workflow_run:
+    workflows: [images, hotfix]
+    types: [completed]
+  repository_dispatch:
+    types: [smoke-green-dev, smoke-green-stage]
+  workflow_dispatch:
+    inputs:
+      env:
+        description: target environment
+        type: choice
+        options: [stage, prod]
+        required: true
+      cells:
+        description: cells for a prod hotfix, comma separated; empty means all
+        type: string
+        default: ""
+
+permissions: {}
+
+jobs:
+  plan:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/')))
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      env: ${{ steps.decide.outputs.env }}
+      source: ${{ steps.decide.outputs.source }}
+      mode: ${{ steps.decide.outputs.mode }}
+      cells: ${{ steps.decide.outputs.cells }}
+      hotfix: ${{ steps.decide.outputs.hotfix }}
+      hold: ${{ steps.decide.outputs.hold }}
+      sha: ${{ steps.decide.outputs.sha }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_ENV: ${{ inputs.env }}
+          INPUT_CELLS: ${{ inputs.cells }}
+          REPO: ${{ github.repository }}
+        run: |
+          hotfix=false cells="" hold=false sha="${RUN_SHA:-$GITHUB_SHA}"
+          case "$EVENT" in
+            workflow_run)
+              env=dev source="" mode=digests
+              pr=$(gh api "repos/${REPO}/commits/${sha}/pulls" --jq '.[0].number // empty')
+              if [ -n "$pr" ]; then
+                labels=$(gh api "repos/${REPO}/pulls/${pr}" --jq '[.labels[].name] | join(",")')
+                body=$(gh api "repos/${REPO}/pulls/${pr}" --jq '.body // ""')
+                if [[ ",${labels}," == *,hotfix,* ]]; then
+                  hotfix=true env=prod mode=digests
+                  cells=$(grep -m1 -oP '^Cells: \K[a-z0-9,-]+' <<<"$body" || true)
+                fi
+              fi ;;
+            repository_dispatch)
+              mode=copy
+              if [ "$ACTION" = smoke-green-dev ]; then env=stage source=dev; else env=prod source=stage; fi ;;
+            *)
+              mode=copy env=$INPUT_ENV cells=$INPUT_CELLS
+              if [ "$env" = stage ]; then source=dev; else source=stage; fi ;;
+          esac
+          if ! [[ $cells =~ ^[a-z0-9,-]*$ ]]; then echo "::error::bad cells value"; exit 1; fi
+          # a planned release waits while a hotfix has not passed the full CI
+          if [ "$hotfix" = false ] && [ "$mode" = digests ]; then
+            open=$(gh issue list --repo "$REPO" --label hotfix-ci-failed --state open --json number --jq length)
+            [ "$open" -gt 0 ] && hold=true
+          fi
+          {
+            echo "env=$env"; echo "source=${source:-}"; echo "mode=$mode"; echo "cells=$cells"
+            echo "hotfix=$hotfix"; echo "hold=$hold"; echo "sha=$sha"
+          } >>"$GITHUB_OUTPUT"
+
+  pr:
+    needs: plan
+    if: needs.plan.outputs.hold != 'true'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    # a running promotion is never cancelled; GitHub keeps only one pending run per group, see the report of the dev gap
+    concurrency:
+      group: promote-${{ needs.plan.outputs.env }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      TARGET: ${{ needs.plan.outputs.env }}
+      SOURCE: ${{ needs.plan.outputs.source }}
+      MODE: ${{ needs.plan.outputs.mode }}
+      CELLS: ${{ needs.plan.outputs.cells }}
+      HOTFIX: ${{ needs.plan.outputs.hotfix }}
+      SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.PROMOTE_APP_ID }}
+          private-key: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: env.MODE == 'digests'
+        with:
+          name: digests
+          path: ${{ runner.temp }}/digests
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: write images.yaml
+        id: change
+        env:
+          DIGESTS: ${{ runner.temp }}/digests/digests.json
+        run: |
+          file="deploy/envs/${TARGET}/images.yaml"
+          if [ "$MODE" = digests ]; then
+            # the artifact is untrusted input: validated against the schema before any write
+            mapfile -t pairs < <(python3 tools/ci/images_yaml.py digests "$DIGESTS")
+            [ "${#pairs[@]}" -gt 0 ] || { echo "::error::no valid digests"; exit 1; }
+            python3 tools/ci/images_yaml.py set "$file" "${pairs[@]}"
+          else
+            python3 tools/ci/images_yaml.py copy "deploy/envs/${SOURCE}/images.yaml" "$file"
+          fi
+          if git diff --quiet -- "$file"; then echo "changed=false" >>"$GITHUB_OUTPUT"; else echo "changed=true" >>"$GITHUB_OUTPUT"; fi
+      - name: open the pull request
+        if: steps.change.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BOT_NAME: ${{ steps.app.outputs.app-slug }}[bot]
+          BOT_ID: ${{ steps.app.outputs.user-id }}
+        run: |
+          branch="promote/${TARGET}-${SHA:0:12}"
+          git config user.name "$BOT_NAME"
+          git config user.email "${BOT_ID}+${BOT_NAME}@users.noreply.github.com"
+          git switch -c "$branch"
+          git add "deploy/envs/${TARGET}/images.yaml"
+          git commit -m "chore(deploy): promote ${TARGET} to ${SHA:0:12}" -m "Spec-Exempt: promotion"
+          git push --force-with-lease origin "$branch"
+          existing=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then echo "pull request #${existing} already open"; exit 0; fi
+          case "$TARGET" in
+            dev) approvals="none; auto-merge when ci-gate is green" ;;
+            stage) approvals="CODEOWNERS of deploy/envs/stage" ;;
+            *) approvals="SRE; router and locker also need security" ;;
+          esac
+          [ "$HOTFIX" = true ] && approvals="SRE lead and on-call; security in the CDE"
+          {
+            echo "Promotion of the digests from ${SOURCE:-the build of ${SHA:0:12}} to ${TARGET}."
+            echo
+            echo "Approvals: ${approvals}"
+            [ -n "$CELLS" ] && echo "Cells: ${CELLS}"
+            [ "$HOTFIX" = true ] && echo "Hotfix: dev and stage are skipped, the smoke runs in prod as an AnalysisRun."
+            true
+          } >body.md
+          labels=(--label promotion --label "env:${TARGET}")
+          [ "$HOTFIX" = true ] && labels+=(--label hotfix)
+          url=$(gh pr create --base main --head "$branch" --title "chore(deploy): promote ${TARGET} to ${SHA:0:12}" --body-file body.md "${labels[@]}")
+          if [ "$TARGET" = dev ]; then gh pr merge --auto --squash "$url"; fi

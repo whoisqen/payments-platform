@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-backup-dr-detection
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: backup-dr-detection
+    rules:
+    - alert: BackupVaultPolicyChanged
+      expr: sum(increase(security_events_total{event="backup_vault_policy_change"}[10m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: aws-backup
+        owner: security-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-vault-policy-changed
+      annotations:
+        summary: A backup vault access policy or lock changed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-vault-policy-changed.md
+        dashboard_url: https://grafana.payments.internal/d/backup

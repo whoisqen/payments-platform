@@ -1,0 +1,26 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest tag
+    policies.kyverno.io/category: Supply chain
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: "(object.spec.containers + object.spec.?initContainers.orValue([])).map(c, c.image)"
+  validations:
+    - expression: "variables.images.all(i, !i.endsWith(':latest') && (i.contains('@sha256:') || i.split('/')[size(i.split('/')) - 1].contains(':')))"
+      message: "Images need an explicit tag other than latest, or a digest."

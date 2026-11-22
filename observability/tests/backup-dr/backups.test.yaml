@@ -1,0 +1,125 @@
+rule_files:
+- ../../alerts/backup-dr/backups.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
+    values: 0+1x19
+  - series: aws_backup_number_of_backup_jobs_expired_sum{backup_vault="gold"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-job-failed
+        backup_vault: gold
+      exp_annotations:
+        summary: An AWS Backup job failed or expired
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
+    values: 0+0x19
+  - series: aws_backup_number_of_backup_jobs_expired_sum{backup_vault="gold"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupJobFailed
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: backup_last_success_timestamp_seconds{store="memorydb-cell-1"}
+    values: '0x21'
+  - series: backup_interval_seconds{store="memorydb-cell-1"}
+    values: 300x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: BackupMissing
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-missing
+        store: memorydb-cell-1
+      exp_annotations:
+        summary: The last successful backup of a store is older than twice its interval
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-missing.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: backup_last_success_timestamp_seconds{store="memorydb-cell-1"}
+    values: 0+60x21
+  - series: backup_interval_seconds{store="memorydb-cell-1"}
+    values: 300x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: BackupMissing
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_backup_number_of_copy_jobs_failed_sum{backup_vault="gold"}
+    values: 0+1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupCopyFailed
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-copy-failed
+        backup_vault: gold
+      exp_annotations:
+        summary: A backup copy to a recovery region or to the backup account failed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#backup-copy-failed
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: aws_backup_number_of_copy_jobs_failed_sum{backup_vault="gold"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupCopyFailed
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
+    values: '0x134'
+  alert_rule_test:
+  - eval_time: 130m
+    alertname: SnapshotCopyStale
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-snapshot-copy-stale
+        store: memorydb-cell-1
+        region: us-east-2
+      exp_annotations:
+        summary: The latest snapshot copy in a recovery region is older than 2 hours
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#snapshot-copy-stale
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
+    values: 0+60x134
+  alert_rule_test:
+  - eval_time: 130m
+    alertname: SnapshotCopyStale
+    exp_alerts: []

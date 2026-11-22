@@ -1,0 +1,101 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: compute
+  id: compute-crash-loop-back-off
+  component: pods
+  failure: pod crash loop in a payments namespace
+  impact: reduced capacity of router, locker, drainer or scheduler; a cell can lose its drainer
+  severity: critical
+  alert: CrashLoopBackOff
+  signal: metric
+  detect_within: 8m
+- layer: compute
+  id: compute-karpenter-cannot-launch-nodes
+  component: karpenter
+  failure: Karpenter fails to launch nodes
+  impact: no scale-out, pending pods; during a switch the cells cannot be created (plan B of D7)
+  severity: critical
+  alert: KarpenterCannotLaunchNodes
+  signal: metric
+  detect_within: 13m
+- layer: compute
+  id: compute-node-not-ready
+  component: nodes
+  failure: node NotReady
+  impact: pods are rescheduled; capacity drops until Karpenter replaces the node
+  severity: warning
+  alert: NodeNotReady
+  signal: metric
+  detect_within: 8m
+- layer: compute
+  id: compute-pod-oom-killed
+  component: pods
+  failure: container killed for memory
+  impact: in-flight requests are lost and retried by the client; repeated kills reduce capacity
+  severity: warning
+  alert: PodOOMKilled
+  signal: metric
+  detect_within: 4m
+- layer: compute
+  id: compute-pods-pending-too-long
+  component: scheduling
+  failure: pods cannot be scheduled
+  impact: missing replicas; autoscaling does not take effect
+  severity: warning
+  alert: PodsPendingTooLong
+  signal: metric
+  detect_within: 18m
+- layer: compute
+  id: compute-hpa-at-max-replicas
+  component: hpa
+  failure: autoscaler at its ceiling
+  impact: no headroom for the next load increase
+  severity: warning
+  alert: HpaAtMaxReplicas
+  signal: metric
+  detect_within: 13m
+- layer: compute
+  id: compute-subnet-free-ips-low
+  component: vpc-cni
+  failure: subnet IP exhaustion
+  impact: new pods cannot get an address
+  severity: warning
+  alert: SubnetFreeIpsLow
+  signal: metric
+  detect_within: 13m
+- layer: compute
+  id: compute-node-image-stale
+  component: node-image
+  failure: stale node image
+  impact: unpatched node OS in the CDE; PCI DSS 6.3.3 patch window
+  severity: warning
+  alert: NodeImageStale
+  signal: metric
+  detect_within: 18m
+- layer: compute
+  id: compute-node-clock-drift
+  component: time-sync
+  failure: clock drift
+  impact: idempotency windows, token expiry and log ordering are affected; PCI DSS 10.6
+  severity: warning
+  alert: NodeClockDrift
+  signal: metric
+  detect_within: 8m
+- layer: compute
+  id: compute-az-node-loss
+  component: nodes
+  failure: More than 30% of the nodes of one AZ are NotReady
+  impact: 'AZ loss: capacity drop and cell degradation'
+  severity: critical
+  alert: null
+  signal: metric
+  reason: needs the zone label joined to node conditions
+- layer: compute
+  id: compute-node-disk-pressure
+  component: nodes
+  failure: Node ephemeral disk pressure
+  impact: evictions of pods
+  severity: warning
+  alert: null
+  signal: metric
+  reason: alert pending the node-exporter filesystem allowlist

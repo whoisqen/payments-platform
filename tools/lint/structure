@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when a directory holds more than LIMIT files (README.md excluded); vendor/ and .claude/ are exempt."""
+"""Fail when a directory holds more than LIMIT files (README.md excluded; the repository root allows ROOT_LIMIT); vendor/, .claude/ and specs/*/progress/ (one file per task) are exempt."""
 import os
 import sys
 from pathlib import Path
@@ -8,14 +8,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "claude
 from _common import ROOT  # noqa: E402
 
 LIMIT = 10
-SKIP = {".git", ".terraform", "node_modules", "__pycache__", "vendor", ".claude"}
+ROOT_LIMIT = 14  # tooling expects Makefile, mise.toml, LICENSE and config dotfiles in the root
+SKIP = {".git", ".terraform", "node_modules", "__pycache__", "vendor", ".claude", ".worktrees"}
 bad = []
 for d, dirs, files in os.walk(ROOT):
     dirs[:] = [x for x in dirs if x not in SKIP]
     n = len([f for f in files if f != "README.md"])
-    if n > LIMIT:
-        bad.append((Path(d).relative_to(ROOT).as_posix() or ".", n))
-for d, n in bad:
-    print(f"structure: error: {d} holds {n} files (limit {LIMIT}); split it by concern")
+    rel = Path(d).relative_to(ROOT).as_posix()
+    limit = ROOT_LIMIT if rel == "." else LIMIT
+    if rel.startswith("specs/") and rel.endswith("/progress"):
+        continue
+    if n > limit:
+        bad.append((rel, n, limit))
+for d, n, limit in bad:
+    print(f"structure: error: {d} holds {n} files (limit {limit}); split it by concern")
 print(f"structure: {len(bad)} error(s)")
 sys.exit(1 if bad else 0)

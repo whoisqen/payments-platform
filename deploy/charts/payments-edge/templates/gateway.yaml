@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: payments-edge
+  labels:
+    app.kubernetes.io/name: payments-edge
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  selector:
+    {{- toYaml .Values.gateway.selector | nindent 4 }}
+  servers:
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        {{- toYaml .Values.gateway.hosts | nindent 8 }}
+      tls:
+        mode: SIMPLE
+        credentialName: {{ .Values.gateway.tlsCredentialName }}
+        minProtocolVersion: TLSV1_2

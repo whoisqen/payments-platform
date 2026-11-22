@@ -1,0 +1,156 @@
+rule_files:
+- ../../slo/generated/payments-authorization.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.01x15
+  - series: slo:sli_error:ratio_rate1m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.01x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnFastest
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: critical
+        failure_mode: application-slo-authorization-availability
+        slo: payments-authorization-availability
+        sloth_id: payments-authorization-availability
+        sloth_service: payments-authorization
+        sloth_slo: availability
+      exp_annotations:
+        summary: Authorization availability is burning the 99.99% error budget (50x over 5m/1m)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.01x15
+  - series: slo:sli_error:ratio_rate1m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0005x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnFastest
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate1h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.00288x15
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.00288x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnFast
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: critical
+        failure_mode: application-slo-authorization-availability
+        slo: payments-authorization-availability
+        sloth_id: payments-authorization-availability
+        sloth_service: payments-authorization
+        sloth_slo: availability
+      exp_annotations:
+        summary: Authorization availability is burning the 99.99% error budget (14.4x over 1h/5m)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate1h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.00288x15
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.000144x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnFast
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0012x15
+  - series: slo:sli_error:ratio_rate30m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0012x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnSlow
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: critical
+        failure_mode: application-slo-authorization-availability
+        slo: payments-authorization-availability
+        sloth_id: payments-authorization-availability
+        sloth_service: payments-authorization
+        sloth_slo: availability
+      exp_annotations:
+        summary: Authorization availability is burning the 99.99% error budget (6x over 6h/30m)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0012x15
+  - series: slo:sli_error:ratio_rate30m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 6e-05x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnSlow
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate3d{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0002x15
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0002x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnTicket
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: warning
+        failure_mode: application-slo-authorization-availability
+        slo: payments-authorization-availability
+        sloth_id: payments-authorization-availability
+        sloth_service: payments-authorization
+        sloth_slo: availability
+      exp_annotations:
+        summary: Authorization availability is burning the 99.99% error budget (1x over 3d/6h)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate3d{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0002x15
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 1e-05x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsAuthorizationAvailabilityBurnTicket
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: http_server_requests_total{service="router",route="payments_confirm",code="500",fault="platform"}
+    values: 0+1x20
+  - series: http_server_requests_total{service="router",route="payments_confirm",code="200"}
+    values: 0+999x20
+  promql_expr_test:
+  - expr: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability"}
+    eval_time: 15m
+    exp_samples:
+    - labels: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability",team="payments-core",owner="payments-core-oncall",layer="application"}
+      value: 0.001

@@ -77,9 +77,17 @@ class GateTest(unittest.TestCase):
         self.write("specs/001-x/tasks.md", TASKS)
         self.assertEqual(self.gate("docs(specs): add draft spec")[0], 0)
 
-    def test_in_progress_spec_files_need_a_trailer(self):
+    def test_in_progress_spec_files_are_human_edited(self):
         self.write("specs/001-x/spec.md", spec_md("in-progress"))
+        self.assertEqual(self.gate("docs(specs): edit spec")[0], 0)
+
+    def test_implemented_spec_files_are_frozen(self):
+        self.write("specs/001-x/spec.md", spec_md("implemented"))
         self.assertEqual(self.gate("docs(specs): edit spec")[0], 1)
+
+    def test_human_only_tooling_needs_no_spec(self):
+        self.write("tools/lint/new-lint")
+        self.assertEqual(self.gate("feat(ci): add lint")[0], 0)
 
     def test_gated_file_needs_spec_trailer(self):
         self.write("infra/modules/x/main.tf")
@@ -119,6 +127,24 @@ class GateTest(unittest.TestCase):
         code, err = self.gate("feat(infra): add module\n\nSpec: specs/001-x#T1")
         self.assertEqual(code, 1)
         self.assertIn("not in-progress", err)
+
+    def test_owner_directed_exemption(self):
+        self.write("infra/a.tf")
+        self.assertEqual(self.gate("feat(infra): add a\n\nSpec: none\nSpec-Exempt: owner-directed")[0], 0)
+
+    def test_trivial_exemption_within_limits(self):
+        self.write("infra/a.tf")
+        self.write("infra/b.tf")
+        self.assertEqual(self.gate("fix(infra): fix a\n\nSpec: none\nSpec-Exempt: trivial")[0], 0)
+
+    def test_trivial_exemption_rejects_two_domains_or_cde(self):
+        self.write("infra/a.tf")
+        self.write("deploy/b.yaml")
+        self.assertEqual(self.gate("fix(infra): fix a\n\nSpec: none\nSpec-Exempt: trivial")[0], 1)
+
+    def test_trivial_exemption_rejects_cde_path(self):
+        self.write("vendor/card-vault/src/x.rs")
+        self.assertEqual(self.gate("fix(locker): fix x\n\nSpec: none\nSpec-Exempt: trivial\nPCI-Impact: none")[0], 1)
 
     def test_unknown_task(self):
         self.approved_spec()

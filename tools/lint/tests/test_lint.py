@@ -459,3 +459,87 @@ class StructureLintTest(unittest.TestCase):
         code, out = self.run_in(11)
         self.assertEqual(code, 1)
         self.assertIn("infra holds 11 files", out)
+
+    def test_root_allows_more_files(self):
+        root = Path(tempfile.mkdtemp(prefix="structure-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        for i in range(14):
+            (root / f"f{i}").write_text("x", encoding="utf-8")
+        self.assertEqual(run(REPO / "tools" / "lint" / "structure", root)[0], 0)
+        (root / "f14").write_text("x", encoding="utf-8")
+        code, out = run(REPO / "tools" / "lint" / "structure", root)
+        self.assertEqual(code, 1)
+        self.assertIn(". holds 15 files (limit 14)", out)
+
+
+    def test_progress_directory_is_exempt(self):
+        root = Path(tempfile.mkdtemp(prefix="structure-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        d = root / "specs" / "001-x" / "progress"
+        d.mkdir(parents=True)
+        for i in range(12):
+            (d / f"T{i}.md").write_text("x", encoding="utf-8")
+        self.assertEqual(run(REPO / "tools" / "lint" / "structure", root)[0], 0)
+
+SMALL = """---
+id: 001-example
+tier: small
+status: draft
+owner: platform
+milestone: 001-example
+issue: none
+pci-impact: none
+adr: []
+---
+
+# 001-example: Small change
+
+## Goal
+
+Add one module.
+
+## Acceptance criteria
+
+- [ ] AC1: terraform test passes
+
+## Tasks
+
+```yaml
+- id: T1
+  title: Add module
+  agent: terraform-engineer
+  paths: ["{path}"]
+  depends_on: []
+  provides: none
+  requires: []
+  acceptance: AC1
+  issue: none
+```
+"""
+
+
+class SmallSpecTest(unittest.TestCase):
+    def setUp(self):
+        self.root = make_root()
+        self.addCleanup(shutil.rmtree, self.root, True)
+
+    def write(self, text):
+        d = self.root / "specs" / "001-example"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "spec.md").write_text(text, encoding="utf-8")
+        (self.root / "specs" / "README.md").write_text("# specs\n\n" + INDEX_HEAD + "| 001 | Small change | draft | 001-example |\n", encoding="utf-8")
+        return run(SPEC_LINT, self.root)
+
+    def test_small_spec_passes_without_plan_and_tasks(self):
+        code, out = self.write(SMALL.replace("{path}", "infra/modules/example/**"))
+        self.assertEqual(code, 0, out)
+
+    def test_small_spec_rejects_cde_paths(self):
+        code, out = self.write(SMALL.replace("{path}", "vendor/card-vault/**"))
+        self.assertEqual(code, 1)
+        self.assertIn("needs tier full", out)
+
+    def test_small_spec_length_limit(self):
+        code, out = self.write(SMALL.replace("Add one module.", "\n".join(f"line {i}" for i in range(40))))
+        self.assertEqual(code, 1)
+        self.assertIn("at most 30", out)

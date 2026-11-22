@@ -1,0 +1,301 @@
+Resources:
+  VpcDefaultSecurityGroupClosed:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-vpc-default-sg-closed
+      Description: PCI DSS 1.3.1 the default security group allows no traffic.
+      Source: {Owner: AWS, SourceIdentifier: VPC_DEFAULT_SECURITY_GROUP_CLOSED}
+  VpcSgOpenOnlyToAuthorizedPorts:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-vpc-sg-authorized-ports
+      Description: PCI DSS 1.2.5 security groups open to the world only on authorized ports.
+      InputParameters: {authorizedTcpPorts: "443"}
+      Source: {Owner: AWS, SourceIdentifier: VPC_SG_OPEN_ONLY_TO_AUTHORIZED_PORTS}
+  IncomingSshDisabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-incoming-ssh-disabled
+      Description: PCI DSS 1.3.1 no inbound SSH, nodes have no SSH access.
+      Source: {Owner: AWS, SourceIdentifier: INCOMING_SSH_DISABLED}
+  SubnetNoAutoPublicIp:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-subnet-no-auto-public-ip
+      Description: PCI DSS 1.4.1 subnets do not assign public IPs.
+      Source: {Owner: AWS, SourceIdentifier: SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED}
+  Ec2NoPublicIp:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-ec2-no-public-ip
+      Description: PCI DSS 1.4.1 instances have no public IP.
+      Source: {Owner: AWS, SourceIdentifier: EC2_INSTANCE_NO_PUBLIC_IP}
+  RdsNoPublicAccess:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-no-public-access
+      Description: PCI DSS 1.4.1 databases are not publicly accessible.
+      Source: {Owner: AWS, SourceIdentifier: RDS_INSTANCE_PUBLIC_ACCESS_CHECK}
+  S3BlockPublicAccess:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-block-public-access
+      Description: PCI DSS 1.4.2 S3 Block Public Access is on.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_LEVEL_PUBLIC_ACCESS_PROHIBITED}
+  S3NoPublicRead:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-no-public-read
+      Description: PCI DSS 1.4.2 buckets do not allow public read.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_PUBLIC_READ_PROHIBITED}
+  S3NoPublicWrite:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-no-public-write
+      Description: PCI DSS 1.4.2 buckets do not allow public write.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_PUBLIC_WRITE_PROHIBITED}
+  EbsSnapshotNotPublic:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-ebs-snapshot-not-public
+      Description: PCI DSS 3.5.1 EBS snapshots are not restorable by everyone.
+      Source: {Owner: AWS, SourceIdentifier: EBS_SNAPSHOT_PUBLIC_RESTORABLE_CHECK}
+  RdsSnapshotNotPublic:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-snapshot-not-public
+      Description: PCI DSS 3.5.1 RDS snapshots are not public.
+      Source: {Owner: AWS, SourceIdentifier: RDS_SNAPSHOTS_PUBLIC_PROHIBITED}
+  Ec2Imdsv2:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-ec2-imdsv2
+      Description: PCI DSS 2.2.1 instances accept only IMDSv2.
+      Source: {Owner: AWS, SourceIdentifier: EC2_IMDSV2_CHECK}
+  EncryptedVolumes:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-encrypted-volumes
+      Description: PCI DSS 3.5.1 attached EBS volumes are encrypted.
+      Source: {Owner: AWS, SourceIdentifier: ENCRYPTED_VOLUMES}
+  RdsStorageEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-storage-encrypted
+      Description: PCI DSS 3.5.1 RDS storage is encrypted.
+      Source: {Owner: AWS, SourceIdentifier: RDS_STORAGE_ENCRYPTED}
+  RdsSnapshotEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-snapshot-encrypted
+      Description: PCI DSS 3.5.1 RDS snapshots are encrypted.
+      Source: {Owner: AWS, SourceIdentifier: RDS_SNAPSHOT_ENCRYPTED}
+  S3DefaultEncryptionKms:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-default-encryption-kms
+      Description: PCI DSS 3.5.1 buckets encrypt with KMS by default.
+      Source: {Owner: AWS, SourceIdentifier: S3_DEFAULT_ENCRYPTION_KMS}
+  DynamoDbEncryptedKms:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-dynamodb-encrypted-kms
+      Description: PCI DSS 3.5.1 DynamoDB tables use a KMS key.
+      Source: {Owner: AWS, SourceIdentifier: DYNAMODB_TABLE_ENCRYPTED_KMS}
+  EfsEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-efs-encrypted
+      Description: PCI DSS 3.5.1 EFS file systems are encrypted.
+      Source: {Owner: AWS, SourceIdentifier: EFS_ENCRYPTED_CHECK}
+  BackupRecoveryPointEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-backup-recovery-point-encrypted
+      Description: PCI DSS 3.5.1 recovery points are encrypted.
+      Source: {Owner: AWS, SourceIdentifier: BACKUP_RECOVERY_POINT_ENCRYPTED}
+  KmsKeyRotation:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-kms-key-rotation
+      Description: PCI DSS 3.7.4 customer managed keys rotate.
+      Source: {Owner: AWS, SourceIdentifier: CMK_BACKING_KEY_ROTATION_ENABLED}
+  KmsKeyNotScheduledForDeletion:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-kms-key-not-scheduled-for-deletion
+      Description: PCI DSS 3.7.5 keys with data behind them are not scheduled for deletion.
+      Source: {Owner: AWS, SourceIdentifier: KMS_CMK_NOT_SCHEDULED_FOR_DELETION}
+  S3SslRequestsOnly:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-ssl-requests-only
+      Description: PCI DSS 4.2.1 buckets accept only TLS requests.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_SSL_REQUESTS_ONLY}
+  ElbTlsListenersOnly:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-elb-tls-listeners-only
+      Description: PCI DSS 4.2.1 load balancers listen with TLS only.
+      Source: {Owner: AWS, SourceIdentifier: ELB_TLS_HTTPS_LISTENERS_ONLY}
+  AlbHttpToHttpsRedirect:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-alb-http-to-https
+      Description: PCI DSS 4.2.1 HTTP listeners redirect to HTTPS.
+      Source: {Owner: AWS, SourceIdentifier: ALB_HTTP_TO_HTTPS_REDIRECTION_CHECK}
+  IamNoAdminPolicies:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-no-admin-statements
+      Description: PCI DSS 7.2.2 no policy grants full administrator access.
+      Source: {Owner: AWS, SourceIdentifier: IAM_POLICY_NO_STATEMENTS_WITH_ADMIN_ACCESS}
+  IamNoInlinePolicies:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-no-inline-policies
+      Description: PCI DSS 7.2.1 access is granted through managed policies.
+      Source: {Owner: AWS, SourceIdentifier: IAM_NO_INLINE_POLICY_CHECK}
+  IamUserNoPolicies:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-user-no-policies
+      Description: PCI DSS 7.2.1 policies attach to roles and groups, not to users.
+      Source: {Owner: AWS, SourceIdentifier: IAM_USER_NO_POLICIES_CHECK}
+  IamRootNoAccessKey:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-root-no-access-key
+      Description: PCI DSS 8.2.2 the root user has no access key.
+      Source: {Owner: AWS, SourceIdentifier: IAM_ROOT_ACCESS_KEY_CHECK}
+  RootMfaEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-root-mfa-enabled
+      Description: PCI DSS 8.4.2 the root user has MFA.
+      Source: {Owner: AWS, SourceIdentifier: ROOT_ACCOUNT_MFA_ENABLED}
+  IamConsoleMfa:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-console-mfa
+      Description: PCI DSS 8.4.2 console users have MFA.
+      Source: {Owner: AWS, SourceIdentifier: MFA_ENABLED_FOR_IAM_CONSOLE_ACCESS}
+  AccessKeysRotated:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-access-keys-rotated
+      Description: PCI DSS 8.3.9 any remaining access key is at most 90 days old.
+      InputParameters: {maxAccessKeyAge: "90"}
+      Source: {Owner: AWS, SourceIdentifier: ACCESS_KEYS_ROTATED}
+  IamPasswordPolicy:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-iam-password-policy
+      Description: PCI DSS 8.3.6 password length, reuse and age.
+      InputParameters: {MinimumPasswordLength: "12", PasswordReusePrevention: "4", MaxPasswordAge: "90"}
+      Source: {Owner: AWS, SourceIdentifier: IAM_PASSWORD_POLICY}
+  CloudTrailEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-cloudtrail-enabled
+      Description: PCI DSS 10.2.1 CloudTrail is enabled.
+      Source: {Owner: AWS, SourceIdentifier: CLOUD_TRAIL_ENABLED}
+  CloudTrailLogValidation:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-cloudtrail-log-validation
+      Description: PCI DSS 10.3.4 trail log files are validated for integrity.
+      Source: {Owner: AWS, SourceIdentifier: CLOUD_TRAIL_LOG_FILE_VALIDATION_ENABLED}
+  CloudTrailEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-cloudtrail-encrypted
+      Description: PCI DSS 10.3.2 trail logs are encrypted with KMS.
+      Source: {Owner: AWS, SourceIdentifier: CLOUD_TRAIL_ENCRYPTION_ENABLED}
+  CloudTrailCloudWatchLogs:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-cloudtrail-cloudwatch-logs
+      Description: PCI DSS 10.4.1 trail events reach CloudWatch Logs for review.
+      Source: {Owner: AWS, SourceIdentifier: CLOUD_TRAIL_CLOUD_WATCH_LOGS_ENABLED}
+  VpcFlowLogsEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-vpc-flow-logs
+      Description: PCI DSS 10.2.1 VPC flow logs are on.
+      Source: {Owner: AWS, SourceIdentifier: VPC_FLOW_LOGS_ENABLED}
+  LogGroupRetention:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-log-group-retention
+      Description: PCI DSS 10.5.1 log groups keep 365 days.
+      InputParameters: {MinRetentionTime: "365"}
+      Source: {Owner: AWS, SourceIdentifier: CW_LOGGROUP_RETENTION_PERIOD_CHECK}
+  LogGroupEncrypted:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-log-group-encrypted
+      Description: PCI DSS 10.3.2 log groups are encrypted.
+      Source: {Owner: AWS, SourceIdentifier: CLOUDWATCH_LOG_GROUP_ENCRYPTED}
+  S3DefaultLock:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-default-lock
+      Description: PCI DSS 10.3.2 audit buckets have a default Object Lock retention.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_DEFAULT_LOCK_ENABLED}
+  GuardDutyEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-guardduty-enabled
+      Description: PCI DSS 11.5.1 GuardDuty is enabled and centrally managed.
+      Source: {Owner: AWS, SourceIdentifier: GUARDDUTY_ENABLED_CENTRALIZED}
+  SecurityHubEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-securityhub-enabled
+      Description: PCI DSS 11.3.1 Security Hub is enabled.
+      Source: {Owner: AWS, SourceIdentifier: SECURITYHUB_ENABLED}
+  RequiredTags:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-required-tags
+      Description: PCI DSS 12.5.2 scope tags are present; the managed rule takes six keys, the rest are in the custom pack.
+      InputParameters: {tag1Key: pci-scope, tag2Key: data-class, tag3Key: backup-tier, tag4Key: managed-by, tag5Key: owner, tag6Key: environment}
+      Source: {Owner: AWS, SourceIdentifier: REQUIRED_TAGS}
+  RdsBackupEnabled:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-backup-enabled
+      Description: PCI DSS 12.10.1 database instances have backups.
+      Source: {Owner: AWS, SourceIdentifier: DB_INSTANCE_BACKUP_ENABLED}
+  DynamoDbPitr:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-dynamodb-pitr
+      Description: PCI DSS 12.10.1 DynamoDB tables have point-in-time recovery.
+      Source: {Owner: AWS, SourceIdentifier: DYNAMODB_PITR_ENABLED}
+  BackupPlanFrequencyAndRetention:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-backup-plan-frequency-retention
+      Description: PCI DSS 12.10.1 backup plans run at least daily and keep 35 days.
+      InputParameters: {requiredFrequencyValue: "1", requiredFrequencyUnit: days, requiredRetentionDays: "35"}
+      Source: {Owner: AWS, SourceIdentifier: BACKUP_PLAN_MIN_FREQUENCY_AND_MIN_RETENTION_CHECK}
+  BackupNoManualDeletion:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-backup-no-manual-deletion
+      Description: PCI DSS 10.3.2 recovery points cannot be deleted by hand.
+      Source: {Owner: AWS, SourceIdentifier: BACKUP_RECOVERY_POINT_MANUAL_DELETION_DISABLED}
+  S3Versioning:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-s3-versioning
+      Description: PCI DSS 10.3.2 buckets are versioned.
+      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_VERSIONING_ENABLED}
+  RdsClusterDeletionProtection:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: pci-rds-cluster-deletion-protection
+      Description: PCI DSS 12.10.1 database clusters have deletion protection.
+      Source: {Owner: AWS, SourceIdentifier: RDS_CLUSTER_DELETION_PROTECTION_ENABLED}

@@ -1,0 +1,66 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-backup-dr-backups
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: backup-dr-backups
+    rules:
+    - alert: BackupJobFailed
+      expr: sum by (backup_vault) (increase(aws_backup_number_of_backup_jobs_failed_sum[1h]) + increase(aws_backup_number_of_backup_jobs_expired_sum[1h])) > 0
+      labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-job-failed
+      annotations:
+        summary: An AWS Backup job failed or expired
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: BackupMissing
+      expr: time() - max by (store) (backup_last_success_timestamp_seconds) > 2 * max by (store) (backup_interval_seconds)
+      for: 5m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-missing
+      annotations:
+        summary: The last successful backup of a store is older than twice its interval
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-missing.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: BackupCopyFailed
+      expr: sum by (backup_vault) (increase(aws_backup_number_of_copy_jobs_failed_sum[1h])) > 0
+      labels:
+        severity: warning
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-copy-failed
+      annotations:
+        summary: A backup copy to a recovery region or to the backup account failed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#backup-copy-failed
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: SnapshotCopyStale
+      expr: time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds) > 2 * 3600
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-snapshot-copy-stale
+      annotations:
+        summary: The latest snapshot copy in a recovery region is older than 2 hours
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#snapshot-copy-stale
+        dashboard_url: https://grafana.payments.internal/d/backup

@@ -1,0 +1,92 @@
+rule_files:
+- ../../alerts/application/resilience.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: retry_total{dependency="router-locker"}
+    values: 0+20x21
+  - series: dependency_requests_total{dependency="router-locker"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: RetryStorm
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: resilience
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-retry-storm
+        dependency: router-locker
+      exp_annotations:
+        summary: Retries exceed 10% of the traffic to a dependency
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#retry-storm
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: retry_total{dependency="router-locker"}
+    values: 0+1x21
+  - series: dependency_requests_total{dependency="router-locker"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: RetryStorm
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: retry_budget_exhausted_total{dependency="router-locker"}
+    values: 0+1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RetryBudgetExhausted
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: resilience
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-retry-budget-exhausted
+        dependency: router-locker
+      exp_annotations:
+        summary: The retry budget of the locker or PSP sync is exhausted
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/retry-budget-exhausted.md
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: retry_budget_exhausted_total{dependency="router-locker"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RetryBudgetExhausted
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: retry_budget_exhausted_total{dependency="aurora"}
+    values: 0+1x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: RetryBudgetExhaustedNonCritical
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: resilience
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-retry-budget-exhausted-non-critical
+        dependency: aurora
+      exp_annotations:
+        summary: The retry budget of a dependency is exhausted
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#retry-budget-exhausted-non-critical
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: retry_budget_exhausted_total{dependency="aurora"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: RetryBudgetExhaustedNonCritical
+    exp_alerts: []

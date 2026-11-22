@@ -28,6 +28,10 @@ terraform plan
 
 Offline tests: `for m in modules/*; do terraform -chdir=$m init -backend=false && terraform -chdir=$m test; done`.
 
+## Personal account instead of an organization
+
+`-var account_type=user` skips the organization settings, the team reviewers, the CODEOWNERS file and the merge queue (they exist only for organizations). Use `-var github_token` via `TF_VAR_github_token` for a token instead of the GitHub App, `-var import_existing=true` to adopt a repository that already exists, and `-var 'tag_bypass={actor_id=5,actor_type="RepositoryRole"}'` so that repository admins can create `v*` tags.
+
 ## Not covered by the provider
 
 - Enforcing 2FA for the organization: a setting in the GitHub UI, check it manually.

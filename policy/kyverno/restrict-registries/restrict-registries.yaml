@@ -1,0 +1,27 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+# The account id is a placeholder until the shared-services ECR account is known; the three regions hold the ECR replicas of D7.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-registries
+  annotations:
+    policies.kyverno.io/title: Restrict registries
+    policies.kyverno.io/category: Supply chain
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: "(object.spec.containers + object.spec.?initContainers.orValue([])).map(c, c.image)"
+  validations:
+    - expression: "variables.images.all(i, i.matches('^123456789012\\\\.dkr\\\\.ecr\\\\.(eu-central-1|us-east-1|us-east-2)\\\\.amazonaws\\\\.com/'))"
+      message: "Images must come from the platform ECR in eu-central-1, us-east-1 or us-east-2."

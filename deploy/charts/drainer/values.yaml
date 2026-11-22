@@ -1,0 +1,89 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only)
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/drainer
+  pullPolicy: IfNotPresent
+
+# The old pod finishes its current batch, so a rolling update never drops below the current pods
+workload:
+  kind: Deployment
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    maxSurge: 25%
+    maxUnavailable: 0
+
+container:
+  port: 8080
+  env:
+    RUN_ENV: production
+    # Read by the KEDA trigger below, which runs outside the pod
+    REDIS_ADDRESS: memorydb.invalid:6379
+  envFromSecrets: []
+  # 1500 rows/s per pod (section 8); batches are small, so memory stays low
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      memory: 512Mi
+
+probes:
+  startup:
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 36
+  liveness:
+    path: /health
+    periodSeconds: 10
+  readiness:
+    path: /health/ready
+    periodSeconds: 5
+    timeoutSeconds: 3
+
+# Finishing a batch needs more than the router drain, so the grace period is the full 60 s
+lifecycle:
+  preStopSeconds: 15
+  terminationGracePeriodSeconds: 60
+
+scheduling:
+  nodePool: workers
+
+service:
+  enabled: true
+  port: 8080
+
+autoscaling:
+  enabled: true
+  kind: keda
+  minReplicas: 3
+  maxReplicas: 6
+  triggers:
+    # The region file lists one trigger per shard stream; the first one is the default
+    - type: redis-streams
+      metadata:
+        addressFromEnv: REDIS_ADDRESS
+        passwordFromEnv: REDIS_PASSWORD
+        enableTLS: "true"
+        stream: "{shard_0}_drainer_stream"
+        consumerGroup: drainer_group
+        pendingEntriesCount: "10000"
+
+pdb:
+  enabled: true
+  maxUnavailable: 10%
+
+networkPolicy:
+  enabled: true
+  dataPorts: [5432, 6379]
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+serviceAccount:
+  create: true
+
+istio:
+  inject: true
+  authorizationPolicy:
+    enabled: false

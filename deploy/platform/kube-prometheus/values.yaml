@@ -1,0 +1,14 @@
+# Long-term storage and dashboards live in the central stack outside the CDE; here only the in-cluster scrape and rules
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 6h
+    # Every ServiceMonitor and rule of the platform charts is picked up, not only the ones with a release label
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false

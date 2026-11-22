@@ -1,0 +1,1 @@
+{{- include "platform-common.pdb" (dict "root" . "cfg" .Values.producer "name" "scheduler-producer" "component" "producer") }}

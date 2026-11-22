@@ -56,6 +56,18 @@ class PreEdit(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class Worktree(unittest.TestCase):
+    def test_root_comes_from_the_edited_file(self):
+        import shutil, tempfile
+        wt = Path(tempfile.mkdtemp(prefix="wt-"))
+        self.addCleanup(shutil.rmtree, wt, True)
+        (wt / ".claude").mkdir()
+        shutil.copy(REPO / ".claude" / "orchestration.yaml", wt / ".claude" / "orchestration.yaml")
+        ok = hook("pre_edit.py", {"tool_input": {"file_path": str(wt / "infra" / "modules" / "x" / "main.tf")}, "agent_type": "terraform-engineer"})
+        bad = hook("pre_edit.py", {"tool_input": {"file_path": str(wt / "deploy" / "x.yaml")}, "agent_type": "terraform-engineer"})
+        self.assertEqual((ok[0], bad[0]), (0, 2))
+
+
 class PreBash(unittest.TestCase):
     def test_git_global_option_does_not_hide_commit(self):
         code, _ = bash("git -c user.name=a commit -m 'x Co-Authored-By: Claude <noreply@anthropic.com>'")
@@ -74,9 +86,17 @@ class PreBash(unittest.TestCase):
     def test_human_push_allowed_by_hook(self):
         self.assertEqual(bash("git push origin HEAD")[0], 0)
 
-    def test_infra_mutations(self):
-        for cmd in ("terraform -chdir=x apply", "kubectl -n x delete pod y", "AWS_PROFILE=cde-prod aws s3 ls",
-                    "aws --profile cde-prod s3 ls", "aws s3 rm s3://b/k", "helm upgrade x y", "terragrunt run-all apply"):
+    def test_infra_mutations_blocked_for_agents(self):
+        for cmd in ("terraform -chdir=x apply", "kubectl -n x delete pod y", "aws s3 rm s3://b/k", "helm upgrade x y",
+                    "terragrunt run-all apply"):
+            self.assertEqual(bash(cmd, agent="terraform-engineer")[0], 2, cmd)
+
+    def test_main_session_may_apply(self):
+        for cmd in ("terraform apply", "git push origin main"):
+            self.assertEqual(bash(cmd)[0], 0, cmd)
+
+    def test_cde_targets_blocked_for_everyone(self):
+        for cmd in ("AWS_PROFILE=cde-prod aws s3 ls", "aws --profile cde-prod s3 ls"):
             self.assertEqual(bash(cmd)[0], 2, cmd)
 
     def test_read_only_commands_pass(self):

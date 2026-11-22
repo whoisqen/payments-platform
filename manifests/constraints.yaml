@@ -1,0 +1,35 @@
+# Read when a rule, a number or an owner decision matters. Owner decisions override the architecture source.
+hard_rules:
+  - card data (PAN, CVV) never in logs, traces, metric labels or fixtures; Rust card fields use Secret<T>
+  - a charge is never retried automatically; a PSP timeout is the unknown state, settled by sync
+  - router never writes PostgreSQL on the hot path (MemoryDB plus Redis stream, drainer writes in batches)
+  - migrations are expand-contract only; down.sql never runs in prod
+  - agents never run apply, never touch the CDE, card data or prod data, never merge
+  - images by digest only (sha256), signed; no latest tags
+slo:
+  authorization: 99.99% without 5xx on our side, budget 4.3 min / 30 d
+  platform_overhead: p99 < 150 ms for 99.9% of requests, budget 43.2 min
+  status_read: p99 < 50 ms, 99.95%, budget 21.6 min
+  outgoing_webhook: delivered < 60 s, 99.9%, no budget
+  drain_lag: p99 < 5 s, alert at stream length > 50,000
+  locker: 99.99%
+load: {average_tps: 160, daily_peak_tps: 480, sale_peak_tps: 1430, stress_tps: 2860, rps_per_tps: 7}
+recovery:
+  az_loss: {rpo: 0, rto: 1 min}
+  region_loss: {rpo_payment_data: "<= 10 s Aurora + drain lag", rto: 60 min, rto_plan_b: 75 min}
+  logical_error_restore: 30 min into prepared capacity
+  analytics: {rpo: 15 min, rto: 4 h}
+  kubernetes_state: {rpo: "0 (Git)", objects: 1 h Velero}
+owner_decisions:
+  D1: version tags v* SemVer (breaking major, feat minor, fix patch), only the tagging workflow creates them, a tag builds nothing
+  D2: application databases (Aurora cells and locker, DynamoDB) base backup plus PITR to any second, data loss <= 5 min, daily restore test, alert when latest restorable time lags > 5 min for 10 min, no stateful resource without a backup plan
+  D3: MemoryDB, ClickHouse, Velero hourly, 35 days; snapshot taken by the migration Job before every schema change, kept 35 days
+  D4: logical-error restore 30 min; backup_restore_duration_seconds with alert at 80%; zstd low level, restore as code, warm-up before traffic
+  D5: object backups colder after 7 and 14 days; monthly 7-year archive in the coldest tier
+  D6: Frankfurt is the only writing region; HA only from 3 AZs; no active-active, no standby compute; semi-automatic switch with fencing
+  D7: data replicated to us-east-1 and us-east-2 (headless Aurora Global secondaries, DynamoDB Global Tables MREC written only from Frankfurt, S3 RTC, ECR, hourly snapshot copies); MemoryDB rebuilt from Aurora; MSK rebuilt from the S3 archive; compute from Terraform at the switch; plan B us-east-2 after 10 min without capacity
+  D8: a cell takes traffic at 75% of priority hot keys warm; after 5 min it takes traffic anyway with a non-paging alert
+cost: {finops_approval_above_usd_month: 1000, budgets_alert: [80%, 100%], reservation_utilization: "> 95%", coverage: 70-80%}
+open_issues:
+  - stale eu-west-1 passages in the source (sections 1, 9, 12, 23.5) are withdrawn by D6 and D7
+  - DynamoDB recovery-region write deny is an SCP; the switch runbook must detach it

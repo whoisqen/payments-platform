@@ -1,0 +1,10 @@
+apiVersion: v2
+name: migrations
+description: Pre-upgrade Job that takes an on-demand snapshot and then runs expand-only schema migrations
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

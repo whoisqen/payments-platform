@@ -1,0 +1,119 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: security-pci
+  id: security-pci-guard-duty-high-finding
+  component: guardduty
+  failure: GuardDuty high finding
+  impact: possible compromise of an AWS account or workload
+  severity: security
+  alert: GuardDutyHighFinding
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-guard-duty-runtime-cde-finding
+  component: runtime-monitoring
+  failure: runtime threat in the CDE
+  impact: possible code execution or card data access inside a CDE pod or node
+  severity: security
+  alert: GuardDutyRuntimeCdeFinding
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-pan-detected-in-logs
+  component: pan-detection
+  failure: PAN in logs
+  impact: 'PCI DSS 3.3 violation: card data left the CDE; the collector masks it but the origin must be fixed'
+  severity: security
+  alert: PanDetectedInLogs
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-root-account-login
+  component: iam
+  failure: root account login
+  impact: the root user bypasses every control; PCI DSS 8.2
+  severity: security
+  alert: RootAccountLogin
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-break-glass-role-used
+  component: iam
+  failure: break-glass role used
+  impact: emergency access to the CDE; must match an approved incident
+  severity: security
+  alert: BreakGlassRoleUsed
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-scp-changed
+  component: organizations
+  failure: SCP change
+  impact: guardrails of the organization were modified; PCI DSS 1.2 and 7.2
+  severity: security
+  alert: ScpChanged
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-iam-change-outside-terraform
+  component: iam
+  failure: IAM drift by hand
+  impact: permissions changed without review; PCI DSS 7.2.4
+  severity: security
+  alert: IamChangeOutsideTerraform
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-vault-sealed
+  component: vault
+  failure: Vault sealed
+  impact: services cannot read secrets or database credentials after their lease expires; the locker key access is affected
+  severity: critical
+  alert: VaultSealed
+  signal: metric
+  detect_within: 4m
+- layer: security-pci
+  id: security-pci-vault-audit-device-failing
+  component: vault-audit
+  failure: Vault audit device failing
+  impact: Vault stops answering requests when no audit device can write; PCI DSS 10.2
+  severity: critical
+  alert: VaultAuditDeviceFailing
+  signal: metric
+  detect_within: 5m
+- layer: security-pci
+  id: security-pci-cde-network-policy-changed
+  component: network-policy
+  failure: CDE network policy change
+  impact: segmentation of the CDE may be weakened; PCI DSS 1.2.2
+  severity: warning
+  alert: CdeNetworkPolicyChanged
+  signal: metric
+  detect_within: 3m
+- layer: security-pci
+  id: security-pci-kms-key-rotation-overdue
+  component: kms
+  failure: KMS key rotation overdue
+  impact: a cryptoperiod is exceeded; PCI DSS 3.7.4
+  severity: warning
+  alert: KmsKeyRotationOverdue
+  signal: metric
+  detect_within: 33m
+- layer: security-pci
+  id: security-pci-kyverno-audit-violations
+  component: kyverno
+  failure: Kyverno audit violations
+  impact: workloads break a rule that is not yet enforced; they will be blocked when it is
+  severity: warning
+  alert: KyvernoAuditViolations
+  signal: metric
+  detect_within: 13m
+- layer: security-pci
+  id: security-pci-unauthorized-api-calls
+  component: cloudtrail
+  failure: Spike of AccessDenied API calls
+  impact: probing of permissions by a compromised principal
+  severity: security
+  alert: null
+  signal: metric
+  reason: CloudTrail metric filter is not created yet

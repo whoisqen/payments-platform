@@ -1,0 +1,31 @@
+ou: Workloads/CDE
+accounts:
+  - name: cde-dev
+    email: aws-pay-cde-dev@example.com
+    customizations: cde
+    sso_user: &sso { email: platform@example.com, first_name: Platform, last_name: Team }
+    tags: &cde
+      environment: dev
+      team: payments-core
+      owner: payments-core@example.com
+      cost-center: cc-200
+      cell: shared
+      pci-scope: cde
+      data-class: card-data
+      backup-tier: bronze
+  - name: cde-stage
+    email: aws-pay-cde-stage@example.com
+    customizations: cde
+    sso_user: *sso
+    tags:
+      <<: *cde
+      environment: stage
+      backup-tier: silver
+  - name: cde-prod
+    email: aws-pay-cde-prod@example.com
+    customizations: cde
+    sso_user: *sso
+    tags:
+      <<: *cde
+      environment: prod
+      backup-tier: gold

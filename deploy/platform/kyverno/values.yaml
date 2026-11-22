@@ -1,0 +1,6 @@
+# Three replicas: an unavailable admission controller must not block pod creation in the CDE
+admissionController:
+  replicas: 3
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2

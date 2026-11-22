@@ -1,0 +1,20 @@
+{
+  "description": "Hypothesis: a MemoryDB shard failover loses no payment writes and keeps 5xx below 0.1% for at most 30 s. Stop: chaos-stop alarm. FIS has no native MemoryDB action, so an SSM Automation document calls failover-shard.",
+  "actions": {
+    "failover-shard": {
+      "actionId": "aws:ssm:send-automation-document",
+      "description": "Run failover-shard on one shard of the stage cell cluster",
+      "parameters": {
+        "documentArn": "arn:aws:ssm:eu-central-1:${STAGE_ACCOUNT_ID}:document/pay-stage-chaos-memorydb-failover-shard",
+        "documentParameters": "{\"ClusterName\":\"pay-stage-euc1-cell-1-memorydb\",\"ShardName\":\"0001\"}",
+        "maxDuration": "PT10M"
+      }
+    }
+  },
+  "stopConditions": [
+    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:eu-central-1:${STAGE_ACCOUNT_ID}:alarm:pay-stage-euc1-chaos-stop" }
+  ],
+  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/pay-stage-euc1-fis-experiment",
+  "tags": { "Name": "chaos-memorydb-failover", "environment": "stage", "failure-mode": "data-memorydb-failover" },
+  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+}

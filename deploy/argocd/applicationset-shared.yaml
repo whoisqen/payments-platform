@@ -1,0 +1,126 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-locker
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/whoisqen/payments-platform
+        revision: main
+        directories:
+          - path: deploy/envs/*/*/locker
+  template:
+    metadata:
+      name: 'payments-locker-{{ index .path.segments 2 }}-{{ index .path.segments 3 }}'
+    spec:
+      project: payments
+      destination:
+        name: 'pay-{{ index .path.segments 2 }}-euc1-locker'
+        namespace: payments
+      sources:
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          path: deploy/charts/payments-locker
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/locker/values.yaml
+              - $values/deploy/envs/{{ index .path.segments 2 }}/images.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-edge
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/whoisqen/payments-platform
+        revision: main
+        directories:
+          - path: deploy/envs/*/*/edge
+  template:
+    metadata:
+      name: 'payments-edge-{{ index .path.segments 2 }}-{{ index .path.segments 3 }}'
+    spec:
+      project: payments
+      destination:
+        name: 'pay-{{ index .path.segments 2 }}-euc1-edge'
+        namespace: payments-edge
+      sources:
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          path: deploy/charts/payments-edge
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/edge/values.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-control-center
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # The digest of a chart that is not an umbrella is read from images.yaml and passed as a parameter
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/whoisqen/payments-platform
+              revision: main
+              files:
+                - path: deploy/envs/*/images.yaml
+          - list:
+              elements:
+                - region: eu-central-1
+  template:
+    metadata:
+      name: 'payments-control-center-{{ index .path.segments 2 }}-{{ .region }}'
+    spec:
+      project: payments
+      destination:
+        name: 'pay-{{ index .path.segments 2 }}-euc1-control-center'
+        namespace: control-center
+      sources:
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          path: deploy/charts/control-center
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ .region }}/control-center/values.yaml
+            parameters:
+              - name: image.digest
+                value: '{{ index . "control-center" "image" "digest" }}'
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

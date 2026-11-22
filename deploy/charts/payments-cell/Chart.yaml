@@ -1,0 +1,19 @@
+apiVersion: v2
+name: payments-cell
+description: One cell as one release - router, drainer, scheduler and the migrations Job
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: router
+    version: 0.1.0
+    repository: file://../router
+  - name: drainer
+    version: 0.1.0
+    repository: file://../drainer
+  - name: scheduler
+    version: 0.1.0
+    repository: file://../scheduler
+  - name: migrations
+    version: 0.1.0
+    repository: file://../migrations
