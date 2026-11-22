@@ -1,20 +1,34 @@
 ---
-id: 001-devops-srs
+id: 001-devops-platform
 status: in-progress
 owner: platform
-milestone: 001-devops-srs
-issue: "#1"
-pci-impact: none
+milestone: 001-devops-platform
+issue: "#22"
+pci-impact: yes
 adr: []
 ---
 
-# 001-devops-srs: Software requirements specification of the DevOps part
+# 001-devops-platform: DevOps platform as code, from requirements to verified delivery
 
 ## Problem
 
-The DevOps part of the platform (AWS accounts and network, Kubernetes and delivery, data protection and recovery, security controls, observability, CI/CD and everything managed as code) is described only by the architecture document. That document lives outside the repository, in the Claude project memory, is written in Ukrainian, and mixes requirements with design decisions and operating procedures. Nothing in the repository states, in a form that can be cited and tested, what the DevOps part must provide and how well. Change specifications in `specs/` therefore have no stable requirement IDs to trace their acceptance criteria to, and a reviewer cannot tell a requirement from a design choice.
+The platform has one architecture document that lives outside the repository, and the work derived from it was split across two specifications and open-ended tickets: a requirements specification, a GitHub-settings specification and a build of infrastructure, charts, pipelines and observability that had no specification at all. Progress could not be read from the tracker, because tickets were wide and did not match the work in the repository.
+
+This is the single specification of the DevOps part. It states the requirements (the SRS), and the work that implements them in seven milestones, each ticket being one task of `tasks.md` with a verifiable "Done when" list. The project is complete when every task is done, the pull request to `main` is merged by a human, and nothing remains in the tracker except follow-ups opened after the merge.
+
+Milestones:
+
+- M1 Requirements baseline: SRS of the DevOps part confirmed as the baseline (docs/requirements, ADR of the region model).
+- M2 Repository as code: GitHub organization, repository, rulesets, environments and CODEOWNERS in Terraform; repository files; drift check.
+- M3 Cloud foundation: State bootstrap, CI roles, AFT, network, edge, keys, secrets and registries for dev and stage.
+- M4 Data stores and recovery: Aurora, DynamoDB, MemoryDB, MSK, OpenSearch, ClickHouse, backups and the recovery regions.
+- M5 Kubernetes platform and delivery: EKS, Karpenter, Helm charts, Argo CD, CI/CD workflows and the ARC runner pool.
+- M6 Security, policy and observability: Policy as code, Vault and secrets, observability, trust and SCP hardening.
+- M7 Verification and release readiness: Load, chaos, smoke and e2e tests, review follow-ups, placeholders, threat model.
 
 ## Goals and non-goals
+
+Requirements (M1, the earlier requirements specification):
 
 - Goal: write the first edition of the software requirements specification of the DevOps part in `docs/requirements/`, structured after ISO/IEC/IEEE 29148, in English, derived from the architecture document, and confirm it as the baseline through the spec gate.
 - Goal: every requirement is one table row with a stable never reused ID (`FR-<area>-<n>`, `NFR-<area>-<n>`), one verification method and the technical implementation (tool, resource, setting or number); the text is purely technical, without introductions or explanation of trivial steps.
@@ -25,9 +39,16 @@ The DevOps part of the platform (AWS accounts and network, Kubernetes and delive
 - Non-goal: the business behavior of the payment services (PSP routing, merchant API authentication, webhook signing, routing of payments between cells by hash, card tokenization logic); sections 2 and 6 are in scope only for their platform controls.
 - Non-goal: the repository process: section 11; in section 14 the directory tree, directory naming and the glossary extract; in section 18 the directory tree (including the layout of `infra/` and `policy/`), agent models, code comments and refactoring; sections 21.4 and 27.1 to 27.4, 27.7, 27.8; the Claude Code bullet of 21.5. `CLAUDE.md` governs them.
 - Non-goal: design rationale and operating procedures (ADRs, runbooks); the SRS links to them as "ADR-0NN (architecture section 13)".
-- Non-goal: changing code, infrastructure or policy, and translating the architecture document. The only architecture decision made here is the ADR of T11 that records the owner decisions D6 and D7.
+- Non-goal: translating the architecture document; the M1 tasks change no code, infrastructure or policy. The only architecture decision made here is the ADR of T10 that records the owner decisions D6 and D7.
 
-### Decisions of the owner
+Platform work (M2 to M7):
+
+- Goal: every file the milestones list exists in the repository as code, validated offline by the checks named in the acceptance criteria, and delivered by one pull request from `feat/infra-code-all` to `main`.
+- Goal: the tracker mirrors this specification: one GitHub issue per task, grouped by milestone, state Todo, In progress or Done, closed by the pull request that delivers it.
+- Goal: placeholders (`CHANGEME`, `REPLACE_*`) are the only unknown values, and `tools/ci/placeholder_report.py` lists them.
+- Non-goal (platform work): applying anything, and creating the AWS accounts, the GitHub organization, the GitHub App or any secret; the owner supplies real values.
+- Non-goal (platform work): `prod` and `cde-prod` live stacks and values; agents may not write them (`.claude/orchestration.yaml`), a human adds them after the dev and stage stacks are verified.
+- Non-goal (platform work): the business behavior of the payment services and changes under `vendor/`.
 
 - D1, version tags: `v*` (SemVer `vX.Y.Z`; breaking change bumps major, `feat` bumps minor, `fix` bumps patch) replaces `rel-<date>.<N>`. Only the tagging workflow creates them, after a successful prod rollout in all cells; creation is allowed and deletion denied by the ruleset; a tag builds nothing and attaches a changelog, SBOM and provenance. The version identifier stays the image digest.
 - D2, application databases (Aurora PostgreSQL of every cell and of the locker, DynamoDB with the merchant-to-cell map): a base backup plus point-in-time recovery to any second within the retention; data loss on restore at most 5 minutes; the restore is verified automatically every day; an alert fires when the latest restorable time lags more than 5 minutes for 10 minutes; a policy denies a stateful resource without a backup plan, the written exception list of section 19 being the only way around it. This replaces the weekly restore test and the retention and frequency rows of sections 5 and 19 for these stores.
@@ -39,6 +60,10 @@ The DevOps part of the platform (AWS accounts and network, Kubernetes and delive
 - D8, cache warm-up (an owner addition that the source does not contain): after a node replacement, an AZ loss or a recovery a cell takes traffic when at least 75% of the most important hot keys (merchant configuration, routing, limits), loaded by priority, are in MemoryDB, measured by `cache_warm_ratio`; the rest of the cache warms under traffic. The readiness probe waits at most 5 minutes; if the ratio is still below 75% the cell takes traffic anyway and raises an alert that does not page the on-call.
 
 ## Acceptance criteria
+
+Every criterion names the check that proves it.
+
+M1 Requirements baseline (tasks T1 to T10):
 
 Every criterion names the check that proves it.
 
@@ -57,17 +82,44 @@ Every criterion names the check that proves it.
 - [ ] AC5: `traceability.md` has one row per numbered subsection of every in-scope section that has subsections (and one per unnumbered part of sections 1 and 8), one row per other in-scope section, one row per ADR of section 13 (IDs or "design decision only"), and an "out of scope" row with the reason for each excluded part; verified against the architecture headings and by `tools/lint/srs-lint`, which fails if a defined ID is missing from `traceability.md` or a cited ID is not defined.
 - [ ] AC6: the documents use glossary terms and contain no Cyrillic; every `/glossary-check` warning is fixed or justified in the list of terms used in another sense in `srs.md`; verified by `/glossary-check` and by `LC_ALL=C.UTF-8 grep -rP '[\x{0400}-\x{04FF}]' docs/requirements` printing nothing.
 - [ ] AC7: no requirement contradicts the architecture document except where an owner decision listed in `srs.md` overrides it, and none describes business behavior of the payment services; verified by the human reviewer of the pull request.
-- [ ] AC8: every file in `docs/requirements/` outside `README.md` and `addenda/` has `status: baseline`, and the commit that sets it passes the spec gate with `Spec: specs/001-devops-srs#T10`; verified by `tools/lint/spec-gate` on that commit, and by the gate rejecting an addendum before this commit exists.
+- [ ] AC8: every file in `docs/requirements/` outside `README.md` and `addenda/` has `status: baseline`, and the commit that sets it passes the spec gate with `Spec: specs/001-devops-platform#T9`; verified by `tools/lint/spec-gate` on that commit, and by the gate rejecting an addendum before this commit exists.
 - [ ] AC9: no filler: no requirement or implementation exceeds the limits of AC3, no section explains a step an engineer or agent already knows, and the human reviewer finds no filler; verified by `tools/lint/srs-lint` and the human reviewer of the pull request.
 - [ ] AC10: `infrastructure.md` fixes the `deploy/` layout and the per-chart placement (one file per resource kind in `templates/`, tests in `tests/`, schema and values next to `Chart.yaml`, environment values only under `envs/<env>/[<region>/[<cell>/]]`, addons only under `platform/`) and states that every Kubernetes manifest lives under `deploy/`; verified by the human reviewer.
 - [ ] AC11: `srs.md` lists D1 to D8 with the source passage each overrides, and the withdrawn passages: MemoryDB Multi-Region, Velero, S3 and Terraform-state copies to eu-west-1, the cde-prod eu-west-1 VPC, clusters in each region, the eu-west-1 endpoint group of Global Accelerator (ADR-007), the 5-minute PSP reconciliation after failover, the S3 audit copy target in eu-west-1 (the audit copy now goes to us-east-1 and us-east-2), eu-west-1 in the SCP region allow list, MirrorMaker 2 of section 19, the quarterly full restore of a cell in the DR region of section 19, the 5-minute RTO derivation of section 3 and the pilot-light rationale of ADR-004, and the locker row RPO 0 and RTO 5 min of section 1, and the replicas "in the reserve region" of ADR-003 and ADR-013; verified by the human reviewer.
-- [ ] AC12: `docs/adr/` contains the ADR of T11 that records the region model of D6 and D7 (data replicated to us-east-1 and us-east-2, compute only in Terraform, plan B in us-east-2) and supersedes the warm standby of ADR-004; verified by `ls docs/adr`.
+- [ ] AC12: `docs/adr/` contains the ADR of T10 that records the region model of D6 and D7 (data replicated to us-east-1 and us-east-2, compute only in Terraform, plan B in us-east-2) and supersedes the warm standby of ADR-004; verified by `ls docs/adr`.
+
+M2 Repository as code (T11 to T16):
+
+- [ ] AC13: `infra/github/` holds only `main.tf`, `variables.tf`, `versions.tf`, `backend.hcl.example`, `config/owners.yaml`, `README.md` and `modules/{organization,repository,rulesets,environments,codeowners}/`, each module with `main.tf`, `variables.tf`, `versions.tf` and `tests/`; verified by `ls` and `tools/lint/structure`.
+- [ ] AC14: every variable that names a real object has a `CHANGEME` default, no secret is in the repository and the GitHub App key is read from `GITHUB_APP_PEM_FILE`; verified by `gitleaks detect` and `terraform validate`.
+- [ ] AC15: `terraform fmt -check`, `validate`, `tflint` and `terraform test` (mocked provider) pass in `infra/github/` and assert each row of architecture section 10: squash-merge only, auto-delete, 2 approvals with 1 from CODEOWNERS, dismiss stale, last-push approval, required checks, linear history, signed commits, merge queue, no force push, `v*` tag rule, environment reviewers, read-only `GITHUB_TOKEN`, SHA-pinned allowlisted actions.
+- [ ] AC16: `CODEOWNERS` exists, is generated from `infra/github/config/owners.yaml` and has one line per mapping; CDE paths need two approvals from the owning teams; verified by a `terraform test` assertion.
+- [ ] AC17: the drift workflow, `renovate.json5`, `.pre-commit-config.yaml` and `commitlint.config.js` are valid for their tools and `spec-gate` runs at the `commit-msg` stage; verified by `actionlint`, `pre-commit validate-config`, `renovate-config-validator` and `commitlint --print-config`.
+- [ ] AC18: `commitlint` and `tools/lint/spec-gate` accept and reject the same subjects; verified by the parity test of T16.
+
+M3 and M4 Cloud foundation, data stores and recovery (T17 to T23):
+
+- [ ] AC19: every module under `infra/modules/` has `versions.tf`, `variables.tf`, `main.tf`, `outputs.tf`, a README of at most 10 lines and `tests/`, and passes `make lint-terraform test-terraform`.
+- [ ] AC20: dev and stage stacks use variables for every account, role and CIDR; `mock_outputs` are allowed only for `init` and `validate`; verified by `terragrunt validate` and `tools/ci/placeholder_report.py`.
+- [ ] AC21: Aurora of every cell and of the locker has headless Global Database secondaries in us-east-1 and us-east-2, DynamoDB uses Global Tables with writes denied in both recovery regions, and backups keep 35 days with colder tiers at 7 and 14 days; verified by `terraform test` assertions.
+
+M5 Kubernetes platform and delivery (T24 to T30):
+
+- [ ] AC22: `make lint-helm test-helm` pass; every image is referenced by digest and every chart has `values.schema.json`, `ci/lint-values.yaml` and `tests/`.
+- [ ] AC23: workflows pass `actionlint`, pin every action by SHA, set `permissions: {}` at the top and push images only from `main` and `release/*`; the CI job `ci-gate` is green on the pull request.
+- [ ] AC24: the locker Aurora admits only the locker pod security groups, and `ci-pr` runners have no route to cell or CDE namespaces; verified by `terraform test` and the NetworkPolicy test.
+
+M6 and M7 Security, observability and verification (T31 to T40):
+
+- [ ] AC25: `make test-policy` passes; `python3 observability/tests/run.py` passes and every alert has a runbook file.
+- [ ] AC26: OIDC trust of the apply roles is limited to `main` and `release/*`, and the `terraform-apply` SCP exception names an exact ARN; verified by tests with a negative case.
+- [ ] AC27: k6, chaos, smoke, e2e and contract suites run offline in CI; prod Argo CD Applications do not auto-sync from `main`; the threat model covers the `ci-pr` perimeter; no `REPLACE_*` remains for an environment before its apply.
 
 ## Impact on SLO, PCI and cost
 
-- SLO: none, documentation only; the SRS records the SLOs, and D6 and D7 change the region rows of section 1.
-- PCI: none for this documentation; the requirements of D2 to D7 bring recovery regions (encrypted card data of the locker in backups, KMS replica keys, IAM roles, SCP allow list) into the scope of the CDE, so each implementing specification sets `pci-impact: yes` and gets its own PCI review.
-- Cost: none now; D6 removes the warm standby, and daily restores of every Aurora cluster, the hourly backups, the 35-day retention and the S3 replication add cost, which each implementing specification estimates.
+- SLO: none while nothing is applied; the SRS records the SLOs and D6 and D7 change the region rows of section 1.
+- PCI: yes, tasks T25, T29 and T30 touch the CDE paths `infra/live/*/*/locker/**` and `deploy/platform/arc/**`; the recovery regions of D2 to D7 bring encrypted card data of the locker into backups, KMS replica keys, IAM roles and the SCP allow list, so the pull request carries `PCI-Impact: yes` commits and its own PCI review.
+- Cost: none now; the daily restores, hourly backups, 35-day retention, S3 replication and CI runner pools add cost to be estimated with Infracost before the first apply.
 
 ## Risks
 
@@ -77,3 +129,5 @@ Every criterion names the check that proves it.
 - Many owner decisions override the source, so writers could carry over stale text. Mitigation: AC11 lists the overridden and withdrawn passages and T3, T4 and T7 cite that list.
 - D7 depends on free AWS capacity at the moment of the switch (no reservation, no standby compute). Mitigation: several instance families and Aurora classes, the continuous replicas in us-east-2 for plan B, and the quarterly test in both regions measures the critical path; the second replica doubles the storage and transfer cost.
 - GitHub issues do not exist yet: they are created after the approval, and until then `issue: none`. Mitigation: the spec gate rejects a commit for a task without an issue number.
+- The build was written before this specification (owner-directed, commits carry `Spec: none`); the tasks describe it after the fact and the "Done" state means implemented and delivered by the pull request, not applied.
+- One large pull request (about 60 commits) is hard to review; mitigation: the milestones group the diff by concern and the Sonnet review findings are tracked as T34, T35 and T38.
