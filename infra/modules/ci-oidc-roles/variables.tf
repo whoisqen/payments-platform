@@ -1,0 +1,105 @@
+variable "account_id" {
+  type        = string
+  description = "Account that hosts the roles."
+
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.account_id))
+    error_message = "account_id must be 12 digits."
+  }
+}
+
+variable "environment" {
+  type        = string
+  description = "dev, stage or prod; also the state key prefix."
+
+  validation {
+    condition     = contains(["dev", "stage", "prod"], var.environment)
+    error_message = "environment must be dev, stage or prod."
+  }
+}
+
+variable "github_repository" {
+  type        = string
+  description = "Repository in the form owner/name that may assume the roles."
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name."
+  }
+}
+
+variable "create_oidc_provider" {
+  type        = bool
+  default     = true
+  description = "Create the GitHub OIDC provider; false when the account already has it."
+}
+
+variable "oidc_provider_arn" {
+  type        = string
+  default     = null
+  description = "ARN of an existing GitHub OIDC provider; used when create_oidc_provider is false."
+}
+
+variable "permissions_boundary_arn" {
+  type        = string
+  description = "Boundary policy (policy/iam/boundaries) attached to every role and required on roles they create."
+}
+
+variable "state_bucket_arn" {
+  type        = string
+  description = "Terraform state bucket."
+}
+
+variable "state_kms_key_arn" {
+  type        = string
+  description = "KMS key of the state bucket."
+}
+
+variable "plan_read_actions" {
+  type = list(string)
+  default = [
+    "ec2:Describe*", "elasticloadbalancing:Describe*", "kms:Describe*", "kms:Get*", "kms:List*",
+    "iam:Get*", "iam:List*", "s3:GetBucket*", "s3:GetEncryptionConfiguration", "s3:GetLifecycleConfiguration",
+    "s3:GetReplicationConfiguration", "s3:GetAccelerateConfiguration", "s3:ListAllMyBuckets",
+    "ecr:Describe*", "ecr:GetLifecyclePolicy", "ecr:GetRepositoryPolicy", "ecr:GetRegistryScanningConfiguration",
+    "ecr:GetReplicationConfiguration", "ecr:ListTagsForResource", "route53:Get*", "route53:List*",
+    "acm:Describe*", "acm:List*", "globalaccelerator:Describe*", "globalaccelerator:List*",
+    "network-firewall:Describe*", "network-firewall:List*", "ram:Get*", "ram:List*", "logs:Describe*",
+    "dynamodb:Describe*", "rds:Describe*", "elasticache:Describe*", "memorydb:Describe*", "tag:GetResources",
+  ]
+  description = "Metadata reads of the plan role; no data reads (objects, secrets, parameters)."
+}
+
+variable "apply_roles" {
+  type = map(object({
+    github_environment = string
+    actions            = list(string)
+    resource_arns      = list(string)
+    unscoped_actions   = optional(list(string), [])
+  }))
+  default     = {}
+  description = "One apply role per component (key = component): the GitHub environment that may assume it, actions on named resources, and the few actions that cannot be scoped."
+
+  validation {
+    condition = alltrue([
+      for r in var.apply_roles : !contains(r.actions, "*") && !contains(r.unscoped_actions, "*") &&
+      alltrue([for a in concat(r.actions, r.unscoped_actions) : !contains(["iam:*", "organizations:*", "sts:*"], a)])
+    ])
+    error_message = "no role may hold *, iam:*, organizations:* or sts:*."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.apply_roles : length(r.resource_arns) > 0 && !contains(r.resource_arns, "*")])
+    error_message = "resource_arns must name resources; use unscoped_actions for actions without resource-level scoping."
+  }
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Tags of section 22; team, owner, pci-scope, data-class and backup-tier are required."
+
+  validation {
+    condition     = alltrue([for k in ["team", "owner", "pci-scope", "data-class", "backup-tier"] : contains(keys(var.tags), k)])
+    error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
+  }
+}

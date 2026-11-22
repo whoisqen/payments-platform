@@ -1,0 +1,15 @@
+ou: Sandbox
+accounts:
+  - name: sandbox-preview
+    email: aws-pay-sandbox-preview@example.com
+    customizations: sandbox
+    sso_user: { email: platform@example.com, first_name: Platform, last_name: Team }
+    tags:
+      environment: dev
+      team: platform
+      owner: platform@example.com
+      cost-center: cc-300
+      cell: shared
+      pci-scope: out-of-scope
+      data-class: public
+      backup-tier: none

@@ -1,0 +1,9 @@
+# Copy to backend.tf after the first apply, then: terraform init -migrate-state -backend-config="bucket=<state_bucket output>" -backend-config="kms_key_id=<state_kms_key_arn output>"
+terraform {
+  backend "s3" {
+    key          = "bootstrap/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
+  }
+}
