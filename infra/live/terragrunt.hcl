@@ -1,6 +1,6 @@
 # Root of every live stack: path infra/live/<env>/<region>[/<cell>]/<component> gives environment, region, cell and component.
 locals {
-  parts        = split("/", path_relative_to_include())
+  parts        = split("/", path_relative_to_include("root"))
   env          = local.parts[0]
   region       = local.parts[1]
   component    = element(local.parts, length(local.parts) - 1)
@@ -22,7 +22,7 @@ remote_state {
   # Every stack keeps its state in the eu-central-1 bucket of infra/bootstrap, under its own <env>/ prefix.
   config = {
     bucket       = "pay-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
-    key          = "${path_relative_to_include()}/terraform.tfstate"
+    key          = "${path_relative_to_include("root")}/terraform.tfstate"
     region       = "eu-central-1"
     encrypt      = true
     use_lockfile = true
@@ -46,7 +46,7 @@ generate "provider" {
           component   = "${local.component}"
           cost-center = "${local.env_cfg.cost_center}"
           managed-by  = "terraform"
-          repo        = "infra/live/${path_relative_to_include()}"
+          repo        = "infra/live/${path_relative_to_include("root")}"
         }
       }
     }

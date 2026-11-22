@@ -139,6 +139,9 @@ COMMON["foundation/vpc"] = common("vpc", '''  component            = "vpc-cde"
 COMMON["foundation/egress-vpc"] = common("vpc", '''  component               = "vpc-egress"
   enable_internet_gateway = true
   flow_logs_bucket_arn    = local.env_cfg.flow_logs_bucket_arn
+  # The egress VPC holds no workloads, so it needs no endpoints.
+  gateway_endpoint_services   = []
+  interface_endpoint_services = []
   cidr_block              = local.env_cfg.egress_cidr
   # Public tier holds the NAT gateways, private the firewall endpoints and data the transit gateway attachments.
   subnet_cidrs = {
