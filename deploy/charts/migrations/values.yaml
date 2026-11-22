@@ -1,6 +1,6 @@
 # image.digest is supplied by deploy/envs/<env>/images.yaml (CI only); the migrator digest moves with the router digest
 image:
-  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/migrator
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/migrator
   pullPolicy: IfNotPresent
 
 database:

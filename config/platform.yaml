@@ -8,7 +8,7 @@ owner:
 
 registry:
   # ECR registry host prefix, for example 123456789012.dkr.ecr.eu-central-1.amazonaws.com
-  ecr_prefix: CHANGEME.dkr.ecr.eu-central-1.amazonaws.com
+  ecr_prefix: 123456789012.dkr.ecr.eu-central-1.amazonaws.com
   ecr_repo_prefix: payments
 
 accounts:
@@ -39,3 +39,21 @@ storage:
 access:
   # Name of the IAM Identity Center permission set that gets view-only access to the clusters
   sre_view_permission_set: AWSReservedSSO_SRE-View
+
+deploy:
+  # Values written into deploy/ by tools/config/render.py. The suffixes are the account-specific part of the
+  # Aurora and MemoryDB endpoints and are known only after the data stacks are applied.
+  dev:
+    data_cidrs: [10.120.8.0/22]
+    endpoint_cidrs: [10.120.255.0/24]
+    gateway_host: api.dev.payments.example.com
+    cluster_domain: dev.example.internal
+    rds_suffix: example
+    memorydb_suffix: example
+  stage:
+    data_cidrs: [10.130.8.0/22]
+    endpoint_cidrs: [10.130.255.0/24]
+    gateway_host: api.stage.payments.example.com
+    cluster_domain: stage.example.internal
+    rds_suffix: example
+    memorydb_suffix: example
