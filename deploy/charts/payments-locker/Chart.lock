@@ -1,0 +1,9 @@
+dependencies:
+- name: locker
+  repository: file://../locker
+  version: 0.1.0
+- name: migrations
+  repository: file://../migrations
+  version: 0.1.0
+digest: sha256:f7957ac7d87b507bffeeddbe72a74fb3263dd65c159248c0772a168611f2530f
+generated: "2026-11-22T01:38:48.785978877+02:00"

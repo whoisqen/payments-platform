@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-istio
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  payments-platform/addons: enabled
+          # Istio ships as three charts that must be applied in this order
+          - list:
+              elements:
+                - chart: base
+                  namespace: istio-system
+                  wave: "-2"
+                - chart: istiod
+                  namespace: istio-system
+                  wave: "-1"
+                - chart: gateway
+                  namespace: istio-ingress
+                  wave: "0"
+  template:
+    metadata:
+      name: 'istio-{{ .chart }}-{{ .name }}'
+      labels:
+        payments-platform/addon: istio
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{ .wave }}'
+    spec:
+      project: platform
+      destination:
+        server: '{{ .server }}'
+        namespace: '{{ .namespace }}'
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://istio-release.storage.googleapis.com/charts
+          chart: '{{ .chart }}'
+          targetRevision: 1.30.8
+          helm:
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/deploy/platform/istio/values-{{ .chart }}.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

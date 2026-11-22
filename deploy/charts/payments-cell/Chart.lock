@@ -1,0 +1,15 @@
+dependencies:
+- name: router
+  repository: file://../router
+  version: 0.1.0
+- name: drainer
+  repository: file://../drainer
+  version: 0.1.0
+- name: scheduler
+  repository: file://../scheduler
+  version: 0.1.0
+- name: migrations
+  repository: file://../migrations
+  version: 0.1.0
+digest: sha256:adbd769405e83977b9ed98e8566567f5c891a36484a46eee753b30a6d4fa42d3
+generated: "2026-11-22T01:38:46.637179732+02:00"

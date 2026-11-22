@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["global"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["environment", "region", "dataCidrs", "endpointCidrs"],
+      "properties": {
+        "environment": { "enum": ["dev", "stage", "prod"] },
+        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
+        "dataCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 },
+        "endpointCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 }
+      }
+    },
+    "locker": { "type": "object" },
+    "locker-migrations": { "type": "object" }
+  }
+}

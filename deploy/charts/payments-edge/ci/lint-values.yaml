@@ -1,0 +1,12 @@
+# Offline lint and chart-testing only; real values come from deploy/envs/
+global:
+  environment: dev
+  region: eu-central-1
+gateway:
+  hosts: ["api.dev.payments.example.com"]
+routing:
+  cells:
+    - name: cell-0
+      host: router.payments.svc.cell-0.example
+    - name: spare
+      host: router.payments.svc.spare.example

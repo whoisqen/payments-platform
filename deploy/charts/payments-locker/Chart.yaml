@@ -1,0 +1,14 @@
+apiVersion: v2
+name: payments-locker
+description: Locker shared by all cells, with its own migrations Job against its own database
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: locker
+    version: 0.1.0
+    repository: file://../locker
+  - name: migrations
+    alias: locker-migrations
+    version: 0.1.0
+    repository: file://../migrations

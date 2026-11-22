@@ -1,0 +1,54 @@
+suite: locker
+templates:
+  - workload.yaml
+  - autoscaling.yaml
+  - pdb.yaml
+  - istio/authorizationpolicy.yaml
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: canaries by Istio weight 1, 10, 50 and then 100
+    template: workload.yaml
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: spec.strategy.canary.steps[2].setWeight
+          value: 10
+      - equal:
+          path: spec.strategy.canary.steps[4].setWeight
+          value: 50
+  - it: stays off Spot on the payments pool
+    template: workload.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.tolerations
+      - equal:
+          path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
+          value: payments
+  - it: autoscales between 5 and 24 on CPU
+    template: autoscaling.yaml
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 5
+      - equal:
+          path: spec.maxReplicas
+          value: 24
+  - it: has a PodDisruptionBudget
+    template: pdb.yaml
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+  - it: admits only router to the locker
+    template: istio/authorizationpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].from[0].source.principals[0]
+          value: cluster.local/ns/payments/sa/router
+  - it: rejects a malformed digest
+    template: workload.yaml
+    set:
+      image.digest: latest
+    asserts:
+      - failedTemplate: {}

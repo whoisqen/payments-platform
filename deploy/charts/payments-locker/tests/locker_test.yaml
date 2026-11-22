@@ -1,0 +1,29 @@
+suite: payments-locker
+templates:
+  - charts/locker/templates/workload.yaml
+  - charts/locker-migrations/templates/job.yaml
+set:
+  global.environment: dev
+  global.region: eu-central-1
+  global.dataCidrs: ["10.120.0.0/16"]
+  global.endpointCidrs: ["10.120.255.0/24"]
+  locker.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  locker-migrations.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+tests:
+  - it: renders the locker canary
+    template: charts/locker/templates/workload.yaml
+    asserts:
+      - isKind:
+          of: Rollout
+  - it: runs its own migrations Job before the locker
+    template: charts/locker-migrations/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "@sha256:b{64}$"

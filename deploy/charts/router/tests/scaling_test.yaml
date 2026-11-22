@@ -1,0 +1,39 @@
+suite: router scaling and disruption
+templates:
+  - autoscaling.yaml
+  - pdb.yaml
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: has a PodDisruptionBudget of 10 percent
+    template: pdb.yaml
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: 10%
+  - it: scales the Rollout on CPU and requests per pod
+    template: autoscaling.yaml
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Rollout
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 70
+      - equal:
+          path: spec.metrics[1].pods.metric.name
+          value: http_requests_per_second
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 600
+  - it: renders nothing for the HPA when autoscaling is off
+    template: autoscaling.yaml
+    set:
+      autoscaling.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -1,0 +1,42 @@
+{{- if .Values.backfill.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-backfill
+  labels:
+    {{- include "migrations.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "migrations.labels" . | nindent 8 }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: false
+      {{- include "migrations.podSecurity" . | nindent 6 }}
+      containers:
+        - name: backfill
+          image: {{ include "migrations.image" . | quote }}
+          command:
+            {{- toYaml .Values.backfill.command | nindent 12 }}
+          env:
+            {{- include "migrations.env" . | nindent 12 }}
+            - name: BACKFILL_BATCH_SIZE
+              value: {{ .Values.backfill.batchSize | quote }}
+            - name: BACKFILL_MAX_REPLICA_LAG_MS
+              value: {{ .Values.backfill.maxReplicaLagMs | quote }}
+          resources:
+            {{- toYaml .Values.job.resources | nindent 12 }}
+          {{- include "migrations.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

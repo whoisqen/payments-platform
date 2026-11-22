@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-vault
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/vault: enabled
+  template:
+    metadata:
+      name: 'vault-{{ .name }}'
+      labels:
+        payments-platform/addon: vault
+    spec:
+      project: platform
+      destination:
+        server: '{{ .server }}'
+        namespace: vault
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://helm.releases.hashicorp.com
+          chart: vault
+          targetRevision: 0.34.1
+          helm:
+            valueFiles:
+              - $values/deploy/platform/vault/values.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

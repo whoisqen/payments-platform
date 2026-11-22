@@ -1,0 +1,30 @@
+suite: router values schema
+templates:
+  - service.yaml
+tests:
+  - it: rejects a tag instead of a digest
+    set:
+      image.tag: v1.2.3
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a malformed digest
+    set:
+      image.digest: sha256:abc
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a missing digest
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a typo in a values key
+    set:
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      autoscalling.enabled: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a warm-up wait above 5 minutes
+    set:
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      warmup.maxWaitSeconds: 600
+    asserts:
+      - failedTemplate: {}

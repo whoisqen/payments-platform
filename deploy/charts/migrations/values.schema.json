@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "database", "snapshot", "migrate", "job", "serviceAccount"],
+  "properties": {
+    "global": { "type": "object" },
+    "platform-common": { "type": "object" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "name", "user"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "not": { "pattern": "(?i)proxy" } },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "name": { "type": "string", "minLength": 1 },
+        "user": { "type": "string", "minLength": 1 }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "command"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "store": { "enum": ["aurora", "dynamodb", "clickhouse", "opensearch"] },
+        "retentionDays": { "type": "integer", "minimum": 35 },
+        "waitTimeoutSeconds": { "type": "integer", "minimum": 60 }
+      }
+    },
+    "migrate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "mode"],
+      "properties": {
+        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "mode": { "const": "expand-only" },
+        "lockTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|min)$" },
+        "statementTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|min)$" }
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hookWeight", "activeDeadlineSeconds", "ttlSecondsAfterFinished", "resources"],
+      "properties": {
+        "hookWeight": { "type": "integer", "maximum": -5 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 900 },
+        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 3600 },
+        "resources": { "type": "object" }
+      }
+    },
+    "backfill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "batchSize": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "maxReplicaLagMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "const": "migrator" },
+        "annotations": { "type": "object" }
+      }
+    }
+  }
+}

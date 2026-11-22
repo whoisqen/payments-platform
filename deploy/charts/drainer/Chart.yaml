@@ -1,0 +1,10 @@
+apiVersion: v2
+name: drainer
+description: Moves payment state from the Redis stream into PostgreSQL in batches
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

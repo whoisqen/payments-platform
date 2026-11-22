@@ -1,0 +1,44 @@
+suite: drainer
+templates:
+  - workload.yaml
+  - autoscaling.yaml
+  - pdb.yaml
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: rolls with maxSurge 25 percent and no unavailable pod
+    template: workload.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 25%
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+      - equal:
+          path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
+          value: workers
+  - it: scales on the Redis stream between 3 and 6
+    template: autoscaling.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: spec.triggers[0].type
+          value: redis-streams
+      - equal:
+          path: spec.maxReplicaCount
+          value: 6
+  - it: has a PodDisruptionBudget
+    template: pdb.yaml
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+  - it: rejects a missing digest
+    template: workload.yaml
+    set:
+      image.digest: null
+    asserts:
+      - failedTemplate: {}

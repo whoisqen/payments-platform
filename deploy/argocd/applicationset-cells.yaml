@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-cells
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # One Application per environment x region x cell directory
+    - git:
+        repoURL: https://github.com/whoisqen/payments-platform
+        revision: main
+        directories:
+          - path: deploy/envs/*/*/cell-*
+          - path: deploy/envs/*/*/spare
+  # Migrations and rollouts go cell-0 first: a bad migration stops there (section 17)
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: payments-platform/cell
+              operator: In
+              values: [cell-0]
+        - matchExpressions:
+            - key: payments-platform/cell
+              operator: In
+              values: [cell-1]
+        - matchExpressions:
+            - key: payments-platform/cell
+              operator: In
+              values: [cell-2]
+        - matchExpressions:
+            - key: payments-platform/cell
+              operator: In
+              values: [cell-3, spare]
+  template:
+    metadata:
+      name: 'payments-cell-{{ index .path.segments 2 }}-{{ index .path.segments 3 }}-{{ .path.basename }}'
+      labels:
+        payments-platform/cell: '{{ .path.basename }}'
+        payments-platform/environment: '{{ index .path.segments 2 }}'
+    spec:
+      project: payments
+      destination:
+        name: 'pay-{{ index .path.segments 2 }}-euc1-{{ .path.basename }}'
+        namespace: payments
+      sources:
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          path: deploy/charts/payments-cell
+          helm:
+            # Layers: environment, region, cell, then the digests written by CI
+            valueFiles:
+              - $values/deploy/envs/{{ index .path.segments 2 }}/values.yaml
+              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/values.yaml
+              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/{{ .path.basename }}/values.yaml
+              - $values/deploy/envs/{{ index .path.segments 2 }}/images.yaml
+        - repoURL: https://github.com/whoisqen/payments-platform
+          targetRevision: main
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

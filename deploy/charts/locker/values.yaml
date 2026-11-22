@@ -1,0 +1,89 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only)
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/locker
+  pullPolicy: IfNotPresent
+
+workload:
+  kind: Rollout
+  minReadySeconds: 10
+  progressDeadlineSeconds: 900
+  strategy:
+    type: Canary
+    # 1 -> 10 -> 50 -> 100 of the requests from router (section 4)
+    weights: [1, 10, 50]
+    pauseDuration: 10m
+  analysis:
+    prometheusAddress: http://prometheus-operated.monitoring.svc:9090
+    maxErrorRate: 0.0005
+    maxP99DeltaMs: 150
+    authorizationRate: false
+
+container:
+  port: 3001
+  env:
+    RUN_ENV: production
+  envFromSecrets: []
+  # 300 RPS per pod (section 8); no sizing is given, so 1 vCPU and 1 GiB is a starting point for the load test
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 1Gi
+
+probes:
+  startup:
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 36
+  liveness:
+    path: /health
+    periodSeconds: 10
+  readiness:
+    path: /health
+    periodSeconds: 5
+
+lifecycle:
+  preStopSeconds: 15
+  terminationGracePeriodSeconds: 60
+
+# On-Demand only: an interrupted pod mid-call leaves the payment in the unknown state
+scheduling:
+  nodePool: payments
+  tolerations: []
+
+service:
+  enabled: true
+  port: 3001
+
+autoscaling:
+  enabled: true
+  kind: hpa
+  minReplicas: 5
+  maxReplicas: 24
+  targetCPU: 70
+
+pdb:
+  enabled: true
+  maxUnavailable: 10%
+
+networkPolicy:
+  enabled: true
+  dataPorts: [5432]
+  # Only router may call the locker
+  extraIngress: []
+  extraEgress: []
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+serviceAccount:
+  create: true
+
+istio:
+  inject: true
+  authorizationPolicy:
+    enabled: true
+    principals:
+      - cluster.local/ns/payments/sa/router

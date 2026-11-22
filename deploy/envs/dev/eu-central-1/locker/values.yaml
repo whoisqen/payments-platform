@@ -1,0 +1,21 @@
+# Locker shared by all cells of the region, with its own database
+global:
+  environment: dev
+  region: eu-central-1
+  dataCidrs:
+    - 10.120.8.0/22
+  endpointCidrs:
+    - 10.120.255.0/24
+
+locker:
+  container:
+    env:
+      RUN_ENV: development
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 6
+
+locker-migrations:
+  database:
+    host: pay-dev-euc1-aurora-locker.cluster-example.eu-central-1.rds.amazonaws.com
+    name: locker

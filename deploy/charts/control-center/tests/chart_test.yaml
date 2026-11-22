@@ -1,0 +1,33 @@
+suite: control-center
+templates:
+  - workload.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: rolls without unavailable pods
+    template: workload.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+  - it: has a PodDisruptionBudget
+    template: pdb.yaml
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+  - it: denies traffic by default with explicit ingress and egress
+    template: networkpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+  - it: rejects a malformed digest
+    template: workload.yaml
+    set:
+      image.digest: sha256:xyz
+    asserts:
+      - failedTemplate: {}

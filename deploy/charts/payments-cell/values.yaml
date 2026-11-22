@@ -1,0 +1,9 @@
+# Layers on top of these defaults: envs/<env>, envs/<env>/<region>, envs/<env>/<region>/<cell>, images.yaml
+global:
+  cell: ""
+  environment: ""
+  region: ""
+  # Data subnets of the cell (MemoryDB, Aurora); the NetworkPolicy opens the data ports only to them
+  dataCidrs: []
+  # VPC interface endpoints reached by the snapshot step of the migrations Job
+  endpointCidrs: []

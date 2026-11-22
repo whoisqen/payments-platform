@@ -1,0 +1,71 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only)
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/control-center
+  pullPolicy: IfNotPresent
+
+workload:
+  kind: Deployment
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    maxSurge: 25%
+    maxUnavailable: 0
+
+container:
+  port: 9000
+  env: {}
+  envFromSecrets: []
+  # Not sized in the architecture; the panel is a thin web server in front of the router API
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 256Mi
+
+probes:
+  startup:
+    path: /
+    periodSeconds: 5
+    failureThreshold: 36
+  liveness:
+    path: /
+    periodSeconds: 10
+  readiness:
+    path: /
+    periodSeconds: 5
+
+lifecycle:
+  preStopSeconds: 15
+  terminationGracePeriodSeconds: 60
+
+scheduling:
+  nodePool: workers
+
+service:
+  enabled: true
+  port: 9000
+
+autoscaling:
+  enabled: true
+  kind: hpa
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPU: 70
+
+pdb:
+  enabled: true
+  maxUnavailable: 10%
+
+networkPolicy:
+  enabled: true
+  dataPorts: []
+
+serviceMonitor:
+  enabled: false
+
+serviceAccount:
+  create: true
+
+istio:
+  inject: true

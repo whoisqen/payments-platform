@@ -1,0 +1,11 @@
+pilot:
+  autoscaleMin: 3
+
+meshConfig:
+  # The sidecar starts before the application so the first PSP call is already inside the mesh
+  defaultConfig:
+    holdApplicationUntilProxyStarts: true
+  # The CDE has no direct internet exit: only registered egress hosts are reachable
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+  enableTracing: true

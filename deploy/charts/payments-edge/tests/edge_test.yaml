@@ -1,0 +1,63 @@
+suite: payments-edge
+templates:
+  - gateway.yaml
+  - virtualservice.yaml
+  - envoyfilter.yaml
+  - certificate.yaml
+set:
+  global.environment: dev
+  global.region: eu-central-1
+  gateway.hosts: ["api.dev.payments.example.com"]
+  routing.cells:
+    - name: cell-0
+      host: router.cell-0.example
+    - name: spare
+      host: router.spare.example
+tests:
+  - it: terminates TLS 1.2 or newer on 443
+    template: gateway.yaml
+    asserts:
+      - equal:
+          path: spec.servers[0].port.number
+          value: 443
+      - equal:
+          path: spec.servers[0].tls.minProtocolVersion
+          value: TLSV1_2
+  - it: routes by the cell header without retries and ends with an explicit error
+    template: virtualservice.yaml
+    asserts:
+      - equal:
+          path: spec.http[0].match[0].headers["x-payments-cell"].exact
+          value: cell-0
+      - equal:
+          path: spec.http[0].retries.attempts
+          value: 0
+      - equal:
+          path: spec.http[2].directResponse.status
+          value: 503
+  - it: sheds load with 429 at the gateway
+    template: envoyfilter.yaml
+    asserts:
+      - equal:
+          path: spec.configPatches[0].patch.value.typed_config.value.status.code
+          value: TooManyRequests
+  - it: issues the gateway certificate from the issuer
+    template: certificate.yaml
+    asserts:
+      - equal:
+          path: spec.issuerRef.name
+          value: payments-ca
+  - it: rejects a cell name outside the five cells
+    template: gateway.yaml
+    set:
+      routing.cells:
+        - name: cell-9
+          host: x
+    asserts:
+      - failedTemplate: {}
+  - it: rejects an empty host list
+    template: gateway.yaml
+    set:
+      gateway.hosts: []
+    asserts:
+      - failedTemplate: {}

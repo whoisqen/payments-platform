@@ -1,0 +1,10 @@
+apiVersion: v2
+name: router
+description: Public API of the platform, canary-rolled behind Istio
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

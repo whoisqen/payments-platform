@@ -1,0 +1,104 @@
+# image.digest is supplied by deploy/envs/<env>/images.yaml (CI only); a tag is rejected by the schema
+image:
+  repository: 000000000000.dkr.ecr.eu-central-1.amazonaws.com/payments/router
+  pullPolicy: IfNotPresent
+
+workload:
+  kind: Rollout
+  # After drainer (wave 0): a new router may write stream fields only a new drainer reads
+  syncWave: 1
+  minReadySeconds: 10
+  progressDeadlineSeconds: 900
+  strategy:
+    type: Canary
+    # 1 -> 5 -> 25 -> 50 -> 100 with 10 minutes of analysis between steps (section 4)
+    weights: [1, 5, 25, 50]
+    pauseDuration: 10m
+  analysis:
+    prometheusAddress: http://prometheus-operated.monitoring.svc:9090
+    maxErrorRate: 0.0005
+    maxP99DeltaMs: 150
+    authorizationRate: true
+
+container:
+  port: 8080
+  env:
+    RUN_ENV: production
+  envFromSecrets: []
+  # 1 vCPU and 3 GiB per pod is the base capacity of section 8; CPU has no limit to avoid throttling during a PSP call
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+    limits:
+      memory: 3Gi
+
+probes:
+  # Boot is allowed 5 minutes before the kubelet restarts the pod
+  startup:
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 60
+  liveness:
+    path: /health
+    periodSeconds: 10
+    failureThreshold: 3
+  # The deep check reaches MemoryDB and PostgreSQL; the cache warm-up gate of D8 sits behind it
+  readiness:
+    path: /health/ready
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+lifecycle:
+  preStopSeconds: 15
+  terminationGracePeriodSeconds: 60
+
+# On-Demand pool without a Spot toleration: a pod killed mid-call to a PSP creates an unknown state
+scheduling:
+  nodePool: payments
+  tolerations: []
+
+warmup:
+  enabled: true
+  minRatio: 0.75
+  maxWaitSeconds: 300
+
+service:
+  enabled: true
+  port: 8080
+
+autoscaling:
+  enabled: true
+  kind: hpa
+  minReplicas: 20
+  maxReplicas: 90
+  targetCPU: 70
+  # 15 RPS base capacity at 70% target until the breakpoint test confirms 60
+  rpsPerPod: 10
+
+pdb:
+  enabled: true
+  maxUnavailable: 10%
+
+networkPolicy:
+  enabled: true
+  dataPorts: [5432, 6379]
+  extraIngress: []
+  extraEgress: []
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+istio:
+  inject: true
+  authorizationPolicy:
+    enabled: true
+    principals:
+      - cluster.local/ns/istio-system/sa/istio-ingressgateway

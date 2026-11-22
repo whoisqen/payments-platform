@@ -1,0 +1,19 @@
+# Secrets reach pods through External Secrets, so the sidecar injector stays off
+injector:
+  enabled: false
+
+server:
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+  # One Vault pod per AZ
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: topology.kubernetes.io/zone
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
