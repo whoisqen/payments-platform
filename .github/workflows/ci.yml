@@ -54,6 +54,9 @@ jobs:
         with:
           install_args: actionlint gitleaks shellcheck python
       - run: make lint-workflows lint-repo
+      - name: placeholders report (non-blocking)
+        continue-on-error: true
+        run: python3 tools/ci/placeholder_report.py
       - name: gitleaks
         run: gitleaks detect --no-banner --redact --log-opts "${BASE_SHA}..${HEAD_SHA}"
 
