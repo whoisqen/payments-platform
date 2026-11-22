@@ -1,0 +1,4 @@
+*
+!vendor/hyperswitch/
+!docker/_common/collect-libs.sh
+**/target

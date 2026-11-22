@@ -1,0 +1,14 @@
+schemaVersion: 2.0.0
+metadataTest:
+  user: "10001:10001"
+  entrypoint: ["/app/${SERVICE}"]
+fileExistenceTests:
+  - name: no shell
+    path: /bin/sh
+    shouldExist: false
+  - name: no package manager
+    path: /usr/bin/apt
+    shouldExist: false
+  - name: no compiler
+    path: /usr/bin/gcc
+    shouldExist: false
