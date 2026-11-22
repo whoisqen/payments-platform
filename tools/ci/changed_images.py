@@ -48,8 +48,6 @@ def any_match(path, entries):
 def images_for(files, cfg):
     rebuild_all = cfg["rebuild_all"]
     images = cfg["images"]
-    if not files:
-        return list(SERVICES), True
     selected, everything = set(), False
     for f in files:
         if f.endswith("README.md"):
@@ -81,8 +79,12 @@ def main(argv=None):
     ap.add_argument("--base")
     ap.add_argument("--head")
     ap.add_argument("--files-from", help="read paths from this file, - for stdin")
+    ap.add_argument("--paths", metavar="SERVICE", help="print the input paths of one image and exit")
     ns = ap.parse_args(argv)
     cfg = parse_paths(CONFIG.read_text(encoding="utf-8"))
+    if ns.paths:
+        print("\n".join(cfg["images"][ns.paths] + cfg["rebuild_all"]))
+        return 0
     if ns.files_from:
         src = sys.stdin if ns.files_from == "-" else open(ns.files_from, encoding="utf-8")
         files = [x.strip() for x in src.read().splitlines() if x.strip()]

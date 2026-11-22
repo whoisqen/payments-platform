@@ -1,10 +1,7 @@
 # Read by tools/ci/changed_images.py; prefixes end with / and match a directory, other entries match a file.
 rebuild_all:
   - docker/_common/
-  - vendor/hyperswitch/Cargo.lock
-  - vendor/card-vault/Cargo.lock
   - tools/ci/image-paths.yaml
-  - .github/workflows/images.yml
 images:
   router:
     - docker/router/
