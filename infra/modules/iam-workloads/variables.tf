@@ -1,0 +1,99 @@
+variable "region" {
+  type        = string
+  description = "Region of the provider this module instance runs in."
+  validation {
+    condition     = contains(["eu-central-1", "us-east-1", "us-east-2"], var.region)
+    error_message = "region must be eu-central-1, us-east-1 or us-east-2."
+  }
+}
+
+variable "environment" {
+  type        = string
+  description = "dev, stage or prod."
+  validation {
+    condition     = contains(["dev", "stage", "prod"], var.environment)
+    error_message = "environment must be dev, stage or prod."
+  }
+}
+
+variable "cell" {
+  type        = string
+  description = "Cell whose cluster the roles serve, for example cell-0 or spare; part of every role name."
+  validation {
+    condition     = can(regex("^(cell-[0-3]|spare)$", var.cell))
+    error_message = "cell must be cell-0 to cell-3 or spare."
+  }
+}
+
+variable "account_id" {
+  type        = string
+  description = "AWS account of the cluster; builds the MemoryDB user ARNs and the source account condition."
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.account_id))
+    error_message = "account_id must be 12 digits."
+  }
+}
+
+variable "cluster_name" {
+  type        = string
+  description = "Cluster of the cell (eks module); the pod identity associations are created in it."
+}
+
+variable "cluster_arn" {
+  type        = string
+  description = "Cluster ARN; the trust policy accepts only pods of this cluster."
+}
+
+variable "permissions_boundary_arn" {
+  type        = string
+  description = "Boundary policy (workload-boundary) attached to every role."
+}
+
+variable "deny_recovery_writes_policy_arn" {
+  type        = string
+  description = "deny_recovery_writes_policy_arn of dynamodb-global; every service role attaches it so that no write reaches a recovery replica."
+}
+
+variable "memorydb" {
+  type = object({
+    cluster_arn = string
+    users       = map(string)
+  })
+  description = "MemoryDB cluster of the cell and the ACL user of each service (key = service name); a service without a user gets no MemoryDB access."
+}
+
+variable "rds_db_connect_arns" {
+  type        = map(list(string))
+  default     = {}
+  description = "rds-db:connect resource ARNs per service (arn:aws:rds-db:<region>:<account>:dbuser:<resource-id>/<user>); a service without entries gets no database access."
+}
+
+variable "locker_kms_key_arn" {
+  type        = string
+  description = "Key of the locker; only the locker role may use it."
+}
+
+variable "secrets_kms_key_arn" {
+  type        = string
+  description = "Key of the Secrets Manager secrets that external-secrets reads."
+}
+
+variable "secret_arns" {
+  type        = list(string)
+  default     = []
+  description = "Secrets external-secrets may read, by ARN; empty means no access."
+}
+
+variable "dynamodb_table_arn" {
+  type        = string
+  description = "Merchant-to-cell table; router and scheduler read it, nobody writes from a cell."
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Tags of section 22; team, owner, pci-scope, data-class and backup-tier are required."
+  validation {
+    condition     = alltrue([for k in ["team", "owner", "pci-scope", "data-class", "backup-tier"] : contains(keys(var.tags), k)])
+    error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
+  }
+}
