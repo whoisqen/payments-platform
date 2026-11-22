@@ -1,0 +1,109 @@
+rule_files:
+- ../../slo/generated/payments-status.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate1h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0144x15
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0144x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnFast
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: critical
+        failure_mode: application-slo-payment-status-read
+        slo: payments-status-read
+        sloth_id: payments-status-read
+        sloth_service: payments-status
+        sloth_slo: read
+      exp_annotations:
+        summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (14.4x over 1h/5m)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate1h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0144x15
+  - series: slo:sli_error:ratio_rate5m{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.00072x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnFast
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.006x15
+  - series: slo:sli_error:ratio_rate30m{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.006x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnSlow
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: critical
+        failure_mode: application-slo-payment-status-read
+        slo: payments-status-read
+        sloth_id: payments-status-read
+        sloth_service: payments-status
+        sloth_slo: read
+      exp_annotations:
+        summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (6x over 6h/30m)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.006x15
+  - series: slo:sli_error:ratio_rate30m{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.0003x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnSlow
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate3d{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.001x15
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.001x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnTicket
+    exp_alerts:
+    - exp_labels:
+        team: payments-core
+        owner: payments-core-oncall
+        layer: application
+        service: router
+        severity: warning
+        failure_mode: application-slo-payment-status-read
+        slo: payments-status-read
+        sloth_id: payments-status-read
+        sloth_service: payments-status
+        sloth_slo: read
+      exp_annotations:
+        summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (1x over 3d/6h)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+- interval: 1m
+  input_series:
+  - series: slo:sli_error:ratio_rate3d{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 0.001x15
+  - series: slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read",team="payments-core",owner="payments-core-oncall",layer="application"}
+    values: 5e-05x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: PaymentsStatusReadBurnTicket
+    exp_alerts: []

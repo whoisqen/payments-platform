@@ -1,0 +1,64 @@
+rule_files:
+- ../../alerts/backup-dr/drills.yaml
+evaluation_interval: 1d
+tests:
+- interval: 1d
+  input_series:
+  - series: restore_test_last_run_timestamp_seconds{store="aurora-cell-1"}
+    values: '0x10'
+  alert_rule_test:
+  - eval_time: 5d
+    alertname: RestoreTestStale
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-test-stale
+        store: aurora-cell-1
+      exp_annotations:
+        summary: No automatic restore test ran for a store in 2 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-test-stale
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1d
+  input_series:
+  - series: restore_test_last_run_timestamp_seconds{store="aurora-cell-1"}
+    values: 0+86400x10
+  alert_rule_test:
+  - eval_time: 5d
+    alertname: RestoreTestStale
+    exp_alerts: []
+- interval: 1d
+  input_series:
+  - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-1"}
+    values: '0x110'
+  - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-2"}
+    values: 0+86400x110
+  alert_rule_test:
+  - eval_time: 101d
+    alertname: DrSwitchTestOverdue
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: dr-switch
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-dr-switch-test-overdue
+        region: us-east-1
+      exp_annotations:
+        summary: The quarterly switch test of a recovery region is overdue
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+- interval: 1d
+  input_series:
+  - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-1"}
+    values: 0+86400x110
+  - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-2"}
+    values: 0+86400x110
+  alert_rule_test:
+  - eval_time: 101d
+    alertname: DrSwitchTestOverdue
+    exp_alerts: []

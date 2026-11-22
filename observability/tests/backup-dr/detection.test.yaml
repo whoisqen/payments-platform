@@ -1,0 +1,31 @@
+rule_files:
+- ../../alerts/backup-dr/detection.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: security_events_total{event="backup_vault_policy_change"}
+    values: 0+1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupVaultPolicyChanged
+    exp_alerts:
+    - exp_labels:
+        severity: security
+        team: security
+        service: aws-backup
+        owner: security-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-vault-policy-changed
+      exp_annotations:
+        summary: A backup vault access policy or lock changed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-vault-policy-changed.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: security_events_total{event="backup_vault_policy_change"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupVaultPolicyChanged
+    exp_alerts: []

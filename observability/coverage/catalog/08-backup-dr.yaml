@@ -1,0 +1,146 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: backup-dr
+  id: backup-dr-backup-job-failed
+  component: aws-backup
+  failure: backup job failed or expired
+  impact: a store has no fresh recovery point; data loss on restore grows beyond the 5-minute target (D2) or the hourly target (D3)
+  severity: critical
+  alert: BackupJobFailed
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-backup-missing
+  component: aws-backup
+  failure: backup missing
+  impact: the recovery point is older than the allowed loss
+  severity: critical
+  alert: BackupMissing
+  signal: metric
+  detect_within: 8m
+- layer: backup-dr
+  id: backup-dr-backup-copy-failed
+  component: aws-backup
+  failure: backup copy failed
+  impact: a recovery region lacks the latest hourly copy
+  severity: warning
+  alert: BackupCopyFailed
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-snapshot-copy-stale
+  component: snapshot-copy
+  failure: snapshot copy stale in a recovery region
+  impact: the snapshot-only stores (MemoryDB, ClickHouse, Vault, Velero) lose more than the 1 h target at a switch
+  severity: warning
+  alert: SnapshotCopyStale
+  signal: metric
+  detect_within: 8m
+- layer: backup-dr
+  id: backup-dr-restore-test-failed
+  component: restore-test
+  failure: restore test failed
+  impact: a backup that cannot be restored is not a backup; D2 and D4 targets are unproven
+  severity: critical
+  alert: RestoreTestFailed
+  signal: metric
+  detect_within: 8m
+- layer: backup-dr
+  id: backup-dr-restore-duration-near-target
+  component: restore-test
+  failure: restore close to its target
+  impact: the 30-minute restore target (D4) will be missed as data grows
+  severity: warning
+  alert: RestoreDurationNearTarget
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-restore-too-slow
+  component: restore-test
+  failure: restore slower than target
+  impact: the RTO of the store is not met
+  severity: warning
+  alert: RestoreTooSlow
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-latest-restorable-time-lag-high
+  component: pitr
+  failure: latest restorable time lags
+  impact: a point-in-time restore would lose more than the 5-minute target (D2)
+  severity: critical
+  alert: LatestRestorableTimeLagHigh
+  signal: metric
+  detect_within: 13m
+- layer: backup-dr
+  id: backup-dr-aurora-global-lag-high
+  component: global-database
+  failure: Aurora Global lag above 5 s
+  impact: the 10 s RPO budget (D7) is at risk; managed RPO stays off so the writer is not paused
+  severity: critical
+  alert: AuroraGlobalLagHigh
+  signal: metric
+  detect_within: 5m
+- layer: backup-dr
+  id: backup-dr-aurora-global-lag-rpo-budget-exceeded
+  component: global-database
+  failure: Aurora Global lag above the RPO budget
+  impact: a switch now would lose more than 10 s of payment data; reconciliation covers the gap
+  severity: critical
+  alert: AuroraGlobalLagRpoBudgetExceeded
+  signal: metric
+  detect_within: 4m
+- layer: backup-dr
+  id: backup-dr-dynamo-db-global-table-lag-high
+  component: global-tables
+  failure: Global Table replication lag
+  impact: the merchant-to-cell map in a recovery region is behind (RPO is seconds)
+  severity: warning
+  alert: DynamoDbGlobalTableLagHigh
+  signal: metric
+  detect_within: 13m
+- layer: backup-dr
+  id: backup-dr-s3-replication-lag-high
+  component: s3-replication
+  failure: S3 replication lag
+  impact: the S3 and event-archive RPO of 15 min is exceeded
+  severity: warning
+  alert: S3ReplicationLagHigh
+  signal: metric
+  detect_within: 13m
+- layer: backup-dr
+  id: backup-dr-restore-test-stale
+  component: restore-test
+  failure: restore test not running
+  impact: the daily verification of D2 is silent
+  severity: warning
+  alert: RestoreTestStale
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-dr-switch-test-overdue
+  component: dr-test
+  failure: quarterly switch test overdue
+  impact: the 60 min RTO (75 min in plan B) is not measured; the switch runbook may have rotted
+  severity: warning
+  alert: DrSwitchTestOverdue
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-backup-vault-policy-changed
+  component: backup-vault
+  failure: backup vault policy changed
+  impact: backups could be deleted or exposed; PCI DSS 3.6 and ransomware protection
+  severity: security
+  alert: BackupVaultPolicyChanged
+  signal: metric
+  detect_within: 3m
+- layer: backup-dr
+  id: backup-dr-recovery-region-quota-low
+  component: recovery-regions
+  failure: Service quotas in us-east-1 or us-east-2 below the switch plan
+  impact: compute cannot be created at the switch (plan B trigger)
+  severity: warning
+  alert: null
+  signal: metric
+  reason: quota metrics of the recovery regions are not collected yet

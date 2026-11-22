@@ -1,0 +1,52 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-backup-dr-restore
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: backup-dr-restore
+    rules:
+    - alert: RestoreTestFailed
+      expr: min by (store) (restore_test_success) == 0
+      for: 5m
+      labels:
+        severity: critical
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-test-failed
+      annotations:
+        summary: The automatic restore test of a store failed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/restore-test-failed.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: RestoreDurationNearTarget
+      expr: max by (store) (backup_restore_duration_seconds) > 0.8 * max by (store) (backup_restore_target_seconds)
+      labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-duration-near-target
+      annotations:
+        summary: Restore duration passed 80% of its target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: RestoreTooSlow
+      expr: max by (store) (backup_restore_duration_seconds) > max by (store) (backup_restore_target_seconds)
+      labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-too-slow
+      annotations:
+        summary: Restore duration exceeded its target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-too-slow
+        dashboard_url: https://grafana.payments.internal/d/backup

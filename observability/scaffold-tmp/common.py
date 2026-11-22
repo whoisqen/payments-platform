@@ -27,6 +27,7 @@ def a(**kw):
     kw.setdefault("extra_tests", [])
     kw.setdefault("skip_auto", False)
     kw.setdefault("norules", False)
+    kw.setdefault("eval_interval", "1m")
     ALL.append(kw)
 
 
@@ -126,7 +127,7 @@ def render_tests(layer, group, items, rule_path):
         if spike:
             tests.append({"interval": "1m", "input_series": series_block(al, "spike", n), "alert_rule_test": [quiet]})
         tests.extend(al["extra_tests"])
-    doc = {"rule_files": [rule_path], "evaluation_interval": "1m", "tests": tests}
+    doc = {"rule_files": [rule_path], "evaluation_interval": items[0]["eval_interval"], "tests": tests}
     return dump(doc)
 
 
