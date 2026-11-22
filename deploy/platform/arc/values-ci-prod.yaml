@@ -10,7 +10,9 @@ template:
     automountServiceAccountToken: false
     priorityClassName: ci-prod
     nodeSelector:
-      karpenter.sh/nodepool: ci
+      karpenter.sh/nodepool: ci-prod
+    tolerations:
+      - {key: workload, operator: Equal, value: ci-prod, effect: NoSchedule}
     securityContext:
       runAsNonRoot: true
       runAsUser: 1001
@@ -31,5 +33,7 @@ template:
           requests:
             cpu: "2"
             memory: 4Gi
+            ephemeral-storage: 10Gi
           limits:
             memory: 4Gi
+            ephemeral-storage: 20Gi

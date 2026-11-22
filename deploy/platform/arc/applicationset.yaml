@@ -16,8 +16,6 @@ spec:
       name: 'arc-controller-{{ .name }}'
       labels:
         payments-platform/addon: arc
-      annotations:
-        argocd.argoproj.io/sync-wave: "0"
     spec:
       project: platform
       destination:
@@ -38,9 +36,13 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        retry:
+          limit: 10
+          backoff: {duration: 30s, factor: 2, maxDuration: 10m}
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -60,8 +62,6 @@ spec:
       name: 'arc-config-{{ .name }}'
       labels:
         payments-platform/addon: arc
-      annotations:
-        argocd.argoproj.io/sync-wave: "-1"
     spec:
       project: platform
       destination:
@@ -75,8 +75,12 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        retry:
+          limit: 10
+          backoff: {duration: 30s, factor: 2, maxDuration: 10m}
         syncOptions:
           - CreateNamespace=true
+          - SkipDryRunOnMissingResource=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -103,8 +107,6 @@ spec:
       name: 'arc-{{ .scaleSet }}-{{ .name }}'
       labels:
         payments-platform/addon: arc
-      annotations:
-        argocd.argoproj.io/sync-wave: "1"
     spec:
       project: platform
       destination:
@@ -125,5 +127,10 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        retry:
+          limit: 10
+          backoff: {duration: 30s, factor: 2, maxDuration: 10m}
         syncOptions:
+          - CreateNamespace=true
           - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
