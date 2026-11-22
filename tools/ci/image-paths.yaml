@@ -1,0 +1,43 @@
+# Read by tools/ci/changed_images.py; prefixes end with / and match a directory, other entries match a file.
+rebuild_all:
+  - docker/_common/
+  - vendor/hyperswitch/Cargo.lock
+  - vendor/card-vault/Cargo.lock
+  - tools/ci/image-paths.yaml
+  - .github/workflows/images.yml
+images:
+  router:
+    - docker/router/
+    - vendor/hyperswitch/
+  drainer:
+    - docker/drainer/
+    - vendor/hyperswitch/
+  scheduler:
+    - docker/scheduler/
+    - vendor/hyperswitch/
+  locker:
+    - docker/locker/
+    - vendor/card-vault/
+  control-center:
+    - docker/control-center/
+areas:
+  rust:
+    - vendor/hyperswitch/
+    - vendor/card-vault/
+  terraform:
+    - infra/
+  helm:
+    - deploy/
+  policy:
+    - policy/
+  python:
+    - tools/
+    - scripts/
+  workflows:
+    - .github/
+  docker:
+    - docker/
+  shell:
+    - scripts/
+    - docker/
+    - tools/

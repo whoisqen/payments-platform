@@ -1,0 +1,7 @@
+# Final image size budgets in MiB; the images workflow fails a build above its budget.
+budgets_mib:
+  router: 180
+  drainer: 120
+  scheduler: 150
+  locker: 80
+  control-center: 900
