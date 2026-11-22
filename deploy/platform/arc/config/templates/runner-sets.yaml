@@ -1,0 +1,46 @@
+{{- range $name, $set := .Values.scaleSets }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arc-{{ $name }}
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    app.kubernetes.io/part-of: ci-runners
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: arc-{{ $name }}
+  {{- if $set.roleArn }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ $set.roleArn | quote }}
+  {{- end }}
+automountServiceAccountToken: false
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ $set.priorityClass.name }}
+value: {{ $set.priorityClass.value }}
+preemptionPolicy: {{ $set.priorityClass.preemptionPolicy }}
+globalDefault: false
+description: Runner pods of the {{ $name }} scale set
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: github-app
+  namespace: arc-{{ $name }}
+spec:
+  refreshInterval: {{ $.Values.refreshInterval }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $.Values.secretStore.name }}
+  target:
+    name: github-app
+  dataFrom:
+    - extract:
+        key: {{ $.Values.secretStore.githubAppKey }}
+{{- end }}

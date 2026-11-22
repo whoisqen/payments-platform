@@ -1,0 +1,25 @@
+replicaCount: 1
+
+# Controller stays on the system pool, runners use the shared CI NodePool
+nodeSelector:
+  karpenter.sh/nodepool: system
+
+priorityClassName: system-cluster-critical
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+flags:
+  logLevel: info

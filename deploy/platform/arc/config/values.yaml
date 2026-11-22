@@ -1,0 +1,18 @@
+# Account and role values are placeholders; real ones come from the shared-services live stack outputs
+secretStore:
+  name: REPLACE_CLUSTER_SECRET_STORE
+  githubAppKey: REPLACE_SECRETS_MANAGER_KEY_GITHUB_APP
+refreshInterval: 1h
+scaleSets:
+  ci-prod:
+    priorityClass: {name: ci-prod, value: 100000, preemptionPolicy: PreemptLowerPriority}
+    roleArn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/REPLACE_CI_PROD_ROLE
+  ci-stage:
+    priorityClass: {name: ci-stage, value: 1000, preemptionPolicy: Never}
+    roleArn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/REPLACE_CI_STAGE_ROLE
+  ci-pr:
+    priorityClass: {name: ci-pr, value: 500, preemptionPolicy: Never}
+networkPolicy:
+  dnsNamespace: kube-system
+  # RFC1918 and link-local are denied so ci-pr cannot reach cell, CDE or node metadata addresses
+  deniedCidrs: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]

@@ -16,6 +16,7 @@ spec:
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm
     - public.ecr.aws/karpenter
+    - ghcr.io/actions/actions-runner-controller-charts
   destinations:
     - server: '*'
       namespace: '*'

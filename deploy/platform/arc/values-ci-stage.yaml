@@ -1,0 +1,35 @@
+githubConfigUrl: https://github.com/whoisqen
+# Created by the ExternalSecret in config/, never inline
+githubConfigSecret: github-app
+runnerScaleSetName: ci-stage
+minRunners: 0
+maxRunners: 10
+template:
+  spec:
+    serviceAccountName: ci-stage
+    automountServiceAccountToken: false
+    priorityClassName: ci-stage
+    nodeSelector:
+      karpenter.sh/nodepool: ci
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 123
+      fsGroup: 123
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+      - name: runner
+        # REPLACE_DIGEST: pin by digest before sync
+        image: ghcr.io/actions/actions-runner@sha256:REPLACE_DIGEST_RUNNER
+        command: ["/home/runner/run.sh"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+          limits:
+            memory: 4Gi
