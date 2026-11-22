@@ -4,7 +4,7 @@
 
 Nine requirement files under `docs/requirements/`, one ADR under `docs/adr/`, and edits to `docs/glossary.md` and `docs/requirements/README.md`; one owner (`docs-writer`), no code.
 
-- Source: `/home/vlad/.claude/projects/-data-vlad-portfolio-payments-platform/memory/payments-platform-architecture.md`, dated 2026-11-20, revision 2026-11-21, SHA-256 prefix `5daa9b628fe392a3`. Agents read it by this absolute path (it is outside their worktrees); `srs.md` records the same title, date and prefix. If the checksum changes the writer stops and the human decides between an addendum and a rewrite.
+- Source: the architecture source split by section (memory `architecture/README.md`), dated 2026-11-20, revision 2026-11-21, SHA-256 prefix `5daa9b628fe392a3`. Agents read it by this absolute path (it is outside their worktrees); `srs.md` records the same title, date and prefix. If the checksum changes the writer stops and the human decides between an addendum and a rewrite.
 - ID areas: functional `INF`, `DAT`, `SEC`, `DEL`, `OBS`, `COST`; `NFR-` only in `nfr.md` with the areas `SLO`, `CAP`, `REC`, `COST`, `COV`; the area files cite them.
 - File map:
   - `nfr.md` (T2): all numeric targets (sections 1, 2, 8 thresholds, 12 limits, 13, 21.5 capacity, 25.2, 25.4, D2 to D8).

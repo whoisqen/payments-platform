@@ -4,7 +4,8 @@ Payment orchestrator based on Hyperswitch. The architecture is described in the 
 
 | Directory | Contents |
 |---|---|
-| `vendor/` | third-party code, unchanged (hyperswitch, card-vault, e2e tests) |
+| `AGENTS.md`, `manifests/` | rules for agents and the compact project context (read these first) |
+| `vendor/` | upstream code (hyperswitch, card-vault, e2e tests) |
 | `docker/` | service Dockerfiles |
 | `infra/` | Terraform / Terragrunt |
 | `deploy/` | Helm charts and ArgoCD |

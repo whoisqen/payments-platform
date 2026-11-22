@@ -1,6 +1,6 @@
 version: 1
 defaults:
-  worktree_root: ../wt
+  worktree_root: .worktrees        # branch agent/<area>-<slug>
   branch_prefix: agent/
   base: phase_start_commit
   max_parallel: 4

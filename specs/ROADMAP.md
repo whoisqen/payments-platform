@@ -1,6 +1,6 @@
 # Roadmap: every part of the architecture document and the specification that carries it
 
-Source: `payments-platform-architecture.md` (27 sections). One row per section or group of subsections. A section is done only when its specification is `implemented`. Order follows the dependencies in the last column.
+Source: the architecture source (memory `architecture/README.md`) (27 sections). One row per section or group of subsections. A section is done only when its specification is `implemented`. Order follows the dependencies in the last column.
 
 | Spec | Title | Architecture sections | Depends on | State |
 |---|---|---|---|---|

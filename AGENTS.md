@@ -33,7 +33,7 @@ context_policy:
 
 - Write only inside your `owns` (`.claude/orchestration.yaml`); for another domain write `specs/<spec>/handoffs/<you>-<to>.md`.
 - Never run `terraform apply`, `kubectl`/`helm` mutations, mutating `aws` calls, `git push` or merges. Do not commit: the orchestrator commits.
-- Work in the worktree path the task gives you; your branch is `agent/<area>-<slug>`.
+- Work in the worktree path the task gives you; your branch is `agent/<area>-<slug>`. The orchestrator moves GitHub issues and writes `specs/<spec>/progress/` files; you do not.
 
 ## Verification (run what applies, in the directory you changed)
 
@@ -41,6 +41,11 @@ context_policy:
 - Helm: `helm lint --strict`, `helm template ... | kubeconform -ignore-missing-schemas -summary`, `helm unittest`.
 - Policies: `opa test <dir>`, `opa fmt --fail -l`, `kyverno test <dir>`. Alerts: `promtool check rules`, `promtool test rules`.
 - Workflows: `actionlint`. Python: `python3 -m py_compile`, `python3 -m unittest`. Layout: `tools/lint/structure`.
+
+## Reviewers (read-only agents)
+
+- You see only the diff and the spec; you never review a change you wrote.
+- Rate every finding low, medium or high (high blocks); give file and line, the risk and a concrete fix; return the report as your final message.
 
 ## Report (at most 300 words)
 

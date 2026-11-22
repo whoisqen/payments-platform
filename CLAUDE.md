@@ -20,7 +20,7 @@ Working language is English for every file, commit and PR. Rules shared with all
 
 - `tools/lint/spec-lint` (`--write-index`), `tools/lint/srs-lint`, `tools/lint/orchestration-lint --strict`, `tools/lint/structure`; tests: `python3 -m unittest discover -s tools/lint/tests`.
 - `tools/lint/spec-gate` runs as the `commit-msg` hook (`git config core.hooksPath tools/scripts/git-hooks`) and in CI (`--range`). A non-exempt file needs `Spec: specs/NNN-slug#Tn` of an approved or in-progress spec; exemptions: `Spec-Exempt: trivial` (tier trivial), `owner-directed` (owner told to build without a spec), `bootstrap`, `upstream-import`.
-- Lifecycle `draft -> approved (human) -> in-progress -> implemented | superseded`; issues are created after approval; tasks are tracked in `specs/<spec>/progress/Tn.md` and the GitHub project (Todo, In Progress, Done).
+- Lifecycle `draft -> approved (human) -> in-progress -> implemented | superseded`; issues are created after approval; the orchestrator tracks tasks in `specs/<spec>/progress/Tn.md` and the GitHub project (Todo, In Progress, Done).
 
 ## Claude Code configuration
 
@@ -31,5 +31,5 @@ Working language is English for every file, commit and PR. Rules shared with all
 ## Conventions
 
 - Commits: `type(scope): summary` (at most 72 characters, summary starts lower-case), scope from `router drainer scheduler locker control-center infra deploy policy observability docker ci claude docs vendor specs`; trailers `Refs: #N`, `Spec:` or `Spec-Exempt:`, `PCI-Impact: none|yes` on CDE paths (`policy/cde-paths.yaml`). No AI co-authorship marks.
-- Branches: trunk `main`, short-lived `<type>/<n>-<slug>`; environments are directories (`deploy/envs/<env>`, `infra/live/<env>/<region>/<component>`), never branches.
+- Branches and delivery: see `manifests/project.yaml` (`delivery`).
 - Architecture invariants that span files are in `manifests/constraints.yaml`.
