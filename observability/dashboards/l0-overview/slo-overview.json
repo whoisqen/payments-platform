@@ -1,0 +1,680 @@
+{
+  "uid": "slo-overview",
+  "title": "SLO overview",
+  "description": "How much budget is left and how fast it burns.",
+  "tags": [
+    "payments-platform",
+    "l0",
+    "slo"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "default",
+          "value": "default"
+        }
+      },
+      {
+        "name": "env",
+        "label": "env",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up, env)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "prod",
+          "value": "prod"
+        }
+      },
+      {
+        "name": "region",
+        "label": "region",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\"}, region)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "eu-central-1",
+          "value": "eu-central-1"
+        }
+      },
+      {
+        "name": "cell",
+        "label": "cell",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\",region=~\"$region\"}, cell)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\"}, service)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "psp",
+        "label": "psp",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(psp_requests_total{env=~\"$env\"}, psp)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "link",
+      "title": "L0 Platform overview",
+      "url": "/d/platform-overview",
+      "icon": "dashboard",
+      "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "L1 Payments and PSP",
+      "url": "/d/payments",
+      "icon": "dashboard",
+      "targetBlank": false
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "name": "deploys",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "enable": true,
+        "iconColor": "blue",
+        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "titleFormat": "deploy {{name}}"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Error budget left",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "title": "slo: authorization availability, budget left %",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * slo:period_error_budget_remaining:ratio{env=~\"$env\",sloth_id=\"payments-authorization-availability\"}",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "title": "slo: platform overhead latency, budget left %",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * slo:period_error_budget_remaining:ratio{env=~\"$env\",sloth_id=\"payments-platform-overhead-latency\"}",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "gauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "title": "slo: status read, budget left %",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * slo:period_error_budget_remaining:ratio{env=~\"$env\",sloth_id=\"payments-status-read\"}",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "gauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "title": "slo: webhook delivery, budget left %",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * slo:period_error_budget_remaining:ratio{env=~\"$env\",sloth_id=\"payments-webhooks-delivery\"}",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Burn rate",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "title": "slo: burn rate over 1 h, x budget",
+      "description": "14.4 pages (2% of the budget per hour); 6 pages over 6 hours.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:sli_error:ratio_rate1h{env=~\"$env\"} / on(env, region, sloth_id, sloth_slo, sloth_service) slo:error_budget:ratio",
+          "legendFormat": "{{sloth_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "title": "slo: burn rate over 6 h, x budget",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:sli_error:ratio_rate6h{env=~\"$env\"} / on(env, region, sloth_id, sloth_slo, sloth_service) slo:error_budget:ratio",
+          "legendFormat": "{{sloth_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "title": "slo: burn rate over 5 min, x budget",
+      "description": "50 pages for the 99.99% authorization SLO.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:sli_error:ratio_rate5m{env=~\"$env\"} / on(env, region, sloth_id, sloth_slo, sloth_service) slo:error_budget:ratio",
+          "legendFormat": "{{sloth_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 14.4
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "title": "slo: burn rate over 3 days, x budget",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:sli_error:ratio_rate3d{env=~\"$env\"} / on(env, region, sloth_id, sloth_slo, sloth_service) slo:error_budget:ratio",
+          "legendFormat": "{{sloth_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}

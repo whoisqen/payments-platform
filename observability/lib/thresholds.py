@@ -21,7 +21,6 @@ ALERT_LINKS = {
     "DrainLagHigh": "DRAIN_LAG_S",
     "RedisStreamBacklog": "REDIS_STREAM_LEN",
     "SchedulerQueueDelayHigh": "SCHEDULER_QUEUE_S",
-    "MemoryDbMemoryHigh": "MEMORYDB_MEM_WARN",
     "MemoryDbMemoryCritical": "MEMORYDB_MEM_CRIT",
     "AuroraReplicaLagHigh": "AURORA_REPLICA_LAG_MS",
     "AuroraGlobalLagHigh": "AURORA_GLOBAL_LAG_MS",
