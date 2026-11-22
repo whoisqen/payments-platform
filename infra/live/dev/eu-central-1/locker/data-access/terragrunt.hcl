@@ -29,7 +29,7 @@ dependency "eks_cell_0" {
   mock_outputs = {
     cluster_name           = "pay-mock-euc1-eks"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    node_security_group_id = "sg-00000000"
+    locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
@@ -40,7 +40,7 @@ dependency "eks_cell_1" {
   mock_outputs = {
     cluster_name           = "pay-mock-euc1-eks"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    node_security_group_id = "sg-00000000"
+    locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
@@ -51,7 +51,7 @@ dependency "eks_cell_2" {
   mock_outputs = {
     cluster_name           = "pay-mock-euc1-eks"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    node_security_group_id = "sg-00000000"
+    locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
@@ -62,7 +62,7 @@ dependency "eks_cell_3" {
   mock_outputs = {
     cluster_name           = "pay-mock-euc1-eks"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    node_security_group_id = "sg-00000000"
+    locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
@@ -73,7 +73,7 @@ dependency "eks_spare" {
   mock_outputs = {
     cluster_name           = "pay-mock-euc1-eks"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    node_security_group_id = "sg-00000000"
+    locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
@@ -83,14 +83,15 @@ inputs = {
   vpc_id          = dependency.vpc.outputs.vpc_id
   data_subnet_ids = dependency.vpc.outputs.subnet_ids["data"]
   client_security_group_ids = [
-    dependency.eks_cell_0.outputs.node_security_group_id,
-    dependency.eks_cell_1.outputs.node_security_group_id,
-    dependency.eks_cell_2.outputs.node_security_group_id,
-    dependency.eks_cell_3.outputs.node_security_group_id,
-    dependency.eks_spare.outputs.node_security_group_id,
+    dependency.eks_cell_0.outputs.locker_pod_security_group_id,
+    dependency.eks_cell_1.outputs.locker_pod_security_group_id,
+    dependency.eks_cell_2.outputs.locker_pod_security_group_id,
+    dependency.eks_cell_3.outputs.locker_pod_security_group_id,
+    dependency.eks_spare.outputs.locker_pod_security_group_id,
   ]
   stores = {
     aurora       = { port = 5432, clients = "aurora-proxy" }
+    # Clients are the locker pod security groups only (PCI DSS 1.4); no cell-wide node group is listed.
     aurora-proxy = { port = 5432, clients = "workload" }
   }
 }

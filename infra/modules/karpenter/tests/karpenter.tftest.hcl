@@ -118,3 +118,16 @@ run "interruption_queue_listens_to_four_events" {
     error_message = "four interruption event rules"
   }
 }
+
+run "cpu_limits_follow_the_override" {
+  command = plan
+
+  variables {
+    cpu_limits = { payments = 32, stateful = 16, cde = 16, workers = 32 }
+  }
+
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-payments.yaml"]).spec.limits.cpu == "32" && yamldecode(output.manifests["nodepool-stateful.yaml"]).spec.limits.cpu == "16"
+    error_message = "pool CPU limits must come from cpu_limits"
+  }
+}

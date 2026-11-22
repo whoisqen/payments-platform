@@ -282,6 +282,7 @@ resource "aws_iam_role_policy" "controller" {
         }
       },
       {
+        # Ec2 Describe* actions do not support resource-level permissions; the region condition is the only scope.
         Sid    = "DescribeCapacity"
         Effect = "Allow"
         Action = [
@@ -293,6 +294,7 @@ resource "aws_iam_role_policy" "controller" {
         Condition = { StringEquals = { "aws:RequestedRegion" = var.region } }
       },
       {
+        # The EC2 pricing API does not support resource-level permissions.
         Sid      = "Pricing"
         Effect   = "Allow"
         Action   = "pricing:GetProducts"

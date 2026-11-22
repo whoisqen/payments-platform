@@ -125,3 +125,47 @@ run "view_access_entry_is_created" {
     error_message = "the view entry is associated"
   }
 }
+
+run "deletion_protection_is_on_outside_dev" {
+  command = plan
+
+  variables {
+    environment = "stage"
+  }
+
+  assert {
+    condition     = aws_eks_cluster.this.deletion_protection
+    error_message = "stage clusters must be protected from deletion"
+  }
+}
+
+run "deletion_protection_is_off_in_dev" {
+  command = plan
+
+  assert {
+    condition     = !aws_eks_cluster.this.deletion_protection
+    error_message = "dev clusters may be deleted"
+  }
+}
+
+run "log_retention_follows_the_input" {
+  command = plan
+
+  variables {
+    log_retention_days = 30
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_group.cluster.retention_in_days == 30
+    error_message = "log_retention_days must reach the log group"
+  }
+}
+
+run "locker_pod_group_is_separate_from_the_node_group" {
+  command = plan
+
+  assert {
+    condition     = aws_security_group.locker_pod.name != aws_security_group.node.name && aws_vpc_security_group_egress_rule.locker_pod_vpc.cidr_ipv4 == var.vpc_cidr_block
+    error_message = "the locker pod group is its own group with VPC-only egress"
+  }
+}
