@@ -32,8 +32,8 @@ def gap(layer, id, component, failure, impact, severity, reason):
 
 
 def minutes(f):
-    m = re.fullmatch(r"(\d+)([ms])", f)
-    return int(m.group(1)) if m.group(2) == "m" else 0
+    m = re.fullmatch(r"(\d+)([smh])", f)
+    return {"m": 1, "h": 60, "s": 0}[m.group(2)] * int(m.group(1))
 
 
 def rb_url(al):

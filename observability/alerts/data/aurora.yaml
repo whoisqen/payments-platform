@@ -1,0 +1,110 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-data-aurora
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: data-aurora
+    rules:
+    - alert: AuroraWriterUnavailable
+      expr: pg_up{role="writer"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-writer-unavailable
+      annotations:
+        summary: The Aurora writer of a cell does not answer
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-writer-unavailable.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraReplicationSlotLagHigh
+      expr: max by (cell, slot_name) (pg_replication_slots_wal_lag_bytes) > 10 * 1024 ^ 3
+      for: 10m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-replication-slot-lag-high
+      annotations:
+        summary: A replication slot retains more than 10 GiB of WAL
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/aurora-replication-slot-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraReplicaLagHigh
+      expr: max by (cell) (aws_rds_aurora_replica_lag_maximum) > 1000
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-replica-lag-high
+      annotations:
+        summary: Aurora replica lag is above 1 second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-replica-lag-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraConnectionsHigh
+      expr: sum by (cell, instance) (pg_stat_database_numbackends) / max by (cell, instance) (pg_settings_max_connections) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-connections-high
+      annotations:
+        summary: Aurora connections exceed 80% of the limit
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-connections-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraCpuHigh
+      expr: max by (cell, instance) (aws_rds_cpuutilization_average) > 80
+      for: 15m
+      labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-cpu-high
+      annotations:
+        summary: Aurora CPU above 80% for 15 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-cpu-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraDeadlocks
+      expr: sum by (cell) (rate(pg_stat_database_deadlocks[5m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-deadlocks
+      annotations:
+        summary: Aurora reports deadlocks
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-deadlocks
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: AuroraTableGrowthFast
+      expr: max by (cell, relname) (pg_table_size_bytes) / max by (cell, relname) (pg_table_size_bytes offset 1d) > 1.2
+      for: 1h
+      labels:
+        severity: warning
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-aurora-table-growth-fast
+      annotations:
+        summary: A table grew more than 20% in a day
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#aurora-table-growth-fast
+        dashboard_url: https://grafana.payments.internal/d/data-stores

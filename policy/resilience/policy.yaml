@@ -1,0 +1,113 @@
+version: 1
+# max_attempts counts retries after the first call; delay = random(0, min(cap, base * 2^n)).
+defaults:
+  retry_budget_ratio: 0.10
+  request_deadline: 30s
+  deadline_propagation: true
+dependencies:
+  psp-authorize:
+    kind: charge
+    timeout: 15s
+    max_attempts: 0
+    base: 0s
+    cap: 0s
+    jitter: full
+    idempotent: false
+    notes: A timeout moves the payment to the unknown state and sync resolves it; another PSP is tried only for errors that prove no charge happened.
+  psp-sync:
+    kind: read
+    timeout: 5s
+    max_attempts: 4
+    base: 1s
+    cap: 30s
+    jitter: full
+    idempotent: true
+    budget_alert: critical
+    notes: Read of the payment status by our reference id; any error is retried.
+  router-locker:
+    kind: read
+    timeout: 300ms
+    max_attempts: 2
+    base: 20ms
+    cap: 100ms
+    jitter: full
+    idempotent: true
+    budget_alert: critical
+    notes: Only token reads and operations that carry an idempotency key.
+  memorydb:
+    kind: read
+    timeout: 50ms
+    max_attempts: 2
+    base: 5ms
+    cap: 50ms
+    jitter: full
+    idempotent: true
+    notes: Reads; a write is retried only with an idempotency key.
+  aurora:
+    kind: read
+    timeout: 2s
+    max_attempts: 2
+    base: 50ms
+    cap: 500ms
+    jitter: full
+    idempotent: true
+    notes: Reads and transactions safe to repeat (serialization failure); DDL is never retried.
+  kafka-producer:
+    kind: write
+    timeout: 30s
+    max_attempts: unlimited
+    bounded_by: timeout
+    base: 100ms
+    cap: 10s
+    jitter: full
+    idempotent: true
+    notes: enable.idempotence=true; the retries stop at delivery.timeout.ms.
+  kafka-consumer:
+    kind: read
+    timeout: 30s
+    max_attempts: 3
+    base: 1s
+    cap: 30s
+    jitter: full
+    idempotent: true
+    dlq: true
+    notes: Handling is idempotent by event key; the event goes to the DLQ after the last attempt.
+  outgoing-webhooks:
+    kind: delivery
+    timeout: 10s
+    max_attempts: 5
+    base: 1m
+    cap: 12h
+    jitter: full
+    idempotent: true
+    dlq: true
+    schedule: [1m, 5m, 30m, 2h, 12h]
+    schedule_jitter_ratio: 0.2
+    notes: The receiver deduplicates by event_id.
+  aws-sdk:
+    kind: infra
+    timeout: sdk-default
+    max_attempts: 5
+    base: 100ms
+    cap: 20s
+    jitter: full
+    idempotent: true
+    notes: Adaptive retry mode; covers Terraform providers too.
+  scripts:
+    kind: infra
+    timeout: 30s
+    max_attempts: 5
+    base: 1s
+    cap: 60s
+    jitter: full
+    idempotent: true
+    notes: Only idempotent steps are retried.
+  ci-network:
+    kind: infra
+    timeout: 60s
+    max_attempts: 3
+    base: 2s
+    cap: 30s
+    jitter: full
+    idempotent: true
+    notes: Dependency download and image push.

@@ -1,0 +1,40 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-network-certificates
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: network-certificates
+    rules:
+    - alert: CertificateExpiryCritical
+      expr: min by (target) (probe_ssl_earliest_cert_expiry) - time() < 14 * 86400
+      for: 10m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-certificate-expiry-critical
+      annotations:
+        summary: A public endpoint certificate expires in less than 14 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/certificate-expiry-critical.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: PspMtlsCertExpiring30d
+      expr: min by (name) (certmanager_certificate_expiration_timestamp_seconds{name=~"psp-mtls-.*"}) - time() < 30 * 86400
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-psp-mtls-cert-expiring30d
+      annotations:
+        summary: A PSP mTLS client certificate expires in less than 30 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#psp-mtls-cert-expiring30d
+        dashboard_url: https://grafana.payments.internal/d/edge

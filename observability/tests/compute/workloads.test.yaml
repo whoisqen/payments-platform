@@ -1,0 +1,151 @@
+rule_files:
+- ../../alerts/compute/workloads.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+    values: 1x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: CrashLoopBackOff
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-crash-loop-back-off
+        namespace: payments-cell-1
+        pod: router-7c9
+      exp_annotations:
+        summary: A payments pod is in CrashLoopBackOff
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/crash-loop-back-off.md
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+    values: '0x21'
+  alert_rule_test:
+  - &id001
+    eval_time: 17m
+    alertname: CrashLoopBackOff
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+    values: 0x9 1x1 0x9
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments-cell-1",pod="router-7c9",container="router"}
+    values: 1x19
+  - series: kube_pod_container_status_restarts_total{namespace="payments-cell-1",pod="router-7c9",container="router"}
+    values: 0+1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: PodOOMKilled
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: kubernetes
+        owner: payments-core-oncall
+        layer: compute
+        failure_mode: compute-pod-oom-killed
+        namespace: payments-cell-1
+        pod: router-7c9
+        container: router
+      exp_annotations:
+        summary: A container was OOMKilled and restarted
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pod-oom-killed
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments-cell-1",pod="router-7c9",container="router"}
+    values: '0x19'
+  - series: kube_pod_container_status_restarts_total{namespace="payments-cell-1",pod="router-7c9",container="router"}
+    values: 0+0x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: PodOOMKilled
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+    values: 1x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: PodsPendingTooLong
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-pods-pending-too-long
+        namespace: payments-cell-1
+      exp_annotations:
+        summary: Pods stay Pending for 15 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pods-pending-too-long
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+    values: '0x31'
+  alert_rule_test:
+  - &id002
+    eval_time: 27m
+    alertname: PodsPendingTooLong
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+    values: 0x9 1x1 0x19
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 24x26
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 24x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: HpaAtMaxReplicas
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: kubernetes
+        owner: payments-core-oncall
+        layer: compute
+        failure_mode: compute-hpa-at-max-replicas
+        namespace: payments-cell-1
+        horizontalpodautoscaler: router
+      exp_annotations:
+        summary: HPA stays at its maximum replicas for 10 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#hpa-at-max-replicas
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 10x26
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 24x26
+  alert_rule_test:
+  - &id003
+    eval_time: 22m
+    alertname: HpaAtMaxReplicas
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 10x9 24x1 10x14
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+    values: 24x9 24x1 24x14
+  alert_rule_test:
+  - *id003

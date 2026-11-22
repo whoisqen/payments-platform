@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-data-memorydb
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: data-memorydb
+    rules:
+    - alert: MemoryDbMemoryCritical
+      expr: max by (cell, instance) (redis_memory_used_bytes / redis_memory_max_bytes) > 0.85
+      for: 5m
+      labels:
+        severity: critical
+        team: data-platform
+        service: memorydb
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-memory-db-memory-critical
+      annotations:
+        summary: MemoryDB memory above 85%, evictions are near
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/memory-db-memory-critical.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: MemoryDbEvictions
+      expr: sum by (cell) (rate(redis_evicted_keys_total[5m])) > 0
+      for: 5m
+      labels:
+        severity: critical
+        team: data-platform
+        service: memorydb
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-memory-db-evictions
+      annotations:
+        summary: MemoryDB evicts keys
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/memory-db-evictions.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: MemoryDbFailoverDetected
+      expr: sum by (cell, shard) (increase(memorydb_failover_events_total[10m])) > 0
+      labels:
+        severity: warning
+        team: data-platform
+        service: memorydb
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-memory-db-failover-detected
+      annotations:
+        summary: A MemoryDB shard failed over
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#memory-db-failover-detected
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: CacheWarmRatioLow
+      expr: min by (cell) (cache_warm_ratio) < 0.75
+      for: 5m
+      labels:
+        severity: warning
+        team: payments-core
+        service: memorydb
+        owner: payments-core-oncall
+        layer: data
+        failure_mode: data-cache-warm-ratio-low
+      annotations:
+        summary: Cache warm ratio stays below 75% five minutes after readiness (non-paging)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#cache-warm-ratio-low
+        dashboard_url: https://grafana.payments.internal/d/data-stores

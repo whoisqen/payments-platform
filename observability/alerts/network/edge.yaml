@@ -1,0 +1,110 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-network-edge
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: network-edge
+    rules:
+    - alert: RegionDown
+      expr: count by (region) (probe_success{probe_target="region-health"} == 0) >= 2
+      for: 2m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-region-down
+      annotations:
+        summary: Region health endpoint fails from at least two of three independent probe points
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/region-down.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: GlobalAcceleratorEndpointUnhealthy
+      expr: min by (accelerator, endpoint_group) (aws_globalaccelerator_healthy_endpoint_count_minimum) < 1
+      for: 3m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-global-accelerator-endpoint-unhealthy
+      annotations:
+        summary: Global Accelerator endpoint group has no healthy endpoint
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/global-accelerator-endpoint-unhealthy.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: NatPortAllocationErrors
+      expr: sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum[5m])) > 0
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-nat-port-allocation-errors
+      annotations:
+        summary: NAT gateway cannot allocate ports, outbound PSP calls fail
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/nat-port-allocation-errors.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: Route53HealthCheckFailing
+      expr: min by (health_check_id) (aws_route53_health_check_status_minimum) < 1
+      for: 3m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-route53-health-check-failing
+      annotations:
+        summary: Route 53 health check reports unhealthy
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/route53-health-check-failing.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: WafBlockedRequestsHigh
+      expr: sum by (web_acl) (rate(aws_wafv2_blocked_requests_sum[5m])) > 100
+      for: 10m
+      labels:
+        severity: warning
+        team: security
+        service: edge
+        owner: security-oncall
+        layer: network
+        failure_mode: network-waf-blocked-requests-high
+      annotations:
+        summary: WAF blocks more than 100 requests per second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#waf-blocked-requests-high
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: NetworkFirewallDropsHigh
+      expr: sum by (firewall) (rate(aws_networkfirewall_dropped_packets_sum[5m])) > 1000
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-network-firewall-drops-high
+      annotations:
+        summary: Network Firewall drops more than 1000 packets per second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#network-firewall-drops-high
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: CloudFront5xxHigh
+      expr: max by (distribution) (aws_cloudfront_5xx_error_rate_average) > 5
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-cloud-front5xx-high
+      annotations:
+        summary: CloudFront 5xx error rate above 5%
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#cloud-front5xx-high
+        dashboard_url: https://grafana.payments.internal/d/edge

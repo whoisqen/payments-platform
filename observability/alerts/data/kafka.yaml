@@ -1,0 +1,54 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-data-kafka
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: data-kafka
+    rules:
+    - alert: KafkaConsumerLagHigh
+      expr: sum by (consumergroup, topic) (kafka_consumergroup_lag) > 100000
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: kafka
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-kafka-consumer-lag-high
+      annotations:
+        summary: Kafka consumer lag above 100000 messages
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-consumer-lag-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: KafkaUnderReplicatedPartitions
+      expr: max by (cluster) (kafka_server_replicamanager_underreplicatedpartitions) > 0
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: kafka
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-kafka-under-replicated-partitions
+      annotations:
+        summary: Kafka has under-replicated partitions
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-under-replicated-partitions
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: KafkaBrokerDiskHigh
+      expr: max by (broker_id) (aws_kafka_kafka_data_logs_disk_used_average) > 80
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: kafka
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-kafka-broker-disk-high
+      annotations:
+        summary: A Kafka broker disk is more than 80% full
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-broker-disk-high
+        dashboard_url: https://grafana.payments.internal/d/data-stores

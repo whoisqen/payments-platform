@@ -1,0 +1,101 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: network
+  id: network-region-down
+  component: probes
+  failure: working region unreachable from two independent probe points
+  impact: payments fail in the region; input to the switch decision of ADR-015
+  severity: critical
+  alert: RegionDown
+  signal: metric
+  detect_within: 5m
+- layer: network
+  id: network-global-accelerator-endpoint-unhealthy
+  component: global-accelerator
+  failure: no healthy endpoint behind Global Accelerator
+  impact: merchant traffic cannot enter the platform
+  severity: critical
+  alert: GlobalAcceleratorEndpointUnhealthy
+  signal: metric
+  detect_within: 6m
+- layer: network
+  id: network-nat-port-allocation-errors
+  component: nat-gateway
+  failure: NAT source port exhaustion
+  impact: calls to PSPs fail from the exhausted gateway, payments go to the unknown state
+  severity: critical
+  alert: NatPortAllocationErrors
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-certificate-expiry-critical
+  component: tls
+  failure: certificate about to expire
+  impact: clients and PSP webhooks reject the connection after expiry
+  severity: critical
+  alert: CertificateExpiryCritical
+  signal: metric
+  detect_within: 13m
+- layer: network
+  id: network-route53-health-check-failing
+  component: route53
+  failure: Route 53 health check failing
+  impact: DNS failover may route merchants to a wrong or no endpoint
+  severity: critical
+  alert: Route53HealthCheckFailing
+  signal: metric
+  detect_within: 6m
+- layer: network
+  id: network-psp-mtls-cert-expiring30d
+  component: psp-mtls
+  failure: PSP mTLS certificate about to expire
+  impact: calls to that PSP are rejected after expiry
+  severity: warning
+  alert: PspMtlsCertExpiring30d
+  signal: metric
+  detect_within: 13m
+- layer: network
+  id: network-waf-blocked-requests-high
+  component: waf
+  failure: WAF rule firing at a high rate
+  impact: an attack in progress or a rule that blocks legitimate merchants
+  severity: warning
+  alert: WafBlockedRequestsHigh
+  signal: metric
+  detect_within: 13m
+- layer: network
+  id: network-network-firewall-drops-high
+  component: network-firewall
+  failure: Network Firewall dropping traffic
+  impact: legitimate egress to a PSP may be blocked by a rule or domain list
+  severity: warning
+  alert: NetworkFirewallDropsHigh
+  signal: metric
+  detect_within: 13m
+- layer: network
+  id: network-cloud-front5xx-high
+  component: cloudfront
+  failure: CloudFront returns 5xx
+  impact: the merchant panel or static assets are unavailable
+  severity: warning
+  alert: CloudFront5xxHigh
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-dns-resolver-failures
+  component: route53-resolver
+  failure: Route 53 Resolver query failures inside the VPC
+  impact: services fail to resolve PSP and AWS endpoints
+  severity: warning
+  alert: null
+  signal: metric
+  reason: no resolver metric exporter yet
+- layer: network
+  id: network-tgw-attachment-down
+  component: transit-gateway
+  failure: Transit Gateway attachment down
+  impact: cells lose the path to the locker VPC
+  severity: critical
+  alert: null
+  signal: metric
+  reason: TGW attachment state metric is not in YACE config yet

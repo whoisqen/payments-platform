@@ -1,0 +1,216 @@
+rule_files:
+- ../../alerts/network/edge.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use1"}
+    values: '0x19'
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use2"}
+    values: '0x19'
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RegionDown
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-region-down
+        region: eu-central-1
+      exp_annotations:
+        summary: Region health endpoint fails from at least two of three independent probe points
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/region-down.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use1"}
+    values: 1x19
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use2"}
+    values: 1x19
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext"}
+    values: 1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RegionDown
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_globalaccelerator_healthy_endpoint_count_minimum{accelerator="payments-api",endpoint_group="euc1"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: GlobalAcceleratorEndpointUnhealthy
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-global-accelerator-endpoint-unhealthy
+        accelerator: payments-api
+        endpoint_group: euc1
+      exp_annotations:
+        summary: Global Accelerator endpoint group has no healthy endpoint
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/global-accelerator-endpoint-unhealthy.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_globalaccelerator_healthy_endpoint_count_minimum{accelerator="payments-api",endpoint_group="euc1"}
+    values: 2x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: GlobalAcceleratorEndpointUnhealthy
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_natgateway_error_port_allocation_sum{nat_gateway_id="nat-0a1"}
+    values: 0+10x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: NatPortAllocationErrors
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-nat-port-allocation-errors
+        nat_gateway_id: nat-0a1
+      exp_annotations:
+        summary: NAT gateway cannot allocate ports, outbound PSP calls fail
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/nat-port-allocation-errors.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_natgateway_error_port_allocation_sum{nat_gateway_id="nat-0a1"}
+    values: 0+0x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: NatPortAllocationErrors
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_route53_health_check_status_minimum{health_check_id="hc-api"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: Route53HealthCheckFailing
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-route53-health-check-failing
+        health_check_id: hc-api
+      exp_annotations:
+        summary: Route 53 health check reports unhealthy
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/route53-health-check-failing.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_route53_health_check_status_minimum{health_check_id="hc-api"}
+    values: 1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: Route53HealthCheckFailing
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_wafv2_blocked_requests_sum{web_acl="payments-api"}
+    values: 0+7200x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: WafBlockedRequestsHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: security
+        service: edge
+        owner: security-oncall
+        layer: network
+        failure_mode: network-waf-blocked-requests-high
+        web_acl: payments-api
+      exp_annotations:
+        summary: WAF blocks more than 100 requests per second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#waf-blocked-requests-high
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_wafv2_blocked_requests_sum{web_acl="payments-api"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: WafBlockedRequestsHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_networkfirewall_dropped_packets_sum{firewall="egress-prod"}
+    values: 0+90000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: NetworkFirewallDropsHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-network-firewall-drops-high
+        firewall: egress-prod
+      exp_annotations:
+        summary: Network Firewall drops more than 1000 packets per second
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#network-firewall-drops-high
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_networkfirewall_dropped_packets_sum{firewall="egress-prod"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: NetworkFirewallDropsHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_cloudfront_5xx_error_rate_average{distribution="control-center"}
+    values: 9x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: CloudFront5xxHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-cloud-front5xx-high
+        distribution: control-center
+      exp_annotations:
+        summary: CloudFront 5xx error rate above 5%
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#cloud-front5xx-high
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: aws_cloudfront_5xx_error_rate_average{distribution="control-center"}
+    values: 0.5x21
+  alert_rule_test:
+  - &id001
+    eval_time: 17m
+    alertname: CloudFront5xxHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_cloudfront_5xx_error_rate_average{distribution="control-center"}
+    values: 0.5x9 9x1 0.5x9
+  alert_rule_test:
+  - *id001
