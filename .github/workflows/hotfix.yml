@@ -1,0 +1,171 @@
+name: hotfix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, closed]
+    branches: [main, "release/**"]
+  push:
+    branches: ["release/**"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: version tag running in prod; creates release/<tag> from it
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: hotfix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    if: >-
+      github.event_name == 'pull_request' && github.event.action != 'closed' &&
+      contains(github.event.pull_request.labels.*.name, 'hotfix') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      tier: ${{ steps.tier.outputs.tier }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: no migrations in the fast pipeline
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '^vendor/(hyperswitch|card-vault)/migrations/'; then
+            echo "::error::a hotfix cannot carry a migration; use the planned release"
+            exit 1
+          fi
+      - name: tier
+        id: tier
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          if ! grep -qvE '^deploy/envs/[^/]+/images\.yaml$' <<<"$files"; then tier=rollback
+          elif ! grep -qv '^deploy/' <<<"$files"; then tier=config
+          else tier=code; fi
+          echo "tier=$tier" >>"$GITHUB_OUTPUT"
+          echo "hotfix tier: $tier" >>"$GITHUB_STEP_SUMMARY"
+      - name: two approvals
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TIER: ${{ steps.tier.outputs.tier }}
+        run: |
+          # a rollback to a digest that already ran in prod needs only the normal review
+          [ "$TIER" = rollback ] && exit 0
+          n=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --paginate --jq '[.[] | select(.state == "APPROVED") | .user.login]' | jq -s 'add | unique | length')
+          if [ "$n" -lt 2 ]; then echo "::error::a hotfix needs two approvals (SRE lead and on-call), found ${n}"; exit 1; fi
+
+  record:
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'hotfix')
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: incident issue with the change record for PCI DSS 6.5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          body=$(printf 'Hotfix merged by pull request #%s.\n\nChange record (PCI DSS 6.5): title, approvers and diff are in the pull request.\nPost-mortem is due after the incident.\n' "$PR")
+          gh issue create --repo "$REPO" --label incident --title "incident: hotfix #${PR}" --body "$body"
+          echo "recorded hotfix #${PR}: ${TITLE}" >>"$GITHUB_STEP_SUMMARY"
+
+  release-branch:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.PROMOTE_APP_ID }}
+          private-key: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+      - name: branch from the tag running in prod
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a version tag"; exit 1; }
+          if gh api "repos/${REPO}/git/ref/heads/release/${TAG}" >/dev/null 2>&1; then echo "release/${TAG} already exists"; exit 0; fi
+          sha=$(gh api "repos/${REPO}/commits/${TAG}" --jq .sha)
+          gh api "repos/${REPO}/git/refs" -f "ref=refs/heads/release/${TAG}" -f "sha=${sha}"
+
+  build:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/images.yml
+    with:
+      services: ""
+
+  full-ci:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  alert-full-ci:
+    needs: full-ci
+    if: github.event_name == 'push' && failure()
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: hold planned releases until the hotfix passes the full CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh issue create --repo "$REPO" --label hotfix-ci-failed --label incident \
+            --title "hotfix ${SHA:0:12} failed the full CI" --body "Planned releases are held until this passes."
+
+  backport:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.PROMOTE_APP_ID }}
+          private-key: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+      - name: pull request that returns the fix to main
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          existing=$(gh pr list --repo "$REPO" --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then echo "pull request #${existing} already open"; exit 0; fi
+          gh pr create --repo "$REPO" --base main --head "$BRANCH" --label backport \
+            --title "chore(ci): return ${BRANCH} to main" --body "Automatic return of a hotfix to main; the branch is deleted after 7 days."

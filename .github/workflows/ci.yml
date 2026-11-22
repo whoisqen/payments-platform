@@ -1,0 +1,251 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_call:
+
+permissions: {}
+
+# a stale PR run is cancelled; merge queue and called runs never are
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+
+jobs:
+  changes:
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      images: ${{ steps.paths.outputs.images }}
+      any_image: ${{ steps.paths.outputs.any_image }}
+      area_rust: ${{ steps.paths.outputs.area_rust }}
+      area_terraform: ${{ steps.paths.outputs.area_terraform }}
+      area_helm: ${{ steps.paths.outputs.area_helm }}
+      area_policy: ${{ steps.paths.outputs.area_policy }}
+      area_python: ${{ steps.paths.outputs.area_python }}
+      area_docker: ${{ steps.paths.outputs.area_docker }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: paths
+        run: python3 tools/ci/changed_images.py --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  lint-fast:
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: actionlint gitleaks shellcheck python
+      - run: make lint-workflows lint-repo
+      - name: gitleaks
+        run: gitleaks detect --no-banner --redact --log-opts "${BASE_SHA}..${HEAD_SHA}"
+
+  commitlint:
+    if: github.event_name != 'workflow_call'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: node
+      - run: npx --yes @commitlint/cli@19.6.0 --config commitlint.config.js --from "$BASE_SHA" --to "$HEAD_SHA"
+
+  spec-gate:
+    name: spec-gate
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 tools/lint/spec-gate --range "${BASE_SHA}..${HEAD_SHA}"
+
+  python:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_python == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: make lint-python test-python
+
+  rust:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_rust == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: vendor/hyperswitch
+            toolchain: 1.94.1
+            features: --features v1
+          - dir: vendor/card-vault
+            toolchain: 1.92.0
+            features: ""
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: toolchain
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal -c rustfmt,clippy
+          rustup default "$TOOLCHAIN"
+          cargo install --locked cargo-nextest
+      - name: fmt, clippy, tests
+        working-directory: ${{ matrix.dir }}
+        env:
+          FEATURES: ${{ matrix.features }}
+        run: |
+          cargo fmt --check
+          # shellcheck disable=SC2086
+          cargo clippy --locked --all-targets $FEATURES -- -D warnings
+          # shellcheck disable=SC2086
+          cargo nextest run --locked $FEATURES --no-fail-fast
+
+  terraform:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_terraform == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: terraform
+      - run: make lint-terraform test-terraform
+
+  helm:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_helm == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: helm kubeconform
+      - name: helm-unittest
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3 --verify=false
+      - run: make lint-helm test-helm
+
+  promotion:
+    needs: [changes]
+    if: needs.changes.outputs.area_helm == 'true' && github.event_name == 'pull_request'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: stage and prod take only digests of the previous environment
+        run: |
+          status=0
+          for pair in "dev stage" "stage prod"; do
+            read -r src dst <<<"$pair"
+            file="deploy/envs/${dst}/images.yaml"
+            [ -f "$file" ] || continue
+            git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "$file" && continue
+            before=$(mktemp)
+            git show "${BASE_SHA}:${file}" >"$before" 2>/dev/null || : >"$before"
+            python3 tools/ci/images_yaml.py verify "deploy/envs/${src}/images.yaml" "$before" "$file" || status=1
+          done
+          exit "$status"
+
+  policy:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_policy == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: opa kyverno conftest
+      - run: make test-policy
+
+  docker:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_docker == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: hadolint shellcheck conftest python
+      - run: make lint-docker
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, policy, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      # a job skipped by a path filter is fine; a failed or cancelled one is not
+      - name: check needs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          bad=$(jq -r 'to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key' <<<"$NEEDS")
+          if [ -n "$bad" ]; then
+            echo "::error::jobs not green: $(echo "$bad" | tr '\n' ' ')"
+            exit 1
+          fi

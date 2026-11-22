@@ -32,6 +32,7 @@ lint-workflows:
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
 	shellcheck docker/_common/collect-libs.sh scripts/*/*.sh
+	@if command -v hadolint >/dev/null; then hadolint --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi
 
 lint-terraform:
@@ -66,7 +67,7 @@ test-policy:
 
 plan: ## terraform plan of every component of ENV (default dev); needs AWS credentials of the plan role
 	@if [ ! -d infra/live/$(ENV) ]; then echo "skip plan: infra/live/$(ENV) does not exist"; exit 0; fi
-	cd infra/live/$(ENV) && terragrunt run-all plan --terragrunt-non-interactive -lock=false
+	cd infra/live/$(ENV) && terragrunt run --all --non-interactive -- plan -lock=false
 
 image-amd64: ## developer image for a laptop, loaded into the local docker; usage: make image-amd64 SERVICE=router
 	@test -n "$(SERVICE)" || { echo "SERVICE is required"; exit 2; }

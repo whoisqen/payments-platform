@@ -1,0 +1,159 @@
+name: tag
+
+# The only creator of v* tags; it runs after a prod rollout finished in all cells and builds nothing.
+on:
+  repository_dispatch:
+    types: [prod-rollout-complete]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: commit that runs in prod in all cells
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: tag
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      version: ${{ steps.next.outputs.version }}
+      bump: ${{ steps.next.outputs.bump }}
+    steps:
+      - id: sha
+        env:
+          DISPATCHED: ${{ github.event.client_payload.sha }}
+          INPUT: ${{ inputs.sha }}
+        run: |
+          sha=${INPUT:-$DISPATCHED}
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a commit sha"; exit 1; }
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: the commit is on main or on a release branch
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          if git merge-base --is-ancestor "$SHA" origin/main; then exit 0; fi
+          for b in $(git branch -r --list 'origin/release/*' --format='%(refname:short)'); do
+            if git merge-base --is-ancestor "$SHA" "$b"; then exit 0; fi
+          done
+          echo "::error::${SHA} is not on main or release/*"
+          exit 1
+      - id: next
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          existing=$(git tag --points-at "$SHA" --list 'v*' | head -n1)
+          if [ -n "$existing" ]; then
+            echo "version=$existing" >>"$GITHUB_OUTPUT"; echo "bump=none" >>"$GITHUB_OUTPUT"; exit 0
+          fi
+          out=$(python3 tools/ci/next_version.py --head "$SHA" --changelog-out changelog.md)
+          echo "version=$(jq -r .version <<<"$out")" >>"$GITHUB_OUTPUT"
+          echo "bump=$(jq -r .bump <<<"$out")" >>"$GITHUB_OUTPUT"
+          # the prod digests of this commit are what the release attaches evidence for
+          git show "${SHA}:deploy/envs/prod/images.yaml" >images.yaml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: steps.next.outputs.bump != 'none'
+        with:
+          name: release-notes
+          path: |
+            changelog.md
+            images.yaml
+          retention-days: 14
+
+  evidence:
+    needs: version
+    if: needs.version.outputs.bump != 'none'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: cosign
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ECR_READ }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+      - name: sbom and provenance of every prod digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          PREFIX: ${{ vars.ECR_REPO_PREFIX }}
+        run: |
+          mkdir -p evidence
+          grep -oP '^  \K[a-z-]+: sha256:[a-f0-9]{64}$' images.yaml | while IFS=': ' read -r svc digest; do
+            ref="${REGISTRY}/${PREFIX}/${svc}@${digest}"
+            cosign download attestation "$ref" |
+              jq -c 'select((.payload | @base64d | fromjson).predicateType | test("cyclonedx")) | .payload | @base64d | fromjson | .predicate' \
+                >"evidence/sbom-${svc}.cdx.json"
+            gh attestation download "oci://${ref}" --repo "$REPO"
+            mv "${digest}.jsonl" "evidence/provenance-${svc}.jsonl"
+          done
+          [ -n "$(ls evidence)" ] || { echo "::error::no evidence found"; exit 1; }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-evidence
+          path: evidence
+          retention-days: 14
+
+  publish:
+    needs: [version, evidence]
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.TAGGING_APP_ID }}
+          private-key: ${{ secrets.TAGGING_APP_PRIVATE_KEY }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-evidence
+          path: evidence
+      - name: tag and release
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.version.outputs.sha }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad version"; exit 1; }
+          current=$(gh api "repos/${REPO}/git/ref/tags/${VERSION}" --jq .object.sha 2>/dev/null || true)
+          if [ -z "$current" ]; then
+            gh api "repos/${REPO}/git/refs" -f "ref=refs/tags/${VERSION}" -f "sha=${SHA}" >/dev/null
+          elif [ "$current" != "$SHA" ]; then
+            echo "::error::${VERSION} already points at ${current}, tags are never moved"
+            exit 1
+          fi
+          if gh release view "$VERSION" --repo "$REPO" >/dev/null 2>&1; then echo "release ${VERSION} exists"; exit 0; fi
+          gh release create "$VERSION" --repo "$REPO" --verify-tag --title "$VERSION" --notes-file changelog.md images.yaml evidence/*

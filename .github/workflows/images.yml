@@ -1,0 +1,191 @@
+name: images
+
+on:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      services:
+        description: JSON list of services to build; empty means the changed ones
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      services:
+        description: JSON list of services to build; empty means the changed ones
+        type: string
+        default: ""
+
+permissions: {}
+
+# publication and signing are never cancelled half way
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PLATFORMS: linux/arm64,linux/amd64
+
+jobs:
+  select:
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      services: ${{ steps.pick.outputs.services }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: pick
+        env:
+          REQUESTED: ${{ inputs.services }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$REQUESTED" ]; then
+            services=$(jq -c --argjson all '["router","drainer","scheduler","locker","control-center"]' '[.[] | select(. as $s | $all | index($s))]' <<<"$REQUESTED")
+          else
+            services=$(python3 tools/ci/changed_images.py --base "$BEFORE_SHA" --head "$AFTER_SHA" | jq -c .images)
+          fi
+          echo "services=$services" >>"$GITHUB_OUTPUT"
+          echo "any=$(jq 'length > 0' <<<"$services")" >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: select
+    if: needs.select.outputs.any == 'true'
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.select.outputs.services) }}
+    env:
+      SERVICE: ${{ matrix.service }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: cosign syft trivy container-structure-test python
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ECR_PUSH }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+      - name: inputs of this image
+        run: |
+          # the last commit that touched the image inputs fixes timestamps, so unchanged code gives the same digest
+          mapfile -t paths < <(python3 tools/ci/changed_images.py --paths "$SERVICE")
+          sha=$(git log -1 --format=%H -- "${paths[@]}")
+          {
+            echo "INPUT_SHA=$sha"
+            echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct "$sha")"
+            echo "IMAGE=${REGISTRY}/${PREFIX}/${SERVICE}"
+            echo "CACHE=${REGISTRY}/${PREFIX}-cache/${SERVICE}:buildcache"
+          } >>"$GITHUB_ENV"
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          PREFIX: ${{ vars.ECR_REPO_PREFIX }}
+      - name: reuse an image already built from these inputs
+        id: exists
+        env:
+          REPOSITORY: ${{ vars.ECR_REPO_PREFIX }}/${{ matrix.service }}
+        run: |
+          # ECR tags are immutable, so a re-run of the same inputs must reuse the digest
+          digest=$(aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$INPUT_SHA" \
+            --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)
+          if [[ $digest == sha256:* ]]; then echo "digest=$digest" >>"$GITHUB_OUTPUT"; fi
+      - name: build and push
+        id: build
+        if: steps.exists.outputs.digest == ''
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/aws"
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\naws_session_token=%s\n' \
+            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$AWS_SESSION_TOKEN" >"$RUNNER_TEMP/aws/credentials"
+          mapfile -t common < <(sed 's/^/--build-arg=/' docker/_common/build-args.env)
+          docker buildx build "${common[@]}" \
+            --file "docker/${SERVICE}/Dockerfile" \
+            --platform "$PLATFORMS" \
+            --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
+            --build-arg "REVISION=${INPUT_SHA}" \
+            --build-arg "CREATED=$(date -u -d "@${SOURCE_DATE_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg "SOURCE_URL=${REPO_URL}" \
+            --build-arg "SCCACHE_BUCKET=${SCCACHE_BUCKET}" \
+            --build-arg "SCCACHE_REGION=${AWS_REGION}" \
+            --secret "id=aws,src=${RUNNER_TEMP}/aws/credentials" \
+            --cache-from "type=registry,ref=${CACHE}" \
+            --cache-to "type=registry,ref=${CACHE},mode=max,image-manifest=true,oci-mediatypes=true" \
+            --output "type=image,name=${IMAGE}:${INPUT_SHA},push=true,rewrite-timestamp=true,oci-mediatypes=true" \
+            --metadata-file "$RUNNER_TEMP/meta.json" \
+            .
+          rm -rf "$RUNNER_TEMP/aws"
+          echo "digest=$(python3 tools/ci/digest_compare.py metadata "$RUNNER_TEMP/meta.json")" >>"$GITHUB_OUTPUT"
+        env:
+          SCCACHE_BUCKET: ${{ vars.SCCACHE_BUCKET }}
+      - name: digest of this image
+        run: echo "DIGEST=${BUILT:-$REUSED}" >>"$GITHUB_ENV"
+        env:
+          BUILT: ${{ steps.build.outputs.digest }}
+          REUSED: ${{ steps.exists.outputs.digest }}
+      - name: trivy blocks on critical findings
+        run: trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --format sarif --output "$RUNNER_TEMP/trivy.sarif" "${IMAGE}@${DIGEST}"
+      - name: structure test
+        if: matrix.service != 'control-center'
+        run: |
+          sed "s|\${SERVICE}|${SERVICE}|" docker/_common/structure-test.yaml >"$RUNNER_TEMP/structure-test.yaml"
+          docker pull "${IMAGE}@${DIGEST}"
+          container-structure-test test --image "${IMAGE}@${DIGEST}" --config "$RUNNER_TEMP/structure-test.yaml"
+      - name: sbom
+        run: syft "${IMAGE}@${DIGEST}" -o "cyclonedx-json=$RUNNER_TEMP/sbom.cdx.json"
+      - name: sign and attach the sbom
+        run: |
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+          cosign attest --yes --type cyclonedx --predicate "$RUNNER_TEMP/sbom.cdx.json" "${IMAGE}@${DIGEST}"
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ env.DIGEST }}
+          push-to-registry: true
+      - name: record the digest
+        run: |
+          jq -n --arg s "$SERVICE" --arg d "$DIGEST" '{($s): $d}' >"$RUNNER_TEMP/digest-${SERVICE}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digest-${{ matrix.service }}
+          path: ${{ runner.temp }}/digest-${{ matrix.service }}.json
+          retention-days: 14
+
+  collect:
+    needs: build
+    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+      - name: one file with every digest of this run
+        run: jq -s 'add' digests/*.json >digests.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digests
+          path: digests.json
+          retention-days: 14
