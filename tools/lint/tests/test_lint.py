@@ -472,6 +472,15 @@ class StructureLintTest(unittest.TestCase):
         self.assertIn(". holds 15 files (limit 14)", out)
 
 
+    def test_progress_directory_is_exempt(self):
+        root = Path(tempfile.mkdtemp(prefix="structure-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        d = root / "specs" / "001-x" / "progress"
+        d.mkdir(parents=True)
+        for i in range(12):
+            (d / f"T{i}.md").write_text("x", encoding="utf-8")
+        self.assertEqual(run(REPO / "tools" / "lint" / "structure", root)[0], 0)
+
 SMALL = """---
 id: 001-example
 tier: small

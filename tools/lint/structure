@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when a directory holds more than LIMIT files (README.md excluded; the repository root allows ROOT_LIMIT); vendor/ and .claude/ are exempt."""
+"""Fail when a directory holds more than LIMIT files (README.md excluded; the repository root allows ROOT_LIMIT); vendor/, .claude/ and specs/*/progress/ (one file per task) are exempt."""
 import os
 import sys
 from pathlib import Path
@@ -16,6 +16,8 @@ for d, dirs, files in os.walk(ROOT):
     n = len([f for f in files if f != "README.md"])
     rel = Path(d).relative_to(ROOT).as_posix()
     limit = ROOT_LIMIT if rel == "." else LIMIT
+    if rel.startswith("specs/") and rel.endswith("/progress"):
+        continue
     if n > limit:
         bad.append((rel, n, limit))
 for d, n, limit in bad:
