@@ -4,6 +4,7 @@ templates:
   - autoscaling.yaml
   - pdb.yaml
   - istio/authorizationpolicy.yaml
+  - securitygrouppolicy.yaml
 set:
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
@@ -52,3 +53,19 @@ tests:
       image.digest: latest
     asserts:
       - failedTemplate: {}
+  - it: attaches the locker pod security group to the locker pods
+    template: securitygrouppolicy.yaml
+    set:
+      securityGroupPolicy.securityGroupIds: [sg-0123456789abcdef0]
+    asserts:
+      - isKind:
+          of: SecurityGroupPolicy
+      - equal:
+          path: apiVersion
+          value: vpcresources.k8s.aws/v1beta1
+      - equal:
+          path: spec.securityGroups.groupIds
+          value: [sg-0123456789abcdef0]
+      - equal:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/component"]
+          value: locker

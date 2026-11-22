@@ -87,3 +87,8 @@ istio:
     enabled: true
     principals:
       - cluster.local/ns/payments/sa/router
+
+# Per-cluster locker_pod security group (Terraform output locker_pod_security_group_id), attached to the pod ENI
+securityGroupPolicy:
+  securityGroupIds:
+    - REPLACE_LOCKER_POD_SG_ID
