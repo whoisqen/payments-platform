@@ -6,6 +6,8 @@ tests:
   input_series:
   - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
     values: 1x21
+  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+    values: 1x21
   alert_rule_test:
   - eval_time: 17m
     alertname: CrashLoopBackOff
@@ -19,6 +21,7 @@ tests:
         failure_mode: compute-crash-loop-back-off
         namespace: payments-cell-1
         pod: router-7c9
+        node: ip-10-0-1-11
       exp_annotations:
         summary: A payments pod is in CrashLoopBackOff
         runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/crash-loop-back-off.md
@@ -27,6 +30,8 @@ tests:
   input_series:
   - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
     values: '0x21'
+  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+    values: 1x21
   alert_rule_test:
   - &id001
     eval_time: 17m
@@ -36,6 +41,8 @@ tests:
   input_series:
   - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
     values: 0x9 1x1 0x9
+  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+    values: 1x9 1x1 1x9
   alert_rule_test:
   - *id001
 - interval: 1m

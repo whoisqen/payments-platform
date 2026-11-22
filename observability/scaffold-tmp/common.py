@@ -225,7 +225,7 @@ def emit():
             write(f"observability/alerts/{layer}/{group}.yaml", render_rules(layer, group, items))
         write(f"observability/tests/{layer}/{group}.test.yaml", render_tests(layer, group, items, f"../../alerts/{layer}/{group}.yaml"))
     layers = sorted({al["layer"] for al in ALL})
-    order = {"network": "01", "compute": "02", "data": "03", "application": "05", "security-pci": "06", "backup-dr": "08"}
+    order = {"network": "01", "compute": "02", "data": "03", "application": "05", "security-pci": "06", "backup-dr": "08", "meta": "09"}
     for layer in layers:
         pag = [al for al in ALL if al["layer"] == layer and al["sev"] in PAGING]
         non = [al for al in ALL if al["layer"] == layer and al["sev"] not in PAGING]

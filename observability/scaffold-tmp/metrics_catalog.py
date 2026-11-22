@@ -33,6 +33,7 @@ SOURCES = [
     (r"^pan_detected", "otel-collector"),
     (r"^finops_", "cost-exporter"),
     (r"^argocd_", "argocd"),
+    (r"^(alertmanager_|prometheus_)", "prometheus"),
 ]
 
 

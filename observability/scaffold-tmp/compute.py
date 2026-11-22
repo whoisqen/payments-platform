@@ -3,10 +3,10 @@ from common import a, gap
 L = "compute"
 
 a(layer=L, group="workloads", name="CrashLoopBackOff", sev="critical", team="platform", svc="kubernetes", comp="pods", dash="kubernetes",
-  expr='max by (namespace, pod) (kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace=~"payments-.*"}) == 1', f="5m",
+  expr='max by (namespace, pod, node) (kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace=~"payments-.*"} * on (namespace, pod) group_left (node) kube_pod_info) == 1', f="5m",
   sum="A payments pod is in CrashLoopBackOff",
-  series=[('kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}', "1x{n}", "0x{n}")],
-  labels={"namespace": "payments-cell-1", "pod": "router-7c9"},
+  series=[('kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}', "1x{n}", "0x{n}"), ('kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}', "1x{n}", "1x{n}")],
+  labels={"namespace": "payments-cell-1", "pod": "router-7c9", "node": "ip-10-0-1-11"},
   failure="pod crash loop in a payments namespace", impact="reduced capacity of router, locker, drainer or scheduler; a cell can lose its drainer",
   sym="A container of a payments namespace has been in CrashLoopBackOff for 5 minutes.",
   diag=["Read the last termination reason and exit code with `kubectl describe` through the diagnostic document.", "Check the rollout that started it: ArgoCD history and the digest of the image.", "Check dependencies in the logs: MemoryDB, Aurora, Vault, locker."],

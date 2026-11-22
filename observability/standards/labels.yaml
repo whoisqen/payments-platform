@@ -1,0 +1,31 @@
+# Allowlist of metric labels; the budget is 2 million active series per region.
+allowed:
+  - env
+  - region
+  - cell
+  - service
+  - psp
+  - dependency
+  - route
+  - code
+  - outcome
+  - kind
+  - store
+  - stream
+  - queue
+  - namespace
+  - pod
+  - node
+  - le
+# Allowed only in aggregated recording rules, never on raw series.
+aggregated_only:
+  - merchant_id
+forbidden:
+  - payment_id
+  - customer_id
+  - token
+  - pan
+  - card_number
+  - cvv
+  - idempotency_key
+  - trace_id

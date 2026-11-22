@@ -1,0 +1,47 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: meta
+  id: meta-watchdog
+  component: watchdog
+  failure: alert pipeline silent (dead man's switch)
+  impact: alerts may not reach anyone; an external service pages when the heartbeat stops
+  severity: none
+  alert: Watchdog
+  signal: metric
+  detect_within: 3m
+- layer: meta
+  id: meta-alertmanager-notifications-failing
+  component: alertmanager
+  failure: notification delivery failing
+  impact: pages or Slack messages are lost
+  severity: critical
+  alert: AlertmanagerNotificationsFailing
+  signal: metric
+  detect_within: 8m
+- layer: meta
+  id: meta-prometheus-rule-evaluation-failing
+  component: prometheus
+  failure: rule evaluation failing
+  impact: alerts of the group do not fire
+  severity: warning
+  alert: PrometheusRuleEvaluationFailing
+  signal: metric
+  detect_within: 8m
+- layer: meta
+  id: meta-active-series-budget-exceeded
+  component: cardinality
+  failure: cardinality budget exceeded
+  impact: cost and query slowness; a label with unbounded values is the usual cause
+  severity: warning
+  alert: ActiveSeriesBudgetExceeded
+  signal: metric
+  detect_within: 18m
+- layer: meta
+  id: meta-alloy-not-forwarding
+  component: alloy
+  failure: Alloy stops forwarding telemetry to the central stack
+  impact: metrics, logs and traces of a cluster go missing
+  severity: critical
+  alert: null
+  signal: metric
+  reason: needs the Alloy self-metrics in the metrics catalog
