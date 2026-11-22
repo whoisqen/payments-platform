@@ -2,7 +2,7 @@
 tag_schema:
   environment:
     required: true
-    values: [dev, stage, prod]
+    values: [dev, stage, prod, shared-services]
   team:
     required: true
     values: [payments-core, platform, security, data]
