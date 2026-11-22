@@ -41,7 +41,12 @@ lint-terraform:
 
 lint-helm:
 	@if [ -z "$(CHARTS)" ]; then echo "skip helm: deploy/charts is empty"; exit 0; fi
-	@for c in $(CHARTS); do helm lint $$c && helm template $$c | kubeconform -strict -ignore-missing-schemas -summary; done
+	@for c in $(CHARTS); do \
+		f=$$c/ci/lint-values.yaml; v=""; [ -f $$f ] && v="-f $$f"; \
+		helm dependency build $$c >/dev/null || exit 1; \
+		helm lint $$c $$v || exit 1; \
+		grep -q '^type: library' $$c/Chart.yaml || helm template $$c $$v | kubeconform -strict -ignore-missing-schemas -summary || exit 1; \
+	done
 
 lint-python:
 	python3 -m py_compile $$(find tools scripts -name '*.py' -not -path '*/node_modules/*')
