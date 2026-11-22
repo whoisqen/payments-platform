@@ -196,6 +196,34 @@ class FailoverTest(unittest.TestCase):
         rec = [c for c in fake.calls if c[2] == "start_automation_execution" and c[3]["DocumentName"] == "dr-psp-reconcile"]
         self.assertEqual(rec[0][3]["Parameters"]["WindowMinutes"], ["5"])
 
+    def test_client_token_is_a_stable_uuid(self):
+        import uuid
+        a = fo.client_token("inc-42-" + "x" * 60, "fence-router")
+        self.assertEqual(str(uuid.UUID(a)), a)
+        self.assertEqual(a, fo.client_token("inc-42-" + "x" * 60, "fence-router"))
+        self.assertNotEqual(a, fo.client_token("inc-42-" + "x" * 60, "memorydb"))
+        self.assertNotEqual(fo.client_token("inc-42-" + "x" * 59 + "y", "fence-router"), a)
+
+    def test_lock_defaults_to_a_recovery_region(self):
+        self.assertNotEqual(fo.parse_args(ARGS).lock_region, "eu-central-1")
+
+    def test_missing_target_endpoint_group_is_rejected_at_parse_time(self):
+        args = list(ARGS)
+        i = args.index(f"us-east-2={USE2_EG}")
+        del args[i - 1:i + 1]
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            fo.parse_args(args)
+
+    def test_unreachable_control_plane_is_a_logged_failure(self):
+        def boom(service, region):
+            raise ConnectionError("endpoint unreachable")
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = fo.main(ARGS, client=boom)
+        self.assertEqual(code, 1)
+        self.assertIn('"event": "error"', out.getvalue())
+
     def test_logs_are_json_lines(self):
         import json
         fake = Fake()

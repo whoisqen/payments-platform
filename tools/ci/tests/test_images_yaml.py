@@ -30,6 +30,20 @@ class ImagesYamlTest(unittest.TestCase):
         self.assertEqual(iy.promotion_violations({"router": A}, {"router": B}, {"router": A}), [])
         self.assertEqual(len(iy.promotion_violations({"router": A}, {"router": A}, {"router": B})), 1)
 
+    def test_rollback_to_a_digest_that_ran_before_is_allowed(self):
+        self.assertEqual(iy.promotion_violations({"router": A}, {"router": A}, {"router": B}, {B}), [])
+
+    def test_history_file_is_read_by_the_cli(self):
+        with tempfile.TemporaryDirectory() as d:
+            files = {n: Path(d) / n for n in ("src", "before", "after", "hist")}
+            files["src"].write_text(iy.render({"router": A}))
+            files["before"].write_text(iy.render({"router": A}))
+            files["after"].write_text(iy.render({"router": B}))
+            files["hist"].write_text(f"- router: {B}\n")
+            args = ["verify", str(files["src"]), str(files["before"]), str(files["after"])]
+            self.assertEqual(iy.main(args), 1)
+            self.assertEqual(iy.main(args + ["--history", str(files["hist"])]), 0)
+
     def test_unchanged_entry_is_not_a_violation(self):
         self.assertEqual(iy.promotion_violations({}, {"router": B}, {"router": B}), [])
 

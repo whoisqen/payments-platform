@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+DIGEST_ANY = re.compile(r"sha256:[a-f0-9]{64}")
 SERVICES = ["router", "drainer", "scheduler", "locker", "control-center"]
 ENVS = ["dev", "stage", "prod"]
 
@@ -39,11 +40,11 @@ def update(current, changes):
     return {**current, **changes}
 
 
-def promotion_violations(source, before, after):
-    # stage and prod take exactly the digest that passed the previous environment
+def promotion_violations(source, before, after, history=()):
+    # stage and prod take the digest of the previous environment; a digest that already ran here is a rollback
     bad = []
     for name, digest in after.items():
-        if before.get(name) != digest and source.get(name) != digest:
+        if before.get(name) != digest and source.get(name) != digest and digest not in history:
             bad.append(f"{name}: {digest} is not the digest of the previous environment")
     return bad
 
@@ -69,10 +70,12 @@ def main(argv=None):
     v.add_argument("source")
     v.add_argument("before")
     v.add_argument("file")
+    v.add_argument("--history", help="file with digests that already ran in the target environment")
     ns = ap.parse_args(argv)
 
     if ns.cmd == "verify":
-        bad = promotion_violations(load(ns.source), load(ns.before), load(ns.file))
+        history = set(DIGEST_ANY.findall(Path(ns.history).read_text(encoding="utf-8"))) if ns.history else set()
+        bad = promotion_violations(load(ns.source), load(ns.before), load(ns.file), history)
         for b in bad:
             print(f"images-yaml: error: {b}")
         return 1 if bad else 0

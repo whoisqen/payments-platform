@@ -50,5 +50,27 @@ class NextVersionTest(unittest.TestCase):
         self.assertEqual(nv.parse_commit("a" * 40, "Merge stuff", "")["type"], "other")
 
 
+class LatestTagTest(unittest.TestCase):
+    def test_nearest_ancestor_not_highest_tag(self):
+        import os
+        import subprocess
+        import tempfile
+
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.test", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@example.test", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+        with tempfile.TemporaryDirectory() as d:
+            def git(*a):
+                return subprocess.run(["git", *a], cwd=d, env=env, capture_output=True, text=True, check=True).stdout.strip()
+
+            git("init", "-q", "-b", "main")
+            git("commit", "-q", "--allow-empty", "-m", "one")
+            git("tag", "v1.0.0")
+            base = git("rev-parse", "HEAD")
+            git("commit", "-q", "--allow-empty", "-m", "two")
+            git("tag", "v2.0.0")
+            self.assertEqual(nv.latest_tag("HEAD", cwd=d), "v2.0.0")
+            self.assertEqual(nv.latest_tag(base, cwd=d), "v1.0.0")
+
+
 if __name__ == "__main__":
     unittest.main()

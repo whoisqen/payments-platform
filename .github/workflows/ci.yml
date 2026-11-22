@@ -2,7 +2,7 @@ name: ci
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
   workflow_call:
 
@@ -185,8 +185,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: stage and prod take only digests of the previous environment
+      - name: stage and prod take the digests of the previous environment
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
+          # an incident change (rollback or hotfix) is reviewed by its own approvals, not by this ordering
+          if [[ ",${LABELS}," == *,hotfix,* ]]; then echo "hotfix label: promotion order is not checked"; exit 0; fi
           status=0
           for pair in "dev stage" "stage prod"; do
             read -r src dst <<<"$pair"
@@ -194,10 +198,39 @@ jobs:
             [ -f "$file" ] || continue
             git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "$file" && continue
             before=$(mktemp)
+            history=$(mktemp)
             git show "${BASE_SHA}:${file}" >"$before" 2>/dev/null || : >"$before"
-            python3 tools/ci/images_yaml.py verify "deploy/envs/${src}/images.yaml" "$before" "$file" || status=1
+            # a digest that already ran in this environment is a rollback and is allowed
+            git log -p "$BASE_SHA" -- "$file" >"$history"
+            python3 tools/ci/images_yaml.py verify "deploy/envs/${src}/images.yaml" "$before" "$file" --history "$history" || status=1
           done
           exit "$status"
+
+  hotfix-guard:
+    needs: [changes]
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'hotfix')
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: no migrations in the fast pipeline
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '^vendor/(hyperswitch|card-vault)/migrations/'; then
+            echo "::error::a hotfix cannot carry a migration; use the planned release"
+            exit 1
+          fi
+      - name: tier
+        run: |
+          files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          if ! grep -qvE '^deploy/envs/[^/]+/images\.yaml$' <<<"$files"; then tier=rollback
+          elif ! grep -qv '^deploy/' <<<"$files"; then tier=config
+          else tier=code; fi
+          echo "hotfix tier: ${tier}" >>"$GITHUB_STEP_SUMMARY"
 
   policy:
     needs: [changes, lint-fast]
@@ -234,7 +267,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, policy, docker]
+    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, hotfix-guard, policy, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

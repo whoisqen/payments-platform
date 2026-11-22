@@ -118,6 +118,39 @@ class MigrateMerchantTest(unittest.TestCase):
         code, _ = run(Fake(cell="cell-3"))
         self.assertEqual(code, mm.EXIT_ABORTED)
 
+    def test_delta_copy_waits_for_the_route_cache(self):
+        fake = Fake()
+        stamps = {}
+        orig = Client.__getattr__
+
+        def spy(self, name):
+            fn = orig(self, name)
+
+            def call(**kw):
+                if name == "update_item" and kw["UpdateExpression"].startswith("SET frozen = :t"):
+                    stamps["freeze"] = self.fake.t
+                if name == "start_automation_execution" and "freeze" in stamps and "delta" not in stamps:
+                    stamps["delta"] = self.fake.t
+                return fn(**kw)
+            return call
+
+        Client.__getattr__ = spy
+        self.addCleanup(setattr, Client, "__getattr__", orig)
+        code, _ = run(fake)
+        self.assertEqual(code, 0)
+        self.assertGreaterEqual(stamps["delta"] - stamps["freeze"], 60)
+
+    def test_freeze_shorter_than_the_route_cache_is_rejected(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            mm.parse_args(ARGS + ["--max-freeze-s", "30"])
+
+    def test_client_token_is_a_stable_uuid(self):
+        import uuid
+        t = mm.client_token("mig-7", "copy")
+        self.assertEqual(str(uuid.UUID(t)), t)
+        self.assertEqual(t, mm.client_token("mig-7", "copy"))
+        self.assertNotEqual(t, mm.client_token("mig-7", "verify"))
+
     def test_dry_run_changes_nothing(self):
         fake = Fake()
         code, out = run(fake, ["--dry-run"])

@@ -3,7 +3,9 @@ import argparse
 import json
 import sys
 import time
+import uuid
 
+TOKEN_NAMESPACE = uuid.UUID("3b9d5a52-8e1c-5f47-b0a3-6c2e9d4f7a11")
 EXIT_ABORTED, EXIT_MISMATCH = 2, 3
 
 
@@ -13,6 +15,11 @@ class Aborted(Exception):
 
 def error_code(exc):
     return getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+
+
+def client_token(run_id, step):
+    # SSM requires a UUID, and uuid5 keeps one token per run and step across re-runs
+    return str(uuid.uuid5(TOKEN_NAMESPACE, f"{run_id}/{step}"))
 
 
 def log(event, **fields):
@@ -48,7 +55,7 @@ class Migration:
             return
         params = {"Merchant": [self.a.merchant], "SourceCell": [self.a.source_cell], "TargetCell": [self.a.target_cell]}
         # the client token makes a re-run of the same step return the same execution
-        ex = self.ssm.start_automation_execution(DocumentName=document, Parameters=params, ClientToken=f"{self.a.run_id}-{step}"[:36])["AutomationExecutionId"]
+        ex = self.ssm.start_automation_execution(DocumentName=document, Parameters=params, ClientToken=client_token(self.a.run_id, step))["AutomationExecutionId"]
         end = self.now() + self.a.step_timeout_s
         while True:
             status = self.ssm.get_automation_execution(AutomationExecutionId=ex)["AutomationExecution"]["AutomationExecutionStatus"]
@@ -114,9 +121,12 @@ class Migration:
         if state["cell"] != self.a.source_cell:
             raise Aborted(f"merchant is in {state['cell']}, not in {self.a.source_cell}")
         self.run_document("cell-copy-merchant", "copy")
-        started = self.now()
         self.freeze()
+        started = self.now()
         try:
+            # gateways cache the route, so writes may still reach the source cell until the cache expires
+            if self.act("wait-route-cache", seconds=self.a.route_cache_ttl_s):
+                self.sleep(self.a.route_cache_ttl_s)
             self.run_document("cell-copy-merchant", "copy-delta")
             if not self.a.dry_run:
                 self.wait_drained()
@@ -138,13 +148,17 @@ def parse_args(argv):
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--region", default="eu-central-1")
     ap.add_argument("--routing-table", default="pay-prod-euc1-merchant-routing")
-    ap.add_argument("--max-freeze-s", type=int, default=30)
+    ap.add_argument("--route-cache-ttl-s", type=int, default=60)
+    ap.add_argument("--max-freeze-s", type=int, default=120)
     ap.add_argument("--max-drain-lag-s", type=float, default=0.5)
     ap.add_argument("--drain-wait-s", type=int, default=20)
     ap.add_argument("--step-timeout-s", type=int, default=1800)
     ap.add_argument("--poll-s", type=int, default=10)
     ap.add_argument("--dry-run", action="store_true")
-    return ap.parse_args(argv)
+    ns = ap.parse_args(argv)
+    if ns.max_freeze_s <= ns.route_cache_ttl_s:
+        ap.error("--max-freeze-s must exceed --route-cache-ttl-s, or the freeze ends before the gateways see it")
+    return ns
 
 
 def main(argv=None, **kw):

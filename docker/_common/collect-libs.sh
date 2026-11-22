@@ -4,6 +4,7 @@ set -euo pipefail
 
 bin=${1:?binary}
 out=${2:?out dir}
+mkdir -p "$out"
 skip='/(ld-linux[^/]*|libc|libm|libdl|libpthread|librt|libutil|libresolv|libgcc_s|libstdc\+\+)\.so'
 
 ldd "$bin" | awk '/=> \//{print $3}' | while read -r lib; do

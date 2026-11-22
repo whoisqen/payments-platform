@@ -83,12 +83,11 @@ def git_log(last_tag, head):
     return out.stdout
 
 
-def latest_tag():
-    out = subprocess.run(["git", "tag", "--list", "v*", "--sort=-v:refname"], cwd=ROOT, capture_output=True, text=True, check=True)
-    for t in out.stdout.split():
-        if TAG.match(t):
-            return t
-    return None
+def latest_tag(head="HEAD", cwd=ROOT):
+    # the nearest ancestor tag, so a release/* branch is versioned against its own history
+    out = subprocess.run(["git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", head], cwd=cwd, capture_output=True, text=True)
+    tag = out.stdout.strip()
+    return tag if out.returncode == 0 and TAG.match(tag) else None
 
 
 def main(argv=None):
@@ -98,7 +97,7 @@ def main(argv=None):
     ap.add_argument("--log-file", help="read the git log from this file instead of running git")
     ap.add_argument("--changelog-out")
     ns = ap.parse_args(argv)
-    last = latest_tag() if ns.last_tag is None else (None if ns.last_tag == "none" else ns.last_tag)
+    last = latest_tag(ns.head) if ns.last_tag is None else (None if ns.last_tag == "none" else ns.last_tag)
     raw = Path(ns.log_file).read_text(encoding="utf-8") if ns.log_file else git_log(last, ns.head)
     commits = parse_log(raw)
     if not commits and last:

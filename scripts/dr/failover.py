@@ -3,7 +3,9 @@ import argparse
 import json
 import sys
 import time
+import uuid
 
+TOKEN_NAMESPACE = uuid.UUID("6f2c1b7e-4d3a-5c1e-9a64-0d5b8e7f1a20")
 SHORT = {"eu-central-1": "euc1", "us-east-1": "use1", "us-east-2": "use2"}
 FENCE_SID = "sid:900001"
 FENCE_RULE = f'drop tcp any any -> any any (msg:"dr fence"; {FENCE_SID}; rev:1;)'
@@ -21,6 +23,11 @@ class LockHeld(Exception):
 
 def error_code(exc):
     return getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+
+
+def client_token(run_id, step):
+    # SSM requires a UUID, and uuid5 keeps one token per run and step across re-runs
+    return str(uuid.uuid5(TOKEN_NAMESPACE, f"{run_id}/{step}"))
 
 
 def log(event, **fields):
@@ -79,7 +86,7 @@ class Failover:
     def run_document(self, region, document, params, step, timeout_s=None):
         ssm = self.client("ssm", region)
         # the client token makes a re-run of the same step return the same execution
-        token = f"{self.a.run_id}-{step}"[:36]
+        token = client_token(self.a.run_id, step)
         if not self.act(step, document=document, region=region):
             return None
         try:
@@ -227,8 +234,8 @@ def parse_args(argv):
     ap.add_argument("--source-region", default="eu-central-1")
     ap.add_argument("--target-region", default="us-east-1")
     ap.add_argument("--fallback-region", default="us-east-2")
-    ap.add_argument("--lock-region", default="eu-central-1")
-    ap.add_argument("--lock-table", default="pay-prod-euc1-dr-lock")
+    ap.add_argument("--lock-region", default="us-east-1", help="never the region being failed away from")
+    ap.add_argument("--lock-table", default="pay-prod-use1-dr-lock")
     ap.add_argument("--global-cluster", help="default: pay-prod-<cell>-aurora-payments")
     ap.add_argument("--fence-rule-group", default="pay-prod-euc1-psp-fence")
     ap.add_argument("--source-endpoint-group", required=True)
@@ -241,6 +248,9 @@ def parse_args(argv):
     ns = ap.parse_args(argv)
     ns.global_cluster = ns.global_cluster or f"pay-prod-{ns.cell}-aurora-payments"
     ns.target_endpoint_groups = dict(p.split("=", 1) for p in ns.target_endpoint_group)
+    missing = {ns.target_region, ns.fallback_region} - set(ns.target_endpoint_groups)
+    if missing:
+        ap.error(f"--target-endpoint-group missing for {sorted(missing)}")
     return ns
 
 
@@ -254,6 +264,10 @@ def main(argv=None, **kw):
     except LockHeld as exc:
         log("skip", reason=str(exc))
         return EXIT_LOCK_HELD
+    except Exception as exc:  # noqa: BLE001
+        # an unreachable control plane must end as a logged failure, never as a traceback
+        log("error", error=type(exc).__name__, reason=str(exc))
+        return 1
     return 0
 
 

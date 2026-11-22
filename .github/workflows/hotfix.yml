@@ -2,7 +2,7 @@ name: hotfix
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, closed]
+    types: [closed]
     branches: [main, "release/**"]
   push:
     branches: ["release/**"]
@@ -20,56 +20,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  guard:
-    if: >-
-      github.event_name == 'pull_request' && github.event.action != 'closed' &&
-      contains(github.event.pull_request.labels.*.name, 'hotfix') &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      tier: ${{ steps.tier.outputs.tier }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: no migrations in the fast pipeline
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '^vendor/(hyperswitch|card-vault)/migrations/'; then
-            echo "::error::a hotfix cannot carry a migration; use the planned release"
-            exit 1
-          fi
-      - name: tier
-        id: tier
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          if ! grep -qvE '^deploy/envs/[^/]+/images\.yaml$' <<<"$files"; then tier=rollback
-          elif ! grep -qv '^deploy/' <<<"$files"; then tier=config
-          else tier=code; fi
-          echo "tier=$tier" >>"$GITHUB_OUTPUT"
-          echo "hotfix tier: $tier" >>"$GITHUB_STEP_SUMMARY"
-      - name: two approvals
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          TIER: ${{ steps.tier.outputs.tier }}
-        run: |
-          # a rollback to a digest that already ran in prod needs only the normal review
-          [ "$TIER" = rollback ] && exit 0
-          n=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --paginate --jq '[.[] | select(.state == "APPROVED") | .user.login]' | jq -s 'add | unique | length')
-          if [ "$n" -lt 2 ]; then echo "::error::a hotfix needs two approvals (SRE lead and on-call), found ${n}"; exit 1; fi
-
   record:
     if: >-
       github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true &&
@@ -114,7 +64,7 @@ jobs:
           gh api "repos/${REPO}/git/refs" -f "ref=refs/heads/release/${TAG}" -f "sha=${sha}"
 
   build:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !github.event.created
     permissions:
       contents: read
       id-token: write
@@ -124,14 +74,14 @@ jobs:
       services: ""
 
   full-ci:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !github.event.created
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
 
   alert-full-ci:
     needs: full-ci
-    if: github.event_name == 'push' && failure()
+    if: github.event_name == 'push' && !github.event.created && failure()
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
@@ -148,7 +98,7 @@ jobs:
 
   backport:
     needs: build
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !github.event.created
     runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
