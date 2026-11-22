@@ -13,13 +13,13 @@ spec:
             payments-platform/vault: enabled
   template:
     metadata:
-      name: 'vault-{{ .name }}'
+      name: 'vault-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: vault
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
+        server: '{{`{{ .server }}`}}'
         namespace: vault
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
@@ -29,8 +29,8 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/vault/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

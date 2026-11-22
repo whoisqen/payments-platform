@@ -1,0 +1,10 @@
+# No individual defaults: generate the values with tools/config/argocd-values.py from config/platform.yaml.
+repo:
+  url: ""
+  revision: main
+cluster:
+  namePrefix: ""
+  regionShort: ""
+  region: ""
+github:
+  configUrl: ""

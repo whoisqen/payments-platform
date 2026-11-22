@@ -13,13 +13,13 @@ spec:
             payments-platform/addons: enabled
   template:
     metadata:
-      name: 'cert-manager-{{ .name }}'
+      name: 'cert-manager-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: cert-manager
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
+        server: '{{`{{ .server }}`}}'
         namespace: cert-manager
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
@@ -29,8 +29,8 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/cert-manager/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-kyverno
+  name: addon-otel-collector
   namespace: argocd
 spec:
   goTemplate: true
@@ -13,24 +13,24 @@ spec:
             payments-platform/addons: enabled
   template:
     metadata:
-      name: 'kyverno-{{ .name }}'
+      name: 'otel-collector-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: kyverno
+        payments-platform/addon: otel-collector
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: kyverno
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://kyverno.github.io/kyverno/
-          chart: kyverno
-          targetRevision: 3.10.0
+        - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+          chart: opentelemetry-collector
+          targetRevision: 0.182.0
           helm:
             valueFiles:
-              - $values/deploy/platform/kyverno/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/otel-collector/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:
@@ -38,4 +38,3 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
-          - ServerSideApply=true

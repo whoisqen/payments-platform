@@ -27,27 +27,27 @@ spec:
                   wave: "0"
   template:
     metadata:
-      name: 'istio-{{ .chart }}-{{ .name }}'
+      name: 'istio-{{`{{ .chart }}`}}-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: istio
       annotations:
-        argocd.argoproj.io/sync-wave: '{{ .wave }}'
+        argocd.argoproj.io/sync-wave: '{{`{{ .wave }}`}}'
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: '{{ .namespace }}'
+        server: '{{`{{ .server }}`}}'
+        namespace: '{{`{{ .namespace }}`}}'
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
         - repoURL: https://istio-release.storage.googleapis.com/charts
-          chart: '{{ .chart }}'
+          chart: '{{`{{ .chart }}`}}'
           targetRevision: 1.30.8
           helm:
             ignoreMissingValueFiles: true
             valueFiles:
-              - $values/deploy/platform/istio/values-{{ .chart }}.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/istio/values-{{`{{ .chart }}`}}.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

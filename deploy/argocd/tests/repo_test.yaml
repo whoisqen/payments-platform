@@ -1,0 +1,32 @@
+suite: repository and cluster names come from values
+templates:
+  - applicationset-cells.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: release
+  cluster.namePrefix: acme
+  cluster.regionShort: use1
+  cluster.region: us-east-1
+  github.configUrl: https://git.example.test/acme
+tests:
+  - it: reads the generator and chart repository and revision from values
+    asserts:
+      - equal:
+          path: spec.generators[0].git.repoURL
+          value: https://git.example.test/acme/platform
+      - equal:
+          path: spec.generators[0].git.revision
+          value: release
+      - equal:
+          path: spec.template.spec.sources[0].repoURL
+          value: https://git.example.test/acme/platform
+  - it: builds the destination cluster name from the prefix and region short
+    asserts:
+      - equal:
+          path: spec.template.spec.destination.name
+          value: "acme-{{ index .path.segments 2 }}-use1-{{ .path.basename }}"
+  - it: fails when the repository is not set
+    set:
+      repo.url: ""
+    asserts:
+      - failedTemplate: {}
