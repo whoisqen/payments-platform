@@ -1,0 +1,300 @@
+rule_files:
+- ../../alerts/application/components.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: http_server_requests_total{service="router",code="500",cell="cell-1"}
+    values: 0+30x21
+  - series: http_server_requests_total{service="router",code="200",cell="cell-1"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: Router5xxRateHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: router
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-router5xx-rate-high
+        cell: cell-1
+      exp_annotations:
+        summary: Router 5xx rate above 1% in a cell
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#router5xx-rate-high
+        dashboard_url: https://grafana.payments.internal/d/router
+- interval: 1m
+  input_series:
+  - series: http_server_requests_total{service="router",code="500",cell="cell-1"}
+    values: 0+0x21
+  - series: http_server_requests_total{service="router",code="200",cell="cell-1"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: Router5xxRateHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: http_server_requests_total{service="locker",code="500"}
+    values: 0+10x21
+  - series: http_server_requests_total{service="locker",code="200"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: LockerErrorRateHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: locker
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-locker-error-rate-high
+      exp_annotations:
+        summary: Locker 5xx rate above 1%
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/locker-error-rate-high.md
+        dashboard_url: https://grafana.payments.internal/d/locker
+- interval: 1m
+  input_series:
+  - series: http_server_requests_total{service="locker",code="500"}
+    values: 0+0x21
+  - series: http_server_requests_total{service="locker",code="200"}
+    values: 0+100x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: LockerErrorRateHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: drain_lag_seconds{cell="cell-1"}
+    values: 20x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: DrainLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: drainer
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-drain-lag-high
+        cell: cell-1
+      exp_annotations:
+        summary: Drain lag above 5 seconds
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/drain-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/drainer
+- interval: 1m
+  input_series:
+  - series: drain_lag_seconds{cell="cell-1"}
+    values: 0.5x21
+  alert_rule_test:
+  - &id001
+    eval_time: 17m
+    alertname: DrainLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: drain_lag_seconds{cell="cell-1"}
+    values: 0.5x9 20x1 0.5x9
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
+    values: 80000x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: RedisStreamBacklog
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: drainer
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-redis-stream-backlog
+        cell: cell-1
+        stream: payments-drain
+      exp_annotations:
+        summary: A Redis stream holds more than 50000 entries
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/redis-stream-backlog.md
+        dashboard_url: https://grafana.payments.internal/d/drainer
+- interval: 1m
+  input_series:
+  - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
+    values: 100x21
+  alert_rule_test:
+  - &id002
+    eval_time: 17m
+    alertname: RedisStreamBacklog
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: redis_stream_length{cell="cell-1",stream="payments-drain"}
+    values: 100x9 80000x1 100x9
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
+    values: 900x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: SchedulerQueueDelayHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: scheduler
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-scheduler-queue-delay-high
+        cell: cell-1
+      exp_annotations:
+        summary: The oldest scheduler task waits more than 10 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/scheduler-queue-delay-high.md
+        dashboard_url: https://grafana.payments.internal/d/scheduler
+- interval: 1m
+  input_series:
+  - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
+    values: 5x21
+  alert_rule_test:
+  - &id003
+    eval_time: 17m
+    alertname: SchedulerQueueDelayHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: scheduler_queue_oldest_task_age_seconds{cell="cell-1"}
+    values: 5x9 900x1 5x9
+  alert_rule_test:
+  - *id003
+- interval: 1m
+  input_series:
+  - series: dlq_depth{queue="webhooks"}
+    values: 4x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: DlqNotEmpty
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: scheduler
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-dlq-not-empty
+        queue: webhooks
+      exp_annotations:
+        summary: A dead-letter queue is not empty
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#dlq-not-empty
+        dashboard_url: https://grafana.payments.internal/d/scheduler
+- interval: 1m
+  input_series:
+  - series: dlq_depth{queue="webhooks"}
+    values: '0x31'
+  alert_rule_test:
+  - &id004
+    eval_time: 27m
+    alertname: DlqNotEmpty
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: dlq_depth{queue="webhooks"}
+    values: 0x9 4x1 0x19
+  alert_rule_test:
+  - *id004
+- interval: 1m
+  input_series:
+  - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
+    values: 700x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: WebhookBacklogOld
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: scheduler
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-webhook-backlog-old
+        cell: cell-1
+      exp_annotations:
+        summary: Outgoing webhooks wait more than 5 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#webhook-backlog-old
+        dashboard_url: https://grafana.payments.internal/d/scheduler
+- interval: 1m
+  input_series:
+  - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
+    values: 5x26
+  alert_rule_test:
+  - &id005
+    eval_time: 22m
+    alertname: WebhookBacklogOld
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: webhook_queue_oldest_age_seconds{cell="cell-1"}
+    values: 5x9 700x1 5x14
+  alert_rule_test:
+  - *id005
+- interval: 1m
+  input_series:
+  - series: reconciliation_amount_mismatch_total{psp="acme"}
+    values: 0+1x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: ReconciliationMismatch
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: scheduler
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-reconciliation-mismatch
+        psp: acme
+      exp_annotations:
+        summary: Daily PSP reconciliation found amount mismatches
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#reconciliation-mismatch
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: reconciliation_amount_mismatch_total{psp="acme"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: ReconciliationMismatch
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_job_status_failed{job_name="migrate-router-20261120",namespace="payments-cell-1"}
+    values: 1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: MigrationJobFailed
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: migrations
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-migration-job-failed
+        job_name: migrate-router-20261120
+        namespace: payments-cell-1
+      exp_annotations:
+        summary: A migration job failed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#migration-job-failed
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: kube_job_status_failed{job_name="migrate-router-20261120",namespace="payments-cell-1"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: MigrationJobFailed
+    exp_alerts: []

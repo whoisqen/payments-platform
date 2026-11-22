@@ -32,7 +32,7 @@
       "properties": {
         "kind": {"type": "string", "enum": ["charge", "read", "write", "delivery", "infra"]},
         "timeout": {"type": "string", "pattern": "^([0-9]+(ms|s|m|h)|sdk-default)$"},
-        "max_attempts": {"type": ["integer", "string"], "minimum": 0, "enum": ["unlimited"]},
+        "max_attempts": {"anyOf": [{"type": "integer", "minimum": 0}, {"const": "unlimited"}]},
         "bounded_by": {"type": "string", "enum": ["timeout"]},
         "base": {"$ref": "#/$defs/duration"},
         "cap": {"$ref": "#/$defs/duration"},

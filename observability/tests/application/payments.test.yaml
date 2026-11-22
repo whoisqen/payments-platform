@@ -1,0 +1,73 @@
+rule_files:
+- ../../alerts/application/payments.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: payments_unknown_state_stale{cell="cell-1"}
+    values: 12x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: UnknownStatePaymentsStale
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: scheduler
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-unknown-state-payments-stale
+      exp_annotations:
+        summary: Payments stay in the unknown state for more than 15 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#unknown-state-payments-stale
+        dashboard_url: https://grafana.payments.internal/d/scheduler
+- interval: 1m
+  input_series:
+  - series: payments_unknown_state_stale{cell="cell-1"}
+    values: '0x26'
+  alert_rule_test:
+  - &id001
+    eval_time: 22m
+    alertname: UnknownStatePaymentsStale
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: payments_unknown_state_stale{cell="cell-1"}
+    values: 0x9 12x1 0x14
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: synthetic_payment_success{probe_point="use1"}
+    values: '0x19'
+  - series: synthetic_payment_success{probe_point="use2"}
+    values: '0x19'
+  - series: synthetic_payment_success{probe_point="ext"}
+    values: '0x19'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: SyntheticPaymentFailing
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: payments-core
+        service: router
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-synthetic-payment-failing
+      exp_annotations:
+        summary: Synthetic payment fails from at least two of three probe points
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/synthetic-payment-failing.md
+        dashboard_url: https://grafana.payments.internal/d/payments
+- interval: 1m
+  input_series:
+  - series: synthetic_payment_success{probe_point="use1"}
+    values: 1x19
+  - series: synthetic_payment_success{probe_point="use2"}
+    values: 1x19
+  - series: synthetic_payment_success{probe_point="ext"}
+    values: 1x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: SyntheticPaymentFailing
+    exp_alerts: []

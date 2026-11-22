@@ -12,6 +12,7 @@ GRAFANA = "https://grafana.payments.internal/d"
 PAGING = ("critical", "security")
 ALL = []
 GAPS = []
+EXTRA_MODES = []
 
 
 def kebab(name):
@@ -24,6 +25,8 @@ def a(**kw):
     kw.setdefault("spike", None)
     kw.setdefault("T", None)
     kw.setdefault("extra_tests", [])
+    kw.setdefault("skip_auto", False)
+    kw.setdefault("norules", False)
     ALL.append(kw)
 
 
@@ -109,6 +112,9 @@ def is_gauge(al):
 def render_tests(layer, group, items, rule_path):
     tests = []
     for al in items:
+        if al["skip_auto"]:
+            tests.extend(al["extra_tests"])
+            continue
         T = al["T"] or max(15, minutes(al["f"]) + 12)
         n = T + 4
         name = al["name"]
@@ -214,7 +220,8 @@ def emit():
     for al in ALL:
         by.setdefault((al["layer"], al["group"]), []).append(al)
     for (layer, group), items in by.items():
-        write(f"observability/alerts/{layer}/{group}.yaml", render_rules(layer, group, items))
+        if not all(al["norules"] for al in items):
+            write(f"observability/alerts/{layer}/{group}.yaml", render_rules(layer, group, items))
         write(f"observability/tests/{layer}/{group}.test.yaml", render_tests(layer, group, items, f"../../alerts/{layer}/{group}.yaml"))
     layers = sorted({al["layer"] for al in ALL})
     order = {"network": "01", "compute": "02", "data": "03", "application": "05", "security-pci": "06", "backup-dr": "08"}
@@ -225,5 +232,5 @@ def emit():
             write(f"docs/runbooks/{layer}/{kebab(al['name'])}.md", runbook_paging(al))
         if non:
             write(f"docs/runbooks/{layer}/warnings.md", runbook_warnings(layer, non))
-        modes = [mode_of(al) for al in ALL if al["layer"] == layer] + [dict(g) for g in GAPS if g["layer"] == layer]
+        modes = [mode_of(al) for al in ALL if al["layer"] == layer] + [dict(m) for m in EXTRA_MODES if m["layer"] == layer] + [dict(g) for g in GAPS if g["layer"] == layer]
         write(f"observability/coverage/catalog/{order[layer]}-{layer}.yaml", "# Single place where failure modes are added; a mode without alert stays a visible gap.\n" + dump({"modes": modes}))
