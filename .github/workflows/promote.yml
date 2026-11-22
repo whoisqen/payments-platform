@@ -120,14 +120,19 @@ jobs:
         if: env.MODE == 'digests'
         with:
           name: digests
+          path: ${{ runner.temp }}/digests
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
       - name: write images.yaml
         id: change
+        env:
+          DIGESTS: ${{ runner.temp }}/digests/digests.json
         run: |
           file="deploy/envs/${TARGET}/images.yaml"
           if [ "$MODE" = digests ]; then
-            mapfile -t pairs < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' digests.json)
+            # the artifact is untrusted input: validated against the schema before any write
+            mapfile -t pairs < <(python3 tools/ci/images_yaml.py digests "$DIGESTS")
+            [ "${#pairs[@]}" -gt 0 ] || { echo "::error::no valid digests"; exit 1; }
             python3 tools/ci/images_yaml.py set "$file" "${pairs[@]}"
           else
             python3 tools/ci/images_yaml.py copy "deploy/envs/${SOURCE}/images.yaml" "$file"

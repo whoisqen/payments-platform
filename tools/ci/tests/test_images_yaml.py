@@ -86,5 +86,16 @@ class DigestCompareTest(unittest.TestCase):
             self.assertEqual(dc.main(["compare", "--rebuilt", str(r), "--reference", str(f)]), 0)
 
 
+    def test_digests_artifact_validated(self):
+        with tempfile.TemporaryDirectory() as d:
+            good = Path(d) / "good.json"
+            good.write_text(json.dumps({"router": A}), encoding="utf-8")
+            self.assertEqual(iy.main(["digests", str(good)]), 0)
+            for bad in ({"router": "x=y"}, {"unknown": A}, {"router": 1}, ["router"]):
+                f = Path(d) / "bad.json"
+                f.write_text(json.dumps(bad), encoding="utf-8")
+                with self.assertRaises((ValueError, TypeError)):
+                    iy.main(["digests", str(f)])
+
 if __name__ == "__main__":
     unittest.main()

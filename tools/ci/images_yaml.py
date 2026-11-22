@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -66,12 +67,23 @@ def main(argv=None):
     c.add_argument("file")
     c.add_argument("--services", help="comma list; default all that differ")
     c.add_argument("--dry-run", action="store_true")
+    d = sub.add_parser("digests", help="validate a digests.json artifact and print name=digest pairs")
+    d.add_argument("file")
     v = sub.add_parser("verify")
     v.add_argument("source")
     v.add_argument("before")
     v.add_argument("file")
     v.add_argument("--history", help="file with digests that already ran in the target environment")
     ns = ap.parse_args(argv)
+
+    if ns.cmd == "digests":
+        data = json.loads(Path(ns.file).read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not all(isinstance(v, str) for v in data.values()):
+            raise ValueError("digests.json must map service names to strings")
+        update({}, data)
+        for name, digest in sorted(data.items()):
+            print(f"{name}={digest}")
+        return 0
 
     if ns.cmd == "verify":
         history = set(DIGEST_ANY.findall(Path(ns.history).read_text(encoding="utf-8"))) if ns.history else set()
