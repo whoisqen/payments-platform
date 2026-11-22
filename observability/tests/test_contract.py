@@ -113,7 +113,7 @@ class AlertContractTest(unittest.TestCase):
     def test_no_withdrawn_region_anywhere(self):
         for root in (OBS, REPO / "docs" / "runbooks", REPO / "policy" / "resilience"):
             for path in root.rglob("*"):
-                if path.is_file() and "scaffold-tmp" not in str(path) and path.suffix in (".yaml", ".md", ".json", ".py", ".tmpl") and path.name != "test_contract.py":
+                if path.is_file() and path.suffix in (".yaml", ".md", ".json", ".py", ".tmpl") and path.name != "test_contract.py":
                     self.assertNotIn("eu-west-1", path.read_text(), str(path))
 
     def test_slo_burn_windows_follow_section_7(self):
