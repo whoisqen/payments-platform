@@ -123,11 +123,59 @@ run "cpu_limits_follow_the_override" {
   command = plan
 
   variables {
-    cpu_limits = { payments = 32, stateful = 16, cde = 16, workers = 32 }
+    cpu_limits = { payments = 32, stateful = 16, cde = 16, workers = 32, ci = 8, ci-prod = 4 }
   }
 
   assert {
     condition     = yamldecode(output.manifests["nodepool-payments.yaml"]).spec.limits.cpu == "32" && yamldecode(output.manifests["nodepool-stateful.yaml"]).spec.limits.cpu == "16"
     error_message = "pool CPU limits must come from cpu_limits"
   }
+}
+
+run "payments_cluster_has_no_ci_pools" {
+  command = plan
+
+  assert {
+    condition     = !contains(keys(output.manifests), "nodepool-ci.yaml") && !contains(keys(output.manifests), "nodepool-ci-prod.yaml") && contains(keys(output.manifests), "nodepool-payments.yaml")
+    error_message = "ci pools are rendered only when enabled"
+  }
+}
+
+run "ci_pools_in_shared_services" {
+  command = plan
+
+  variables {
+    enabled_pools = ["ci", "ci-prod"]
+  }
+
+  assert {
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 2 && !contains(keys(output.manifests), "nodepool-payments.yaml")
+    error_message = "only the ci pools are rendered"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.spec.taints[0].value == "ci" && yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.template.spec.taints[0].value == "ci-prod"
+    error_message = "taints workload=ci and workload=ci-prod, NoSchedule"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.template.spec.requirements[2].values == ["on-demand"] && contains(yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.spec.requirements[2].values, "spot")
+    error_message = "ci-prod is On-Demand, ci may use Spot"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.limits.cpu == "200" && yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.limits.cpu == "100"
+    error_message = "default ci limits"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.metadata.labels["platform.io/pci-scope"] == "none"
+    error_message = "ci nodes are outside the CDE"
+  }
+}
+
+run "ci_and_payments_pools_cannot_mix" {
+  command = plan
+
+  variables {
+    enabled_pools = ["payments", "ci"]
+  }
+
+  expect_failures = [var.enabled_pools]
 }
