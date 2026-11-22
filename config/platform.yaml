@@ -31,5 +31,11 @@ dns:
   psp_domains: [.psp-sandbox.example.com]
 
 storage:
-  # S3 bucket for Terraform state of every environment: pay-<env>-euc1-tf-state-<shared_services account>
+  # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
   state_bucket_prefix: pay
+  # Output state_kms_key_arn of infra/bootstrap
+  state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
+
+access:
+  # Name of the IAM Identity Center permission set that gets view-only access to the clusters
+  sre_view_permission_set: AWSReservedSSO_SRE-View

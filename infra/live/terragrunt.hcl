@@ -9,6 +9,7 @@ locals {
 
   # The account comes from env.hcl because the path carries no account segment.
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
+  cfg     = local.env_cfg.cfg
 }
 
 remote_state {
@@ -21,9 +22,9 @@ remote_state {
 
   # Every stack keeps its state in the eu-central-1 bucket of infra/bootstrap, under its own <env>/ prefix.
   config = {
-    bucket       = "pay-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
+    bucket       = "${local.cfg.storage.state_bucket_prefix}-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
     key          = "${path_relative_to_include("root")}/terraform.tfstate"
-    region       = "eu-central-1"
+    region       = local.cfg.regions.working
     encrypt      = true
     use_lockfile = true
     kms_key_id   = local.env_cfg.state_kms_key_arn
