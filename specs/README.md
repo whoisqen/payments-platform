@@ -20,4 +20,4 @@ Check with `tools/lint/spec-lint`.
 | Number | Title | Status | Milestone |
 |---|---|---|---|
 | 001 | Software requirements specification of the DevOps part | in-progress | 001-devops-srs |
-| 002 | GitHub organization and repository settings as code | draft | 002-repository-as-code |
+| 002 | GitHub organization and repository settings as code | in-progress | 002-repository-as-code |

@@ -1,9 +1,9 @@
 ---
 id: 002-repository-as-code
-status: draft
+status: in-progress
 owner: platform
 milestone: 002-repository-as-code
-issue: none
+issue: "#15"
 pci-impact: none
 adr: []
 ---
