@@ -1,0 +1,23 @@
+# Single source of tool versions for laptops and CI (jdx/mise-action); Renovate keeps them current.
+[tools]
+python = "3.12"
+node = "22"
+terraform = "1.17.0"
+terragrunt = "0.93.0"
+helm = "3.22.0"
+helm-unittest = "1.0.3"
+kubeconform = "0.8.0"
+opa = "1.22.4"
+conftest = "0.62.0"
+kyverno = "1.20.0"
+actionlint = "1.7.12"
+shellcheck = "0.9.0"
+gitleaks = "8.21.2"
+hadolint = "2.12.0"
+trivy = "0.65.0"
+syft = "1.28.0"
+cosign = "2.5.3"
+container-structure-test = "1.19.3"
+
+[settings]
+experimental = true
