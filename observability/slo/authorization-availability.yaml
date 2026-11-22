@@ -1,0 +1,20 @@
+version: prometheus/v1
+service: payments-authorization
+labels: {team: payments-core, owner: payments-core-oncall, layer: application}
+slos:
+  - name: availability
+    objective: 99.99
+    description: Share of POST /payments/{id}/confirm answered without a platform-side 5xx; PSP and bank declines are not counted.
+    sli:
+      events:
+        error_query: sum(rate(http_server_requests_total{service="router",route="payments_confirm",code=~"5..",fault="platform"}[{{.window}}]))
+        total_query: sum(rate(http_server_requests_total{service="router",route="payments_confirm"}[{{.window}}]))
+    alerting:
+      name: PaymentsAuthorizationAvailability
+      labels: {service: router}
+      annotations:
+        summary: Authorization availability is burning the 99.99% error budget
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+      page_alert: {labels: {severity: critical}}
+      ticket_alert: {labels: {severity: warning}}

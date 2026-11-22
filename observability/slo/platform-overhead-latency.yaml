@@ -1,0 +1,20 @@
+version: prometheus/v1
+service: payments-platform-overhead
+labels: {team: payments-core, owner: payments-core-oncall, layer: application}
+slos:
+  - name: latency
+    objective: 99.9
+    description: Share of requests where the platform adds less than 150 ms (p99 target) on top of the PSP time.
+    sli:
+      events:
+        error_query: sum(rate(platform_overhead_seconds_count{service="router"}[{{.window}}])) - sum(rate(platform_overhead_seconds_bucket{service="router",le="0.15"}[{{.window}}]))
+        total_query: sum(rate(platform_overhead_seconds_count{service="router"}[{{.window}}]))
+    alerting:
+      name: PaymentsPlatformOverheadLatency
+      labels: {service: router}
+      annotations:
+        summary: Platform overhead above 150 ms is burning the 99.9% error budget
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
+        dashboard_url: https://grafana.payments.internal/d/slo-overview
+      page_alert: {labels: {severity: critical}}
+      ticket_alert: {labels: {severity: warning}}
