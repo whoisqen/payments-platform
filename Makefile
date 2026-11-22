@@ -52,7 +52,7 @@ lint-python:
 	python3 -m py_compile $$(find tools scripts -name '*.py' -not -path '*/node_modules/*')
 
 lint-secrets:
-	gitleaks detect --no-banner --redact
+	gitleaks detect --no-banner --redact --config .github/gitleaks.toml
 
 test: test-python test-terraform test-helm test-policy ## every offline test CI runs
 
