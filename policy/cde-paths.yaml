@@ -11,3 +11,6 @@ cde_paths:
   - deploy/envs/*/cde-*/**
   - deploy/envs/*/*/cde-*/**
   - policy/opa/cde/**
+  - docker/locker/**
+  - infra/live/*/*/locker/**
+  - deploy/platform/arc/**
