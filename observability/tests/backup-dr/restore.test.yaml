@@ -1,0 +1,103 @@
+rule_files:
+- ../../alerts/backup-dr/restore.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: restore_test_success{store="aurora-cell-1"}
+    values: '0x21'
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: RestoreTestFailed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-test-failed
+        store: aurora-cell-1
+      exp_annotations:
+        summary: The automatic restore test of a store failed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/restore-test-failed.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: restore_test_success{store="aurora-cell-1"}
+    values: 1x21
+  alert_rule_test:
+  - &id001
+    eval_time: 17m
+    alertname: RestoreTestFailed
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: restore_test_success{store="aurora-cell-1"}
+    values: 1x9 0x1 1x9
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: backup_restore_duration_seconds{store="aurora-cell-1"}
+    values: 1500x19
+  - series: backup_restore_target_seconds{store="aurora-cell-1"}
+    values: 1800x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RestoreDurationNearTarget
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-duration-near-target
+        store: aurora-cell-1
+      exp_annotations:
+        summary: Restore duration passed 80% of its target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: backup_restore_duration_seconds{store="aurora-cell-1"}
+    values: 600x19
+  - series: backup_restore_target_seconds{store="aurora-cell-1"}
+    values: 1800x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RestoreDurationNearTarget
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: backup_restore_duration_seconds{store="aurora-cell-1"}
+    values: 2000x19
+  - series: backup_restore_target_seconds{store="aurora-cell-1"}
+    values: 1800x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RestoreTooSlow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-too-slow
+        store: aurora-cell-1
+      exp_annotations:
+        summary: Restore duration exceeded its target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-too-slow
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: backup_restore_duration_seconds{store="aurora-cell-1"}
+    values: 1500x19
+  - series: backup_restore_target_seconds{store="aurora-cell-1"}
+    values: 1800x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RestoreTooSlow
+    exp_alerts: []

@@ -1,0 +1,144 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-security-pci-detection
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: security-pci-detection
+    rules:
+    - alert: GuardDutyHighFinding
+      expr: sum by (account) (increase(guardduty_findings_total{severity="high"}[15m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: guardduty
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-guard-duty-high-finding
+      annotations:
+        summary: GuardDuty reports a high-severity finding
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/guard-duty-high-finding.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: GuardDutyRuntimeCdeFinding
+      expr: sum by (cluster) (increase(guardduty_runtime_findings_total{cde="true"}[15m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: guardduty
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-guard-duty-runtime-cde-finding
+      annotations:
+        summary: GuardDuty Runtime Monitoring raised a finding in the CDE
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/guard-duty-runtime-cde-finding.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: PanDetectedInLogs
+      expr: sum by (source) (increase(pan_detected_total[15m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: otel-collector
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-pan-detected-in-logs
+      annotations:
+        summary: A PAN pattern was detected in telemetry or logs
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/pan-detected-in-logs.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: RootAccountLogin
+      expr: sum(increase(security_events_total{event="root_login"}[10m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: cloudtrail
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-root-account-login
+      annotations:
+        summary: An AWS root account login happened
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/root-account-login.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: BreakGlassRoleUsed
+      expr: sum(increase(security_events_total{event="break_glass"}[10m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: cloudtrail
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-break-glass-role-used
+      annotations:
+        summary: The BreakGlass role was assumed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/break-glass-role-used.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: ScpChanged
+      expr: sum(increase(security_events_total{event="scp_change"}[10m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: cloudtrail
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-scp-changed
+      annotations:
+        summary: A service control policy changed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/scp-changed.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: IamChangeOutsideTerraform
+      expr: sum(increase(security_events_total{event="iam_change_outside_terraform"}[10m])) > 0
+      labels:
+        severity: security
+        team: security
+        service: cloudtrail
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-iam-change-outside-terraform
+      annotations:
+        summary: An IAM change was made outside Terraform
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/iam-change-outside-terraform.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: VaultSealed
+      expr: max by (cluster) (vault_core_unsealed) == 0
+      for: 1m
+      labels:
+        severity: critical
+        team: security
+        service: vault
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-vault-sealed
+      annotations:
+        summary: Vault is sealed
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/vault-sealed.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: VaultAuditDeviceFailing
+      expr: sum by (cluster) (increase(vault_audit_log_request_failure[5m])) > 0
+      for: 2m
+      labels:
+        severity: critical
+        team: security
+        service: vault
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-vault-audit-device-failing
+      annotations:
+        summary: Vault audit device fails
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/vault-audit-device-failing.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+    - alert: CdeNetworkPolicyChanged
+      expr: sum(increase(security_events_total{event="cde_network_change"}[10m])) > 0
+      labels:
+        severity: warning
+        team: security
+        service: cloudtrail
+        owner: security-oncall
+        layer: security-pci
+        failure_mode: security-pci-cde-network-policy-changed
+      annotations:
+        summary: A CDE network control changed (security group, firewall or NACL)
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#cde-network-policy-changed
+        dashboard_url: https://grafana.payments.internal/d/edge

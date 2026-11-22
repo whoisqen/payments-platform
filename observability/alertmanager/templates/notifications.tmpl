@@ -1,0 +1,16 @@
+{{ define "pd.description" -}}
+[{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}
+{{- end }}
+
+{{ define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+{{- end }}
+
+{{ define "slack.text" -}}
+{{ range .Alerts -}}
+*{{ .Annotations.summary }}*
+Runbook: {{ .Annotations.runbook_url }}
+Dashboard: {{ .Annotations.dashboard_url }}
+Owner: {{ .Labels.owner }}, failure mode {{ .Labels.failure_mode }}
+{{ end }}
+{{- end }}

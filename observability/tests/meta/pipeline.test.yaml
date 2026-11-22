@@ -1,0 +1,112 @@
+rule_files:
+- ../../alerts/meta/pipeline.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series: []
+  alert_rule_test:
+  - eval_time: 5m
+    alertname: Watchdog
+    exp_alerts:
+    - exp_labels:
+        severity: none
+        team: observability
+        service: alertmanager
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-watchdog
+      exp_annotations:
+        summary: 'Watchdog: always firing; silence of this alert means the alert pipeline is broken'
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#watchdog
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+- interval: 1m
+  input_series:
+  - series: alertmanager_notifications_failed_total{integration="pagerduty"}
+    values: 0+2x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AlertmanagerNotificationsFailing
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: alertmanager
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-alertmanager-notifications-failing
+        integration: pagerduty
+      exp_annotations:
+        summary: Alertmanager cannot deliver notifications
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/alertmanager-notifications-failing.md
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+- interval: 1m
+  input_series:
+  - series: alertmanager_notifications_failed_total{integration="pagerduty"}
+    values: 0+0x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: AlertmanagerNotificationsFailing
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: prometheus_rule_evaluation_failures_total{rule_group="application-psp"}
+    values: 0+1x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: PrometheusRuleEvaluationFailing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: prometheus
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-prometheus-rule-evaluation-failing
+        rule_group: application-psp
+      exp_annotations:
+        summary: A rule group fails to evaluate
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#prometheus-rule-evaluation-failing
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+- interval: 1m
+  input_series:
+  - series: prometheus_rule_evaluation_failures_total{rule_group="application-psp"}
+    values: 0+0x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: PrometheusRuleEvaluationFailing
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+    values: 2500000x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: ActiveSeriesBudgetExceeded
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: prometheus
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-active-series-budget-exceeded
+        region: eu-central-1
+      exp_annotations:
+        summary: Active series exceed the budget of 2 million per region
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#active-series-budget-exceeded
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+- interval: 1m
+  input_series:
+  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+    values: 900000x31
+  alert_rule_test:
+  - &id001
+    eval_time: 27m
+    alertname: ActiveSeriesBudgetExceeded
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+    values: 900000x9 2500000x1 900000x19
+  alert_rule_test:
+  - *id001

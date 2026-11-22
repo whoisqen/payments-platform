@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-meta-pipeline
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: meta-pipeline
+    rules:
+    - alert: Watchdog
+      expr: vector(1)
+      labels:
+        severity: none
+        team: observability
+        service: alertmanager
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-watchdog
+      annotations:
+        summary: 'Watchdog: always firing; silence of this alert means the alert pipeline is broken'
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#watchdog
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+    - alert: AlertmanagerNotificationsFailing
+      expr: sum by (integration) (rate(alertmanager_notifications_failed_total[5m])) > 0
+      for: 5m
+      labels:
+        severity: critical
+        team: observability
+        service: alertmanager
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-alertmanager-notifications-failing
+      annotations:
+        summary: Alertmanager cannot deliver notifications
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/alertmanager-notifications-failing.md
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+    - alert: PrometheusRuleEvaluationFailing
+      expr: sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[10m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+        team: observability
+        service: prometheus
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-prometheus-rule-evaluation-failing
+      annotations:
+        summary: A rule group fails to evaluate
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#prometheus-rule-evaluation-failing
+        dashboard_url: https://grafana.payments.internal/d/platform-overview
+    - alert: ActiveSeriesBudgetExceeded
+      expr: sum by (region) (prometheus_tsdb_head_series) > 2000000
+      for: 15m
+      labels:
+        severity: warning
+        team: observability
+        service: prometheus
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-active-series-budget-exceeded
+      annotations:
+        summary: Active series exceed the budget of 2 million per region
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#active-series-budget-exceeded
+        dashboard_url: https://grafana.payments.internal/d/platform-overview

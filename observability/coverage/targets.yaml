@@ -1,0 +1,8 @@
+targets:
+  default: 0.8
+  network: 0.8
+  compute: 0.8
+  data: 0.9
+  application: 0.9
+  security-pci: 0.9
+  backup-dr: 0.9

@@ -1,0 +1,74 @@
+rule_files:
+- ../../alerts/network/certificates.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
+    values: 864000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: CertificateExpiryCritical
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-certificate-expiry-critical
+        target: api.payments.internal
+      exp_annotations:
+        summary: A public endpoint certificate expires in less than 14 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/certificate-expiry-critical.md
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
+    values: 5184000x26
+  alert_rule_test:
+  - &id001
+    eval_time: 22m
+    alertname: CertificateExpiryCritical
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: probe_ssl_earliest_cert_expiry{target="api.payments.internal",probe_point="use1"}
+    values: 5184000x9 864000x1 5184000x14
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
+    values: 864000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: PspMtlsCertExpiring30d
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: egress
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-psp-mtls-cert-expiring30d
+        name: psp-mtls-acme
+      exp_annotations:
+        summary: A PSP mTLS client certificate expires in less than 30 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/network/warnings.md#psp-mtls-cert-expiring30d
+        dashboard_url: https://grafana.payments.internal/d/edge
+- interval: 1m
+  input_series:
+  - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
+    values: 5184000x26
+  alert_rule_test:
+  - &id002
+    eval_time: 22m
+    alertname: PspMtlsCertExpiring30d
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: certmanager_certificate_expiration_timestamp_seconds{name="psp-mtls-acme"}
+    values: 5184000x9 864000x1 5184000x14
+  alert_rule_test:
+  - *id002

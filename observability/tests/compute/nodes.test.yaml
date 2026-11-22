@@ -1,0 +1,173 @@
+rule_files:
+- ../../alerts/compute/nodes.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: karpenter_cloudprovider_errors_total{method="Create"}
+    values: 0+2x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: KarpenterCannotLaunchNodes
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-karpenter-cannot-launch-nodes
+      exp_annotations:
+        summary: Karpenter cannot create nodes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/karpenter-cannot-launch-nodes.md
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: karpenter_cloudprovider_errors_total{method="Create"}
+    values: 0+0x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: KarpenterCannotLaunchNodes
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_node_status_condition{condition="Ready",status="true",node="ip-10-0-1-11"}
+    values: '0x21'
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: NodeNotReady
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-node-not-ready
+        condition: Ready
+        status: 'true'
+        node: ip-10-0-1-11
+      exp_annotations:
+        summary: A node is NotReady
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-not-ready
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: kube_node_status_condition{condition="Ready",status="true",node="ip-10-0-1-11"}
+    values: 1x21
+  alert_rule_test:
+  - &id001
+    eval_time: 17m
+    alertname: NodeNotReady
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: kube_node_status_condition{condition="Ready",status="true",node="ip-10-0-1-11"}
+    values: 1x9 0x1 1x9
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: subnet_free_ip_ratio{subnet_id="subnet-0a1"}
+    values: 0.1x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: SubnetFreeIpsLow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-subnet-free-ips-low
+        subnet_id: subnet-0a1
+      exp_annotations:
+        summary: A subnet has less than 20% free IP addresses
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#subnet-free-ips-low
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: subnet_free_ip_ratio{subnet_id="subnet-0a1"}
+    values: 0.6x26
+  alert_rule_test:
+  - &id002
+    eval_time: 22m
+    alertname: SubnetFreeIpsLow
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: subnet_free_ip_ratio{subnet_id="subnet-0a1"}
+    values: 0.6x9 0.1x1 0.6x14
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: node_os_image_age_seconds{nodepool="payments"}
+    values: 3000000x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: NodeImageStale
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-node-image-stale
+        nodepool: payments
+      exp_annotations:
+        summary: Nodes run an OS image older than 30 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-image-stale
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: node_os_image_age_seconds{nodepool="payments"}
+    values: 86400x31
+  alert_rule_test:
+  - &id003
+    eval_time: 27m
+    alertname: NodeImageStale
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: node_os_image_age_seconds{nodepool="payments"}
+    values: 86400x9 3000000x1 86400x19
+  alert_rule_test:
+  - *id003
+- interval: 1m
+  input_series:
+  - series: node_timex_offset_seconds{node="ip-10-0-1-11"}
+    values: 0.4x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: NodeClockDrift
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-node-clock-drift
+        node: ip-10-0-1-11
+      exp_annotations:
+        summary: Node clock drifts more than 100 ms
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-clock-drift
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+- interval: 1m
+  input_series:
+  - series: node_timex_offset_seconds{node="ip-10-0-1-11"}
+    values: 0.001x21
+  alert_rule_test:
+  - &id004
+    eval_time: 17m
+    alertname: NodeClockDrift
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: node_timex_offset_seconds{node="ip-10-0-1-11"}
+    values: 0.001x9 0.4x1 0.001x9
+  alert_rule_test:
+  - *id004

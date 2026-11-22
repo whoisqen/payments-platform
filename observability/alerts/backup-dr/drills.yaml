@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-backup-dr-drills
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: backup-dr-drills
+    rules:
+    - alert: RestoreTestStale
+      expr: time() - max by (store) (restore_test_last_run_timestamp_seconds) > 2 * 86400
+      labels:
+        severity: warning
+        team: data-platform
+        service: restore-verifier
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-restore-test-stale
+      annotations:
+        summary: No automatic restore test ran for a store in 2 days
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-test-stale
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: DrSwitchTestOverdue
+      expr: time() - max by (region) (dr_switch_test_last_success_timestamp_seconds) > 100 * 86400
+      labels:
+        severity: warning
+        team: data-platform
+        service: dr-switch
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-dr-switch-test-overdue
+      annotations:
+        summary: The quarterly switch test of a recovery region is overdue
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue
+        dashboard_url: https://grafana.payments.internal/d/dr-switch

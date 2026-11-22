@@ -1,0 +1,50 @@
+# Helm values (chart prometheus-postgres-exporter), one release per Aurora endpoint, then the ServiceMonitor.
+config:
+  datasourceSecret:
+    name: postgres-exporter-dsn
+    key: dsn
+  logLevel: warn
+  queries: |
+    pg_table:
+      query: "SELECT relname, pg_table_size(relid) AS size_bytes FROM pg_stat_user_tables ORDER BY pg_table_size(relid) DESC LIMIT 20"
+      metrics:
+        - relname: {usage: LABEL, description: Table name}
+        - size_bytes: {usage: GAUGE, description: Table size without indexes}
+    pg_replication_slots:
+      query: "SELECT slot_name, COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn), 0) AS wal_lag_bytes FROM pg_replication_slots"
+      metrics:
+        - slot_name: {usage: LABEL, description: Slot name}
+        - wal_lag_bytes: {usage: GAUGE, description: WAL retained by the slot}
+    pg_stat_statements:
+      query: "SELECT queryid::text AS queryid, total_exec_time * 1000 AS total_exec_time_ms FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20"
+      metrics:
+        - queryid: {usage: LABEL, description: Query hash, never the statement text}
+        - total_exec_time_ms: {usage: COUNTER, description: Execution time per query hash}
+serviceMonitor:
+  enabled: false
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 128Mi}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-exporter
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: prometheus-postgres-exporter}
+  endpoints:
+    - port: http
+      interval: 30s
+      relabelings:
+        - {action: replace, sourceLabels: [__meta_kubernetes_service_label_cell], targetLabel: cell}
+        - {action: replace, sourceLabels: [__meta_kubernetes_service_label_role], targetLabel: role}
+      metricRelabelings:
+        # Only the series that alerts and dashboards read are kept.
+        - action: keep
+          sourceLabels: [__name__]
+          regex: pg_(up|stat_database_(numbackends|deadlocks)|settings_max_connections|replication_slots_wal_lag_bytes|table_size_bytes|stat_statements_total_exec_time_ms_total)
+        - action: labeldrop
+          regex: (payment_id|customer_id|token|pan|card_number|cvv|idempotency_key)

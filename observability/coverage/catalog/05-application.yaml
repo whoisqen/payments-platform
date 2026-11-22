@@ -1,0 +1,218 @@
+# Single place where failure modes are added; a mode without alert stays a visible gap.
+modes:
+- layer: application
+  id: application-psp-degraded
+  component: psp
+  failure: PSP degraded
+  impact: authorization rate falls; routing must move traffic to another PSP; inhibits the authorization-rate alert of this PSP
+  severity: critical
+  alert: PSPDegraded
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-psp-latency-p99-high
+  component: psp
+  failure: PSP slow
+  impact: long waits for merchants and more unknown-state payments at the 15 s timeout
+  severity: warning
+  alert: PspLatencyP99High
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-psp-circuit-breaker-open
+  component: psp
+  failure: PSP circuit breaker open
+  impact: the PSP receives no traffic; fast failure or reroute
+  severity: warning
+  alert: PspCircuitBreakerOpen
+  signal: metric
+  detect_within: 5m
+- layer: application
+  id: application-authorization-rate-drop
+  component: authorization
+  failure: authorization rate drop against last week
+  impact: often the first sign of a PSP problem before 5xx appear
+  severity: warning
+  alert: AuthorizationRateDrop
+  signal: metric
+  detect_within: 18m
+- layer: application
+  id: application-unknown-state-payments-stale
+  component: sync
+  failure: unknown state not resolved by sync
+  impact: merchants see unresolved payments; a charge may exist at the PSP
+  severity: warning
+  alert: UnknownStatePaymentsStale
+  signal: metric
+  detect_within: 13m
+- layer: application
+  id: application-synthetic-payment-failing
+  component: synthetic
+  failure: end-to-end payment fails
+  impact: merchants cannot complete a payment; covers paths that component alerts miss
+  severity: critical
+  alert: SyntheticPaymentFailing
+  signal: metric
+  detect_within: 6m
+- layer: application
+  id: application-router5xx-rate-high
+  component: router
+  failure: router errors
+  impact: failed requests; the SLO burn alerts page when it burns the budget
+  severity: warning
+  alert: Router5xxRateHigh
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-locker-error-rate-high
+  component: locker
+  failure: locker errors
+  impact: tokenization and card reads fail; every payment with a stored card fails; the locker is in the CDE
+  severity: critical
+  alert: LockerErrorRateHigh
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-drain-lag-high
+  component: drainer
+  failure: drainer behind
+  impact: write-behind falls behind; the RPO of payment data grows by the lag (D7)
+  severity: critical
+  alert: DrainLagHigh
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-redis-stream-backlog
+  component: redis-stream
+  failure: stream backlog
+  impact: MemoryDB memory grows and the undrained state is at risk
+  severity: critical
+  alert: RedisStreamBacklog
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-scheduler-queue-delay-high
+  component: scheduler
+  failure: scheduler queue delayed
+  impact: sync of unknown-state payments and outgoing webhooks are late
+  severity: critical
+  alert: SchedulerQueueDelayHigh
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-dlq-not-empty
+  component: dlq
+  failure: messages in DLQ
+  impact: events or webhooks that exhausted their retries wait for a person
+  severity: warning
+  alert: DlqNotEmpty
+  signal: metric
+  detect_within: 18m
+- layer: application
+  id: application-webhook-backlog-old
+  component: webhooks
+  failure: webhook queue backlog
+  impact: merchants receive events late; the 60 s delivery SLO burns
+  severity: warning
+  alert: WebhookBacklogOld
+  signal: metric
+  detect_within: 13m
+- layer: application
+  id: application-reconciliation-mismatch
+  component: reconciliation
+  failure: reconciliation mismatch
+  impact: 'a payment amount differs from the PSP report: possible double charge or missing capture'
+  severity: warning
+  alert: ReconciliationMismatch
+  signal: metric
+  detect_within: 13m
+- layer: application
+  id: application-migration-job-failed
+  component: migrations
+  failure: migration job failed
+  impact: the rollout of the new version is blocked; the schema stays on the old version
+  severity: warning
+  alert: MigrationJobFailed
+  signal: metric
+  detect_within: 4m
+- layer: application
+  id: application-retry-storm
+  component: retries
+  failure: retry storm
+  impact: retries amplify the load on a recovering dependency
+  severity: warning
+  alert: RetryStorm
+  signal: metric
+  detect_within: 8m
+- layer: application
+  id: application-retry-budget-exhausted
+  component: retries
+  failure: retry budget exhausted for locker or PSP sync
+  impact: new retries are dropped and requests fail fast; the dependency is badly degraded
+  severity: critical
+  alert: RetryBudgetExhausted
+  signal: metric
+  detect_within: 5m
+- layer: application
+  id: application-retry-budget-exhausted-non-critical
+  component: retries
+  failure: retry budget exhausted
+  impact: requests to that dependency fail fast instead of retrying
+  severity: warning
+  alert: RetryBudgetExhaustedNonCritical
+  signal: metric
+  detect_within: 13m
+- layer: application
+  id: application-slo-authorization-availability
+  component: slo
+  failure: 'SLO burn: authorization availability burns its 99.99% budget'
+  impact: high error ratio of POST /payments/{id}/confirm
+  severity: critical
+  alert: PaymentsAuthorizationAvailabilityBurnFast
+  signal: slo
+  detect_within: 6m
+- layer: application
+  id: application-slo-platform-overhead-latency
+  component: slo
+  failure: 'SLO burn: platform overhead above 150 ms burns its 99.9% budget'
+  impact: slow platform processing
+  severity: critical
+  alert: PaymentsPlatformOverheadLatencyBurnFast
+  signal: slo
+  detect_within: 6m
+- layer: application
+  id: application-slo-payment-status-read
+  component: slo
+  failure: 'SLO burn: payment status reads burn their 99.95% budget'
+  impact: slow or failing GET /payments/{id}
+  severity: critical
+  alert: PaymentsStatusReadBurnFast
+  signal: slo
+  detect_within: 6m
+- layer: application
+  id: application-slo-merchant-webhook-delivery
+  component: slo
+  failure: 'SLO burn: webhook delivery burns its 99.9% budget'
+  impact: webhooks delivered later than 60 s
+  severity: critical
+  alert: PaymentsWebhookDeliveryBurnFast
+  signal: slo
+  detect_within: 6m
+- layer: application
+  id: application-new-version-regression
+  component: release
+  failure: Error or latency regression right after a new version
+  impact: bad release reaches all cells before the SLO burn alert
+  severity: warning
+  alert: null
+  signal: metric
+  reason: canary analysis alert is owned by the delivery layer and not written yet
+- layer: application
+  id: application-merchant-config-sync
+  component: router
+  failure: Merchant configuration cache not refreshed
+  impact: routing with stale merchant rules
+  severity: warning
+  alert: null
+  signal: metric
+  reason: no freshness metric emitted by the router yet

@@ -1,0 +1,68 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-compute-workloads
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: compute-workloads
+    rules:
+    - alert: CrashLoopBackOff
+      expr: max by (namespace, pod, node) (kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace=~"payments-.*"} * on (namespace, pod) group_left (node) kube_pod_info) == 1
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-crash-loop-back-off
+      annotations:
+        summary: A payments pod is in CrashLoopBackOff
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/crash-loop-back-off.md
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+    - alert: PodOOMKilled
+      expr: max by (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}) == 1 and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total[10m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        team: payments-core
+        service: kubernetes
+        owner: payments-core-oncall
+        layer: compute
+        failure_mode: compute-pod-oom-killed
+      annotations:
+        summary: A container was OOMKilled and restarted
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pod-oom-killed
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+    - alert: PodsPendingTooLong
+      expr: sum by (namespace) (kube_pod_status_phase{phase="Pending"}) > 0
+      for: 15m
+      labels:
+        severity: warning
+        team: platform
+        service: kubernetes
+        owner: platform-oncall
+        layer: compute
+        failure_mode: compute-pods-pending-too-long
+      annotations:
+        summary: Pods stay Pending for 15 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pods-pending-too-long
+        dashboard_url: https://grafana.payments.internal/d/kubernetes
+    - alert: HpaAtMaxReplicas
+      expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+      for: 10m
+      labels:
+        severity: warning
+        team: payments-core
+        service: kubernetes
+        owner: payments-core-oncall
+        layer: compute
+        failure_mode: compute-hpa-at-max-replicas
+      annotations:
+        summary: HPA stays at its maximum replicas for 10 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#hpa-at-max-replicas
+        dashboard_url: https://grafana.payments.internal/d/kubernetes

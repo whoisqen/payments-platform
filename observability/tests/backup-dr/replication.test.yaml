@@ -1,0 +1,169 @@
+rule_files:
+- ../../alerts/backup-dr/replication.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: database_latest_restorable_time_lag_seconds{store="aurora-cell-1"}
+    values: 600x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: LatestRestorableTimeLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-latest-restorable-time-lag-high
+        store: aurora-cell-1
+      exp_annotations:
+        summary: The latest restorable time of a database lags more than 5 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/latest-restorable-time-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+- interval: 1m
+  input_series:
+  - series: database_latest_restorable_time_lag_seconds{store="aurora-cell-1"}
+    values: 30x26
+  alert_rule_test:
+  - &id001
+    eval_time: 22m
+    alertname: LatestRestorableTimeLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: database_latest_restorable_time_lag_seconds{store="aurora-cell-1"}
+    values: 30x9 600x1 30x14
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_global_db_replication_lag_maximum{global_cluster="payments-cell-1",region="us-east-1"}
+    values: 6000x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraGlobalLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-aurora-global-lag-high
+        global_cluster: payments-cell-1
+        region: us-east-1
+      exp_annotations:
+        summary: Aurora Global Database lag above 5 seconds
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_global_db_replication_lag_maximum{global_cluster="payments-cell-1",region="us-east-1"}
+    values: 800x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraGlobalLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_global_db_replication_lag_maximum{global_cluster="payments-cell-1",region="us-east-1"}
+    values: 12000x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraGlobalLagRpoBudgetExceeded
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-aurora-global-lag-rpo-budget-exceeded
+        global_cluster: payments-cell-1
+        region: us-east-1
+      exp_annotations:
+        summary: Aurora Global Database lag above the 10 second RPO budget
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-rpo-budget-exceeded.md
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+- interval: 1m
+  input_series:
+  - series: aws_rds_aurora_global_db_replication_lag_maximum{global_cluster="payments-cell-1",region="us-east-1"}
+    values: 6000x19
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AuroraGlobalLagRpoBudgetExceeded
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+    values: 9000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: DynamoDbGlobalTableLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: dynamodb
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-dynamo-db-global-table-lag-high
+        table_name: merchant-cell-map
+        receiving_region: us-east-2
+      exp_annotations:
+        summary: DynamoDB Global Table replication latency above 5 seconds
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dynamo-db-global-table-lag-high
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+- interval: 1m
+  input_series:
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+    values: 500x26
+  alert_rule_test:
+  - &id002
+    eval_time: 22m
+    alertname: DynamoDbGlobalTableLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+    values: 500x9 9000x1 500x14
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: aws_s3_replication_latency_maximum{bucket="pay-backups",destination_region="us-east-1"}
+    values: 1500x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: S3ReplicationLagHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: s3
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-s3-replication-lag-high
+        bucket: pay-backups
+        destination_region: us-east-1
+      exp_annotations:
+        summary: S3 replication latency above the 15 minute RTC target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#s3-replication-lag-high
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+- interval: 1m
+  input_series:
+  - series: aws_s3_replication_latency_maximum{bucket="pay-backups",destination_region="us-east-1"}
+    values: 120x26
+  alert_rule_test:
+  - &id003
+    eval_time: 22m
+    alertname: S3ReplicationLagHigh
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_s3_replication_latency_maximum{bucket="pay-backups",destination_region="us-east-1"}
+    values: 120x9 1500x1 120x14
+  alert_rule_test:
+  - *id003

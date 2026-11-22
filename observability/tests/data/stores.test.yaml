@@ -1,0 +1,214 @@
+rule_files:
+- ../../alerts/data/stores.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  input_series:
+  - series: aws_dynamodb_throttled_requests_sum{table_name="merchant-cell-map"}
+    values: 0+3x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: DynamoDbThrottling
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: dynamodb
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-dynamo-db-throttling
+        table_name: merchant-cell-map
+      exp_annotations:
+        summary: DynamoDB throttles requests
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#dynamo-db-throttling
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: aws_dynamodb_throttled_requests_sum{table_name="merchant-cell-map"}
+    values: 0+0x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: DynamoDbThrottling
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
+    values: 900x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: ClickHouseReplicationLag
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-replication-lag
+        cluster: analytics
+      exp_annotations:
+        summary: ClickHouse replication delay above 5 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-replication-lag
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
+    values: 2x26
+  alert_rule_test:
+  - &id001
+    eval_time: 22m
+    alertname: ClickHouseReplicationLag
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{cluster="analytics"}
+    values: 2x9 900x1 2x14
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
+    values: 450x31
+  alert_rule_test:
+  - eval_time: 27m
+    alertname: ClickHouseMergeBacklog
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-merge-backlog
+        cluster: analytics
+      exp_annotations:
+        summary: ClickHouse has too many parts per partition
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-merge-backlog
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
+    values: 20x31
+  alert_rule_test:
+  - &id002
+    eval_time: 27m
+    alertname: ClickHouseMergeBacklog
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_MaxPartCountForPartition{cluster="analytics"}
+    values: 20x9 450x1 20x19
+  alert_rule_test:
+  - *id002
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
+    values: 10x26
+  - series: ClickHouseAsyncMetrics_DiskTotal_default{cluster="analytics",instance="ch-1"}
+    values: 100x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: ClickHouseDiskLow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-disk-low
+        cluster: analytics
+        instance: ch-1
+      exp_annotations:
+        summary: ClickHouse disk has less than 15% free
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-disk-low
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
+    values: 60x26
+  - series: ClickHouseAsyncMetrics_DiskTotal_default{cluster="analytics",instance="ch-1"}
+    values: 100x26
+  alert_rule_test:
+  - &id003
+    eval_time: 22m
+    alertname: ClickHouseDiskLow
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: ClickHouseAsyncMetrics_DiskAvailable_default{cluster="analytics",instance="ch-1"}
+    values: 60x9 10x1 60x14
+  - series: ClickHouseAsyncMetrics_DiskTotal_default{cluster="analytics",instance="ch-1"}
+    values: 100x9 100x1 100x14
+  alert_rule_test:
+  - *id003
+- interval: 1m
+  input_series:
+  - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
+    values: 1x21
+  alert_rule_test:
+  - eval_time: 17m
+    alertname: OpenSearchClusterRed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: security
+        service: opensearch
+        owner: security-oncall
+        layer: data
+        failure_mode: data-open-search-cluster-red
+        domain_name: audit
+      exp_annotations:
+        summary: OpenSearch domain status is red
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/open-search-cluster-red.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
+    values: '0x21'
+  alert_rule_test:
+  - &id004
+    eval_time: 17m
+    alertname: OpenSearchClusterRed
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_es_cluster_statusred_maximum{domain_name="audit"}
+    values: 0x9 1x1 0x9
+  alert_rule_test:
+  - *id004
+- interval: 1m
+  input_series:
+  - series: aws_es_free_storage_space_minimum{domain_name="audit"}
+    values: 10000x26
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: OpenSearchDiskLow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: security
+        service: opensearch
+        owner: security-oncall
+        layer: data
+        failure_mode: data-open-search-disk-low
+        domain_name: audit
+      exp_annotations:
+        summary: OpenSearch has less than 20 GiB free per node
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#open-search-disk-low
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+- interval: 1m
+  input_series:
+  - series: aws_es_free_storage_space_minimum{domain_name="audit"}
+    values: 90000x26
+  alert_rule_test:
+  - &id005
+    eval_time: 22m
+    alertname: OpenSearchDiskLow
+    exp_alerts: []
+- interval: 1m
+  input_series:
+  - series: aws_es_free_storage_space_minimum{domain_name="audit"}
+    values: 90000x9 10000x1 90000x14
+  alert_rule_test:
+  - *id005

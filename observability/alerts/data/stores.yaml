@@ -1,0 +1,96 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-data-stores
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: data-stores
+    rules:
+    - alert: DynamoDbThrottling
+      expr: sum by (table_name) (rate(aws_dynamodb_throttled_requests_sum[5m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: dynamodb
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-dynamo-db-throttling
+      annotations:
+        summary: DynamoDB throttles requests
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#dynamo-db-throttling
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: ClickHouseReplicationLag
+      expr: max by (cluster) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay) > 300
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-replication-lag
+      annotations:
+        summary: ClickHouse replication delay above 5 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-replication-lag
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: ClickHouseMergeBacklog
+      expr: max by (cluster) (ClickHouseAsyncMetrics_MaxPartCountForPartition) > 300
+      for: 15m
+      labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-merge-backlog
+      annotations:
+        summary: ClickHouse has too many parts per partition
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-merge-backlog
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: ClickHouseDiskLow
+      expr: min by (cluster, instance) (ClickHouseAsyncMetrics_DiskAvailable_default / ClickHouseAsyncMetrics_DiskTotal_default) < 0.15
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: clickhouse
+        owner: data-platform-oncall
+        layer: data
+        failure_mode: data-click-house-disk-low
+      annotations:
+        summary: ClickHouse disk has less than 15% free
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#click-house-disk-low
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: OpenSearchClusterRed
+      expr: max by (domain_name) (aws_es_cluster_statusred_maximum) >= 1
+      for: 5m
+      labels:
+        severity: critical
+        team: security
+        service: opensearch
+        owner: security-oncall
+        layer: data
+        failure_mode: data-open-search-cluster-red
+      annotations:
+        summary: OpenSearch domain status is red
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/open-search-cluster-red.md
+        dashboard_url: https://grafana.payments.internal/d/data-stores
+    - alert: OpenSearchDiskLow
+      expr: min by (domain_name) (aws_es_free_storage_space_minimum) < 20480
+      for: 10m
+      labels:
+        severity: warning
+        team: security
+        service: opensearch
+        owner: security-oncall
+        layer: data
+        failure_mode: data-open-search-disk-low
+      annotations:
+        summary: OpenSearch has less than 20 GiB free per node
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#open-search-disk-low
+        dashboard_url: https://grafana.payments.internal/d/data-stores

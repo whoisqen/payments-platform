@@ -1,0 +1,89 @@
+# Helm values (chart prometheus-blackbox-exporter) deployed once per probe point, then one Probe per point.
+config:
+  modules:
+    http_2xx:
+      prober: http
+      timeout: 10s
+      http:
+        valid_status_codes: [200]
+        method: GET
+        fail_if_not_ssl: true
+        preferred_ip_protocol: ip4
+        tls_config: {min_version: TLS1.2}
+serviceMonitor:
+  enabled: false
+---
+# Probe point use1: blackbox-exporter in us-east-1, outside the working region.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: probe-use1
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  jobName: blackbox
+  interval: 30s
+  module: http_2xx
+  prober: {url: blackbox.use1.probes.payments.internal:9115}
+  targets:
+    staticConfig:
+      labels: {probe_point: use1}
+      static:
+        - https://api.eu-central-1.payments.internal/probe/region-health
+        - https://api.payments.internal/probe/api
+        - https://webhooks.payments.internal/probe/webhook-in
+        - https://control-center.payments.internal/probe/control-center
+      relabelingConfigs:
+        - {action: replace, sourceLabels: [__param_target], regex: "https://([^/]+)/.*", targetLabel: target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^/]+/probe/([a-z-]+)", targetLabel: probe_target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^.]+\\.([a-z0-9-]+)\\.payments\\.internal/.*", targetLabel: region, replacement: "$1"}
+---
+# Probe point use2: blackbox-exporter in us-east-2, the second recovery region.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: probe-use2
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  jobName: blackbox
+  interval: 30s
+  module: http_2xx
+  prober: {url: blackbox.use2.probes.payments.internal:9115}
+  targets:
+    staticConfig:
+      labels: {probe_point: use2}
+      static:
+        - https://api.eu-central-1.payments.internal/probe/region-health
+        - https://api.payments.internal/probe/api
+        - https://webhooks.payments.internal/probe/webhook-in
+        - https://control-center.payments.internal/probe/control-center
+      relabelingConfigs:
+        - {action: replace, sourceLabels: [__param_target], regex: "https://([^/]+)/.*", targetLabel: target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^/]+/probe/([a-z-]+)", targetLabel: probe_target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^.]+\\.([a-z0-9-]+)\\.payments\\.internal/.*", targetLabel: region, replacement: "$1"}
+---
+# Probe point ext: blackbox-exporter at an external synthetic-monitoring provider, independent of AWS.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: probe-ext
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  jobName: blackbox
+  interval: 30s
+  module: http_2xx
+  prober: {url: blackbox.ext.probes.payments.internal:9115}
+  targets:
+    staticConfig:
+      labels: {probe_point: ext}
+      static:
+        - https://api.eu-central-1.payments.internal/probe/region-health
+        - https://api.payments.internal/probe/api
+        - https://webhooks.payments.internal/probe/webhook-in
+        - https://control-center.payments.internal/probe/control-center
+      relabelingConfigs:
+        - {action: replace, sourceLabels: [__param_target], regex: "https://([^/]+)/.*", targetLabel: target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^/]+/probe/([a-z-]+)", targetLabel: probe_target, replacement: "$1"}
+        - {action: replace, sourceLabels: [__param_target], regex: "https://[^.]+\\.([a-z0-9-]+)\\.payments\\.internal/.*", targetLabel: region, replacement: "$1"}

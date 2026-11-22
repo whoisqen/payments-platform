@@ -1,0 +1,82 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-backup-dr-replication
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: backup-dr-replication
+    rules:
+    - alert: LatestRestorableTimeLagHigh
+      expr: max by (store) (database_latest_restorable_time_lag_seconds) > 300
+      for: 10m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-latest-restorable-time-lag-high
+      annotations:
+        summary: The latest restorable time of a database lags more than 5 minutes
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/latest-restorable-time-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/backup
+    - alert: AuroraGlobalLagHigh
+      expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 5000
+      for: 2m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-aurora-global-lag-high
+      annotations:
+        summary: Aurora Global Database lag above 5 seconds
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-high.md
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+    - alert: AuroraGlobalLagRpoBudgetExceeded
+      expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 10000
+      for: 1m
+      labels:
+        severity: critical
+        team: data-platform
+        service: aurora
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-aurora-global-lag-rpo-budget-exceeded
+      annotations:
+        summary: Aurora Global Database lag above the 10 second RPO budget
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-rpo-budget-exceeded.md
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+    - alert: DynamoDbGlobalTableLagHigh
+      expr: max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum) > 5000
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: dynamodb
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-dynamo-db-global-table-lag-high
+      annotations:
+        summary: DynamoDB Global Table replication latency above 5 seconds
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dynamo-db-global-table-lag-high
+        dashboard_url: https://grafana.payments.internal/d/dr-switch
+    - alert: S3ReplicationLagHigh
+      expr: max by (bucket, destination_region) (aws_s3_replication_latency_maximum) > 900
+      for: 10m
+      labels:
+        severity: warning
+        team: data-platform
+        service: s3
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-s3-replication-lag-high
+      annotations:
+        summary: S3 replication latency above the 15 minute RTC target
+        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#s3-replication-lag-high
+        dashboard_url: https://grafana.payments.internal/d/dr-switch

@@ -1,0 +1,36 @@
+# Helm values (chart prometheus-redis-exporter) for Amazon MemoryDB over TLS, then the ServiceMonitor.
+redisAddress: rediss://memorydb-endpoint:6379
+auth:
+  enabled: true
+  secret:
+    name: memorydb-exporter-auth
+    key: password
+env:
+  - {name: REDIS_EXPORTER_CHECK_STREAMS, value: "payments-drain,payments-events"}
+  - {name: REDIS_EXPORTER_INCL_SYSTEM_METRICS, value: "false"}
+serviceMonitor:
+  enabled: false
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 128Mi}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: prometheus-redis-exporter}
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      relabelings:
+        - {action: replace, sourceLabels: [__meta_kubernetes_service_label_cell], targetLabel: cell}
+      metricRelabelings:
+        - action: keep
+          sourceLabels: [__name__]
+          regex: redis_(up|memory_used_bytes|memory_max_bytes|evicted_keys_total|stream_length|connected_clients|instance_info)
+        - action: labeldrop
+          regex: (payment_id|customer_id|token|pan|card_number|cvv|idempotency_key)
