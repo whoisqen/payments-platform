@@ -72,13 +72,13 @@ variable "plan_read_actions" {
 
 variable "apply_roles" {
   type = map(object({
-    github_environment = string
+    github_environment = optional(string)
     actions            = list(string)
     resource_arns      = list(string)
     unscoped_actions   = optional(list(string), [])
   }))
   default     = {}
-  description = "One apply role per component (key = component): the GitHub environment that may assume it, actions on named resources, and the few actions that cannot be scoped."
+  description = "One apply role per component (key = component): actions on named resources (github_environment is no longer part of the trust and is ignored), and the few actions that cannot be scoped."
 
   validation {
     condition = alltrue([
@@ -91,6 +91,17 @@ variable "apply_roles" {
   validation {
     condition     = alltrue([for r in var.apply_roles : length(r.resource_arns) > 0 && !contains(r.resource_arns, "*")])
     error_message = "resource_arns must name resources; use unscoped_actions for actions without resource-level scoping."
+  }
+}
+
+variable "apply_refs" {
+  type        = list(string)
+  default     = ["refs/heads/main", "refs/heads/release/*"]
+  description = "Git refs that may assume an apply role: main and release branches. The only wildcard allowed is the release/* suffix."
+
+  validation {
+    condition     = length(var.apply_refs) > 0 && alltrue([for r in var.apply_refs : can(regex("^refs/heads/(main|release/([A-Za-z0-9._-]+|[*]))$", r))])
+    error_message = "apply_refs may only be refs/heads/main, refs/heads/release/<name> or refs/heads/release/*."
   }
 }
 

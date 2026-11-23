@@ -48,13 +48,51 @@ run "trust_is_pinned_to_repository_and_context" {
   command = plan
 
   assert {
-    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:example-org/payments-platform:pull_request"
+    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:pull_request"]
     error_message = "plan only from pull requests of this repository"
   }
   assert {
-    condition     = jsondecode(aws_iam_role.apply["network"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:example-org/payments-platform:environment:prod-network"
-    error_message = "apply only from its GitHub environment"
+    condition     = jsondecode(aws_iam_role.apply["network"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:ref:refs/heads/main", "repo:example-org/payments-platform:ref:refs/heads/release/*"]
+    error_message = "apply only from main and release branches of this repository"
   }
+  assert {
+    condition     = jsondecode(aws_iam_role.apply["network"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
+    error_message = "the audience is STS"
+  }
+}
+
+run "no_wildcard_subject_except_the_release_suffix" {
+  command = plan
+
+  assert {
+    condition = alltrue(flatten([
+      for r in values(aws_iam_role.apply) : [
+        for s in jsondecode(r.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] :
+        !strcontains(s, "*") || endswith(s, ":ref:refs/heads/release/*")
+      ]
+    ])) && !strcontains(jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"][0], "*")
+    error_message = "a subject may contain * only as the release/* suffix of an apply role"
+  }
+}
+
+run "other_branches_and_wildcards_are_rejected" {
+  command = plan
+
+  variables {
+    apply_refs = ["refs/heads/*"]
+  }
+
+  expect_failures = [var.apply_refs]
+}
+
+run "feature_branch_is_rejected" {
+  command = plan
+
+  variables {
+    apply_refs = ["refs/heads/main", "refs/heads/feat/x"]
+  }
+
+  expect_failures = [var.apply_refs]
 }
 
 run "plan_cannot_write_state_or_read_secrets" {

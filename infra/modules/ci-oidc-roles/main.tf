@@ -12,10 +12,11 @@ locals {
     Resource = var.state_kms_key_arn
   }
 
-  # The subject pins repository and context, so a fork or another branch cannot assume the role.
-  trust = { for k, sub in merge(
-    { plan = "repo:${var.github_repository}:pull_request" },
-    { for c, r in var.apply_roles : "apply-${c}" => "repo:${var.github_repository}:environment:${r.github_environment}" }
+  # The subject pins repository and ref, so a fork, a pull request branch or another branch cannot assume an apply role.
+  # Plan reads only and runs for pull requests; apply runs from main and release branches.
+  trust = { for k, subs in merge(
+    { plan = ["repo:${var.github_repository}:pull_request"] },
+    { for c, r in var.apply_roles : "apply-${c}" => [for ref in var.apply_refs : "repo:${var.github_repository}:ref:${ref}"] }
     ) : k => jsonencode({
       Version = "2012-10-17"
       Statement = [{
@@ -23,10 +24,8 @@ locals {
         Principal = { Federated = local.provider_arn }
         Action    = "sts:AssumeRoleWithWebIdentity"
         Condition = {
-          StringEquals = {
-            "${local.oidc_host}:aud" = "sts.amazonaws.com"
-            "${local.oidc_host}:sub" = sub
-          }
+          StringEquals = { "${local.oidc_host}:aud" = "sts.amazonaws.com" }
+          StringLike   = { "${local.oidc_host}:sub" = subs }
         }
       }]
     })
