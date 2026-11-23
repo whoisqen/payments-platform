@@ -10,3 +10,4 @@ __pycache__/
 .claude/settings.local.json
 .worktrees/
 .claude/worktrees/
+infra/modules/dr-failover/.build/

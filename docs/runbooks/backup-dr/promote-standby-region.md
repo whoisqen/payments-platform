@@ -14,14 +14,15 @@ The Route 53 health check of the Frankfurt ingress fails and DNS answers with th
 
 ## Actions
 
-1. Fence Frankfurt first (SSM document `pay-runbook-region-down` does this); two writers can charge a payment twice.
-2. Promote the us-east-1 Aurora secondary of each cell and of the locker (global cluster failover), one cell at a time starting with `spare`.
+Promotion starts by itself: when the Route 53 health check of the Frankfurt ingress fails for five minutes, the alarm `*-working-region-down` invokes the Lambda of `infra/modules/dr-failover` (`scripts/dr/failover.py --mode warm --auto`). For every cell and the locker it fences what is reachable, runs `failover-global-cluster` on the Aurora global cluster, and removes us-east-1 from the DynamoDB deny-write policy. A lock record per cell prevents a second promotion. Route 53 has already moved the traffic.
+
+1. Check the Lambda log (`failover-finished` with a result per cell). Exit code 3 means another run holds the lock, which is not a failure.
+2. If a cell failed, re-run it: invoke the Lambda again with the same alarm event (the run id is the incident time, so the run resumes) or run `scripts/dr/failover.py --mode warm --auto --cell <cell> ...` by hand through `runbook-actions`.
 3. The standby releases already use the local cluster endpoints, which become writers on promotion; no values change. Enable migrations (`migrations.enabled`) only after the writer is stable and a migration is due.
-4. Switch the DynamoDB deny-write regions (`deny_write_regions` of the dynamodb stack) so that us-east-1 may write.
-5. Traffic needs no change: Route 53 already answers with us-east-1.
+4. `fence-unverified` in the log means Frankfurt's control plane did not answer; Aurora keeps the old writer from rejoining as a writer, but check the PSP fence rule group once Frankfurt is reachable.
 
 Failing back is a planned switch in the opposite direction after Frankfurt is rebuilt from the replicated data; do not fail back during the incident.
 
 ## Escalation
 
-Promotion needs the incident commander and the primary on-call (ADR-015). Default chain: primary acknowledges within 5 min, the secondary is paged at 5 min and the incident commander at 15 min (section 20.6).
+The incident commander is added at once; the promotion itself needs no confirmation. Default chain: primary acknowledges within 5 min, the secondary is paged at 5 min and the incident commander at 15 min (section 20.6).

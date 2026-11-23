@@ -62,6 +62,10 @@ class Failover:
         return not self.a.dry_run
 
     def confirm(self):
+        if self.a.auto:
+            # the Route 53 health check alarm of the working region is the confirmation (owner decision for the warm standby)
+            log("confirmed", confirmed_by="route53-health-check", run_id=self.a.run_id)
+            return
         if not self.a.confirmed_by:
             raise Refused("no on-call confirmation: the switch is semi-automatic (ADR-015)")
         log("confirmed", confirmed_by=self.a.confirmed_by, run_id=self.a.run_id)
@@ -69,26 +73,34 @@ class Failover:
     def fence(self):
         src = self.a.source_region
         nf = self.client("network-firewall", src)
-        ga = self.client("globalaccelerator", "us-west-2")
+        ga = self.client("globalaccelerator", "us-west-2") if self.a.source_endpoint_group else None
         group = nf.describe_rule_group(RuleGroupName=self.a.fence_rule_group, Type="STATEFUL")
         rules = group["RuleGroup"]["RulesSource"].get("RulesString", "")
         if FENCE_SID not in rules:
             if self.act("fence-firewall", rule_group=self.a.fence_rule_group):
                 nf.update_rule_group(UpdateToken=group["UpdateToken"], RuleGroupName=self.a.fence_rule_group, Type="STATEFUL",
                                      RuleGroup={"RulesSource": {"RulesString": (rules + "\n" + FENCE_RULE).strip()}})
-        eg = ga.describe_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group)["EndpointGroup"]
-        if eg["TrafficDialPercentage"] != 0:
-            if self.act("fence-traffic", endpoint_group=self.a.source_endpoint_group):
-                ga.update_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group, TrafficDialPercentage=0)
+        if ga:
+            eg = ga.describe_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group)["EndpointGroup"]
+            if eg["TrafficDialPercentage"] != 0:
+                if self.act("fence-traffic", endpoint_group=self.a.source_endpoint_group):
+                    ga.update_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group, TrafficDialPercentage=0)
         self.run_document(src, "dr-scale-router-zero", {"Cell": [self.a.cell]}, "fence-router")
         if self.a.dry_run:
             return
         again = nf.describe_rule_group(RuleGroupName=self.a.fence_rule_group, Type="STATEFUL")
-        eg = ga.describe_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group)["EndpointGroup"]
-        if FENCE_SID not in again["RuleGroup"]["RulesSource"].get("RulesString", "") or eg["TrafficDialPercentage"] != 0:
+        dial = ga.describe_endpoint_group(EndpointGroupArn=self.a.source_endpoint_group)["EndpointGroup"]["TrafficDialPercentage"] if ga else 0
+        if FENCE_SID not in again["RuleGroup"]["RulesSource"].get("RulesString", "") or dial != 0:
             raise Refused("fencing of the source region could not be verified")
         self.fenced = True
         log("fenced", region=src, cell=self.a.cell)
+
+    def fence_best_effort(self):
+        # A failed region may not answer its own control plane; Aurora itself keeps the old writer from rejoining as a writer.
+        try:
+            self.fence()
+        except Exception as exc:  # noqa: BLE001
+            log("fence-unverified", region=self.a.source_region, reason=str(exc), cell=self.a.cell)
 
     def run_document(self, region, document, params, step, timeout_s=None):
         ssm = self.client("ssm", region)
@@ -163,7 +175,7 @@ class Failover:
                         ExpressionAttributeValues={":v": {"S": region}, ":id": {"S": self.a.run_id}})
 
     def promote_aurora(self):
-        if not self.fenced and not self.a.dry_run:
+        if not self.fenced and not self.a.dry_run and self.a.mode != "warm":
             raise Refused("promotion needs a verified fence first")
         region = self.region or self.a.target_region
         rds = self.client("rds", region)
@@ -178,6 +190,33 @@ class Failover:
         if self.act("promote-aurora", global_cluster=self.a.global_cluster, region=region):
             rds.failover_global_cluster(GlobalClusterIdentifier=self.a.global_cluster, TargetDbClusterIdentifier=member["DBClusterArn"],
                                         AllowDataLoss=True)
+
+    def allow_dynamodb_writes(self):
+        # The IAM policy denies writes to the merchant-to-cell map in the standby region; the new version drops the promoted region.
+        arn = self.a.deny_policy_arn
+        if not arn:
+            return
+        region = self.region or self.a.target_region
+        iam = self.client("iam", region)
+        current = iam.get_policy(PolicyArn=arn)["Policy"]["DefaultVersionId"]
+        doc = iam.get_policy_version(PolicyArn=arn, VersionId=current)["PolicyVersion"]["Document"]
+        if isinstance(doc, str):
+            doc = json.loads(doc)
+        marker = f":dynamodb:{region}:"
+        for st in doc["Statement"]:
+            res = st["Resource"] if isinstance(st["Resource"], list) else [st["Resource"]]
+            st["Resource"] = [r for r in res if marker not in r]
+        doc["Statement"] = [st for st in doc["Statement"] if st["Resource"]]
+        if not doc["Statement"]:
+            # IAM requires a statement; deny nothing real
+            doc["Statement"] = [{"Effect": "Deny", "Action": "dynamodb:PutItem", "Resource": "arn:aws:dynamodb:*:000000000000:table/none"}]
+        if self.act("allow-dynamodb-writes", region=region, policy=arn):
+            # IAM keeps at most five versions of a policy: drop the oldest non-default one first
+            versions = [v for v in iam.list_policy_versions(PolicyArn=arn).get("Versions", []) if not v["IsDefaultVersion"]]
+            if len(versions) >= 4:
+                oldest = min(versions, key=lambda v: v["CreateDate"])
+                iam.delete_policy_version(PolicyArn=arn, VersionId=oldest["VersionId"])
+            iam.create_policy_version(PolicyArn=arn, PolicyDocument=json.dumps(doc), SetAsDefault=True)
 
     def warm_memorydb(self):
         region = self.region or self.a.target_region
@@ -225,8 +264,12 @@ class Failover:
         self.run_document(region, "dr-psp-reconcile", {"Cell": [self.a.cell], "WindowMinutes": ["5"]}, "reconcile")
 
     def run(self):
-        steps = [self.confirm, self.fence, self.acquire_lock, self.ensure_compute, self.promote_aurora, self.warm_memorydb,
-                 self.scale_cell, self.switch_traffic, self.reconcile]
+        if self.a.mode == "warm":
+            # Route 53 already moved the traffic and the standby compute runs: fence what is reachable, promote the data, reconcile.
+            steps = [self.confirm, self.fence_best_effort, self.acquire_lock, self.promote_aurora, self.allow_dynamodb_writes] + ([self.reconcile] if self.a.reconcile else [])
+        else:
+            steps = [self.confirm, self.fence, self.acquire_lock, self.ensure_compute, self.promote_aurora, self.warm_memorydb,
+                     self.scale_cell, self.switch_traffic, self.reconcile]
         for step in steps:
             log("step", name=step.__name__, cell=self.a.cell)
             step()
@@ -246,12 +289,16 @@ def parse_args(argv):
     ap.add_argument("--lock-table", help="default: <prefix>-prod-<lock region short>-dr-lock")
     ap.add_argument("--global-cluster", help="default: <prefix>-prod-<cell>-aurora-payments")
     ap.add_argument("--fence-rule-group", help="default: <prefix>-prod-<source region short>-psp-fence")
-    ap.add_argument("--source-endpoint-group", required=True)
+    ap.add_argument("--source-endpoint-group", default="")
     ap.add_argument("--target-endpoint-group", action="append", default=[], metavar="REGION=ARN")
     ap.add_argument("--capacity-wait-s", type=int, default=600)
     ap.add_argument("--warm-wait-s", type=int, default=300)
     ap.add_argument("--step-timeout-s", type=int, default=3600)
     ap.add_argument("--poll-s", type=int, default=15)
+    ap.add_argument("--mode", choices=["cold", "warm"], default="cold", help="warm: the standby region already runs compute and Route 53 moves the traffic")
+    ap.add_argument("--auto", action="store_true", help="started by the health check alarm: no on-call confirmation")
+    ap.add_argument("--deny-policy-arn", default="", help="IAM policy that denies DynamoDB writes in the standby region (warm mode)")
+    ap.add_argument("--reconcile", action="store_true", help="warm mode: also run the dr-psp-reconcile document of the target region")
     ap.add_argument("--dry-run", action="store_true")
     ns = ap.parse_args(argv)
     ns.lock_table = ns.lock_table or f"{ns.name_prefix}-prod-{short(ns.lock_region)}-dr-lock"
@@ -259,8 +306,8 @@ def parse_args(argv):
     ns.fence_rule_group = ns.fence_rule_group or f"{ns.name_prefix}-prod-{short(ns.source_region)}-psp-fence"
     ns.target_endpoint_groups = dict(p.split("=", 1) for p in ns.target_endpoint_group)
     missing = {ns.target_region, ns.fallback_region} - set(ns.target_endpoint_groups)
-    if missing:
-        ap.error(f"--target-endpoint-group missing for {sorted(missing)}")
+    if ns.mode == "cold" and (missing or not ns.source_endpoint_group):
+        ap.error(f"cold mode needs --source-endpoint-group and --target-endpoint-group for {sorted(missing)}")
     return ns
 
 

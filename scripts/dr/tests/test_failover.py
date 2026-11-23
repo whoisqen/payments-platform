@@ -8,7 +8,7 @@ SPEC = importlib.util.spec_from_file_location("failover", Path(__file__).resolve
 fo = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(fo)
 
-MUTATING = {"update_rule_group", "update_endpoint_group", "update_item", "start_automation_execution",
+MUTATING = {"delete_policy_version", "create_policy_version", "update_rule_group", "update_endpoint_group", "update_item", "start_automation_execution",
             "failover_global_cluster", "stop_automation_execution"}
 SRC_EG, USE1_EG, USE2_EG = "arn:eg:src", "arn:eg:use1", "arn:eg:use2"
 ARGS = ["--name-prefix", "pay", "--source-region", "eu-central-1", "--target-region", "us-east-1", "--fallback-region", "us-east-2",
@@ -63,6 +63,13 @@ class Fake:
                 {"DBClusterArn": f"arn:aws:rds:{r}:1:cluster:x", "IsWriter": r == self.writer} for r in ("eu-central-1", "us-east-1", "us-east-2")]}]}
         elif name == "failover_global_cluster":
             self.writer = kw["TargetDbClusterIdentifier"].split(":")[3]
+        elif name == "get_policy":
+            return {"Policy": {"DefaultVersionId": "v1"}}
+        elif name == "list_policy_versions":
+            return {"Versions": [{"VersionId": f"v{i}", "IsDefaultVersion": i == 5, "CreateDate": i} for i in range(1, 6)]}
+        elif name == "get_policy_version":
+            return {"PolicyVersion": {"Document": {"Version": "2012-10-17", "Statement": [{"Effect": "Deny", "Action": ["dynamodb:PutItem"], "Resource": [
+                "arn:aws:dynamodb:us-east-1:1:table/t", "arn:aws:dynamodb:us-east-2:1:table/t"]}]}}}
         elif name == "get_metric_statistics":
             return {"Datapoints": [{"Timestamp": self.t, "Minimum": self.warm}]}
         return {}
@@ -86,6 +93,60 @@ def run(fake, extra=(), args=ARGS):
     with contextlib.redirect_stdout(out):
         code = fo.main(list(args) + list(extra), client=fake.client, sleep=sleep, now=lambda: fake.t)
     return code, out.getvalue(), ns
+
+
+WARM = ["--name-prefix", "pay", "--source-region", "eu-central-1", "--target-region", "us-east-1", "--fallback-region", "us-east-2",
+        "--lock-region", "us-east-1", "--cell", "cell-1", "--run-id", "inc-43", "--mode", "warm", "--auto",
+        "--deny-policy-arn", "arn:aws:iam::1:policy/deny", "--poll-s", "30"]
+
+
+class WarmFailoverTest(unittest.TestCase):
+    def test_promotes_without_compute_or_traffic_steps(self):
+        fake = Fake()
+        code, out, _ = run(fake, args=WARM)
+        self.assertEqual(code, 0)
+        self.assertEqual(fake.writer, "us-east-1")
+        names = fake.names()
+        for absent in ("update_endpoint_group", "describe_endpoint_group"):
+            self.assertNotIn(absent, names)
+        self.assertNotIn("dr-create-compute", " ".join(c[3].get("DocumentName", "") for c in fake.calls))
+        self.assertIn("route53-health-check", out)
+
+    def test_dynamodb_writes_allowed_only_in_the_promoted_region(self):
+        fake = Fake()
+        run(fake, args=WARM)
+        created = [c for c in fake.calls if c[2] == "create_policy_version"]
+        self.assertEqual(len(created), 1)
+        doc = __import__("json").loads(created[0][3]["PolicyDocument"])
+        self.assertEqual(doc["Statement"][0]["Resource"], ["arn:aws:dynamodb:us-east-2:1:table/t"])
+
+    def test_oldest_policy_version_is_deleted_at_the_iam_limit(self):
+        fake = Fake()
+        run(fake, args=WARM)
+        deleted = [c for c in fake.calls if c[2] == "delete_policy_version"]
+        self.assertEqual([c[3]["VersionId"] for c in deleted], ["v1"])
+
+    def test_unreachable_source_region_does_not_block_promotion(self):
+        fake = Fake()
+        real = fake.handle
+
+        def handle(service, region, name, kw):
+            if region == "eu-central-1":
+                raise ClientError("EndpointConnectionError")
+            return real(service, region, name, kw)
+
+        fake.handle = handle
+        code, out, _ = run(fake, args=WARM)
+        self.assertEqual(code, 0)
+        self.assertEqual(fake.writer, "us-east-1")
+        self.assertIn("fence-unverified", out)
+
+    def test_held_lock_skips_promotion(self):
+        fake = Fake()
+        fake.lock_held = True
+        code, _, _ = run(fake, args=WARM)
+        self.assertEqual(code, fo.EXIT_LOCK_HELD)
+        self.assertEqual(fake.writer, "eu-central-1")
 
 
 class FailoverTest(unittest.TestCase):

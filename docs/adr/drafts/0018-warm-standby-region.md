@@ -14,7 +14,7 @@ The recovery regions held only data and prepared networks; all compute was creat
 - The standby runs the same releases against its own replicated data and receives no requests while Frankfurt is healthy. Its database endpoints are the local Aurora secondaries, so promotion (`docs/runbooks/backup-dr/promote-standby-region.md`) changes no deploy values.
 - Each region has its own egress path (egress VPC, Network Firewall, transit gateway) so PSP traffic never crosses regions.
 - Data is replicated asynchronously to the standby: Aurora Global Database, DynamoDB Global Tables, S3 replication of backup and archive buckets, Backup copy jobs to the recovery vaults, Secrets Manager and ECR replicas, multi-Region KMS keys.
-- Promotion of the us-east-1 Aurora secondary stays semi-automatic with fencing (D6): one on-call confirmation, because two writers can charge a payment twice.
+- Promotion of the us-east-1 data stores is automatic (owner decision, replaces the semi-automatic switch of D6): the failed Route 53 health check of Frankfurt starts `scripts/dr/failover.py --mode warm --auto` through `infra/modules/dr-failover`. Safeguards: five consecutive failing minutes, missing data never triggers, a DynamoDB lock per cell, one concurrent run, and fencing as far as the failed region answers. Aurora itself keeps the old writer from rejoining as a writer.
 - us-east-2 stays data and backups only; plan B of D7 is unchanged.
 - Environments opt in with `standby_enabled` in `env.hcl` (stage); dev has no standby.
 
