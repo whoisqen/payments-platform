@@ -12,6 +12,10 @@ spec:
         revision: {{ .Values.repo.revision }}
         directories:
           - path: deploy/envs/*/*/locker
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/*
+            exclude: true
+{{- end }}
   template:
     metadata:
       name: 'payments-locker-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
@@ -52,6 +56,10 @@ spec:
         revision: {{ .Values.repo.revision }}
         directories:
           - path: deploy/envs/*/*/edge
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/*
+            exclude: true
+{{- end }}
   template:
     metadata:
       name: 'payments-edge-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
@@ -94,6 +102,10 @@ spec:
               revision: {{ .Values.repo.revision }}
               files:
                 - path: deploy/envs/*/images.yaml
+{{- range .Values.gatedEnvironments }}
+                - path: deploy/envs/{{ . }}/images.yaml
+                  exclude: true
+{{- end }}
           - list:
               elements:
                 - region: {{ .Values.cluster.region }}

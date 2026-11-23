@@ -1,0 +1,180 @@
+{{- if and .Values.gatedEnvironments .Values.gated.revision }}
+{{- $rev := .Values.gated.revision }}
+{{- if not (regexMatch "^v[0-9]+\\.[0-9]+\\.[0-9]+" $rev) }}{{ fail "gated.revision must be a release tag such as v1.4.0, never a branch" }}{{ end }}
+# Production environments (rendered once gated.revision is set): every Application is pinned to one release tag and has no automated sync, so a merge to main changes nothing there
+# until the tag is moved and the cell is synced by hand, one cell at a time.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-cells-gated
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ $rev }}
+        directories:
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/cell-*
+{{- end }}
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/spare
+{{- end }}
+  template:
+    metadata:
+      name: 'payments-cell-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}-{{`{{ .path.basename }}`}}'
+      labels:
+        payments-platform/gated: "true"
+    spec:
+      project: payments
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-{{`{{ .path.basename }}`}}'
+        namespace: payments
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          path: deploy/charts/payments-cell
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/{{`{{ .path.basename }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/images.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          ref: values
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-locker-gated
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ $rev }}
+        directories:
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/locker
+{{- end }}
+  template:
+    metadata:
+      name: 'payments-locker-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
+      labels:
+        payments-platform/gated: "true"
+    spec:
+      project: payments
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-locker'
+        namespace: payments
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          path: deploy/charts/payments-locker
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/locker/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/images.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          ref: values
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-edge-gated
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ $rev }}
+        directories:
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/edge
+{{- end }}
+  template:
+    metadata:
+      name: 'payments-edge-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
+      labels:
+        payments-platform/gated: "true"
+    spec:
+      project: payments
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-edge'
+        namespace: payments-edge
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          path: deploy/charts/payments-edge
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/edge/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          ref: values
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: payments-control-center-gated
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: {{ .Values.repo.url }}
+              revision: {{ $rev }}
+              files:
+{{- range .Values.gatedEnvironments }}
+                - path: deploy/envs/{{ . }}/images.yaml
+{{- end }}
+          - list:
+              elements:
+                - region: {{ .Values.cluster.region }}
+  template:
+    metadata:
+      name: 'payments-control-center-{{`{{ index .path.segments 2 }}`}}-{{`{{ .region }}`}}'
+      labels:
+        payments-platform/gated: "true"
+    spec:
+      project: payments
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" .region "${1}${2}${3}" }}`}}-control-center'
+        namespace: control-center
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          path: deploy/charts/control-center
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ .region }}`}}/control-center/values.yaml
+            parameters:
+              - name: image.digest
+                value: '{{`{{ index . "control-center" "image" "digest" }}`}}'
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          ref: values
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+{{- end }}

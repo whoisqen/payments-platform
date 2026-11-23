@@ -1,0 +1,116 @@
+suite: production environments are pinned and synced by hand
+templates:
+  - applicationset-gated.yaml
+  - applicationset-cells.yaml
+  - applicationset-shared.yaml
+  - appprojects.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  cluster.regionShort: euc1
+  observability.grafanaUrl: https://grafana.example.test
+  gated.revision: v1.4.0
+tests:
+  - it: pins every gated Application to the release tag
+    template: applicationset-gated.yaml
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: v1.4.0
+        documentIndex: 0
+      - equal:
+          path: spec.generators[0].git.revision
+          value: v1.4.0
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.sources[1].targetRevision
+          value: v1.4.0
+        documentIndex: 3
+  - it: has no automated sync, so every cell is synced by hand
+    template: applicationset-gated.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.syncPolicy.automated
+        documentIndex: 0
+      - notExists:
+          path: spec.template.spec.syncPolicy.automated
+        documentIndex: 1
+      - notExists:
+          path: spec.template.spec.syncPolicy.automated
+        documentIndex: 2
+      - notExists:
+          path: spec.template.spec.syncPolicy.automated
+        documentIndex: 3
+  - it: covers prod and cde-prod only
+    template: applicationset-gated.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].git.directories[0].path
+          value: deploy/envs/prod/*/cell-*
+        documentIndex: 0
+      - equal:
+          path: spec.generators[0].git.directories[1].path
+          value: deploy/envs/cde-prod/*/cell-*
+        documentIndex: 0
+  - it: renders nothing while no release tag is set
+    template: applicationset-gated.yaml
+    set:
+      gated.revision: ""
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: never accepts a branch as the revision
+    template: applicationset-gated.yaml
+    set:
+      gated.revision: main
+    asserts:
+      - failedTemplate: {}
+  - it: keeps the gated environments out of the automated cell ApplicationSet
+    template: applicationset-cells.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/prod/*/*
+            exclude: true
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/cde-prod/*/*
+            exclude: true
+  - it: keeps the gated environments out of the automated locker, edge and control-center sets
+    template: applicationset-shared.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/prod/*/*
+            exclude: true
+        documentIndex: 0
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/prod/*/*
+            exclude: true
+        documentIndex: 1
+      - contains:
+          path: spec.generators[0].matrix.generators[0].git.files
+          content:
+            path: deploy/envs/prod/images.yaml
+            exclude: true
+        documentIndex: 2
+  - it: allows exactly the 14 cluster kinds in the platform project and none in payments
+    template: appprojects.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.clusterResourceWhitelist
+          count: 14
+        documentIndex: 0
+      - equal:
+          path: spec.clusterResourceWhitelist
+          value: []
+        documentIndex: 1
