@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   version:
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -76,7 +76,7 @@ jobs:
   evidence:
     needs: version
     if: needs.version.outputs.bump != 'none'
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -123,7 +123,7 @@ jobs:
 
   publish:
     needs: [version, evidence]
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read

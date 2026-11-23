@@ -28,6 +28,7 @@ network:
   # One non-overlapping /16 per environment and region; the module derives subnets from it.
   dev:   {eu-central-1: 10.120.0.0/16, us-east-1: 10.121.0.0/16, us-east-2: 10.122.0.0/16, egress: 10.123.0.0/20}
   stage: {eu-central-1: 10.130.0.0/16, us-east-1: 10.131.0.0/16, us-east-2: 10.132.0.0/16, egress: 10.133.0.0/20}
+  shared_services: {eu-central-1: 10.140.0.0/16, egress: 10.143.0.0/20}
 
 dns:
   dev_zone: dev.pay.example.com
@@ -62,3 +63,8 @@ deploy:
     cluster_domain: stage.example.internal
     rds_suffix: example
     memorydb_suffix: example
+
+runners:
+  # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
+  version: 2.329.0
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"

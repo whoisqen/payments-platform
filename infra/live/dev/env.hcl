@@ -70,8 +70,6 @@ locals {
     stateful = 16
     cde      = 16
     workers  = 32
-    ci       = 16
-    ci-prod  = 8
   }
 
   aurora_writer_class = "db.r7g.large"

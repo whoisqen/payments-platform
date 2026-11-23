@@ -1,0 +1,51 @@
+name: tag-deployed
+
+# Images that a promotion deployed get a <env>-<digest> tag, which the registry retention keeps for rollback.
+on:
+  push:
+    branches: [main]
+    paths: ["deploy/envs/*/images.yaml"]
+
+permissions: {}
+
+concurrency:
+  group: tag-deployed
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ECR_PUSH }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: tag the digests of the changed environments
+        env:
+          PREFIX: ${{ vars.ECR_REPO_PREFIX }}
+        run: |
+          set -euo pipefail
+          for file in $(git diff --name-only HEAD^ HEAD -- 'deploy/envs/*/images.yaml'); do
+            env=$(basename "$(dirname "$file")")
+            python3 tools/ci/deployed_tags.py "$file" "$env" | while read -r service digest tag; do
+              repo="${PREFIX}/${service}"
+              manifest=$(aws ecr batch-get-image --repository-name "$repo" --image-ids "imageDigest=${digest}" \
+                --query 'images[0].imageManifest' --output text)
+              if [ -z "$manifest" ] || [ "$manifest" = None ]; then echo "::error::${repo}@${digest} is not in the registry"; exit 1; fi
+              media=$(jq -r .mediaType <<<"$manifest")
+              # a tag that already points at this digest is a re-run, not an error
+              if ! aws ecr put-image --repository-name "$repo" --image-tag "$tag" --image-manifest "$manifest" \
+                --image-manifest-media-type "$media" >/dev/null 2>"$RUNNER_TEMP/put.err"; then
+                grep -q ImageAlreadyExistsException "$RUNNER_TEMP/put.err" || { cat "$RUNNER_TEMP/put.err"; exit 1; }
+              fi
+              echo "${repo}@${digest} tagged ${tag}"
+            done
+          done

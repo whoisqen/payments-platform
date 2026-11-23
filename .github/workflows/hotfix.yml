@@ -42,7 +42,7 @@ jobs:
 
   release-branch:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -102,7 +102,7 @@ jobs:
   backport:
     needs: build
     if: github.event_name == 'push' && !github.event.created
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read

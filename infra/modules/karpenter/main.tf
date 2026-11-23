@@ -18,15 +18,11 @@ locals {
   EOT
 
   # Payment pools never use Spot: an interrupted pod in the middle of a PSP call leaves the payment in the unknown state.
-  # ci and ci-prod exist only in the shared-services cluster (enabled_pools); a payments cluster never gets them.
   all_pools = {
     payments = { taint = "payments", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     stateful = { taint = "stateful", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     cde      = { taint = "cde", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     workers  = { taint = "workers", capacity = ["spot", "on-demand"], expire = "168h", grace = "90s", consolidation = "WhenEmptyOrUnderutilized" }
-    # Runner pods are never consolidated mid-job; ci-prod stays On-Demand so a release job is not lost to a Spot interruption.
-    ci      = { taint = "ci", scope = "none", capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty" }
-    ci-prod = { taint = "ci-prod", scope = "none", capacity = ["on-demand"], expire = "168h", grace = "1h", consolidation = "WhenEmpty" }
   }
   pools = { for name, p in local.all_pools : name => merge({ scope = "cde" }, p) if contains(var.enabled_pools, name) }
 
