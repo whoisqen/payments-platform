@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vault-config
+description: Network policy, snapshot job and break-glass notes that complement the upstream hashicorp/vault chart
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

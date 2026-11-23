@@ -1,0 +1,62 @@
+suite: external-secrets config
+templates:
+  - clustersecretstores.yaml
+  - networkpolicy.yaml
+tests:
+  - it: renders both stores
+    template: clustersecretstores.yaml
+    asserts:
+      - isKind:
+          of: ClusterSecretStore
+        documentIndex: 0
+      - equal:
+          path: spec.provider.aws.service
+          value: SecretsManager
+        documentIndex: 0
+      - equal:
+          path: spec.provider.vault.auth.kubernetes.role
+          value: external-secrets
+        documentIndex: 1
+  - it: scopes a store to namespaces when a selector is set
+    template: clustersecretstores.yaml
+    set:
+      vault.enabled: false
+      awsSecretsManager.namespaceSelector:
+        matchLabels:
+          payments-platform/secrets: allowed
+    asserts:
+      - equal:
+          path: spec.conditions[0].namespaceSelector.matchLabels["payments-platform/secrets"]
+          value: allowed
+  - it: omits the vault store when disabled
+    template: clustersecretstores.yaml
+    set:
+      vault.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+  - it: starts from default deny
+    template: networkpolicy.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+  - it: fails on a placeholder once values must be resolved
+    template: clustersecretstores.yaml
+    set:
+      requireResolved: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a malformed role ARN
+    template: clustersecretstores.yaml
+    set:
+      awsSecretsManager.roleArn: nope
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a typo in a values key
+    template: clustersecretstores.yaml
+    set:
+      vaults.enabled: true
+    asserts:
+      - failedTemplate: {}

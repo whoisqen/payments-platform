@@ -1,0 +1,60 @@
+suite: vault config
+templates:
+  - networkpolicy.yaml
+  - snapshot.yaml
+tests:
+  - it: renders a default-deny policy and an explicit server policy
+    template: networkpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: vault-server
+        documentIndex: 1
+  - it: schedules the snapshot hourly with a restricted pod
+    template: snapshot.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "0 * * * *"
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+  - it: fails on a placeholder once values must be resolved
+    template: snapshot.yaml
+    set:
+      requireResolved: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a malformed digest
+    template: snapshot.yaml
+    set:
+      snapshot.image.digest: sha256:abc
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a typo in a values key
+    template: snapshot.yaml
+    set:
+      snapshots.enabled: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a malformed role ARN
+    template: snapshot.yaml
+    set:
+      snapshot.roleArn: not-an-arn
+    asserts:
+      - failedTemplate: {}
+  - it: renders no snapshot when disabled
+    template: snapshot.yaml
+    set:
+      snapshot.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

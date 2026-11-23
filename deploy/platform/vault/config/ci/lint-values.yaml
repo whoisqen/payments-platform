@@ -1,0 +1,6 @@
+snapshot:
+  image:
+    repository: registry.example.test/acme/vault-snapshot
+networkPolicy:
+  apiServerCidrs: ["10.0.0.0/28"]
+  awsEndpointCidrs: ["10.0.8.0/22"]

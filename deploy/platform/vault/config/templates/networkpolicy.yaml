@@ -1,0 +1,148 @@
+{{- include "vault-config.guard" . -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-default-deny
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-server
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+      component: server
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- range $np.clientNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault-snapshot
+      ports:
+        - port: {{ $.Values.vault.port }}
+          protocol: TCP
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+      ports:
+        - port: {{ .Values.vault.port }}
+          protocol: TCP
+        - port: {{ .Values.vault.clusterPort }}
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+      ports:
+        - port: {{ .Values.vault.port }}
+          protocol: TCP
+        - port: {{ .Values.vault.clusterPort }}
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - port: 15012
+          protocol: TCP
+    {{- if $np.apiServerCidrs }}
+    # Kubernetes service registration and token review
+    - to:
+        {{- range $np.apiServerCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+    {{- if $np.awsEndpointCidrs }}
+    # KMS auto-unseal
+    - to:
+        {{- range $np.awsEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+{{- if .Values.snapshot.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-snapshot
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault-snapshot
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+      ports:
+        - port: {{ .Values.vault.port }}
+          protocol: TCP
+    {{- if $np.awsEndpointCidrs }}
+    # S3 upload and web identity token exchange
+    - to:
+        {{- range $np.awsEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+{{- end }}
+{{- end }}
