@@ -99,9 +99,9 @@ spec:
                   payments-platform/ci-runners: enabled
           - list:
               elements:
-                - scaleSet: ci-prod
-                - scaleSet: ci-stage
-                - scaleSet: ci-pr
+                {{- range .Values.arc.scaleSets }}
+                - scaleSet: {{ . }}
+                {{- end }}
   template:
     metadata:
       name: 'arc-{{`{{ .scaleSet }}`}}-{{`{{ .name }}`}}'

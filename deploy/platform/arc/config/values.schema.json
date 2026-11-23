@@ -7,6 +7,7 @@
     "refreshInterval",
     "systemsQuotaPods",
     "scaleSets",
+    "defaultRequests",
     "networkPolicy"
   ],
   "properties": {
@@ -28,22 +29,9 @@
     },
     "scaleSets": {
       "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ci-prod",
-        "ci-stage",
-        "ci-pr"
-      ],
-      "properties": {
-        "ci-prod": {
-          "$ref": "#/definitions/privileged"
-        },
-        "ci-stage": {
-          "$ref": "#/definitions/privileged"
-        },
-        "ci-pr": {
-          "$ref": "#/definitions/unprivileged"
-        }
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/scaleSet"
       }
     },
     "networkPolicy": {
@@ -93,79 +81,86 @@
     "systemsQuotaPods": {
       "type": "integer",
       "minimum": 1
-    }
-  },
-  "definitions": {
-    "priorityClass": {
+    },
+    "defaultRequests": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "name",
-        "value",
-        "preemptionPolicy"
+        "cpu",
+        "memory"
       ],
       "properties": {
-        "name": {
+        "cpu": {
           "type": "string"
         },
-        "value": {
-          "type": "integer",
-          "maximum": 1000000
-        },
-        "preemptionPolicy": {
-          "enum": [
-            "PreemptLowerPriority",
-            "Never"
-          ]
+        "memory": {
+          "type": "string"
         }
       }
-    },
-    "privileged": {
+    }
+  },
+  "definitions": {
+    "scaleSet": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "githubAppKey",
-        "priorityClass",
-        "roleArn",
         "quota"
       ],
       "properties": {
-        "priorityClass": {
-          "$ref": "#/definitions/priorityClass"
+        "githubAppKey": {
+          "type": "string",
+          "minLength": 1
         },
         "roleArn": {
           "type": "string",
           "pattern": "^arn:aws:iam::"
         },
-        "githubAppKey": {
-          "type": "string",
-          "minLength": 1
+        "privileged": {
+          "type": "boolean"
+        },
+        "untrusted": {
+          "type": "boolean"
         },
         "quota": {
           "$ref": "#/definitions/quota"
         }
-      }
-    },
-    "unprivileged": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "githubAppKey",
-        "priorityClass",
-        "quota"
-      ],
-      "properties": {
-        "priorityClass": {
-          "$ref": "#/definitions/priorityClass"
-        },
-        "githubAppKey": {
-          "type": "string",
-          "minLength": 1
-        },
-        "quota": {
-          "$ref": "#/definitions/quota"
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "untrusted": {
+                "const": true
+              }
+            },
+            "required": [
+              "untrusted"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "roleArn"
+                  ]
+                },
+                {
+                  "required": [
+                    "privileged"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "roleArn"
+            ]
+          }
         }
-      }
+      ]
     },
     "quota": {
       "type": "object",

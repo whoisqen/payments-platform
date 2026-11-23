@@ -1,15 +1,20 @@
+# ci-build: cargo and image builds of trusted code on arm64 with local NVMe
 # Created by the ExternalSecret in config/, never inline
 githubConfigSecret: github-app
-runnerScaleSetName: ci-stage
-minRunners: 0
-maxRunners: 10
+runnerScaleSetName: ci-build
+# Idle runners kept warm so a job starts without waiting for a node; the rest scale with the queue
+minRunners: 1
+maxRunners: 8
+containerMode:
+  type: dind
 template:
   spec:
-    serviceAccountName: ci-stage
+    serviceAccountName: ci-build
     automountServiceAccountToken: false
-    priorityClassName: ci-stage
     nodeSelector:
-      karpenter.sh/nodepool: ci
+      karpenter.sh/nodepool: ci-build
+    tolerations:
+      - {key: workload, operator: Equal, value: ci-build, effect: NoSchedule}
     securityContext:
       runAsNonRoot: true
       runAsUser: 1001
@@ -28,9 +33,9 @@ template:
             drop: [ALL]
         resources:
           requests:
-            cpu: "1"
-            memory: 4Gi
-            ephemeral-storage: 10Gi
+            cpu: "14"
+            memory: 26Gi
+            ephemeral-storage: 200Gi
           limits:
-            memory: 4Gi
-            ephemeral-storage: 20Gi
+            memory: 26Gi
+            ephemeral-storage: 400Gi

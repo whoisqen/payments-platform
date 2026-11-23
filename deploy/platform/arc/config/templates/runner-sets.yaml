@@ -7,7 +7,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
   labels:
-    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce: {{ if $set.privileged }}privileged{{ else }}restricted{{ end }}
     app.kubernetes.io/part-of: ci-runners
 ---
 apiVersion: v1
@@ -20,15 +20,6 @@ metadata:
     eks.amazonaws.com/role-arn: {{ $set.roleArn | quote }}
   {{- end }}
 automountServiceAccountToken: false
----
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: {{ $set.priorityClass.name }}
-value: {{ $set.priorityClass.value }}
-preemptionPolicy: {{ $set.priorityClass.preemptionPolicy }}
-globalDefault: false
-description: Runner pods of the {{ $name }} scale set
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -58,6 +49,18 @@ spec:
     requests.memory: {{ $set.quota.memory }}
     requests.ephemeral-storage: {{ $set.quota.ephemeralStorage }}
 ---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: arc-{{ $name }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: {{ $.Values.defaultRequests.cpu }}
+        memory: {{ $.Values.defaultRequests.memory }}
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -83,13 +86,13 @@ spec:
             cidr: 0.0.0.0/0
             except:
               {{- $denied := concat $.Values.networkPolicy.cdeCidrs $.Values.networkPolicy.cellCidrs }}
-              {{- if eq $name "ci-pr" }}{{ $denied = concat $denied $.Values.networkPolicy.prDeniedCidrs }}{{ end }}
+              {{- if $set.untrusted }}{{ $denied = concat $denied $.Values.networkPolicy.prDeniedCidrs }}{{ end }}
               {{- range $denied }}
               - {{ . }}
               {{- end }}
       ports:
         - {protocol: TCP, port: 443}
-    {{- if eq $name "ci-pr" }}
+    {{- if $set.untrusted }}
     - to:
         - ipBlock:
             cidr: ::/0
