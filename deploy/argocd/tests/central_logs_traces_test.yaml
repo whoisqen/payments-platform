@@ -1,0 +1,60 @@
+suite: the central cluster stores logs and traces and shows them in Grafana
+templates:
+  - addons/central/loki.yaml
+  - addons/central/tempo.yaml
+  - addons/central/grafana.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  cluster.regionShort: euc1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+tests:
+  - it: runs Loki, Tempo and Grafana only in the central cluster
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
+          value: enabled
+  - it: pins the upstream charts and fixes the release names
+    template: addons/central/loki.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 7.7.0
+      - equal:
+          path: spec.template.spec.sources[0].helm.releaseName
+          value: loki
+  - it: gives Loki the generated storage values
+    template: addons/central/loki.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[1]
+          value: $values/deploy/platform/loki/storage.yaml
+  - it: writes the span metrics of Tempo to vminsert
+    template: addons/central/tempo.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.releaseName
+          value: tempo
+      - equal:
+          path: spec.template.spec.sources[0].helm.parameters[0].name
+          value: metricsGenerator.config.storage.remote_write[0].url
+  - it: derives the host and the root url of Grafana from the configured url
+    template: addons/central/grafana.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: ingress.hosts[0]
+            value: grafana.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: grafana\.ini.server.root_url
+            value: https://grafana.example.test
+      - equal:
+          path: spec.template.spec.sources[1].path
+          value: deploy/platform/grafana/manifests
