@@ -12,12 +12,13 @@ REQUIRED = {
     "owner": ["github_org", "github_repo", "contact_email", "cost_center_prefix"],
     "naming": ["prefix"],
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
-    "accounts": ["shared_services", "dev", "stage"],
+    "accounts": ["shared_services", "dev", "stage", "prod"],
     "regions": ["working", "recovery"],
-    "dns": ["dev_zone", "stage_zone", "psp_domains", "grafana_url"],
+    "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
 }
+STANDBY_ENVS = ("stage", "prod")
 ACCOUNT = re.compile(r"^\d{12}$")
 REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
 
@@ -39,11 +40,11 @@ def check(cfg):
     for r in [regions.get("working"), *(regions.get("recovery") or [])]:
         if not r or not REGION.match(str(r)):
             errors.append(f"region `{r}` is not a valid AWS region name")
-    stage = (cfg.get("deploy") or {}).get("stage") or {}
-    endpoints = stage.get("ingress_endpoints")
-    wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
-    if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
-        errors.append("`deploy.stage.ingress_endpoints` needs an ingress host for the working region and the standby region")
+    for env in STANDBY_ENVS:
+        endpoints = ((cfg.get("deploy") or {}).get(env) or {}).get("ingress_endpoints")
+        wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
+        if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
+            errors.append(f"`deploy.{env}.ingress_endpoints` needs an ingress host for the working region and the standby region")
     nets = {}
     for env, cidrs in (cfg.get("network") or {}).items():
         for region, cidr in cidrs.items():
@@ -59,10 +60,49 @@ def check(cfg):
     return errors
 
 
+CLASS = re.compile(r"^db\.[a-z0-9]+\.[a-z0-9]+$")
+SECTIONS = {"aurora", "memorydb", "standby", "eks", "protection"}
+
+
+def check_sizing(reference, own, env):
+    """Rules of config/environments: prod defines every section, the others override keys that exist there; cde is never Spot."""
+    errors = []
+    for name, doc in (("prod", reference), (env, own)):
+        if not isinstance(doc, dict):
+            errors.append(f"config/environments/{name}.yaml is not a mapping")
+            return errors
+    missing = SECTIONS - set(reference)
+    if missing:
+        errors.append(f"config/environments/prod.yaml lacks sections {sorted(missing)}")
+    for section, keys in own.items():
+        if section not in reference:
+            errors.append(f"config/environments/{env}.yaml: unknown section `{section}`")
+        elif not isinstance(keys, dict) or set(keys) - set(reference[section]):
+            errors.append(f"config/environments/{env}.yaml: `{section}` may only set keys of prod.yaml, got {sorted(set(keys) - set(reference[section])) if isinstance(keys, dict) else keys}")
+    merged = {k: {**v, **own.get(k, {})} for k, v in reference.items() if isinstance(v, dict)}
+    for key in ("writer_class", "reader_class"):
+        if not CLASS.match(str(merged.get("aurora", {}).get(key, ""))):
+            errors.append(f"{env}: aurora.{key} must look like db.r7g.large")
+    if not CLASS.match(str(merged.get("memorydb", {}).get("node_type", ""))):
+        errors.append(f"{env}: memorydb.node_type must look like db.r7g.large")
+    spot = merged.get("eks", {}).get("spot_pools", [])
+    if "cde" in spot or set(spot) - {"payments", "stateful"}:
+        errors.append(f"{env}: eks.spot_pools may hold payments and stateful only; CDE nodes are never Spot")
+    if merged.get("standby", {}).get("enabled") and not merged.get("standby", {}).get("reader_count", 0):
+        errors.append(f"{env}: a warm standby needs standby.reader_count of at least 1")
+    return errors
+
+
 def main(argv=None):
     path = Path(argv[0]) if argv else ROOT / "config" / "platform.yaml"
     cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     errors = check(cfg)
+    if not argv:
+        envdir = ROOT / "config" / "environments"
+        reference = yaml.safe_load((envdir / "prod.yaml").read_text(encoding="utf-8")) or {}
+        for env in ("dev", "stage", "prod"):
+            own = yaml.safe_load((envdir / f"{env}.yaml").read_text(encoding="utf-8")) or {}
+            errors += check_sizing(reference, own, env)
     for e in errors:
         print(f"config: error: {e}")
     print(f"config: {len(errors)} error(s)")

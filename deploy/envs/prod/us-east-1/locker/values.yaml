@@ -1,0 +1,21 @@
+# Locker of the standby region; its database is the local global-database secondary
+global:
+  environment: prod
+  region: us-east-1
+  dataCidrs:
+    - 10.151.96.0/22
+  endpointCidrs:
+    - 10.151.0.0/18
+    - 10.151.64.0/19
+
+locker:
+  container:
+    env:
+      RUN_ENV: production
+
+# Migrations run only where the writer is; enable after promotion
+locker-migrations:
+  enabled: false
+  database:
+    host: pay-prod-use1-aurora-locker.cluster-example.us-east-1.rds.amazonaws.com
+    name: locker

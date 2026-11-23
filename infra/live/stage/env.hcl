@@ -66,26 +66,25 @@ locals {
     }
   }
 
-  eks_log_retention_days = 365
-  # Pool CPU caps sized to the environment; the module default is prod-sized.
-  karpenter_cpu_limits = {
-    payments = 100
-    stateful = 50
-    cde      = 50
-    workers  = 100
-  }
+  # Sizing comes from config/environments: prod.yaml is the reference, <env>.yaml overrides it one level deep.
+  sizing_reference = yamldecode(file("${get_repo_root()}/config/environments/prod.yaml"))
+  sizing_own       = yamldecode(file("${get_repo_root()}/config/environments/stage.yaml"))
+  sizing           = { for k, v in local.sizing_reference : k => merge(v, lookup(local.sizing_own, k, {})) }
 
-  aurora_writer_class = "db.r7g.xlarge"
-  aurora_reader_class = "db.r7g.xlarge"
-  aurora_reader_count = 1
-  # Warm standby: the us-east-1 Aurora secondaries keep reader instances and are promoted at a failover; they take no traffic before.
-  ingress_endpoints    = local.cfg.deploy.stage.ingress_endpoints
-  standby_enabled      = true
-  standby_reader_count = 1
-  standby_reader_class = local.aurora_reader_class
-  standby_node_pool    = { payments = 40, stateful = 20, cde = 20, workers = 20 }
-  deletion_protection  = true
-  memorydb_node_type   = "db.r7g.large"
-  memorydb_shards      = 2
-  vault_lock_enabled   = false
+  eks_log_retention_days = local.sizing.eks.log_retention_days
+  karpenter_cpu_limits   = local.sizing.eks.cpu_limits
+  karpenter_spot_pools   = local.sizing.eks.spot_pools
+
+  aurora_writer_class  = local.sizing.aurora.writer_class
+  aurora_reader_class  = local.sizing.aurora.reader_class
+  aurora_reader_count  = local.sizing.aurora.reader_count
+  memorydb_node_type   = local.sizing.memorydb.node_type
+  memorydb_shards      = local.sizing.memorydb.shards
+  deletion_protection  = local.sizing.protection.deletion_protection
+  vault_lock_enabled   = local.sizing.protection.vault_lock_enabled
+  standby_enabled      = local.sizing.standby.enabled
+  standby_reader_count = local.sizing.standby.reader_count
+  standby_reader_class = local.sizing.standby.reader_class
+  standby_node_pool    = local.sizing.standby.node_pool_cpu_limits
+  ingress_endpoints     = local.cfg.deploy.stage.ingress_endpoints
 }

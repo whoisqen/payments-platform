@@ -1,0 +1,7 @@
+# Frankfurt is the only writing region (D6); the CIDRs are placeholders until infra/live fixes the VPC plan
+global:
+  region: eu-central-1
+  dataCidrs:
+    - 10.150.8.0/22
+  endpointCidrs:
+    - 10.150.255.0/24

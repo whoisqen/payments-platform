@@ -1,4 +1,4 @@
-# Differences of stage from the chart defaults; sizes are below the production numbers of section 8
+# Differences of stage from the chart defaults. The chart defaults are the production sizes, so stage runs at production size.
 global:
   registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
   environment: stage
@@ -7,17 +7,11 @@ router:
   container:
     env:
       RUN_ENV: sandbox
-  autoscaling:
-    minReplicas: 3
-    maxReplicas: 12
 
 drainer:
   container:
     env:
       RUN_ENV: sandbox
-  autoscaling:
-    minReplicas: 3
-    maxReplicas: 6
 
 scheduler:
   producer:
@@ -28,6 +22,3 @@ scheduler:
     container:
       env:
         RUN_ENV: sandbox
-    autoscaling:
-      minReplicas: 3
-      maxReplicas: 12

@@ -1,0 +1,22 @@
+# Locker shared by all cells of the region, with its own database
+global:
+  environment: prod
+  region: eu-central-1
+  dataCidrs:
+    - 10.150.8.0/22
+  endpointCidrs:
+    - 10.150.255.0/24
+
+locker:
+  # Set after the eks stack of the cluster that runs the locker is applied: output locker_pod_security_group_id.
+  securityGroupPolicy:
+    securityGroupIds:
+      - REPLACE_LOCKER_POD_SG_ID
+  container:
+    env:
+      RUN_ENV: production
+
+locker-migrations:
+  database:
+    host: pay-prod-euc1-aurora-locker.cluster-example.eu-central-1.rds.amazonaws.com
+    name: locker

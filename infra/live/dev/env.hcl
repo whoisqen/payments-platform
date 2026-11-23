@@ -63,20 +63,24 @@ locals {
     }
   }
 
-  eks_log_retention_days = 30
-  # Pool CPU caps sized to the environment; the module default is prod-sized.
-  karpenter_cpu_limits = {
-    payments = 32
-    stateful = 16
-    cde      = 16
-    workers  = 32
-  }
+  # Sizing comes from config/environments: prod.yaml is the reference, <env>.yaml overrides it one level deep.
+  sizing_reference = yamldecode(file("${get_repo_root()}/config/environments/prod.yaml"))
+  sizing_own       = yamldecode(file("${get_repo_root()}/config/environments/dev.yaml"))
+  sizing           = { for k, v in local.sizing_reference : k => merge(v, lookup(local.sizing_own, k, {})) }
 
-  aurora_writer_class = "db.r7g.large"
-  aurora_reader_class = "db.r7g.large"
-  aurora_reader_count = 1
-  deletion_protection = false
-  memorydb_node_type  = "db.t4g.small"
-  memorydb_shards     = 1
-  vault_lock_enabled  = false
+  eks_log_retention_days = local.sizing.eks.log_retention_days
+  karpenter_cpu_limits   = local.sizing.eks.cpu_limits
+  karpenter_spot_pools   = local.sizing.eks.spot_pools
+
+  aurora_writer_class  = local.sizing.aurora.writer_class
+  aurora_reader_class  = local.sizing.aurora.reader_class
+  aurora_reader_count  = local.sizing.aurora.reader_count
+  memorydb_node_type   = local.sizing.memorydb.node_type
+  memorydb_shards      = local.sizing.memorydb.shards
+  deletion_protection  = local.sizing.protection.deletion_protection
+  vault_lock_enabled   = local.sizing.protection.vault_lock_enabled
+  standby_enabled      = local.sizing.standby.enabled
+  standby_reader_count = local.sizing.standby.reader_count
+  standby_reader_class = local.sizing.standby.reader_class
+  standby_node_pool    = local.sizing.standby.node_pool_cpu_limits
 }

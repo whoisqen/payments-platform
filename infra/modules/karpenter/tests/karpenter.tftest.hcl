@@ -154,3 +154,30 @@ run "unknown_pool_is_rejected" {
 
   expect_failures = [var.enabled_pools]
 }
+
+run "spot_pools_follow_the_environment_and_cde_never_does" {
+  command = plan
+
+  variables {
+    spot_pools = ["payments", "stateful"]
+  }
+
+  assert {
+    condition     = alltrue([for n in ["payments", "stateful", "workers"] : contains(flatten([for r in yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"]), "spot")])
+    error_message = "payments, stateful and workers may use Spot when the environment lists them"
+  }
+  assert {
+    condition     = !contains(flatten([for r in yamldecode(output.manifests["nodepool-cde.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"]), "spot")
+    error_message = "the cde pool never uses Spot"
+  }
+}
+
+run "cde_pool_cannot_be_listed_for_spot" {
+  command = plan
+
+  variables {
+    spot_pools = ["cde"]
+  }
+
+  expect_failures = [var.spot_pools]
+}
