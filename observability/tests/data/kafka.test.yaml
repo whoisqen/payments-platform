@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_consumergroup_lag{consumergroup="clickhouse-sink",topic="payment-events"}
     values: 250000x26
@@ -21,9 +24,12 @@ tests:
         topic: payment-events
       exp_annotations:
         summary: Kafka consumer lag above 100000 messages
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-consumer-lag-high
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#kafka-consumer-lag-high
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_consumergroup_lag{consumergroup="clickhouse-sink",topic="payment-events"}
     values: 100x26
@@ -33,12 +39,18 @@ tests:
     alertname: KafkaConsumerLagHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_consumergroup_lag{consumergroup="clickhouse-sink",topic="payment-events"}
     values: 100x9 250000x1 100x14
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_server_replicamanager_underreplicatedpartitions{cluster="msk-main"}
     values: 3x21
@@ -56,9 +68,12 @@ tests:
         cluster: msk-main
       exp_annotations:
         summary: Kafka has under-replicated partitions
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-under-replicated-partitions
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#kafka-under-replicated-partitions
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_server_replicamanager_underreplicatedpartitions{cluster="msk-main"}
     values: '0x21'
@@ -68,12 +83,18 @@ tests:
     alertname: KafkaUnderReplicatedPartitions
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kafka_server_replicamanager_underreplicatedpartitions{cluster="msk-main"}
     values: 0x9 3x1 0x9
   alert_rule_test:
   - *id002
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_kafka_kafka_data_logs_disk_used_average{broker_id="1"}
     values: 90x26
@@ -91,9 +112,12 @@ tests:
         broker_id: '1'
       exp_annotations:
         summary: A Kafka broker disk is more than 80% full
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#kafka-broker-disk-high
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#kafka-broker-disk-high
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_kafka_kafka_data_logs_disk_used_average{broker_id="1"}
     values: 40x26
@@ -103,6 +127,9 @@ tests:
     alertname: KafkaBrokerDiskHigh
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_kafka_kafka_data_logs_disk_used_average{broker_id="1"}
     values: 40x9 90x1 40x14

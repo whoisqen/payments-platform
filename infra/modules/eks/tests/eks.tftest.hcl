@@ -19,6 +19,7 @@ mock_provider "aws" {
 }
 
 variables {
+  name_prefix              = "pay"
   region                   = "eu-central-1"
   environment              = "dev"
   component                = "eks-cell-0"

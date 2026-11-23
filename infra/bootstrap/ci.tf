@@ -3,6 +3,7 @@ module "ci_roles" {
 
   account_id               = var.account_id
   environment              = var.environment
+  name_prefix              = var.name_prefix
   github_repository        = var.github_repository
   permissions_boundary_arn = var.permissions_boundary_arn
   state_bucket_arn         = aws_s3_bucket.state.arn

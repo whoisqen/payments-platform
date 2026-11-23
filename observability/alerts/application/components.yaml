@@ -22,8 +22,8 @@ spec:
         failure_mode: application-router5xx-rate-high
       annotations:
         summary: Router 5xx rate above 1% in a cell
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#router5xx-rate-high
-        dashboard_url: https://grafana.payments.internal/d/router
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#router5xx-rate-high'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/router'
     - alert: LockerErrorRateHigh
       expr: sum(rate(http_server_requests_total{service="locker",code=~"5.."}[5m])) / sum(rate(http_server_requests_total{service="locker"}[5m])) > 0.01
       for: 5m
@@ -36,8 +36,8 @@ spec:
         failure_mode: application-locker-error-rate-high
       annotations:
         summary: Locker 5xx rate above 1%
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/locker-error-rate-high.md
-        dashboard_url: https://grafana.payments.internal/d/locker
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/locker-error-rate-high.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/locker'
     - alert: DrainLagHigh
       expr: max by (cell) (drain_lag_seconds) > 5
       for: 5m
@@ -50,8 +50,8 @@ spec:
         failure_mode: application-drain-lag-high
       annotations:
         summary: Drain lag above 5 seconds
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/drain-lag-high.md
-        dashboard_url: https://grafana.payments.internal/d/drainer
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/drain-lag-high.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/drainer'
     - alert: RedisStreamBacklog
       expr: max by (cell, stream) (redis_stream_length) > 50000
       for: 5m
@@ -64,8 +64,8 @@ spec:
         failure_mode: application-redis-stream-backlog
       annotations:
         summary: A Redis stream holds more than 50000 entries
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/redis-stream-backlog.md
-        dashboard_url: https://grafana.payments.internal/d/drainer
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/redis-stream-backlog.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/drainer'
     - alert: SchedulerQueueDelayHigh
       expr: max by (cell) (scheduler_queue_oldest_task_age_seconds) > 600
       for: 5m
@@ -78,8 +78,8 @@ spec:
         failure_mode: application-scheduler-queue-delay-high
       annotations:
         summary: The oldest scheduler task waits more than 10 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/scheduler-queue-delay-high.md
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/scheduler-queue-delay-high.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/scheduler'
     - alert: DlqNotEmpty
       expr: sum by (queue) (dlq_depth) > 0
       for: 15m
@@ -92,8 +92,8 @@ spec:
         failure_mode: application-dlq-not-empty
       annotations:
         summary: A dead-letter queue is not empty
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#dlq-not-empty
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#dlq-not-empty'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/scheduler'
     - alert: WebhookBacklogOld
       expr: max by (cell) (webhook_queue_oldest_age_seconds) > 300
       for: 10m
@@ -106,8 +106,8 @@ spec:
         failure_mode: application-webhook-backlog-old
       annotations:
         summary: Outgoing webhooks wait more than 5 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#webhook-backlog-old
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#webhook-backlog-old'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/scheduler'
     - alert: ReconciliationMismatch
       expr: sum by (psp) (increase(reconciliation_amount_mismatch_total[1d])) > 0
       for: 10m
@@ -120,8 +120,8 @@ spec:
         failure_mode: application-reconciliation-mismatch
       annotations:
         summary: Daily PSP reconciliation found amount mismatches
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#reconciliation-mismatch
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#reconciliation-mismatch'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: MigrationJobFailed
       expr: kube_job_status_failed{job_name=~".*migrat.*"} > 0
       for: 1m
@@ -134,5 +134,5 @@ spec:
         failure_mode: application-migration-job-failed
       annotations:
         summary: A migration job failed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#migration-job-failed
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#migration-job-failed'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'

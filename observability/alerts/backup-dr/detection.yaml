@@ -21,5 +21,5 @@ spec:
         failure_mode: backup-dr-backup-vault-policy-changed
       annotations:
         summary: A backup vault access policy or lock changed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-vault-policy-changed.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/backup-vault-policy-changed.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'

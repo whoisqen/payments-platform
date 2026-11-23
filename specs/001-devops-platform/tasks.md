@@ -440,7 +440,7 @@ Every item is one unit of work for one agent and one GitHub issue. The `id` beco
   title: Pin or gate automated prod sync in Argo CD and verify the AppProject whitelist
   agent: k8s-engineer
   milestone: M7 Verification and release readiness
-  paths: ["deploy/argocd/applicationset-cells.yaml", "deploy/argocd/appprojects.yaml"]
+  paths: ["deploy/argocd/templates/applicationset-cells.yaml", "deploy/argocd/templates/appprojects.yaml"]
   depends_on: ["T27"]
   provides: argocd prod gate
   requires: ["gitops"]

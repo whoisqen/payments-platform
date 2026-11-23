@@ -21,8 +21,8 @@ spec:
         failure_mode: backup-dr-restore-test-stale
       annotations:
         summary: No automatic restore test ran for a store in 2 days
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-test-stale
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#restore-test-stale'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: DrSwitchTestOverdue
       expr: time() - max by (region) (dr_switch_test_last_success_timestamp_seconds) > 100 * 86400
       labels:
@@ -34,5 +34,5 @@ spec:
         failure_mode: backup-dr-dr-switch-test-overdue
       annotations:
         summary: The quarterly switch test of a recovery region is overdue
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'

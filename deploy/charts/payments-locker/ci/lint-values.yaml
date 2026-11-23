@@ -1,5 +1,6 @@
 # Offline lint and chart-testing only; real values come from deploy/envs/ and images.yaml
 global:
+  registry: registry.example.test/acme
   environment: dev
   region: eu-central-1
   dataCidrs: ["10.120.0.0/16"]

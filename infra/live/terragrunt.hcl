@@ -22,7 +22,7 @@ remote_state {
 
   # Every stack keeps its state in the eu-central-1 bucket of infra/bootstrap, under its own <env>/ prefix.
   config = {
-    bucket       = "${local.cfg.storage.state_bucket_prefix}-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
+    bucket       = "${local.cfg.naming.prefix}-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
     key          = "${path_relative_to_include("root")}/terraform.tfstate"
     region       = local.cfg.regions.working
     encrypt      = true
@@ -62,5 +62,6 @@ inputs = {
   region_name    = local.region
   region_short   = local.region_short
   primary_region = local.cfg.regions.working
+  name_prefix    = local.cfg.naming.prefix
   account_id     = local.env_cfg.account_id
 }

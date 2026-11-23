@@ -10,7 +10,7 @@ COV = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(COV))
 import alert_coverage as cov  # noqa: E402
 
-URL = "https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/x/{}.md"
+URL = "{{ $externalLabels.runbook_base_url }}/docs/runbooks/x/{}.md"
 
 
 def rule(name, expr="up == 0", **over):

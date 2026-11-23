@@ -27,7 +27,7 @@ locals {
 resource "aws_iam_role" "backup" {
   count = local.create_plans ? 1 : 0
 
-  name = "pay-${var.env}-${var.region_short}-${var.component}-service"
+  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}-service"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -72,7 +72,7 @@ resource "aws_iam_role_policy" "backup_kms" {
 resource "aws_backup_plan" "tier" {
   for_each = local.create_plans ? local.tier_rules : {}
 
-  name = "pay-${var.env}-${var.region_short}-${each.key}"
+  name = "${var.name_prefix}-${var.env}-${var.region_short}-${each.key}"
 
   dynamic "rule" {
     for_each = each.value
@@ -110,7 +110,7 @@ resource "aws_backup_plan" "tier" {
 resource "aws_backup_selection" "tier" {
   for_each = local.create_plans ? local.tier_rules : {}
 
-  name         = "pay-${var.env}-${var.region_short}-${each.key}"
+  name         = "${var.name_prefix}-${var.env}-${var.region_short}-${each.key}"
   plan_id      = aws_backup_plan.tier[each.key].id
   iam_role_arn = aws_iam_role.backup[0].arn
 

@@ -1,0 +1,12 @@
+# Offline lint and chart-testing only; real values come from tools/config/argocd-values.py
+repo:
+  url: https://git.example.test/acme/platform
+  revision: main
+cluster:
+  namePrefix: acme
+  regionShort: euc1
+  region: eu-central-1
+github:
+  configUrl: https://git.example.test/acme
+observability:
+  grafanaUrl: https://grafana.example.test

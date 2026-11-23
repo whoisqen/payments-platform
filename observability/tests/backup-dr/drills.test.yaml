@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1d
 tests:
 - interval: 1d
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: restore_test_last_run_timestamp_seconds{store="aurora-cell-1"}
     values: '0x10'
@@ -20,9 +23,12 @@ tests:
         store: aurora-cell-1
       exp_annotations:
         summary: No automatic restore test ran for a store in 2 days
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-test-stale
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-test-stale
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1d
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: restore_test_last_run_timestamp_seconds{store="aurora-cell-1"}
     values: 0+86400x10
@@ -31,6 +37,9 @@ tests:
     alertname: RestoreTestStale
     exp_alerts: []
 - interval: 1d
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-1"}
     values: '0x110'
@@ -50,9 +59,12 @@ tests:
         region: us-east-1
       exp_annotations:
         summary: The quarterly switch test of a recovery region is overdue
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue
+        dashboard_url: https://grafana.example.test/d/dr-switch
 - interval: 1d
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-1"}
     values: 0+86400x110

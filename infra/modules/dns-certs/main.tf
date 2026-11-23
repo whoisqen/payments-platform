@@ -1,5 +1,5 @@
 locals {
-  name = "pay-${var.environment}-glob-dns"
+  name = "${var.name_prefix}-${var.environment}-glob-dns"
 
   # Keys come from configuration, so for_each is known at plan time.
   validation_names = merge([

@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-kube-prometheus
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/addons: enabled
+  template:
+    metadata:
+      name: 'kube-prometheus-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: kube-prometheus
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: kube-prometheus-stack
+          targetRevision: 93.6.1
+          helm:
+            valueFiles:
+              - $values/deploy/platform/kube-prometheus/values.yaml
+            # Alert annotations build their links from these labels, see observability/alerts
+            parameters:
+              - name: prometheus.prometheusSpec.externalLabels.runbook_base_url
+                value: {{ printf "%s/blob/%s" .Values.repo.url .Values.repo.revision | quote }}
+              - name: prometheus.prometheusSpec.externalLabels.grafana_url
+                value: {{ .Values.observability.grafanaUrl | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # The CRDs exceed the client-side apply annotation limit
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

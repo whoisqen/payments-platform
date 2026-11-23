@@ -1,6 +1,6 @@
 locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
-  name         = "pay-${var.environment}-${local.region_short}-${var.component}"
+  name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
 
   propagations = merge([
     for k, a in var.attachments : { for rt in a.propagate_to : "${k}/${rt}" => { attachment = k, route_table = rt } }

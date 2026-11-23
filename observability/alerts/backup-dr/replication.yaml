@@ -22,8 +22,8 @@ spec:
         failure_mode: backup-dr-latest-restorable-time-lag-high
       annotations:
         summary: The latest restorable time of a database lags more than 5 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/latest-restorable-time-lag-high.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/latest-restorable-time-lag-high.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: AuroraGlobalLagHigh
       expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 5000
       for: 2m
@@ -36,8 +36,8 @@ spec:
         failure_mode: backup-dr-aurora-global-lag-high
       annotations:
         summary: Aurora Global Database lag above 5 seconds
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-high.md
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/aurora-global-lag-high.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'
     - alert: AuroraGlobalLagRpoBudgetExceeded
       expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 10000
       for: 1m
@@ -50,8 +50,8 @@ spec:
         failure_mode: backup-dr-aurora-global-lag-rpo-budget-exceeded
       annotations:
         summary: Aurora Global Database lag above the 10 second RPO budget
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/aurora-global-lag-rpo-budget-exceeded.md
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/aurora-global-lag-rpo-budget-exceeded.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'
     - alert: DynamoDbGlobalTableLagHigh
       expr: max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum) > 5000
       for: 10m
@@ -64,8 +64,8 @@ spec:
         failure_mode: backup-dr-dynamo-db-global-table-lag-high
       annotations:
         summary: DynamoDB Global Table replication latency above 5 seconds
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#dynamo-db-global-table-lag-high
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#dynamo-db-global-table-lag-high'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'
     - alert: S3ReplicationLagHigh
       expr: max by (bucket, destination_region) (aws_s3_replication_latency_maximum) > 900
       for: 10m
@@ -78,5 +78,5 @@ spec:
         failure_mode: backup-dr-s3-replication-lag-high
       annotations:
         summary: S3 replication latency above the 15 minute RTC target
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#s3-replication-lag-high
-        dashboard_url: https://grafana.payments.internal/d/dr-switch
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#s3-replication-lag-high'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'

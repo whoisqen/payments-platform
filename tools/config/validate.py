@@ -10,10 +10,11 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 REQUIRED = {
     "owner": ["github_org", "github_repo", "contact_email", "cost_center_prefix"],
+    "naming": ["prefix"],
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
     "accounts": ["shared_services", "dev", "stage"],
     "regions": ["working", "recovery"],
-    "dns": ["dev_zone", "stage_zone", "psp_domains"],
+    "dns": ["dev_zone", "stage_zone", "psp_domains", "grafana_url"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
 }

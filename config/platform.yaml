@@ -6,6 +6,10 @@ owner:
   contact_email: vladyslav.kozlov.it@gmail.com
   cost_center_prefix: cc
 
+naming:
+  # Prefix of every resource name: <prefix>-<env>-<region-short>-<component>
+  prefix: pay
+
 registry:
   # ECR registry host prefix, for example 123456789012.dkr.ecr.eu-central-1.amazonaws.com
   ecr_prefix: 123456789012.dkr.ecr.eu-central-1.amazonaws.com
@@ -30,6 +34,7 @@ dns:
   dev_zone: dev.pay.example.com
   stage_zone: stage.pay.example.com
   psp_domains: [.psp-sandbox.example.com]
+  grafana_url: https://grafana.payments.internal
 
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
@@ -56,6 +61,8 @@ deploy:
     endpoint_cidrs: [10.130.255.0/24]
     gateway_host: api.stage.payments.example.com
     cluster_domain: stage.example.internal
+    # Public ingress name per region, known after the first deploy; the DNS routing builds one latency record each.
+    ingress_endpoints: {eu-central-1: ingress.euc1.stage.example.internal, us-east-1: ingress.use1.stage.example.internal}
     rds_suffix: example
     memorydb_suffix: example
 

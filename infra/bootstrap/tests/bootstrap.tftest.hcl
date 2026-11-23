@@ -7,6 +7,7 @@ mock_provider "aws" {
 }
 
 variables {
+  name_prefix              = "pay"
   account_id               = "555555555555"
   github_repository        = "example-org/payments-platform"
   permissions_boundary_arn = "arn:aws:iam::555555555555:policy/workload-boundary"

@@ -22,8 +22,8 @@ spec:
         failure_mode: backup-dr-restore-test-failed
       annotations:
         summary: The automatic restore test of a store failed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/restore-test-failed.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/restore-test-failed.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: RestoreDurationNearTarget
       expr: max by (store) (backup_restore_duration_seconds) > 0.8 * max by (store) (backup_restore_target_seconds)
       labels:
@@ -35,8 +35,8 @@ spec:
         failure_mode: backup-dr-restore-duration-near-target
       annotations:
         summary: Restore duration passed 80% of its target
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: RestoreTooSlow
       expr: max by (store) (backup_restore_duration_seconds) > max by (store) (backup_restore_target_seconds)
       labels:
@@ -48,5 +48,5 @@ spec:
         failure_mode: backup-dr-restore-too-slow
       annotations:
         summary: Restore duration exceeded its target
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-too-slow
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#restore-too-slow'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'

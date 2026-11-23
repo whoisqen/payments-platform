@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
     values: 3600x46
@@ -20,9 +23,12 @@ tests:
         key_alias: locker-pan
       exp_annotations:
         summary: A KMS key is past its rotation date
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kms-key-rotation-overdue
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/warnings.md#kms-key-rotation-overdue
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
     values: '0x46'
@@ -32,12 +38,18 @@ tests:
     alertname: KmsKeyRotationOverdue
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kms_key_rotation_overdue_seconds{key_alias="locker-pan"}
     values: 0x9 3600x1 0x34
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit",policy_name="disallow-privileged"}
     values: 0+1x26
@@ -55,9 +67,12 @@ tests:
         policy_name: disallow-privileged
       exp_annotations:
         summary: Kyverno audit policies report violations
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#kyverno-audit-violations
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/warnings.md#kyverno-audit-violations
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit",policy_name="disallow-privileged"}
     values: 0+0x26

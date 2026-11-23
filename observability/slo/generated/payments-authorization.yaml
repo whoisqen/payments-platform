@@ -144,8 +144,8 @@ spec:
         slo: payments-authorization-availability
       annotations:
         summary: Authorization availability is burning the 99.99% error budget (50x over 5m/1m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnFast
       expr: slo:sli_error:ratio_rate1h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (14.4 * 0.0001) and slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (14.4 * 0.0001)
       labels:
@@ -158,8 +158,8 @@ spec:
         slo: payments-authorization-availability
       annotations:
         summary: Authorization availability is burning the 99.99% error budget (14.4x over 1h/5m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnSlow
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (6 * 0.0001) and slo:sli_error:ratio_rate30m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (6 * 0.0001)
       labels:
@@ -172,8 +172,8 @@ spec:
         slo: payments-authorization-availability
       annotations:
         summary: Authorization availability is burning the 99.99% error budget (6x over 6h/30m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnTicket
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (1 * 0.0001) and slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (1 * 0.0001)
       labels:
@@ -186,5 +186,5 @@ spec:
         slo: payments-authorization-availability
       annotations:
         summary: Authorization availability is burning the 99.99% error budget (1x over 3d/6h)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/authorization-availability.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'

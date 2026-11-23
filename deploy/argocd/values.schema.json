@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["repo", "cluster", "github", "observability"],
+  "properties": {
+    "repo": {
+      "type": "object",
+      "required": ["url", "revision"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https://[^/]+/[^/]+/[^/]+$"},
+        "revision": {"type": "string", "minLength": 1}
+      }
+    },
+    "cluster": {
+      "type": "object",
+      "required": ["namePrefix", "regionShort", "region"],
+      "properties": {
+        "namePrefix": {"type": "string", "minLength": 1},
+        "regionShort": {"type": "string", "pattern": "^[a-z]{3,4}[0-9]$"},
+        "region": {"type": "string", "pattern": "^[a-z]{2}(-[a-z]+)+-[0-9]$"}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "required": ["grafanaUrl"],
+      "properties": {
+        "grafanaUrl": {"type": "string", "pattern": "^https://[^/]+$"}
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": ["configUrl"],
+      "properties": {
+        "configUrl": {"type": "string", "pattern": "^https://[^/]+/[^/]+$"}
+      }
+    }
+  }
+}

@@ -77,4 +77,6 @@ inputs = {
   proxy_subnet_ids          = dependency.vpc.outputs.subnet_ids["data"]
   availability_zones        = include.envcommon.locals.env_cfg.azs["us-east-1"]
   writer_az                 = include.envcommon.locals.env_cfg.azs["us-east-1"][0]
+  recovery_instance_count   = include.envcommon.locals.env_cfg.standby_enabled ? include.envcommon.locals.env_cfg.standby_reader_count : 0
+  recovery_instance_class   = include.envcommon.locals.env_cfg.standby_reader_class
 }

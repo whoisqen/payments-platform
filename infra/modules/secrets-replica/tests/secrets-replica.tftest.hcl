@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix  = "pay"
   env          = "prod"
   region_short = "euc1"
   kms_key_arn  = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0006"

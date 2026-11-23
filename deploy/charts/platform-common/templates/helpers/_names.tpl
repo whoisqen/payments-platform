@@ -22,7 +22,8 @@ payments-platform/cell: {{ . | quote }}
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
 {{- fail "image.digest must match ^sha256:[a-f0-9]{64}$" -}}
 {{- end -}}
-{{- printf "%s@%s" $img.repository $digest -}}
+{{- $registry := required "global.registry is required (registry host and repository prefix, no trailing slash)" (.root.Values.global | default dict).registry -}}
+{{- printf "%s/%s@%s" $registry $img.repository $digest -}}
 {{- end }}
 
 {{- define "platform-common.serviceAccountName" -}}

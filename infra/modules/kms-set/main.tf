@@ -5,6 +5,7 @@ module "key" {
   account_id         = var.account_id
   region             = var.region
   environment        = var.environment
+  name_prefix        = var.name_prefix
   component          = each.key
   is_replica         = var.is_replica
   primary_key_arn    = var.is_replica ? var.primary_key_arns[each.key] : null

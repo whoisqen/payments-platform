@@ -1,5 +1,5 @@
 locals {
-  name = "pay-${var.environment}-glob-${var.component}"
+  name = "${var.name_prefix}-${var.environment}-glob-${var.component}"
 }
 
 resource "aws_globalaccelerator_accelerator" "this" {

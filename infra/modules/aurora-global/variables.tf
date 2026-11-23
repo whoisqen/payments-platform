@@ -192,9 +192,20 @@ variable "global_cluster_identifier" {
 }
 
 variable "recovery_instance_count" {
-  description = "Instances created in a recovery region; 0 keeps it storage only, set at the switch."
+  description = "Reader instances in a recovery region; 0 keeps it storage only. Above 0 the region serves reads (warm standby) and the proxy needs proxy_secret_arn."
   type        = number
   default     = 0
+
+  validation {
+    condition     = var.recovery_instance_count >= 0 && var.recovery_instance_count <= 3
+    error_message = "recovery_instance_count must be 0 to 3."
+  }
+}
+
+variable "recovery_instance_class" {
+  description = "Instance class of recovery-region instances; null uses reader_instance_class."
+  type        = string
+  default     = null
 }
 
 variable "lag_alarm_threshold_ms" {
@@ -218,4 +229,14 @@ variable "alarm_actions" {
   description = "SNS topic ARNs of the lag alarm per region key; the topic must live in the alarm region."
   type        = map(string)
   default     = {}
+}
+
+variable "name_prefix" {
+  type        = string
+  description = "Prefix of every resource name, for example the project short name; set from config/platform.yaml (naming.prefix)."
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9]{1,10}$", var.name_prefix))
+    error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
+  }
 }

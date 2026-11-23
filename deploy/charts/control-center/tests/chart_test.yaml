@@ -4,6 +4,7 @@ templates:
   - pdb.yaml
   - networkpolicy.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: rolls without unavailable pods

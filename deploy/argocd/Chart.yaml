@@ -1,0 +1,5 @@
+apiVersion: v2
+name: argocd-bootstrap
+description: Argo CD AppProjects and ApplicationSets of the platform; every repository, cluster and revision value is a chart value.
+type: application
+version: 0.1.0

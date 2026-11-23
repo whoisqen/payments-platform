@@ -144,8 +144,8 @@ spec:
         slo: payments-status-read
       annotations:
         summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (14.4x over 1h/5m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/payment-status-read.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsStatusReadBurnSlow
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read"} > (6 * 0.0005) and slo:sli_error:ratio_rate30m{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read"} > (6 * 0.0005)
       labels:
@@ -158,8 +158,8 @@ spec:
         slo: payments-status-read
       annotations:
         summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (6x over 6h/30m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/payment-status-read.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsStatusReadBurnTicket
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read"} > (1 * 0.0005) and slo:sli_error:ratio_rate6h{sloth_id="payments-status-read",sloth_service="payments-status",sloth_slo="read"} > (1 * 0.0005)
       labels:
@@ -172,5 +172,5 @@ spec:
         slo: payments-status-read
       annotations:
         summary: Payment status reads slower than 50 ms or failing are burning the 99.95% error budget (1x over 3d/6h)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/payment-status-read.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/payment-status-read.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'

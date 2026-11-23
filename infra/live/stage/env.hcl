@@ -75,8 +75,14 @@ locals {
   aurora_writer_class = "db.r7g.xlarge"
   aurora_reader_class = "db.r7g.xlarge"
   aurora_reader_count = 1
-  deletion_protection = true
-  memorydb_node_type  = "db.r7g.large"
-  memorydb_shards     = 2
-  vault_lock_enabled  = false
+  # Warm standby: the us-east-1 Aurora clusters run readers; writes stay in eu-central-1.
+  ingress_endpoints    = local.cfg.deploy.stage.ingress_endpoints
+  standby_enabled      = true
+  standby_reader_count = 1
+  standby_reader_class = local.aurora_reader_class
+  standby_node_pool    = { payments = 40, stateful = 20, cde = 20, workers = 20 }
+  deletion_protection  = true
+  memorydb_node_type   = "db.r7g.large"
+  memorydb_shards      = 2
+  vault_lock_enabled   = false
 }

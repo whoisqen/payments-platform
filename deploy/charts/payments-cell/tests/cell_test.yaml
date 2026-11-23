@@ -5,6 +5,7 @@ templates:
   - charts/drainer/templates/workload.yaml
   - charts/migrations/templates/job.yaml
 set:
+  global.registry: registry.example.test/acme
   global.cell: cell-1
   global.environment: dev
   global.region: eu-central-1

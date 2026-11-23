@@ -4,6 +4,7 @@ module "state_key" {
   account_id  = var.account_id
   region      = "eu-central-1"
   environment = var.environment
+  name_prefix = var.name_prefix
   component   = "tf-state"
   tags        = var.tags
 }
@@ -16,6 +17,7 @@ module "state_key_use1" {
   account_id      = var.account_id
   region          = "us-east-1"
   environment     = var.environment
+  name_prefix     = var.name_prefix
   component       = "tf-state"
   is_replica      = true
   primary_key_arn = module.state_key.key_arn
@@ -30,6 +32,7 @@ module "state_key_use2" {
   account_id      = var.account_id
   region          = "us-east-2"
   environment     = var.environment
+  name_prefix     = var.name_prefix
   component       = "tf-state"
   is_replica      = true
   primary_key_arn = module.state_key.key_arn

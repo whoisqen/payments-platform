@@ -6,6 +6,7 @@ templates:
   - istio/authorizationpolicy.yaml
   - securitygrouppolicy.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: canaries by Istio weight 1, 10, 50 and then 100

@@ -22,8 +22,8 @@ spec:
         failure_mode: compute-crash-loop-back-off
       annotations:
         summary: A payments pod is in CrashLoopBackOff
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/crash-loop-back-off.md
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/crash-loop-back-off.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: PodOOMKilled
       expr: max by (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}) == 1 and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total[10m]) > 0
       for: 1m
@@ -36,8 +36,8 @@ spec:
         failure_mode: compute-pod-oom-killed
       annotations:
         summary: A container was OOMKilled and restarted
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pod-oom-killed
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#pod-oom-killed'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: PodsPendingTooLong
       expr: sum by (namespace) (kube_pod_status_phase{phase="Pending"}) > 0
       for: 15m
@@ -50,8 +50,8 @@ spec:
         failure_mode: compute-pods-pending-too-long
       annotations:
         summary: Pods stay Pending for 15 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#pods-pending-too-long
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#pods-pending-too-long'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: HpaAtMaxReplicas
       expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
       for: 10m
@@ -64,5 +64,5 @@ spec:
         failure_mode: compute-hpa-at-max-replicas
       annotations:
         summary: HPA stays at its maximum replicas for 10 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#hpa-at-max-replicas
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#hpa-at-max-replicas'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'

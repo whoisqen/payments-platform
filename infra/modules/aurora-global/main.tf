@@ -1,5 +1,5 @@
 locals {
-  name    = "pay-${var.env}-${var.region_short}-${var.component}"
+  name    = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
   working = var.region_role == "working"
 
   reader_azs = [for az in var.availability_zones : az if az != var.writer_az]
@@ -25,7 +25,8 @@ locals {
     { name = "pgaudit.log", value = "ddl,role", apply_method = "immediate" },
   ]
 
-  proxy_enabled    = local.working || var.recovery_instance_count > 0
+  # A recovery region gets a proxy only once it serves reads and has a secret to read.
+  proxy_enabled    = local.working || (var.recovery_instance_count > 0 && var.proxy_secret_arn != null)
   proxy_cluster_id = local.working ? aws_rds_cluster.primary[0].id : aws_rds_cluster.secondary[var.region_name].id
   proxy_secret_arn = local.working ? aws_rds_cluster.primary[0].master_user_secret[0].secret_arn : var.proxy_secret_arn
 }
@@ -146,7 +147,7 @@ resource "aws_rds_cluster" "secondary" {
   for_each = local.secondaries
 
   region                    = each.key
-  cluster_identifier        = "pay-${var.env}-${each.value.short}-${var.component}"
+  cluster_identifier        = "${var.name_prefix}-${var.env}-${each.value.short}-${var.component}"
   engine                    = "aurora-postgresql"
   engine_version            = var.engine_version
   global_cluster_identifier = local.working ? aws_rds_global_cluster.this[0].id : var.global_cluster_identifier
@@ -164,7 +165,7 @@ resource "aws_rds_cluster" "secondary" {
   copy_tags_to_snapshot     = true
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = false
-  final_snapshot_identifier = "pay-${var.env}-${each.value.short}-${var.component}-final"
+  final_snapshot_identifier = "${var.name_prefix}-${var.env}-${each.value.short}-${var.component}-final"
 
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
@@ -173,7 +174,7 @@ resource "aws_rds_cluster" "secondary" {
   tags = var.tags
 }
 
-# Instances appear in a recovery region only at the switch, through recovery_instance_count.
+# Readers of a warm-standby region; writes still go to the working region only.
 resource "aws_rds_cluster_instance" "recovery" {
   count = local.working ? 0 : var.recovery_instance_count
 
@@ -182,7 +183,7 @@ resource "aws_rds_cluster_instance" "recovery" {
   cluster_identifier              = aws_rds_cluster.secondary[var.region_name].id
   engine                          = aws_rds_cluster.secondary[var.region_name].engine
   engine_version                  = aws_rds_cluster.secondary[var.region_name].engine_version
-  instance_class                  = var.writer_instance_class
+  instance_class                  = coalesce(var.recovery_instance_class, var.reader_instance_class)
   availability_zone               = var.availability_zones[count.index % 3]
   promotion_tier                  = count.index == 0 ? 0 : 1
   performance_insights_enabled    = true

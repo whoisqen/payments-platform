@@ -10,5 +10,5 @@ output "key_id" {
 
 output "alias_name" {
   value       = aws_kms_alias.this.name
-  description = "Alias in the form alias/pay-<env>-<region-short>-<component>."
+  description = "Alias in the form alias/<prefix>-<env>-<region-short>-<component>."
 }

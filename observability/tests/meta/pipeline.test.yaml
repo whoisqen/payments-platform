@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series: []
   alert_rule_test:
   - eval_time: 5m
@@ -17,9 +20,12 @@ tests:
         failure_mode: meta-watchdog
       exp_annotations:
         summary: 'Watchdog: always firing; silence of this alert means the alert pipeline is broken'
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#watchdog
-        dashboard_url: https://grafana.payments.internal/d/platform-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/meta/warnings.md#watchdog
+        dashboard_url: https://grafana.example.test/d/platform-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: alertmanager_notifications_failed_total{integration="pagerduty"}
     values: 0+2x21
@@ -37,9 +43,12 @@ tests:
         integration: pagerduty
       exp_annotations:
         summary: Alertmanager cannot deliver notifications
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/alertmanager-notifications-failing.md
-        dashboard_url: https://grafana.payments.internal/d/platform-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/meta/alertmanager-notifications-failing.md
+        dashboard_url: https://grafana.example.test/d/platform-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: alertmanager_notifications_failed_total{integration="pagerduty"}
     values: 0+0x21
@@ -48,6 +57,9 @@ tests:
     alertname: AlertmanagerNotificationsFailing
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: prometheus_rule_evaluation_failures_total{rule_group="application-psp"}
     values: 0+1x21
@@ -65,9 +77,12 @@ tests:
         rule_group: application-psp
       exp_annotations:
         summary: A rule group fails to evaluate
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#prometheus-rule-evaluation-failing
-        dashboard_url: https://grafana.payments.internal/d/platform-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/meta/warnings.md#prometheus-rule-evaluation-failing
+        dashboard_url: https://grafana.example.test/d/platform-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: prometheus_rule_evaluation_failures_total{rule_group="application-psp"}
     values: 0+0x21
@@ -76,6 +91,9 @@ tests:
     alertname: PrometheusRuleEvaluationFailing
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: prometheus_tsdb_head_series{region="eu-central-1"}
     values: 2500000x31
@@ -93,9 +111,12 @@ tests:
         region: eu-central-1
       exp_annotations:
         summary: Active series exceed the budget of 2 million per region
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/meta/warnings.md#active-series-budget-exceeded
-        dashboard_url: https://grafana.payments.internal/d/platform-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/meta/warnings.md#active-series-budget-exceeded
+        dashboard_url: https://grafana.example.test/d/platform-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: prometheus_tsdb_head_series{region="eu-central-1"}
     values: 900000x31
@@ -105,6 +126,9 @@ tests:
     alertname: ActiveSeriesBudgetExceeded
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: prometheus_tsdb_head_series{region="eu-central-1"}
     values: 900000x9 2500000x1 900000x19

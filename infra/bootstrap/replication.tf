@@ -5,6 +5,7 @@ module "replica_use1" {
 
   region         = "us-east-1"
   environment    = var.environment
+  name_prefix    = var.name_prefix
   account_id     = var.account_id
   kms_key_arn    = module.state_key_use1.key_arn
   retention_days = var.state_retention_days
@@ -18,6 +19,7 @@ module "replica_use2" {
 
   region         = "us-east-2"
   environment    = var.environment
+  name_prefix    = var.name_prefix
   account_id     = var.account_id
   kms_key_arn    = module.state_key_use2.key_arn
   retention_days = var.state_retention_days
@@ -25,7 +27,7 @@ module "replica_use2" {
 }
 
 resource "aws_iam_role" "replication" {
-  name = "pay-${var.environment}-euc1-tf-state-replication"
+  name = "${var.name_prefix}-${var.environment}-euc1-tf-state-replication"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -37,7 +39,7 @@ resource "aws_iam_role" "replication" {
     }]
   })
 
-  tags = merge(var.tags, { Name = "pay-${var.environment}-euc1-tf-state-replication" })
+  tags = merge(var.tags, { Name = "${var.name_prefix}-${var.environment}-euc1-tf-state-replication" })
 }
 
 resource "aws_iam_role_policy" "replication" {
