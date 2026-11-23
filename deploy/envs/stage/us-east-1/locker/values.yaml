@@ -1,4 +1,4 @@
-# Locker of the standby region; the database is the Frankfurt writer (D6)
+# Locker of the standby region; the database is the working region writer (D6)
 global:
   environment: stage
   region: us-east-1

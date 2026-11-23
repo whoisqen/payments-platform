@@ -26,6 +26,7 @@ lint-repo:
 	tools/lint/spec-lint
 	tools/lint/structure
 	python3 tools/config/validate.py
+	python3 tools/config/render_standby.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

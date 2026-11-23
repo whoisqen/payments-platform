@@ -1,4 +1,4 @@
-# Cell spare in the standby region: local Aurora reader and MemoryDB, writes to the Frankfurt writer; endpoints are placeholders until infra/live exports them
+# Cell spare in the standby region: local Aurora reader and MemoryDB, writes to the working region writer; endpoints are placeholders until infra/live exports them
 global:
   cell: spare
 

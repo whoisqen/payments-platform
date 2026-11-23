@@ -67,6 +67,8 @@ deploy:
     ingress_endpoints:
       eu-central-1: ingress-euc1.stage.pay.example.com
       us-east-1: ingress-use1.stage.pay.example.com
+    # Transit gateway id per region; add after the tgw stack is applied (the vpc stack then routes egress through it).
+    # transit_gateway_ids: {eu-central-1: tgw-0123456789abcdef0}
     # Warm standby: CIDRs of the standby region (data subnets and the private tier that holds the endpoints).
     standby:
       us-east-1:

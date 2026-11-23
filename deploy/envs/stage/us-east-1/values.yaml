@@ -1,4 +1,4 @@
-# Warm standby: serves reads from the local Aurora readers; every write goes to the Frankfurt writer (D6)
+# Warm standby: serves reads from the local Aurora readers; every write goes to the working region writer (D6)
 global:
   region: us-east-1
   dataCidrs:

@@ -25,10 +25,11 @@ locals {
   vpc_cidrs   = { for region, cidr in local.cfg.network.stage : region => cidr if !startswith(region, "egress") }
   egress_cidr = local.cfg.network.stage.egress
   # Each region with workloads has its own egress VPC and transit gateway (no cross-region path for PSP traffic).
-  egress_cidrs = { "eu-central-1" = local.cfg.network.stage.egress, "us-east-1" = local.cfg.network.stage["egress-us-east-1"] }
+  egress_cidrs = { for r in concat([local.cfg.regions.working], slice(local.cfg.regions.recovery, 0, 1)) : r => r == local.cfg.regions.working ? local.cfg.network.stage.egress : local.cfg.network.stage["egress-${r}"] }
 
   # Set after the first apply of tgw: the vpc stack needs the attachment before it may route through it (two-step by design).
-  transit_gateway_ids = { "eu-central-1" = null, "us-east-1" = null }
+  # Region => transit gateway id, filled in config/platform.yaml (deploy.stage.transit_gateway_ids) after tgw is applied.
+  transit_gateway_ids = try(local.cfg.deploy.stage.transit_gateway_ids, {})
 
   psp_domains = local.cfg.dns.psp_domains
   zone_name   = local.cfg.dns.stage_zone
