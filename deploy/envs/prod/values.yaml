@@ -1,0 +1,24 @@
+# Differences of prod from the chart defaults. The chart defaults are the production sizes, so prod runs at production size.
+global:
+  registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
+  environment: prod
+
+router:
+  container:
+    env:
+      RUN_ENV: production
+
+drainer:
+  container:
+    env:
+      RUN_ENV: production
+
+scheduler:
+  producer:
+    container:
+      env:
+        RUN_ENV: production
+  consumer:
+    container:
+      env:
+        RUN_ENV: production

@@ -1,0 +1,34 @@
+# Cell spare: its own Aurora writer, reader and MemoryDB; endpoints are placeholders until infra/live exports them
+global:
+  cell: spare
+
+migrations:
+  database:
+    host: pay-prod-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+
+router:
+  container:
+    env:
+      ROUTER__MASTER_DATABASE__HOST: pay-prod-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+      ROUTER__REPLICA_DATABASE__HOST: pay-prod-euc1-aurora-spare.cluster-ro-example.eu-central-1.rds.amazonaws.com
+      ROUTER__REDIS__HOST: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com
+
+drainer:
+  container:
+    env:
+      DRAINER__MASTER_DATABASE__HOST: pay-prod-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+      DRAINER__REDIS__HOST: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com
+      REDIS_ADDRESS: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com:6379
+
+scheduler:
+  producer:
+    container:
+      env:
+        ROUTER__MASTER_DATABASE__HOST: pay-prod-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__REDIS__HOST: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com
+  consumer:
+    container:
+      env:
+        ROUTER__MASTER_DATABASE__HOST: pay-prod-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__REDIS__HOST: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com
+        REDIS_ADDRESS: clustercfg.pay-prod-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com:6379

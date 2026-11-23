@@ -1,0 +1,3 @@
+# Not layered: the digest comes from images.yaml through the ApplicationSet, the rest is here
+global:
+  environment: prod

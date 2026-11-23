@@ -15,9 +15,6 @@ locker:
   container:
     env:
       RUN_ENV: sandbox
-  autoscaling:
-    minReplicas: 3
-    maxReplicas: 12
 
 locker-migrations:
   database:

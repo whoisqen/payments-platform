@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-ENV = "stage"
+ENVS = {"stage": "sandbox", "prod": "production"}  # environment -> RUN_ENV of its workloads
 
 
 def short(region):
@@ -21,7 +21,8 @@ def lines(items, indent):
     return "".join(f"{' ' * indent}- {i}\n" for i in items)
 
 
-def render(cfg):
+def render(cfg, env):
+    ENV, RUN_ENV = env, ENVS[env]
     prefix = cfg["storage"]["state_bucket_prefix"]
     d = cfg["deploy"][ENV]
     work, standby = cfg["regions"]["working"], cfg["regions"]["recovery"][0]
@@ -86,10 +87,7 @@ global:
 locker:
   container:
     env:
-      RUN_ENV: sandbox
-  autoscaling:
-    minReplicas: 3
-    maxReplicas: 12
+      RUN_ENV: {RUN_ENV}
 
 # Migrations run only where the writer is; enable after promotion
 locker-migrations:
@@ -117,7 +115,7 @@ routing:
 def main(argv):
     cfg = yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
     changed = []
-    for path, text in render(cfg).items():
+    for path, text in {p: x for env in ENVS for p, x in render(cfg, env).items()}.items():
         old = path.read_text(encoding="utf-8") if path.exists() else None
         if old != text:
             changed.append(path.relative_to(ROOT).as_posix())
