@@ -73,3 +73,27 @@ resource "aws_iam_policy" "deny_recovery_writes" {
 
   tags = var.tags
 }
+
+# The table's own replication latency to each replica region (metric lives in the region of the source table).
+resource "aws_cloudwatch_metric_alarm" "replication_latency" {
+  for_each = var.recovery_regions
+
+  alarm_name          = "${local.name}-replication-to-${each.key}"
+  alarm_description   = "DynamoDB global table replication latency to ${each.key} above the threshold"
+  namespace           = "AWS/DynamoDB"
+  metric_name         = "ReplicationLatency"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = var.replication_latency_threshold_ms
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+
+  dimensions = {
+    TableName       = aws_dynamodb_table.this.name
+    ReceivingRegion = each.key
+  }
+
+  tags = var.tags
+}

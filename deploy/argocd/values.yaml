@@ -4,7 +4,6 @@ repo:
   revision: main
 cluster:
   namePrefix: ""
-  regionShort: ""
   region: ""
 observability:
   grafanaUrl: ""

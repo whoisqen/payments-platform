@@ -8,5 +8,7 @@ terraform {
 
 inputs = {
   record_name = "api.${local.env_cfg.zone_name}"
-  endpoints   = { for region, host in local.env_cfg.ingress_endpoints : region => { region = region, target_dns = host } }
+  # All traffic goes to the working region; the standby answers only when its health check fails.
+  primary_key = local.env_cfg.cfg.regions.working
+  endpoints   = { for region, host in local.env_cfg.ingress_endpoints : region => { target_dns = host } }
 }

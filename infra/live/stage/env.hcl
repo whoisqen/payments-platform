@@ -22,11 +22,14 @@ locals {
     "us-east-2"    = ["us-east-2a", "us-east-2b", "us-east-2c"]
   }
 
-  vpc_cidrs   = { for region, cidr in local.cfg.network.stage : region => cidr if region != "egress" }
+  vpc_cidrs   = { for region, cidr in local.cfg.network.stage : region => cidr if !startswith(region, "egress") }
   egress_cidr = local.cfg.network.stage.egress
+  # Each region with workloads has its own egress VPC and transit gateway (no cross-region path for PSP traffic).
+  egress_cidrs = { for r in concat([local.cfg.regions.working], slice(local.cfg.regions.recovery, 0, 1)) : r => r == local.cfg.regions.working ? local.cfg.network.stage.egress : local.cfg.network.stage["egress-${r}"] }
 
   # Set after the first apply of tgw: the vpc stack needs the attachment before it may route through it (two-step by design).
-  transit_gateway_id = null
+  # Region => transit gateway id, filled in config/platform.yaml (deploy.stage.transit_gateway_ids) after tgw is applied.
+  transit_gateway_ids = try(local.cfg.deploy.stage.transit_gateway_ids, {})
 
   psp_domains = local.cfg.dns.psp_domains
   zone_name   = local.cfg.dns.stage_zone
@@ -75,7 +78,7 @@ locals {
   aurora_writer_class = "db.r7g.xlarge"
   aurora_reader_class = "db.r7g.xlarge"
   aurora_reader_count = 1
-  # Warm standby: the us-east-1 Aurora clusters run readers; writes stay in eu-central-1.
+  # Warm standby: the us-east-1 Aurora secondaries keep reader instances and are promoted at a failover; they take no traffic before.
   ingress_endpoints    = local.cfg.deploy.stage.ingress_endpoints
   standby_enabled      = true
   standby_reader_count = 1

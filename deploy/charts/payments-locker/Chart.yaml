@@ -12,3 +12,4 @@ dependencies:
     alias: locker-migrations
     version: 0.1.0
     repository: file://../migrations
+    condition: locker-migrations.enabled

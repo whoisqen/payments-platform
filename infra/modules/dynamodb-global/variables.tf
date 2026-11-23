@@ -105,3 +105,20 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "alarm_actions" {
+  description = "SNS topic ARNs of the replication latency alarms."
+  type        = list(string)
+  default     = []
+}
+
+variable "replication_latency_threshold_ms" {
+  description = "Replication latency to a replica region above which the alarm fires; matches the Aurora lag alarm (5 s)."
+  type        = number
+  default     = 5000
+
+  validation {
+    condition     = var.replication_latency_threshold_ms > 0
+    error_message = "replication_latency_threshold_ms must be positive."
+  }
+}

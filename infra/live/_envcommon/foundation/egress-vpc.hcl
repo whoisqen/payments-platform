@@ -1,5 +1,8 @@
 locals {
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
+  # An environment with several regions lists one egress CIDR per region; the others use the single one.
+  region      = basename(dirname(get_terragrunt_dir()))
+  egress_cidr = try(local.env_cfg.egress_cidrs[local.region], local.env_cfg.egress_cidr)
 }
 
 terraform {
@@ -13,12 +16,12 @@ inputs = {
   # The egress VPC holds no workloads, so it needs no endpoints.
   gateway_endpoint_services   = []
   interface_endpoint_services = []
-  cidr_block                  = local.env_cfg.egress_cidr
+  cidr_block                  = local.egress_cidr
   # Public tier holds the NAT gateways, private the firewall endpoints and data the transit gateway attachments.
   subnet_cidrs = {
-    public  = [for i in range(3) : cidrsubnet(local.env_cfg.egress_cidr, 6, i)]
-    private = [for i in range(3) : cidrsubnet(local.env_cfg.egress_cidr, 8, 16 + i)]
-    data    = [for i in range(3) : cidrsubnet(local.env_cfg.egress_cidr, 8, 32 + i)]
+    public  = [for i in range(3) : cidrsubnet(local.egress_cidr, 6, i)]
+    private = [for i in range(3) : cidrsubnet(local.egress_cidr, 8, 16 + i)]
+    data    = [for i in range(3) : cidrsubnet(local.egress_cidr, 8, 32 + i)]
   }
   tags = {
     team        = "platform"

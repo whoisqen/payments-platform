@@ -6,7 +6,6 @@ set:
   repo.url: https://git.example.test/acme/platform
   repo.revision: release
   cluster.namePrefix: acme
-  cluster.regionShort: use1
   cluster.region: us-east-1
   observability.grafanaUrl: https://grafana.example.test
 tests:
@@ -22,12 +21,12 @@ tests:
       - equal:
           path: spec.template.spec.sources[0].repoURL
           value: https://git.example.test/acme/platform
-  - it: builds the destination cluster name from the prefix and region short
+  - it: builds the destination cluster name from the prefix and the region directory
     template: applicationset-cells.yaml
     asserts:
       - equal:
           path: spec.template.spec.destination.name
-          value: "acme-{{ index .path.segments 2 }}-use1-{{ .path.basename }}"
+          value: 'acme-{{ index .path.segments 2 }}-{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}-{{ .path.basename }}'
   - it: gives Prometheus the runbook and Grafana bases as external labels
     template: addons/kube-prometheus.yaml
     asserts:

@@ -1,4 +1,4 @@
-# HTTPS probe of each regional ingress; a failing check drops that region from the latency answer.
+# HTTPS probe of each regional ingress; the primary check decides when the standby takes over.
 resource "aws_route53_health_check" "this" {
   for_each = var.endpoints
 
@@ -11,7 +11,7 @@ resource "aws_route53_health_check" "this" {
   failure_threshold = var.failure_threshold
 }
 
-# Latency routing with a health check: Route 53 skips an unhealthy region, which is the failover.
+# Failover routing: the primary answers every query while its check is healthy; the secondary answers only when it is not.
 resource "aws_route53_record" "this" {
   for_each = var.endpoints
 
@@ -23,7 +23,7 @@ resource "aws_route53_record" "this" {
   set_identifier  = each.key
   health_check_id = aws_route53_health_check.this[each.key].id
 
-  latency_routing_policy {
-    region = each.value.region
+  failover_routing_policy {
+    type = each.key == var.primary_key ? "PRIMARY" : "SECONDARY"
   }
 }

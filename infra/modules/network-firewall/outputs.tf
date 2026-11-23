@@ -17,3 +17,8 @@ output "nat_gateway_ids" {
   value       = [for k in sort(keys(aws_nat_gateway.this)) : aws_nat_gateway.this[k].id]
   description = "NAT gateways, one per AZ."
 }
+
+output "psp_fence_rule_group_name" {
+  description = "Rule group that the failover script edits to fence the region."
+  value       = aws_networkfirewall_rule_group.psp_fence.name
+}

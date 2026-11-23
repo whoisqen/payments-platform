@@ -18,7 +18,7 @@ spec:
     spec:
       project: payments
       destination:
-        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{ .Values.cluster.regionShort }}-locker'
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-locker'
         namespace: payments
       sources:
         - repoURL: {{ .Values.repo.url }}
@@ -58,7 +58,7 @@ spec:
     spec:
       project: payments
       destination:
-        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{ .Values.cluster.regionShort }}-edge'
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-edge'
         namespace: payments-edge
       sources:
         - repoURL: {{ .Values.repo.url }}
@@ -103,7 +103,7 @@ spec:
     spec:
       project: payments
       destination:
-        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{ .Values.cluster.regionShort }}-control-center'
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-control-center'
         namespace: control-center
       sources:
         - repoURL: {{ .Values.repo.url }}

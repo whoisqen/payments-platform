@@ -11,5 +11,5 @@ dependencies:
 - name: migrations
   repository: file://../migrations
   version: 0.1.0
-digest: sha256:adbd769405e83977b9ed98e8566567f5c891a36484a46eee753b30a6d4fa42d3
-generated: "2026-11-22T01:38:46.637179732+02:00"
+digest: sha256:6aa7315fa53126bda2293bfc461c5bc8f2b2498bb261b84b0aff79d026e7a570
+generated: "2026-11-23T14:16:28.313180194+02:00"

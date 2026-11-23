@@ -16,4 +16,6 @@ inputs = {
     private = [for i in range(3) : cidrsubnet(include.envcommon.locals.env_cfg.vpc_cidrs["us-east-1"], 3, i)]
     data    = [for i in range(3) : cidrsubnet(include.envcommon.locals.env_cfg.vpc_cidrs["us-east-1"], 8, 96 + i)]
   }
+  enable_egress_route       = try(include.envcommon.locals.env_cfg.transit_gateway_ids[include.root.locals.region], null) != null
+  egress_transit_gateway_id = try(include.envcommon.locals.env_cfg.transit_gateway_ids[include.root.locals.region], null)
 }

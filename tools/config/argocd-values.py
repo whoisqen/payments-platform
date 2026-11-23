@@ -8,17 +8,12 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def region_short(region):
-    a, b, c = region.split("-")
-    return f"{a}{b[0]}{c}"
-
-
 def values(cfg):
     org, repo = cfg["owner"]["github_org"], cfg["owner"]["github_repo"]
     working = cfg["regions"]["working"]
     return {
         "repo": {"url": f"https://github.com/{org}/{repo}", "revision": "main"},
-        "cluster": {"namePrefix": cfg["storage"]["state_bucket_prefix"], "regionShort": region_short(working), "region": working},
+        "cluster": {"namePrefix": cfg["storage"]["state_bucket_prefix"], "region": working},
         "observability": {"grafanaUrl": cfg["dns"]["grafana_url"]},
     }
 
