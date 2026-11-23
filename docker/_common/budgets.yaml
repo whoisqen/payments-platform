@@ -5,3 +5,4 @@ budgets_mib:
   scheduler: 150
   locker: 80
   control-center: 900
+  vault-snapshot: 400

@@ -1,0 +1,30 @@
+schemaVersion: 2.0.0
+metadataTest:
+  user: "10001:10001"
+  # the Job commands set the entrypoint
+  entrypoint: []
+fileExistenceTests:
+  - name: vault
+    path: /usr/local/bin/vault
+    shouldExist: true
+    permissions: "-r-xr-xr-x"
+  - name: aws
+    path: /usr/local/aws-cli/v2/current/bin/aws
+    shouldExist: true
+  - name: jq
+    path: /usr/local/bin/jq
+    shouldExist: true
+    permissions: "-r-xr-xr-x"
+commandTests:
+  - name: vault runs
+    command: /usr/local/bin/vault
+    args: ["version"]
+    expectedOutput: ["Vault v2\\.0\\."]
+  - name: aws runs
+    command: /usr/local/aws-cli/v2/current/bin/aws
+    args: ["--version"]
+    expectedOutput: ["aws-cli/2\\."]
+  - name: jq runs
+    command: /usr/local/bin/jq
+    args: ["--version"]
+    expectedOutput: ["jq-1\\."]
