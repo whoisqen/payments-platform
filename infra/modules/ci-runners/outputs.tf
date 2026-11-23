@@ -1,21 +1,26 @@
 output "secret_names" {
-  description = "Secrets Manager names of the GitHub App keys per scale set; the values are set outside Terraform."
-  value       = { for s, secret in aws_secretsmanager_secret.github_app : s => secret.name }
+  description = "Secrets Manager names of the GitHub App credentials per pool; the values are set outside Terraform."
+  value       = { for n, s in aws_secretsmanager_secret.github_app : n => s.name }
+}
+
+output "asg_names" {
+  description = "Auto Scaling group of each pool."
+  value       = { for n, g in aws_autoscaling_group.pool : n => g.name }
 }
 
 output "runner_role_arns" {
-  description = "IAM role of each scale set; ARC puts it on the runner service account."
-  value       = { for s, r in aws_iam_role.runner : s => r.arn }
+  description = "Instance role of each pool."
+  value       = { for n, r in aws_iam_role.runner : n => r.arn }
+}
+
+output "runs_on_labels" {
+  description = "Runner label that jobs use in runs-on, per pool."
+  value       = { for n in local.pool_names : n => n }
 }
 
 output "github_push_role_arn" {
   description = "Role that GitHub Actions assumes on main and release branches to push images."
   value       = aws_iam_role.github_push.arn
-}
-
-output "external_secrets_role_arn" {
-  description = "Role of the External Secrets controller that reads the GitHub App keys."
-  value       = aws_iam_role.external_secrets.arn
 }
 
 output "cache_bucket_name" {

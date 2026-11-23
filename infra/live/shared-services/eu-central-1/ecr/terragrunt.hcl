@@ -13,10 +13,8 @@ dependency "kms" {
 
   mock_outputs = {
     key_arns = {
-      "ebs-nodes"     = "arn:aws:kms:eu-central-1:000000000000:key/mrk-ebs-nodes"
-      "logs"          = "arn:aws:kms:eu-central-1:000000000000:key/mrk-logs"
-      "shared"        = "arn:aws:kms:eu-central-1:000000000000:key/mrk-shared"
-      "runners-cache" = "arn:aws:kms:eu-central-1:000000000000:key/mrk-runners-cache"
+      "ebs-nodes" = "arn:aws:kms:eu-central-1:000000000000:key/mrk-ebs-nodes"
+      "shared"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-shared"
     }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate"]

@@ -132,84 +132,25 @@ run "cpu_limits_follow_the_override" {
   }
 }
 
-run "payments_cluster_has_no_ci_pools" {
-  command = plan
-
-  assert {
-    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-ci-")]) == 0 && contains(keys(output.manifests), "nodepool-payments.yaml") && !contains(keys(output.manifests), "ec2nodeclass-ci-nvme.yaml")
-    error_message = "ci pools and the NVMe node class are rendered only when enabled"
-  }
-}
-
-run "ci_pools_are_split_by_workload_and_architecture" {
+run "pools_follow_enabled_pools" {
   command = plan
 
   variables {
-    enabled_pools = ["ci-build", "ci-test", "ci-light", "ci-pr"]
+    enabled_pools = ["payments", "workers"]
   }
 
   assert {
-    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 4 && !contains(keys(output.manifests), "nodepool-payments.yaml")
-    error_message = "only the four ci pools are rendered"
-  }
-  assert {
-    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : [for r in yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["arm64"]])
-    error_message = "runners are arm64"
-  }
-  assert {
-    condition     = [for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["4xlarge", "8xlarge"] && [for r in yamldecode(output.manifests["nodepool-ci-light.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["large", "xlarge"]
-    error_message = "each pool has a defined instance size range by purpose"
-  }
-  assert {
-    condition     = [for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"][0] == ["on-demand"] && contains([for r in yamldecode(output.manifests["nodepool-ci-test.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"][0], "spot")
-    error_message = "build is On-Demand, tests may use Spot"
-  }
-  assert {
-    condition     = yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.nodeClassRef.name == "ci-nvme" && yamldecode(output.manifests["nodepool-ci-test.yaml"]).spec.template.spec.nodeClassRef.name == "hardened" && yamldecode(output.manifests["ec2nodeclass-ci-nvme.yaml"]).spec.instanceStorePolicy == "RAID0"
-    error_message = "build pools use the NVMe node class with RAID0 instance store"
-  }
-  assert {
-    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.budgets == [{ nodes = "100%" }] && yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.consolidateAfter == "2m"])
-    error_message = "idle runner nodes are dropped after 2 minutes at any time of day"
-  }
-  assert {
-    condition     = yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.template.spec.taints[0].value == "ci-pr" && yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.limits.cpu == "128"
-    error_message = "untrusted pull request code has its own tainted pool"
-  }
-  assert {
-    condition     = yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.metadata.labels["platform.io/pci-scope"] == "none"
-    error_message = "ci nodes are outside the CDE"
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 2 && !contains(keys(output.manifests), "nodepool-cde.yaml")
+    error_message = "only the enabled pools are rendered"
   }
 }
 
-run "ci_and_payments_pools_cannot_mix" {
+run "unknown_pool_is_rejected" {
   command = plan
 
   variables {
-    enabled_pools = ["payments", "ci-light"]
+    enabled_pools = ["payments", "ci"]
   }
 
   expect_failures = [var.enabled_pools]
-}
-
-run "nodes_may_fill_the_pull_through_cache_only_under_its_prefixes" {
-  command = plan
-
-  variables {
-    pull_through_cache_prefixes = ["ecr-public", "quay"]
-  }
-
-  assert {
-    condition     = length(aws_iam_role_policy.pull_through) == 1 && alltrue([for r in jsondecode(aws_iam_role_policy.pull_through[0].policy).Statement[0].Resource : endswith(r, "/*") && (strcontains(r, "/ecr-public/") || strcontains(r, "/quay/"))]) && length(jsondecode(aws_iam_role_policy.pull_through[0].policy).Statement[0].Resource) == 2
-    error_message = "one statement scoped to the two cache prefixes"
-  }
-}
-
-run "no_pull_through_policy_by_default" {
-  command = plan
-
-  assert {
-    condition     = length(aws_iam_role_policy.pull_through) == 0
-    error_message = "nodes get no pull-through permission unless prefixes are given"
-  }
 }

@@ -18,21 +18,13 @@ locals {
   EOT
 
   # Payment pools never use Spot: an interrupted pod in the middle of a PSP call leaves the payment in the unknown state.
-  # The ci-* pools exist only in the shared-services cluster (enabled_pools); a payments cluster never gets them.
   all_pools = {
     payments = { taint = "payments", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     stateful = { taint = "stateful", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     cde      = { taint = "cde", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     workers  = { taint = "workers", capacity = ["spot", "on-demand"], expire = "168h", grace = "90s", consolidation = "WhenEmptyOrUnderutilized" }
-    # Runner pools: nodes are split by workload and CPU architecture, never by priority, so one queue is served first come first served.
-    # What a job may do is decided by its service account; only untrusted pull request code has nodes of its own.
-    # Build nodes have local NVMe for layers and the cargo target directory; a release build is not lost to Spot.
-    ci-build = { taint = "ci-build", scope = "none", arch = ["arm64"], sizes = ["4xlarge", "8xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-test  = { taint = "ci-test", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-light = { taint = "ci-light", scope = "none", arch = ["arm64"], sizes = ["large", "xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "5m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-pr    = { taint = "ci-pr", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge", "4xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
   }
-  pools = { for name, p in local.all_pools : name => merge({ scope = "cde", arch = ["arm64", "amd64"], sizes = null, node_class = "hardened", consolidate_after = "5m" }, p) if contains(var.enabled_pools, name) }
+  pools = { for name, p in local.all_pools : name => merge({ scope = "cde" }, p) if contains(var.enabled_pools, name) }
 
   ec2_node_class = {
     apiVersion = "karpenter.k8s.aws/v1"
@@ -65,19 +57,6 @@ locals {
     }
   }
 
-  # Local NVMe of the instance is the ephemeral storage of the node; the EBS data volume is not needed.
-  ec2_node_class_nvme = merge(local.ec2_node_class, {
-    metadata = { name = "ci-nvme" }
-    spec = merge(local.ec2_node_class.spec, {
-      instanceStorePolicy = "RAID0"
-      blockDeviceMappings = [local.ec2_node_class.spec.blockDeviceMappings[0]]
-    })
-  })
-  ec2_node_classes = merge(
-    { hardened = local.ec2_node_class },
-    anytrue([for p in values(local.pools) : p.node_class == "ci-nvme"]) ? { "ci-nvme" = local.ec2_node_class_nvme } : {},
-  )
-
   node_pools = { for name, p in local.pools : name => {
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
@@ -87,28 +66,27 @@ locals {
       template = {
         metadata = { labels = { workload = p.taint, "platform.io/pci-scope" = p.scope } }
         spec = {
-          nodeClassRef           = { group = "karpenter.k8s.aws", kind = "EC2NodeClass", name = p.node_class }
+          nodeClassRef           = { group = "karpenter.k8s.aws", kind = "EC2NodeClass", name = "hardened" }
           taints                 = [{ key = "workload", value = p.taint, effect = "NoSchedule" }]
           expireAfter            = p.expire
           terminationGracePeriod = p.grace
           requirements = [
             { key = "kubernetes.io/os", operator = "In", values = ["linux"] },
-            { key = "kubernetes.io/arch", operator = "In", values = p.arch },
+            { key = "kubernetes.io/arch", operator = "In", values = ["arm64", "amd64"] },
             { key = "karpenter.sh/capacity-type", operator = "In", values = p.capacity },
             { key = "karpenter.k8s.aws/instance-family", operator = "In", values = var.instance_families[name] },
-            p.sizes == null ? { key = "karpenter.k8s.aws/instance-size", operator = "NotIn", values = ["metal", "nano", "micro", "small"] } : { key = "karpenter.k8s.aws/instance-size", operator = "In", values = p.sizes },
+            { key = "karpenter.k8s.aws/instance-size", operator = "NotIn", values = ["metal", "nano", "micro", "small"] },
           ]
         }
       }
-      # Payment pools: outside 02:00-06:00 UTC only expiry may replace a node; inside it at most 10% at a time.
-      # Runner pools drop empty nodes at any time, so an idle pool costs nothing.
+      # Outside 02:00-06:00 UTC only expiry may replace a node; inside it at most 10% at a time.
       disruption = {
         consolidationPolicy = p.consolidation
-        consolidateAfter    = p.consolidate_after
-        budgets = jsondecode(startswith(name, "ci-") ? jsonencode([{ nodes = "100%" }]) : jsonencode([
+        consolidateAfter    = "5m"
+        budgets = [
           { nodes = "10%" },
           { nodes = "0", reasons = ["Drifted", "Underutilized", "Empty"], schedule = "0 6 * * *", duration = "20h" },
-        ]))
+        ]
       }
     }
   } }
@@ -397,20 +375,4 @@ resource "aws_eks_pod_identity_association" "controller" {
   service_account = "karpenter"
   role_arn        = aws_iam_role.controller.arn
   tags            = var.tags
-}
-
-# The managed pull-only policy cannot fill a pull-through cache; this lets a node import and create only under the cache prefixes.
-resource "aws_iam_role_policy" "pull_through" {
-  count = length(var.pull_through_cache_prefixes) > 0 ? 1 : 0
-
-  name = "ecr-pull-through"
-  role = aws_iam_role.node.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ecr:BatchImportUpstreamImage", "ecr:CreateRepository"]
-      Resource = [for p in var.pull_through_cache_prefixes : "arn:aws:ecr:${var.region}:${var.account_id}:repository/${p}/*"]
-    }]
-  })
 }

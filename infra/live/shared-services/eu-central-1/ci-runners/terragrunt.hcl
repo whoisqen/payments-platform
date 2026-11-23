@@ -8,20 +8,36 @@ include "envcommon" {
   expose = true
 }
 
-dependency "eks" {
-  config_path = "../eks"
+dependency "vpc" {
+  config_path = "../vpc"
 
   mock_outputs = {
-    oidc_provider_arn = "arn:aws:iam::000000000000:oidc-provider/oidc.eks.eu-central-1.amazonaws.com/id/MOCK"
-    oidc_issuer       = "oidc.eks.eu-central-1.amazonaws.com/id/MOCK"
+    vpc_id = "vpc-00000000"
+    subnet_ids = {
+      public  = ["subnet-a00000000", "subnet-a10000000", "subnet-a20000000"]
+      private = ["subnet-b00000000", "subnet-b10000000", "subnet-b20000000"]
+      data    = ["subnet-c00000000", "subnet-c10000000", "subnet-c20000000"]
+    }
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate"]
+}
+
+dependency "kms" {
+  config_path = "../kms"
+
+  mock_outputs = {
+    key_arns = {
+      "ebs-nodes" = "arn:aws:kms:eu-central-1:000000000000:key/mrk-ebs-nodes"
+      "shared"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-shared"
+    }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate"]
 }
 
 inputs = {
-  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
-  oidc_issuer       = dependency.eks.outputs.oidc_issuer
-  scale_sets        = include.envcommon.locals.env_cfg.ci_scale_sets
+  vpc_id          = dependency.vpc.outputs.vpc_id
+  subnet_ids      = dependency.vpc.outputs.subnet_ids["private"]
+  ebs_kms_key_arn = dependency.kms.outputs.key_arns["ebs-nodes"]
   tags = {
     team        = "platform"
     owner       = include.envcommon.locals.env_cfg.owner

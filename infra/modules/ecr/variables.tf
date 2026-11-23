@@ -8,16 +8,6 @@ variable "region" {
   }
 }
 
-variable "environment" {
-  type        = string
-  description = "dev, stage or prod."
-
-  validation {
-    condition     = contains(["dev", "stage", "prod"], var.environment)
-    error_message = "environment must be dev, stage or prod."
-  }
-}
-
 variable "account_id" {
   type        = string
   description = "Registry account (shared-services); replication stays inside it."

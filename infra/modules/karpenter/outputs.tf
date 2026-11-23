@@ -1,6 +1,6 @@
 output "manifests" {
   value = merge(
-    { for name, c in local.ec2_node_classes : "ec2nodeclass-${name}.yaml" => yamlencode(c) },
+    { "ec2nodeclass-hardened.yaml" = yamlencode(local.ec2_node_class) },
     { for name, p in local.node_pools : "nodepool-${name}.yaml" => yamlencode(p) },
   )
   description = "EC2NodeClass and NodePool manifests by file name, for the ArgoCD platform application; the Karpenter CRDs are not applied from Terraform."

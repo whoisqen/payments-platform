@@ -15,6 +15,7 @@ REQUIRED = {
     "regions": ["working", "recovery"],
     "dns": ["dev_zone", "stage_zone", "psp_domains"],
     "storage": ["state_bucket_prefix"],
+    "runners": ["version", "sha256"],
 }
 ACCOUNT = re.compile(r"^\d{12}$")
 REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")

@@ -1,32 +1,38 @@
 locals {
-  scale_sets = toset(keys(var.scale_sets))
-  # Roles that may write the cache; every other role reads it.
-  cache_writers = [for s, c in var.scale_sets : s if c.cache_write]
+  pool_names = toset(keys(var.pools))
+  # Pools that may write the cache; every other pool reads it.
+  cache_writers = [for n, p in var.pools : n if p.cache_write]
 
   bucket_name = "${var.name_prefix}-ci-cache-${var.account_id}"
   bucket_arn  = "arn:aws:s3:::${local.bucket_name}"
-  # Role ARNs are built from names so that policies that reference them are known at plan time.
-  runner_role_name = { for s in local.scale_sets : s => "${var.name_prefix}-ci-runner-${s}" }
-  runner_role_arn  = { for s in local.scale_sets : s => "arn:aws:iam::${var.account_id}:role/${local.runner_role_name[s]}" }
+  # Names are built from the pool, so that policies that reference them are known at plan time.
+  asg_name         = { for n in local.pool_names : n => "${var.name_prefix}-ci-${n}" }
+  runner_role_name = { for n in local.pool_names : n => "${var.name_prefix}-ci-runner-${n}" }
+  runner_role_arn  = { for n in local.pool_names : n => "arn:aws:iam::${var.account_id}:role/${local.runner_role_name[n]}" }
+  asg_arn          = { for n in local.pool_names : n => "arn:aws:autoscaling:${var.region}:${var.account_id}:autoScalingGroup:*:autoScalingGroupName/${local.asg_name[n]}" }
   push_role_name   = "${var.name_prefix}-ci-ecr-push"
-  eso_role_name    = "${var.name_prefix}-ci-external-secrets"
   github_subjects  = [for r in var.github_push_refs : "repo:${var.github_repository}:ref:${r}"]
 
-  # Only the runners of the cache roles and the push role may touch cache objects; management actions stay open for Terraform.
-  cache_read_actions  = ["s3:GetObject", "s3:ListBucket"]
-  cache_write_actions = ["s3:PutObject"]
+  # Only the roles of the cache writers and the push role may write cache objects; management actions stay open for Terraform.
   cache_read_statements = [
-    { Effect = "Allow", Action = local.cache_read_actions, Resource = [local.bucket_arn, "${local.bucket_arn}/*"] },
+    { Effect = "Allow", Action = ["s3:GetObject", "s3:ListBucket"], Resource = [local.bucket_arn, "${local.bucket_arn}/*"] },
     { Effect = "Allow", Action = ["kms:Decrypt"], Resource = [aws_kms_key.cache.arn] },
   ]
   cache_write_statements = [
-    { Effect = "Allow", Action = local.cache_write_actions, Resource = ["${local.bucket_arn}/*"] },
+    { Effect = "Allow", Action = ["s3:PutObject"], Resource = ["${local.bucket_arn}/*"] },
     { Effect = "Allow", Action = ["kms:GenerateDataKey"], Resource = [aws_kms_key.cache.arn] },
   ]
-  ecr_pull_statements = [
-    { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = ["*"] },
-    { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"], Resource = var.ecr_repository_arns },
-  ]
+  ecr_pull_statements = concat(
+    [
+      { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = ["*"] },
+      { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"], Resource = var.ecr_repository_arns },
+    ],
+    length(var.pull_through_cache_prefixes) == 0 ? [] : [{
+      Effect   = "Allow"
+      Action   = ["ecr:BatchImportUpstreamImage", "ecr:CreateRepository", "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+      Resource = [for p in var.pull_through_cache_prefixes : "arn:aws:ecr:${var.region}:${var.account_id}:repository/${p}/*"]
+    }],
+  )
   ecr_push_statements = [
     { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = ["*"] },
     { Effect = "Allow", Action = [
@@ -35,42 +41,29 @@ locals {
     ], Resource = var.ecr_repository_arns },
   ]
 
-  # What a job may do is the property of its scale set, not of a priority: cache write, image pull, plan roles; untrusted code gets an explicit deny.
-  runner_policies = { for s, c in var.scale_sets : s => concat(
+  # What a job may do is the property of its pool: cache write, image pull, plan roles. Every instance reads its own GitHub App key to register
+  # and protects itself from scale-in while a job runs; untrusted pools get an explicit deny of roles and the registry.
+  pool_policies = { for n, p in var.pools : n => concat(
     local.cache_read_statements,
-    c.cache_write ? local.cache_write_statements : [],
-    c.ecr_pull ? local.ecr_pull_statements : [],
-    c.assume_plan ? [{ Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.plan_role_arns }] : [],
-    c.untrusted ? [{ Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*", "secretsmanager:*"], Resource = ["*"] }] : [],
+    p.cache_write ? local.cache_write_statements : [],
+    p.ecr_pull ? local.ecr_pull_statements : [],
+    p.assume_plan ? [{ Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.plan_role_arns }] : [],
+    [
+      { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_secretsmanager_secret.github_app[n].arn] },
+      { Effect = "Allow", Action = ["kms:Decrypt"], Resource = [aws_kms_key.secrets.arn] },
+      { Effect = "Allow", Action = ["autoscaling:SetInstanceProtection"], Resource = [local.asg_arn[n]] },
+    ],
+    p.untrusted ? [{ Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*"], Resource = ["*"] }] : [],
   ) }
 
-  secret_arns = [for s in local.scale_sets : aws_secretsmanager_secret.github_app[s].arn]
-
-  # Web-identity trust of a service account of the runner cluster.
-  runner_trust = { for s in local.scale_sets : s => {
+  ec2_trust = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Federated = var.oidc_provider_arn }
-      Action    = "sts:AssumeRoleWithWebIdentity"
-      Condition = { StringEquals = {
-        "${var.oidc_issuer}:aud" = "sts.amazonaws.com"
-        "${var.oidc_issuer}:sub" = "system:serviceaccount:arc-${s}:${s}"
-      } }
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
     }]
-  } }
-  eso_trust = {
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Federated = var.oidc_provider_arn }
-      Action    = "sts:AssumeRoleWithWebIdentity"
-      Condition = { StringEquals = {
-        "${var.oidc_issuer}:aud" = "sts.amazonaws.com"
-        "${var.oidc_issuer}:sub" = "system:serviceaccount:${var.external_secrets_namespace}:${var.external_secrets_service_account}"
-      } }
-    }]
-  }
+  })
 }
 
 resource "aws_kms_key" "cache" {
@@ -86,7 +79,7 @@ resource "aws_kms_alias" "cache" {
 }
 
 resource "aws_kms_key" "secrets" {
-  description             = "GitHub App keys of the CI runner scale sets"
+  description             = "GitHub App keys of the CI runner pools"
   enable_key_rotation     = true
   deletion_window_in_days = 30
   tags                    = var.tags
@@ -164,7 +157,7 @@ resource "aws_s3_bucket_policy" "cache" {
         Principal = "*"
         Action    = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource  = [local.bucket_arn, "${local.bucket_arn}/*"]
-        Condition = { ArnNotLike = { "aws:PrincipalArn" = concat([for s in local.scale_sets : local.runner_role_arn[s]], [aws_iam_role.github_push.arn]) } }
+        Condition = { ArnNotLike = { "aws:PrincipalArn" = concat([for n in local.pool_names : local.runner_role_arn[n]], [aws_iam_role.github_push.arn]) } }
       },
       {
         Sid       = "DenyCacheWritesOutsideBuildRoles"
@@ -178,34 +171,50 @@ resource "aws_s3_bucket_policy" "cache" {
   })
 }
 
+# The value is JSON {"app_id": ..., "installation_id": ..., "private_key": ...} set outside Terraform; the app needs only the runner administration permission.
 resource "aws_secretsmanager_secret" "github_app" {
-  for_each                = local.scale_sets
+  for_each                = local.pool_names
   name                    = "${var.name_prefix}/ci/github-app/${each.key}"
-  description             = "GitHub App private key of the ${each.key} runner scale set; the value is set outside Terraform"
+  description             = "GitHub App credentials that the instances of the ${each.key} pool register their runner with; the value is set outside Terraform"
   kms_key_id              = aws_kms_key.secrets.arn
   recovery_window_in_days = var.secret_recovery_window_days
   tags                    = var.tags
 }
 
 resource "aws_iam_role" "runner" {
-  for_each             = local.scale_sets
+  for_each             = local.pool_names
   name                 = local.runner_role_name[each.key]
-  assume_role_policy   = jsonencode(local.runner_trust[each.key])
+  assume_role_policy   = local.ec2_trust
   permissions_boundary = var.permissions_boundary_arn
   max_session_duration = 3600
   tags                 = var.tags
 }
 
 resource "aws_iam_role_policy" "runner" {
-  for_each = local.scale_sets
+  for_each = local.pool_names
   name     = "runner-access"
   role     = aws_iam_role.runner[each.key].id
   policy = jsonencode({
     Version   = "2012-10-17"
-    Statement = local.runner_policies[each.key]
+    Statement = local.pool_policies[each.key]
   })
 }
 
+# Session Manager replaces SSH: no inbound port is open on any runner.
+resource "aws_iam_role_policy_attachment" "ssm" {
+  for_each   = local.pool_names
+  role       = aws_iam_role.runner[each.key].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "runner" {
+  for_each = local.pool_names
+  name     = local.runner_role_name[each.key]
+  role     = aws_iam_role.runner[each.key].name
+  tags     = var.tags
+}
+
+# GitHub Actions on main and release branches pushes images with this role through OIDC, from whichever runner runs the job.
 resource "aws_iam_role" "github_push" {
   name                 = local.push_role_name
   permissions_boundary = var.permissions_boundary_arn
@@ -229,24 +238,4 @@ resource "aws_iam_role_policy" "github_push" {
   name   = "ecr-push"
   role   = aws_iam_role.github_push.id
   policy = jsonencode({ Version = "2012-10-17", Statement = local.ecr_push_statements })
-}
-
-resource "aws_iam_role" "external_secrets" {
-  name                 = local.eso_role_name
-  assume_role_policy   = jsonencode(local.eso_trust)
-  permissions_boundary = var.permissions_boundary_arn
-  max_session_duration = 3600
-  tags                 = var.tags
-}
-
-resource "aws_iam_role_policy" "external_secrets" {
-  name = "read-github-app-keys"
-  role = aws_iam_role.external_secrets.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      { Effect = "Allow", Action = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"], Resource = local.secret_arns },
-      { Effect = "Allow", Action = ["kms:Decrypt"], Resource = [aws_kms_key.secrets.arn] },
-    ]
-  })
 }

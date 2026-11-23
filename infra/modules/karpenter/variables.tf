@@ -72,11 +72,6 @@ variable "instance_families" {
     stateful = ["r7g", "r6g", "r7i", "r6i"]
     cde      = ["m7g", "m6g", "m7i", "m6i"]
     workers  = ["m6g", "m7g", "m8g", "c7g", "c8g", "r7g", "m7i", "c7i"]
-    # Graviton runners: local NVMe for the arm64 image builds, general purpose Graviton for tests and lint. Developers build amd64 images locally.
-    ci-build = ["c7gd", "m7gd", "c6gd"]
-    ci-test  = ["m7g", "m6g", "c7g"]
-    ci-light = ["m7g", "m6g", "c7g"]
-    ci-pr    = ["c7g", "m7g", "c6g", "m6g"]
   }
 }
 
@@ -88,31 +83,17 @@ variable "cpu_limits" {
     stateful = 100
     cde      = 200
     workers  = 400
-    ci-build = 128
-    ci-test  = 64
-    ci-light = 48
-    ci-pr    = 128
   }
 }
 
 variable "enabled_pools" {
   type        = list(string)
-  description = "NodePools rendered for this cluster. Payments clusters keep the default; the shared-services cluster sets the ci-* pools so that CI pods never land on payments nodes and payment pools never exist next to runners."
+  description = "NodePools rendered for this cluster; a cluster that holds no CDE workload may leave the cde pool out."
   default     = ["payments", "stateful", "cde", "workers"]
   validation {
-    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci-build", "ci-test", "ci-light", "ci-pr"], n)])
-    error_message = "enabled_pools may contain payments, stateful, cde, workers, ci-build, ci-test, ci-light and ci-pr only."
+    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers"], n)])
+    error_message = "enabled_pools may contain payments, stateful, cde and workers only."
   }
-  validation {
-    condition     = !(anytrue([for n in var.enabled_pools : startswith(n, "ci-")]) && anytrue([for n in var.enabled_pools : !startswith(n, "ci-")]))
-    error_message = "ci pools and payments pools must not share a cluster."
-  }
-}
-
-variable "pull_through_cache_prefixes" {
-  type        = list(string)
-  default     = []
-  description = "ECR pull-through cache repository prefixes that nodes may import into on a first pull; empty grants nothing."
 }
 
 variable "tags" {

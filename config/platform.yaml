@@ -58,3 +58,8 @@ deploy:
     cluster_domain: stage.example.internal
     rds_suffix: example
     memorydb_suffix: example
+
+runners:
+  # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
+  version: 2.329.0
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"

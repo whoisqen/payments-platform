@@ -22,8 +22,6 @@ locals {
     "arn:aws:ecr:eu-central-1:${local.account_id}:repository/${local.cfg.registry.ecr_repo_prefix}/*",
   ]
 
-  kubernetes_version   = "1.34"
-  bottlerocket_version = "v1.49.0"
 
   azs = {
     "eu-central-1" = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
@@ -36,43 +34,20 @@ locals {
   transit_gateway_id = null
 
   kms_keys = {
-    "ebs-nodes"     = { user_role_arns = [local.autoscaling_slr_arn] }
-    "logs"          = { service_principals = ["logs.amazonaws.com"] }
-    "shared"        = {}
-    "runners-cache" = {}
+    "ebs-nodes" = { user_role_arns = [local.autoscaling_slr_arn] }
+    "shared"    = {}
   }
 
-  # People get view only; ArgoCD is limited to the ARC and ESO namespaces and never cluster-admin.
-  access_entries = {
-    sre-view = {
-      principal_arn = "arn:aws:iam::${local.account_id}:role/aws-reserved/sso.amazonaws.com/${local.cfg.access.sre_view_permission_set}"
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-    }
-    argocd = {
-      principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.storage.state_bucket_prefix}-shared-services-argocd-controller"
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
-      scope         = "namespace"
-      namespaces    = ["arc-systems", "arc-ci-build", "arc-ci-test", "arc-ci-light", "arc-ci-pr", "external-secrets"]
-    }
+  # Runner pools: one Auto Scaling group of Spot instances each, split by kind of job and never by priority.
+  # warm_size instances run during working hours, min_size outside them; target_cpu is the average CPU that adds instances.
+  ci_pools = {
+    ci-build = { instance_types = ["c7gd.4xlarge", "c6gd.4xlarge", "m7gd.4xlarge"], min_size = 0, warm_size = 1, max_size = 8, root_volume_gb = 30, on_demand_base = 0, target_cpu = 50, labels = ["build"], cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-test  = { instance_types = ["m7g.2xlarge", "m6g.2xlarge", "c7g.2xlarge"], min_size = 0, warm_size = 1, max_size = 16, root_volume_gb = 40, on_demand_base = 0, target_cpu = 50, labels = ["test"], cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-light = { instance_types = ["m7g.large", "m6g.large", "c7g.large"], min_size = 0, warm_size = 1, max_size = 20, root_volume_gb = 30, on_demand_base = 0, target_cpu = 50, labels = ["light"], cache_write = false, ecr_pull = false, assume_plan = true, untrusted = false }
+    ci-pr    = { instance_types = ["c7g.2xlarge", "m7g.2xlarge", "c6g.2xlarge"], min_size = 0, warm_size = 1, max_size = 20, root_volume_gb = 40, on_demand_base = 0, target_cpu = 50, labels = ["pr"], cache_write = false, ecr_pull = false, assume_plan = false, untrusted = true }
   }
-
-  eks_log_retention_days = 90
-  # Runner pool CPU caps; the pools are split by workload and architecture, not by priority.
-  karpenter_cpu_limits = {
-    ci-build = 128
-    ci-test  = 64
-    ci-light = 48
-    ci-pr    = 128
-  }
-  enabled_pools = ["ci-build", "ci-test", "ci-light", "ci-pr"]
-
-  # What each scale set may do; jobs pick one with runs-on: <name> and share the queue without priorities.
-  ci_scale_sets = {
-    ci-build = { cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
-    ci-test  = { cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
-    ci-light = { cache_write = false, ecr_pull = false, assume_plan = true, untrusted = false }
-    ci-pr    = { cache_write = false, ecr_pull = false, assume_plan = false, untrusted = true }
-  }
+  runner_version = local.cfg.runners.version
+  runner_sha256  = local.cfg.runners.sha256
 
   # Registries pulled through the own ECR: nodes get them closer and faster, and an upstream outage does not stop CI.
   pull_through_cache = {
