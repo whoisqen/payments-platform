@@ -52,18 +52,29 @@ locals {
       principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.storage.state_bucket_prefix}-shared-services-argocd-controller"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
       scope         = "namespace"
-      namespaces    = ["arc-systems", "arc-ci-prod", "arc-ci-stage", "arc-ci-pr", "external-secrets"]
+      namespaces    = ["arc-systems", "arc-ci-build", "arc-ci-build-amd64", "arc-ci-test", "arc-ci-light", "arc-ci-pr", "external-secrets"]
     }
   }
 
   eks_log_retention_days = 90
-  # Runner pool CPU caps; ci-pr has its own pool so that untrusted pull requests never share nodes with ci-stage.
+  # Runner pool CPU caps; the pools are split by workload and architecture, not by priority.
   karpenter_cpu_limits = {
-    ci      = 32
-    ci-prod = 16
-    ci-pr   = 16
+    ci-build       = 128
+    ci-build-amd64 = 32
+    ci-test        = 64
+    ci-light       = 32
+    ci-pr          = 128
   }
-  enabled_pools = ["ci", "ci-prod", "ci-pr"]
+  enabled_pools = ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"]
+
+  # What each scale set may do; jobs pick one with runs-on: <name> and share the queue without priorities.
+  ci_scale_sets = {
+    ci-build       = { cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-build-amd64 = { cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-test        = { cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-light       = { cache_write = false, ecr_pull = false, assume_plan = true, untrusted = false }
+    ci-pr          = { cache_write = false, ecr_pull = false, assume_plan = false, untrusted = true }
+  }
 
   deletion_protection = true
 }

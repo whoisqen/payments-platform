@@ -56,7 +56,26 @@ variable "ecr_repository_arns" {
 
 variable "plan_role_arns" {
   type        = list(string)
-  description = "Plan roles of the environment accounts that the ci-prod runner may assume; apply roles are never listed."
+  description = "Plan roles of the environment accounts that scale sets with assume_plan may assume; apply roles are never listed."
+}
+
+variable "scale_sets" {
+  type = map(object({
+    cache_write = bool
+    ecr_pull    = bool
+    assume_plan = bool
+    untrusted   = bool
+  }))
+  description = "Runner scale sets and what each may do; the key is the scale set name that jobs use in runs-on and the service account of its runners."
+
+  validation {
+    condition     = length(var.scale_sets) > 0 && alltrue([for k in keys(var.scale_sets) : can(regex("^[a-z][a-z0-9-]{1,30}$", k))])
+    error_message = "scale_sets needs at least one lower-case name."
+  }
+  validation {
+    condition     = alltrue([for c in values(var.scale_sets) : !(c.untrusted && (c.cache_write || c.ecr_pull || c.assume_plan))])
+    error_message = "an untrusted scale set may not write the cache, pull images or assume a role."
+  }
 }
 
 variable "cache_expiration_days" {

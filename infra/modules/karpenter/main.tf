@@ -18,19 +18,22 @@ locals {
   EOT
 
   # Payment pools never use Spot: an interrupted pod in the middle of a PSP call leaves the payment in the unknown state.
-  # ci and ci-prod exist only in the shared-services cluster (enabled_pools); a payments cluster never gets them.
+  # The ci-* pools exist only in the shared-services cluster (enabled_pools); a payments cluster never gets them.
   all_pools = {
     payments = { taint = "payments", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     stateful = { taint = "stateful", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     cde      = { taint = "cde", capacity = ["on-demand"], expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     workers  = { taint = "workers", capacity = ["spot", "on-demand"], expire = "168h", grace = "90s", consolidation = "WhenEmptyOrUnderutilized" }
-    # Runner pods are never consolidated mid-job; ci-prod stays On-Demand so a release job is not lost to a Spot interruption.
-    ci      = { taint = "ci", scope = "none", capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty" }
-    ci-prod = { taint = "ci-prod", scope = "none", capacity = ["on-demand"], expire = "168h", grace = "1h", consolidation = "WhenEmpty" }
-    # Untrusted pull request code gets nodes of its own, never shared with ci-stage pods that hold IRSA tokens.
-    ci-pr = { taint = "ci-pr", scope = "none", capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty" }
+    # Runner pools: nodes are split by workload and CPU architecture, never by priority, so one queue is served first come first served.
+    # What a job may do is decided by its service account; only untrusted pull request code has nodes of its own.
+    # Build nodes have local NVMe for layers and the cargo target directory; a release build is not lost to Spot.
+    ci-build       = { taint = "ci-build", scope = "none", arch = ["arm64"], sizes = ["4xlarge", "8xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-build-amd64 = { taint = "ci-build-amd64", scope = "none", arch = ["amd64"], sizes = ["2xlarge", "4xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-test        = { taint = "ci-test", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-light       = { taint = "ci-light", scope = "none", arch = ["arm64"], sizes = ["large", "xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "5m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-pr          = { taint = "ci-pr", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge", "4xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
   }
-  pools = { for name, p in local.all_pools : name => merge({ scope = "cde" }, p) if contains(var.enabled_pools, name) }
+  pools = { for name, p in local.all_pools : name => merge({ scope = "cde", arch = ["arm64", "amd64"], sizes = null, node_class = "hardened", consolidate_after = "5m" }, p) if contains(var.enabled_pools, name) }
 
   ec2_node_class = {
     apiVersion = "karpenter.k8s.aws/v1"
@@ -63,6 +66,19 @@ locals {
     }
   }
 
+  # Local NVMe of the instance is the ephemeral storage of the node; the EBS data volume is not needed.
+  ec2_node_class_nvme = merge(local.ec2_node_class, {
+    metadata = { name = "ci-nvme" }
+    spec = merge(local.ec2_node_class.spec, {
+      instanceStorePolicy = "RAID0"
+      blockDeviceMappings = [local.ec2_node_class.spec.blockDeviceMappings[0]]
+    })
+  })
+  ec2_node_classes = merge(
+    { hardened = local.ec2_node_class },
+    anytrue([for p in values(local.pools) : p.node_class == "ci-nvme"]) ? { "ci-nvme" = local.ec2_node_class_nvme } : {},
+  )
+
   node_pools = { for name, p in local.pools : name => {
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
@@ -72,27 +88,28 @@ locals {
       template = {
         metadata = { labels = { workload = p.taint, "platform.io/pci-scope" = p.scope } }
         spec = {
-          nodeClassRef           = { group = "karpenter.k8s.aws", kind = "EC2NodeClass", name = "hardened" }
+          nodeClassRef           = { group = "karpenter.k8s.aws", kind = "EC2NodeClass", name = p.node_class }
           taints                 = [{ key = "workload", value = p.taint, effect = "NoSchedule" }]
           expireAfter            = p.expire
           terminationGracePeriod = p.grace
           requirements = [
             { key = "kubernetes.io/os", operator = "In", values = ["linux"] },
-            { key = "kubernetes.io/arch", operator = "In", values = ["arm64", "amd64"] },
+            { key = "kubernetes.io/arch", operator = "In", values = p.arch },
             { key = "karpenter.sh/capacity-type", operator = "In", values = p.capacity },
             { key = "karpenter.k8s.aws/instance-family", operator = "In", values = var.instance_families[name] },
-            { key = "karpenter.k8s.aws/instance-size", operator = "NotIn", values = ["metal", "nano", "micro", "small"] },
+            p.sizes == null ? { key = "karpenter.k8s.aws/instance-size", operator = "NotIn", values = ["metal", "nano", "micro", "small"] } : { key = "karpenter.k8s.aws/instance-size", operator = "In", values = p.sizes },
           ]
         }
       }
-      # Outside 02:00-06:00 UTC only expiry may replace a node; inside it at most 10% at a time.
+      # Payment pools: outside 02:00-06:00 UTC only expiry may replace a node; inside it at most 10% at a time.
+      # Runner pools drop empty nodes at any time, so an idle pool costs nothing.
       disruption = {
         consolidationPolicy = p.consolidation
-        consolidateAfter    = "5m"
-        budgets = [
+        consolidateAfter    = p.consolidate_after
+        budgets = jsondecode(startswith(name, "ci-") ? jsonencode([{ nodes = "100%" }]) : jsonencode([
           { nodes = "10%" },
           { nodes = "0", reasons = ["Drifted", "Underutilized", "Empty"], schedule = "0 6 * * *", duration = "20h" },
-        ]
+        ]))
       }
     }
   } }

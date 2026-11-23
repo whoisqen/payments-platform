@@ -11,14 +11,20 @@ variables {
   ecr_repository_arns      = ["arn:aws:ecr:eu-central-1:123456789012:repository/payments/*"]
   plan_role_arns           = ["arn:aws:iam::333333333333:role/acme-stage-tf-plan"]
   tags                     = { team = "platform" }
+  scale_sets = {
+    ci-build = { cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-test  = { cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
+    ci-light = { cache_write = false, ecr_pull = false, assume_plan = true, untrusted = false }
+    ci-pr    = { cache_write = false, ecr_pull = false, assume_plan = false, untrusted = true }
+  }
 }
 
 run "one_secret_and_role_per_scale_set_without_secret_values" {
   command = plan
 
   assert {
-    condition     = length(aws_secretsmanager_secret.github_app) == 3 && length(aws_iam_role.runner) == 3
-    error_message = "each of ci-prod, ci-stage and ci-pr needs its own secret and role"
+    condition     = length(aws_secretsmanager_secret.github_app) == 4 && length(aws_iam_role.runner) == 4
+    error_message = "each scale set needs its own secret and role"
   }
   assert {
     condition     = aws_secretsmanager_secret.github_app["ci-pr"].name == "acme/ci/github-app/ci-pr"
@@ -60,8 +66,8 @@ run "ci_pr_role_is_denied_roles_registry_and_secrets" {
     error_message = "ci-pr must carry an explicit deny of assume-role, ECR and Secrets Manager"
   }
   assert {
-    condition     = !can(regex("tf-plan", aws_iam_role_policy.runner["ci-pr"].policy)) && can(regex("tf-plan", aws_iam_role_policy.runner["ci-prod"].policy))
-    error_message = "only ci-prod may reach the plan roles"
+    condition     = !can(regex("tf-plan", aws_iam_role_policy.runner["ci-pr"].policy)) && can(regex("tf-plan", aws_iam_role_policy.runner["ci-light"].policy))
+    error_message = "only the plan-role scale set may reach the plan roles"
   }
 }
 

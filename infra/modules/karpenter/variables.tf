@@ -72,9 +72,12 @@ variable "instance_families" {
     stateful = ["r7g", "r6g", "r7i", "r6i"]
     cde      = ["m7g", "m6g", "m7i", "m6i"]
     workers  = ["m6g", "m7g", "m8g", "c7g", "c8g", "r7g", "m7i", "c7i"]
-    ci       = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
-    ci-prod  = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
-    ci-pr    = ["c7g", "c7i", "m7g", "m7i", "c6i", "m6i"]
+    # Graviton runners with local NVMe for builds, general purpose Graviton for tests and lint; x86 only builds the amd64 image.
+    ci-build       = ["c7gd", "m7gd", "c6gd"]
+    ci-build-amd64 = ["c7id", "m7id", "c6id"]
+    ci-test        = ["m7g", "m6g", "c7g"]
+    ci-light       = ["m7g", "m6g", "c7g"]
+    ci-pr          = ["c7g", "m7g", "c6g", "m6g"]
   }
 }
 
@@ -82,26 +85,28 @@ variable "cpu_limits" {
   type        = map(number)
   description = "CPU limit per pool; it caps the cost of a runaway scale-up."
   default = {
-    payments = 400
-    stateful = 100
-    cde      = 200
-    workers  = 400
-    ci       = 200
-    ci-prod  = 100
-    ci-pr    = 100
+    payments       = 400
+    stateful       = 100
+    cde            = 200
+    workers        = 400
+    ci-build       = 128
+    ci-build-amd64 = 32
+    ci-test        = 64
+    ci-light       = 32
+    ci-pr          = 128
   }
 }
 
 variable "enabled_pools" {
   type        = list(string)
-  description = "NodePools rendered for this cluster. Payments clusters keep the default; the shared-services cluster sets [\"ci\", \"ci-prod\", \"ci-pr\"] so that CI pods never land on payments nodes and payment pools never exist next to runners."
+  description = "NodePools rendered for this cluster. Payments clusters keep the default; the shared-services cluster sets the ci-* pools so that CI pods never land on payments nodes and payment pools never exist next to runners."
   default     = ["payments", "stateful", "cde", "workers"]
   validation {
-    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci", "ci-prod", "ci-pr"], n)])
-    error_message = "enabled_pools may contain payments, stateful, cde, workers, ci, ci-prod and ci-pr only."
+    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"], n)])
+    error_message = "enabled_pools may contain payments, stateful, cde, workers, ci-build, ci-build-amd64, ci-test, ci-light and ci-pr only."
   }
   validation {
-    condition     = !(anytrue([for n in var.enabled_pools : startswith(n, "ci")]) && anytrue([for n in var.enabled_pools : !startswith(n, "ci")]))
+    condition     = !(anytrue([for n in var.enabled_pools : startswith(n, "ci-")]) && anytrue([for n in var.enabled_pools : !startswith(n, "ci-")]))
     error_message = "ci pools and payments pools must not share a cluster."
   }
 }

@@ -21,6 +21,7 @@ dependency "eks" {
 inputs = {
   oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
   oidc_issuer       = dependency.eks.outputs.oidc_issuer
+  scale_sets        = include.envcommon.locals.env_cfg.ci_scale_sets
   tags = {
     team        = "platform"
     owner       = include.envcommon.locals.env_cfg.owner

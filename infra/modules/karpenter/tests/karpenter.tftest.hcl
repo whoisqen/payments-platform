@@ -123,7 +123,7 @@ run "cpu_limits_follow_the_override" {
   command = plan
 
   variables {
-    cpu_limits = { payments = 32, stateful = 16, cde = 16, workers = 32, ci = 8, ci-prod = 4 }
+    cpu_limits = { payments = 32, stateful = 16, cde = 16, workers = 32 }
   }
 
   assert {
@@ -136,40 +136,48 @@ run "payments_cluster_has_no_ci_pools" {
   command = plan
 
   assert {
-    condition     = !contains(keys(output.manifests), "nodepool-ci.yaml") && !contains(keys(output.manifests), "nodepool-ci-prod.yaml") && contains(keys(output.manifests), "nodepool-payments.yaml")
-    error_message = "ci pools are rendered only when enabled"
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-ci-")]) == 0 && contains(keys(output.manifests), "nodepool-payments.yaml") && !contains(keys(output.manifests), "ec2nodeclass-ci-nvme.yaml")
+    error_message = "ci pools and the NVMe node class are rendered only when enabled"
   }
 }
 
-run "ci_pools_in_shared_services" {
+run "ci_pools_are_split_by_workload_and_architecture" {
   command = plan
 
   variables {
-    enabled_pools = ["ci", "ci-prod", "ci-pr"]
+    enabled_pools = ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"]
   }
 
   assert {
-    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 3 && !contains(keys(output.manifests), "nodepool-payments.yaml")
-    error_message = "only the ci pools are rendered"
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 5 && !contains(keys(output.manifests), "nodepool-payments.yaml")
+    error_message = "only the five ci pools are rendered"
   }
   assert {
-    condition     = yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.template.spec.taints[0].value == "ci-pr" && yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.limits.cpu == "100"
-    error_message = "ci-pr has its own tainted pool"
+    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : [for r in yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["arm64"]]) && [for r in yamldecode(output.manifests["nodepool-ci-build-amd64.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["amd64"]
+    error_message = "runners are arm64; only ci-build-amd64 is x86"
   }
   assert {
-    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.spec.taints[0].value == "ci" && yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.template.spec.taints[0].value == "ci-prod"
-    error_message = "taints workload=ci and workload=ci-prod, NoSchedule"
+    condition     = [for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["4xlarge", "8xlarge"] && [for r in yamldecode(output.manifests["nodepool-ci-light.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["large", "xlarge"]
+    error_message = "each pool has a defined instance size range by purpose"
   }
   assert {
-    condition     = yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.template.spec.requirements[2].values == ["on-demand"] && contains(yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.spec.requirements[2].values, "spot")
-    error_message = "ci-prod is On-Demand, ci may use Spot"
+    condition     = [for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"][0] == ["on-demand"] && contains([for r in yamldecode(output.manifests["nodepool-ci-test.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"][0], "spot")
+    error_message = "build is On-Demand, tests may use Spot"
   }
   assert {
-    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.limits.cpu == "200" && yamldecode(output.manifests["nodepool-ci-prod.yaml"]).spec.limits.cpu == "100"
-    error_message = "default ci limits"
+    condition     = yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.nodeClassRef.name == "ci-nvme" && yamldecode(output.manifests["nodepool-ci-test.yaml"]).spec.template.spec.nodeClassRef.name == "hardened" && yamldecode(output.manifests["ec2nodeclass-ci-nvme.yaml"]).spec.instanceStorePolicy == "RAID0"
+    error_message = "build pools use the NVMe node class with RAID0 instance store"
   }
   assert {
-    condition     = yamldecode(output.manifests["nodepool-ci.yaml"]).spec.template.metadata.labels["platform.io/pci-scope"] == "none"
+    condition     = alltrue([for n in ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"] : yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.budgets == [{ nodes = "100%" }] && yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.consolidateAfter == "2m"])
+    error_message = "idle runner nodes are dropped after 2 minutes at any time of day"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.template.spec.taints[0].value == "ci-pr" && yamldecode(output.manifests["nodepool-ci-pr.yaml"]).spec.limits.cpu == "128"
+    error_message = "untrusted pull request code has its own tainted pool"
+  }
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.metadata.labels["platform.io/pci-scope"] == "none"
     error_message = "ci nodes are outside the CDE"
   }
 }
@@ -178,7 +186,7 @@ run "ci_and_payments_pools_cannot_mix" {
   command = plan
 
   variables {
-    enabled_pools = ["payments", "ci"]
+    enabled_pools = ["payments", "ci-light"]
   }
 
   expect_failures = [var.enabled_pools]

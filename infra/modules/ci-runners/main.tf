@@ -1,5 +1,7 @@
 locals {
-  scale_sets = toset(["ci-prod", "ci-stage", "ci-pr"])
+  scale_sets = toset(keys(var.scale_sets))
+  # Roles that may write the cache; every other role reads it.
+  cache_writers = [for s, c in var.scale_sets : s if c.cache_write]
 
   bucket_name = "${var.name_prefix}-ci-cache-${var.account_id}"
   bucket_arn  = "arn:aws:s3:::${local.bucket_name}"
@@ -33,16 +35,14 @@ locals {
     ], Resource = var.ecr_repository_arns },
   ]
 
-  runner_policies = {
-    ci-prod = concat(local.cache_read_statements, local.cache_write_statements, [
-      { Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.plan_role_arns },
-    ])
-    ci-stage = concat(local.cache_read_statements, local.ecr_pull_statements)
-    # Pull request code: read-only cache, no registry, no secrets, and no way to assume another role.
-    ci-pr = concat(local.cache_read_statements, [
-      { Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*", "secretsmanager:*"], Resource = ["*"] },
-    ])
-  }
+  # What a job may do is the property of its scale set, not of a priority: cache write, image pull, plan roles; untrusted code gets an explicit deny.
+  runner_policies = { for s, c in var.scale_sets : s => concat(
+    local.cache_read_statements,
+    c.cache_write ? local.cache_write_statements : [],
+    c.ecr_pull ? local.ecr_pull_statements : [],
+    c.assume_plan ? [{ Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.plan_role_arns }] : [],
+    c.untrusted ? [{ Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*", "secretsmanager:*"], Resource = ["*"] }] : [],
+  ) }
 
   secret_arns = [for s in local.scale_sets : aws_secretsmanager_secret.github_app[s].arn]
 
@@ -167,12 +167,12 @@ resource "aws_s3_bucket_policy" "cache" {
         Condition = { ArnNotLike = { "aws:PrincipalArn" = concat([for s in local.scale_sets : local.runner_role_arn[s]], [aws_iam_role.github_push.arn]) } }
       },
       {
-        Sid       = "DenyCacheWritesOutsideCiProd"
+        Sid       = "DenyCacheWritesOutsideBuildRoles"
         Effect    = "Deny"
         Principal = "*"
         Action    = ["s3:PutObject", "s3:DeleteObject"]
         Resource  = ["${local.bucket_arn}/*"]
-        Condition = { ArnNotLike = { "aws:PrincipalArn" = [local.runner_role_arn["ci-prod"]] } }
+        Condition = { ArnNotLike = { "aws:PrincipalArn" = [for w in local.cache_writers : local.runner_role_arn[w]] } }
       },
     ]
   })
