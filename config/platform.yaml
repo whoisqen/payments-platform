@@ -97,7 +97,8 @@ central:
   # Replace the example host names with the real ones.
   metrics_remote_write_url: https://metrics.observability.pay.example.com/insert/0/prometheus/api/v1/write
   alertmanager_url: https://alertmanager.observability.pay.example.com
-  logs_otlp_endpoint: https://logs.observability.pay.example.com:4318
+  # the OTLP/HTTP exporter appends /v1/logs, and Loki serves it under /otlp
+  logs_otlp_endpoint: https://logs.observability.pay.example.com:4318/otlp
   traces_otlp_endpoint: tempo.observability.pay.example.com:4317
   # Samples of the two Prometheus replicas that differ by less than this interval are one sample; it equals the scrape interval.
   dedup_interval: 30s

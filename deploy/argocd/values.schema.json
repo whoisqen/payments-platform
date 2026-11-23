@@ -99,7 +99,7 @@
         },
         "logsOtlpEndpoint": {
           "type": "string",
-          "pattern": "^https://[^/]+$"
+          "pattern": "^https://[^/]+(/.*)?$"
         },
         "tracesOtlpEndpoint": {
           "type": "string",
