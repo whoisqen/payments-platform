@@ -1,6 +1,9 @@
+import fnmatch
 import json
 import unittest
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 # SCP limit 5120 characters, backup policy limit 10000 characters, both counted without whitespace.
@@ -83,6 +86,51 @@ class SecurityBaseline(unittest.TestCase):
     def test_public_s3_is_blocked(self):
         self.assertIn("s3:PutAccountPublicAccessBlock", self.actions("DenyPublicS3AccessBlockChanges"))
         self.assertIn("public-read", self.s["DenyPublicS3Acls"]["Condition"]["StringEquals"]["s3:x-amz-acl"])
+
+
+class ApplyRoleException(unittest.TestCase):
+    """The exception for the Terraform apply role names the role of each account, not any account."""
+
+    def setUp(self):
+        cfg = yaml.safe_load((ROOT.parent.parent / "config" / "platform.yaml").read_text())
+        self.cfg = cfg
+        s = statements(load(ROOT / "security-baseline.json"))
+        self.patterns = {
+            sid: s[sid]["Condition"]["ArnNotLike"]["aws:PrincipalArn"]
+            for sid in ("DenyChangingImdsOptionsExceptTerraform", "DenyPublicS3AccessBlockChanges")
+        }
+
+    def excepted(self, sid, arn):
+        return any(fnmatch.fnmatchcase(arn, p) for p in self.patterns[sid])
+
+    def test_no_pattern_matches_any_account(self):
+        for sid, patterns in self.patterns.items():
+            for p in patterns:
+                with self.subTest(sid=sid, pattern=p):
+                    self.assertNotIn("iam::*", p)
+                    self.assertRegex(p, r"^arn:aws:iam::\d{12}:role/")
+
+    def test_patterns_are_derived_from_the_platform_config(self):
+        prefix, accounts = self.cfg["naming"]["prefix"], self.cfg["accounts"]
+        want = sorted(f"arn:aws:iam::{accounts[env]}:role/{prefix}-{env}-glob-tf-apply-*" for env in ("dev", "stage", "prod") if env in accounts)
+        for sid, patterns in self.patterns.items():
+            self.assertEqual(sorted(patterns), want, sid)
+
+    def test_apply_role_of_its_own_account_is_excepted(self):
+        prefix, accounts = self.cfg["naming"]["prefix"], self.cfg["accounts"]
+        for sid in self.patterns:
+            self.assertTrue(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/{prefix}-stage-glob-tf-apply-network"))
+
+    def test_same_role_name_in_another_account_is_not_excepted(self):
+        prefix = self.cfg["naming"]["prefix"]
+        for sid in self.patterns:
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::999999999999:role/{prefix}-stage-glob-tf-apply-network"))
+
+    def test_other_roles_of_the_account_are_not_excepted(self):
+        accounts = self.cfg["accounts"]
+        for sid in self.patterns:
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/terraform-apply"))
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/{self.cfg['naming']['prefix']}-stage-glob-tf-plan"))
 
 
 class DenyTagEdit(unittest.TestCase):
