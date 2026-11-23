@@ -10,6 +10,7 @@ Actions Runner Controller on the shared-services cluster. Jobs from every workfl
 | `ci-light` | lint, commit checks, plan, promotion | `ci-light` | arm64 `m7g` large to xlarge, Spot or On-Demand | 1 / 20 | 1.5 CPU, 5 GiB |
 | `ci-pr` | every job of pull request code | `ci-pr` | arm64 `c7g` xlarge to 4xlarge, Spot or On-Demand | 1 / 20 | 3 CPU, 12 GiB |
 
+- Workflows pick a pool with repository variables: `RUNNER_BUILD` = `ci-build`, `RUNNER_BUILD_AMD64` = `ci-build-amd64`, `RUNNER_TEST` = `ci-test`, `RUNNER_LIGHT` = `ci-light` (promotion, tags, hotfix, nightly), `RUNNER_PR` = `ci-pr` (all jobs of pull requests); unset falls back to `ubuntu-latest`.
 - What a job may do comes from the service account of its scale set (cache write, image pull, plan role); `ci-pr` is untrusted: its own nodes, no role, private ranges denied, no ECR, no secrets.
 - Only the two build namespaces allow the privileged `dind` sidecar that `docker buildx` needs; they run trusted code on nodes of their own.
 - Build nodes use local NVMe as ephemeral storage (RAID0), so layers, the cargo target directory and the sccache working set never touch EBS.
