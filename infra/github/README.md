@@ -12,7 +12,7 @@ infra/github/
     repository/     repository, vulnerability alerts, Actions allowlist, read-only GITHUB_TOKEN
     rulesets/       main (2 approvals, CODEOWNERS, signatures, linear history, merge queue, ci-gate, spec-gate), tags v*
     environments/   dev, stage, prod (SRE), cde-prod (SRE and security), deployments from main only
-    codeowners/     renders config/owners.yaml into .github/CODEOWNERS
+    codeowners/     renders config/owners.yaml into CODEOWNERS at the repository root
 ```
 
 Each module has `variables.tf`, `versions.tf`, `main.tf` and `tests/` with a mocked provider.

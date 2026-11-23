@@ -34,3 +34,44 @@ run "lines" {
     error_message = "CDE infrastructure needs platform and security"
   }
 }
+
+run "personal_account_maps_every_team_to_the_user" {
+  command = plan
+
+  variables {
+    handles = { payments_core = "@org", security = "@org", platform = "@org", sre = "@org" }
+  }
+
+  assert {
+    condition     = strcontains(local.codeowners, "/vendor/hyperswitch/crates/router/** @org\n") && !strcontains(local.codeowners, "@org @org")
+    error_message = "teams that share a handle appear once per line"
+  }
+  assert {
+    condition     = length(split("\n", trimspace(local.codeowners))) == length(local.owners) + 1
+    error_message = "still one line per mapping"
+  }
+}
+
+run "bad_handle_rejected" {
+  command = plan
+
+  variables {
+    handles = { security = "org/security" }
+  }
+
+  expect_failures = [var.handles]
+}
+
+run "committed_file_matches_the_rendered_output" {
+  command = plan
+
+  variables {
+    organization = "whoisqen"
+    handles      = { payments_core = "@whoisqen", security = "@whoisqen", platform = "@whoisqen", sre = "@whoisqen" }
+  }
+
+  assert {
+    condition     = file("../../../../CODEOWNERS") == local.codeowners
+    error_message = "CODEOWNERS at the repository root must be the rendered owners.yaml; regenerate it"
+  }
+}
