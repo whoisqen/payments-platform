@@ -33,6 +33,13 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: vault-snapshot
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault-bootstrap
+        {{- range $np.clientCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
       ports:
         - port: {{ $.Values.vault.port }}
           protocol: TCP
@@ -135,6 +142,53 @@ spec:
           protocol: TCP
     {{- if $np.awsEndpointCidrs }}
     # S3 upload and web identity token exchange
+    - to:
+        {{- range $np.awsEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+{{- end }}
+{{- if .Values.bootstrap.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-bootstrap
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault-bootstrap
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+      ports:
+        - port: {{ .Values.vault.port }}
+          protocol: TCP
+    {{- if $np.awsEndpointCidrs }}
+    # Secrets Manager and credential exchange
     - to:
         {{- range $np.awsEndpointCidrs }}
         - ipBlock:

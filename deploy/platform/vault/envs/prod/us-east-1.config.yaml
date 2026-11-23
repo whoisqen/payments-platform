@@ -1,0 +1,20 @@
+# prod us-east-1: names Terraform creates; pod roles come from Pod Identity associations vault/vault-snapshot and vault/vault-bootstrap
+requireResolved: true
+
+snapshot:
+  image:
+    repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/vault-snapshot
+  bucket: pay-prod-use1-vault-snapshots
+  region: us-east-1
+
+bootstrap:
+  region: us-east-1
+  initSecretId: pay/prod/vault/init
+
+networkPolicy:
+  # Other clusters of the VPC call Vault through its load balancer
+  clientCidrs:
+    - 10.151.0.0/16
+  awsEndpointCidrs:
+    - 10.151.0.0/18
+    - 10.151.64.0/19
