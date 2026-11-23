@@ -76,3 +76,12 @@ run "tag_schema_is_enforced" {
 
   expect_failures = [var.tags]
 }
+
+run "replication_latency_alarm_per_replica" {
+  command = plan
+
+  assert {
+    condition     = length(aws_cloudwatch_metric_alarm.replication_latency) == 2 && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].dimensions["ReceivingRegion"] == "us-east-1" && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].threshold == 5000
+    error_message = "one latency alarm per replica region with the 5 s default"
+  }
+}
