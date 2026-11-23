@@ -80,6 +80,7 @@
       "required": [
         "metricsRemoteWriteUrl",
         "alertmanagerHost",
+        "sentryUrl",
         "dedupInterval"
       ],
       "properties": {
@@ -90,6 +91,10 @@
         "alertmanagerHost": {
           "type": "string",
           "pattern": "^[a-z0-9.-]+(:[0-9]+)?$"
+        },
+        "sentryUrl": {
+          "type": "string",
+          "pattern": "^https://[a-z0-9.-]+(:[0-9]+)?/?$"
         },
         "dedupInterval": {
           "type": "string",

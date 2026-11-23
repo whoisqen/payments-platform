@@ -97,6 +97,8 @@ central:
   # Replace the example host names with the real ones.
   metrics_remote_write_url: https://metrics.observability.pay.example.com/insert/0/prometheus/api/v1/write
   alertmanager_url: https://alertmanager.observability.pay.example.com
+  # Sentry (error tracking, self-hosted, no card data); applications send events to the DSN host under this URL
+  sentry_url: https://sentry.observability.pay.example.com
   logs_otlp_endpoint: https://logs.observability.pay.example.com:4318
   traces_otlp_endpoint: tempo.observability.pay.example.com:4317
   # Samples of the two Prometheus replicas that differ by less than this interval are one sample; it equals the scrape interval.

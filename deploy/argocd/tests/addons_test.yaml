@@ -7,6 +7,7 @@ set:
   observability.grafanaUrl: https://grafana.example.test
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
   central.dedupInterval: 30s
 tests:
   - it: layers the vault values by environment and region from the cluster labels

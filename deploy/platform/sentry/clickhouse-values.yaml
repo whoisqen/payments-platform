@@ -1,0 +1,25 @@
+# Values of the bitnami clickhouse chart (release `sentry-clickhouse`), the event store of Snuba: one shard, three replicas, keeper for replication.
+fullnameOverride: sentry-clickhouse
+global:
+  security:
+    allowInsecureImages: true
+image:
+  repository: bitnamilegacy/clickhouse
+keeper:
+  image:
+    repository: bitnamilegacy/clickhouse-keeper
+  persistence:
+    size: 8Gi
+shards: 1
+replicaCount: 3
+clusterName: default
+auth:
+  username: default
+  existingSecret: sentry-secrets
+  existingSecretKey: clickhouse-password
+persistence:
+  size: 200Gi
+podAntiAffinityPreset: hard
+pdb:
+  create: true
+  maxUnavailable: 1

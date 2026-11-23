@@ -19,6 +19,7 @@ def values(cfg):
         "central": {
             "metricsRemoteWriteUrl": cfg["central"]["metrics_remote_write_url"],
             "alertmanagerHost": urlparse(cfg["central"]["alertmanager_url"]).netloc,
+            "sentryUrl": cfg["central"]["sentry_url"],
             "dedupInterval": cfg["central"]["dedup_interval"],
         },
     }

@@ -1,0 +1,11 @@
+# With replication the bitnami chart names the primary service `-primary`, but the sentry chart connects to `sentry-sentry-postgresql`
+apiVersion: v1
+kind: Service
+metadata: {name: sentry-sentry-postgresql, namespace: sentry}
+spec:
+  ports:
+    - {name: tcp-postgresql, port: 5432, targetPort: tcp-postgresql}
+  selector:
+    app.kubernetes.io/name: sentry-postgresql
+    app.kubernetes.io/instance: sentry
+    app.kubernetes.io/component: primary
