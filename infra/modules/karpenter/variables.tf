@@ -96,6 +96,16 @@ variable "enabled_pools" {
   }
 }
 
+variable "spot_pools" {
+  type        = list(string)
+  default     = []
+  description = "Pools that may use Spot nodes besides the on-demand fallback; the workers pool always may. Never the cde pool."
+  validation {
+    condition     = alltrue([for n in var.spot_pools : contains(["payments", "stateful"], n)])
+    error_message = "spot_pools may contain payments and stateful only: CDE nodes are never Spot, workers always may be."
+  }
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags of section 22; team, owner, pci-scope, data-class and backup-tier are required."
