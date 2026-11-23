@@ -1,6 +1,0 @@
-apiVersion: v2
-name: arc-config
-description: Namespaces, PriorityClasses, service accounts, credentials and network isolation of the CI runner scale sets
-type: application
-version: 0.1.0
-appVersion: "0.0.0"

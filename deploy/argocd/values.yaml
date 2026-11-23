@@ -6,7 +6,5 @@ cluster:
   namePrefix: ""
   regionShort: ""
   region: ""
-github:
-  configUrl: ""
 observability:
   grafanaUrl: ""

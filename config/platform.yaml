@@ -60,7 +60,5 @@ deploy:
     endpoint_cidrs: [10.130.255.0/24]
     gateway_host: api.stage.payments.example.com
     cluster_domain: stage.example.internal
-    # Public ingress name per region, known after the first deploy; the DNS routing builds one latency record each.
-    ingress_endpoints: {eu-central-1: ingress.euc1.stage.example.internal, us-east-1: ingress.use1.stage.example.internal}
     rds_suffix: example
     memorydb_suffix: example
