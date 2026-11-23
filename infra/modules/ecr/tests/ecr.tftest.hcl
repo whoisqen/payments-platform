@@ -85,8 +85,8 @@ run "retention_protects_promoted_images_and_signatures" {
     error_message = "release, prod, stage, dev and cosign artifact tags have a rule each"
   }
   assert {
-    condition     = jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[1].selection.countNumber == 50 && jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[5].selection.countNumber == 100
-    error_message = "prod keeps 50 images and unpromoted builds keep the latest 100 by default"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[1].selection.countNumber == 10 && jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[5].selection.countNumber == 10
+    error_message = "prod keeps 10 images and unpromoted builds keep the latest 10 by default"
   }
   assert {
     condition     = length([for r in jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules : r if r.selection.tagStatus == "untagged"]) == 1
@@ -98,7 +98,7 @@ run "retention_values_are_validated" {
   command = plan
 
   variables {
-    retention = { releases = 0, prod = 50, stage = 20, dev = 10, signatures = 800, builds = 100, untagged_days = 3 }
+    retention = { releases = 0, prod = 10, stage = 5, dev = 3, signatures = 150, builds = 10, untagged_days = 1 }
   }
 
   expect_failures = [var.retention]

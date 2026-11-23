@@ -101,13 +101,13 @@ variable "retention" {
   })
   description = "Retention: image counts kept per tag class (v*, prod-*, stage-*, dev-* promotions and sha256-* signature artifacts), the latest builds kept under their git sha, and the age in days of untagged images."
   default = {
-    releases      = 100
-    prod          = 50
-    stage         = 20
-    dev           = 10
-    signatures    = 800
-    builds        = 100
-    untagged_days = 3
+    releases      = 20
+    prod          = 10
+    stage         = 5
+    dev           = 3
+    signatures    = 150
+    builds        = 10
+    untagged_days = 1
   }
 
   validation {

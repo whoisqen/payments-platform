@@ -27,11 +27,10 @@ locals {
     # Runner pools: nodes are split by workload and CPU architecture, never by priority, so one queue is served first come first served.
     # What a job may do is decided by its service account; only untrusted pull request code has nodes of its own.
     # Build nodes have local NVMe for layers and the cargo target directory; a release build is not lost to Spot.
-    ci-build       = { taint = "ci-build", scope = "none", arch = ["arm64"], sizes = ["4xlarge", "8xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-build-amd64 = { taint = "ci-build-amd64", scope = "none", arch = ["amd64"], sizes = ["2xlarge", "4xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-test        = { taint = "ci-test", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-light       = { taint = "ci-light", scope = "none", arch = ["arm64"], sizes = ["large", "xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "5m", consolidation = "WhenEmpty", consolidate_after = "2m" }
-    ci-pr          = { taint = "ci-pr", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge", "4xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-build = { taint = "ci-build", scope = "none", arch = ["arm64"], sizes = ["4xlarge", "8xlarge"], node_class = "ci-nvme", capacity = ["on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-test  = { taint = "ci-test", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-light = { taint = "ci-light", scope = "none", arch = ["arm64"], sizes = ["large", "xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "5m", consolidation = "WhenEmpty", consolidate_after = "2m" }
+    ci-pr    = { taint = "ci-pr", scope = "none", arch = ["arm64"], sizes = ["xlarge", "2xlarge", "4xlarge"], capacity = ["spot", "on-demand"], expire = "168h", grace = "10m", consolidation = "WhenEmpty", consolidate_after = "2m" }
   }
   pools = { for name, p in local.all_pools : name => merge({ scope = "cde", arch = ["arm64", "amd64"], sizes = null, node_class = "hardened", consolidate_after = "5m" }, p) if contains(var.enabled_pools, name) }
 

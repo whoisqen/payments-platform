@@ -145,16 +145,16 @@ run "ci_pools_are_split_by_workload_and_architecture" {
   command = plan
 
   variables {
-    enabled_pools = ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"]
+    enabled_pools = ["ci-build", "ci-test", "ci-light", "ci-pr"]
   }
 
   assert {
-    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 5 && !contains(keys(output.manifests), "nodepool-payments.yaml")
-    error_message = "only the five ci pools are rendered"
+    condition     = length([for k in keys(output.manifests) : k if startswith(k, "nodepool-")]) == 4 && !contains(keys(output.manifests), "nodepool-payments.yaml")
+    error_message = "only the four ci pools are rendered"
   }
   assert {
-    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : [for r in yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["arm64"]]) && [for r in yamldecode(output.manifests["nodepool-ci-build-amd64.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["amd64"]
-    error_message = "runners are arm64; only ci-build-amd64 is x86"
+    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : [for r in yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"][0] == ["arm64"]])
+    error_message = "runners are arm64"
   }
   assert {
     condition     = [for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["4xlarge", "8xlarge"] && [for r in yamldecode(output.manifests["nodepool-ci-light.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.k8s.aws/instance-size"][0] == ["large", "xlarge"]
@@ -169,7 +169,7 @@ run "ci_pools_are_split_by_workload_and_architecture" {
     error_message = "build pools use the NVMe node class with RAID0 instance store"
   }
   assert {
-    condition     = alltrue([for n in ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"] : yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.budgets == [{ nodes = "100%" }] && yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.consolidateAfter == "2m"])
+    condition     = alltrue([for n in ["ci-build", "ci-test", "ci-light", "ci-pr"] : yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.budgets == [{ nodes = "100%" }] && yamldecode(output.manifests["nodepool-${n}.yaml"]).spec.disruption.consolidateAfter == "2m"])
     error_message = "idle runner nodes are dropped after 2 minutes at any time of day"
   }
   assert {
