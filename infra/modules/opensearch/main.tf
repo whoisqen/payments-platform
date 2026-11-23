@@ -1,5 +1,5 @@
 locals {
-  name = "pay-${var.env}-${var.region_short}-${var.component}"
+  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
 }
 
 resource "aws_opensearch_domain" "this" {

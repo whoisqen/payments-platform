@@ -1,5 +1,5 @@
 locals {
-  name              = "pay-${var.env}-${var.region_short}-${var.component}"
+  name              = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
   deny_write_region = coalesce(var.deny_write_regions, keys(var.recovery_regions))
 
   deny_write_resources = flatten([

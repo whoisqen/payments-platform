@@ -95,3 +95,13 @@ variable "deny_write_regions" {
   type        = list(string)
   default     = null
 }
+
+variable "name_prefix" {
+  type        = string
+  description = "Prefix of every resource name, for example the project short name; set from config/platform.yaml (naming.prefix)."
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9]{1,10}$", var.name_prefix))
+    error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
+  }
+}

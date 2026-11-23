@@ -1,5 +1,5 @@
 locals {
-  name = "pay-${var.env}-${var.region_short}-${var.component}"
+  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
 
   # Topics are created from the YAML catalog by the kafka module, never by a producer.
   server_properties = join("\n", [

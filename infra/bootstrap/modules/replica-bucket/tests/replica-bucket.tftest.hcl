@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix = "pay"
   region      = "us-east-1"
   environment = "prod"
   account_id  = "555555555555"

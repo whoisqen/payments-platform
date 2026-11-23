@@ -11,7 +11,7 @@ locals {
   # A working stack also creates the locked destination buckets, so replication never targets a missing bucket.
   buckets = local.working ? merge(local.local_bucket, var.recovery_regions) : local.local_bucket
 
-  names = { for r, b in local.buckets : r => "pay-${var.env}-${b.short}-${var.component}" }
+  names = { for r, b in local.buckets : r => "${var.name_prefix}-${var.env}-${b.short}-${var.component}" }
 
   destinations = local.working ? var.recovery_regions : {}
   dest_order   = { for i, r in sort(keys(local.destinations)) : r => i + 1 }
@@ -182,7 +182,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
 resource "aws_iam_role" "replication" {
   count = local.working ? 1 : 0
 
-  name = "pay-${var.env}-${var.region_short}-${var.component}-replication"
+  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}-replication"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

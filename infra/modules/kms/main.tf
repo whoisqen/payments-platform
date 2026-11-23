@@ -1,6 +1,6 @@
 locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
-  name         = "pay-${var.environment}-${local.region_short}-${var.component}"
+  name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
   is_replica   = var.is_replica
   root_arn     = "arn:aws:iam::${var.account_id}:root"
 

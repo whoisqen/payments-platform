@@ -11,7 +11,7 @@ locals {
   # A working stack also owns the vaults in the recovery regions that receive the copies.
   vaults = local.working ? merge(local.local_vault, var.recovery_regions) : local.local_vault
 
-  vault_names = { for r, v in local.vaults : r => "pay-${var.env}-${v.short}-${var.component}" }
+  vault_names = { for r, v in local.vaults : r => "${var.name_prefix}-${var.env}-${v.short}-${var.component}" }
 }
 
 resource "aws_backup_vault" "this" {

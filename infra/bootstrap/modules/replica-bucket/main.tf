@@ -1,6 +1,6 @@
 locals {
   region_short = { "us-east-1" = "use1", "us-east-2" = "use2" }[var.region]
-  name         = "pay-${var.environment}-${local.region_short}-${var.component}-${var.account_id}"
+  name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}-${var.account_id}"
 }
 
 resource "aws_s3_bucket" "this" {

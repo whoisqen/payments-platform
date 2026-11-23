@@ -1,5 +1,5 @@
 locals {
-  names = { for k, s in var.secrets : k => "pay-${var.env}-${var.region_short}-${k}" }
+  names = { for k, s in var.secrets : k => "${var.name_prefix}-${var.env}-${var.region_short}-${k}" }
 }
 
 # Only the container is managed; values are written by Vault or by rotation, never by Terraform.
