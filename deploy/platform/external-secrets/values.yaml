@@ -1,4 +1,4 @@
-# Upstream external-secrets chart 2.15.0 (pinned in deploy/argocd/templates/addons/external-secrets.yaml); REPLACE_* values are set per environment
+# Upstream external-secrets chart 2.15.0 (pinned in deploy/argocd/templates/addons/external-secrets.yaml)
 installCRDs: true
 
 replicaCount: 2
@@ -6,12 +6,10 @@ replicaCount: 2
 serviceMonitor:
   enabled: true
 
-# Pod identity role that reads Secrets Manager; no static AWS credentials exist
+# The EKS Pod Identity association on external-secrets/external-secrets gives the pod its role; no static AWS credentials and no annotation
 serviceAccount:
   create: true
   name: external-secrets
-  annotations:
-    eks.amazonaws.com/role-arn: REPLACE_ESO_ROLE_ARN
 
 podSecurityContext:
   runAsNonRoot: true

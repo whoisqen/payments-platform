@@ -1,4 +1,4 @@
-# Upstream hashicorp/vault chart 0.34.1 (pinned in deploy/argocd/templates/addons/vault.yaml); REPLACE_* values are set per environment
+# Upstream hashicorp/vault chart 0.34.1 (pinned in deploy/argocd/templates/addons/vault.yaml)
 global:
   tlsDisable: true
 
@@ -12,8 +12,8 @@ csi:
 server:
   image:
     repository: hashicorp/vault
-    # Version and digest in one string, resolved per environment
-    tag: "REPLACE_VAULT_VERSION@sha256:REPLACE_VAULT_IMAGE_DIGEST"
+    # Pinned by version and digest (the appVersion of chart 0.34.1); Renovate bumps both
+    tag: "2.0.4@sha256:5be49781ecf78bfe775c5309c6a4d9f4e9e040b6c885c99eb2b12fb69855e1a2"
   logLevel: info
   resources:
     requests:
@@ -33,12 +33,10 @@ server:
     initialDelaySeconds: 60
     periodSeconds: 5
     failureThreshold: 2
-  # Pod identity role that may use the unseal key; no static AWS credentials exist
+  # The EKS Pod Identity association on vault/vault gives the pod the role that may use the unseal key; no static AWS credentials and no annotation
   serviceAccount:
     create: true
     name: vault
-    annotations:
-      eks.amazonaws.com/role-arn: REPLACE_VAULT_ROLE_ARN
   extraLabels:
     payments-platform/part-of: payments-platform
   statefulSet:
@@ -98,10 +96,8 @@ server:
             leader_api_addr = "http://vault-2.vault-internal:8200"
           }
         }
-        seal "awskms" {
-          region     = "REPLACE_AWS_REGION"
-          kms_key_id = "REPLACE_KMS_KEY_ID"
-        }
+        # Key and region come from VAULT_AWSKMS_SEAL_KEY_ID and AWS_REGION (server.extraEnvironmentVars of the environment layer)
+        seal "awskms" {}
         telemetry {
           prometheus_retention_time = "30s"
           disable_hostname = true

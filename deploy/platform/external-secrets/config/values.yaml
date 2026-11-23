@@ -9,7 +9,8 @@ awsSecretsManager:
   enabled: true
   storeName: aws-secrets-manager
   region: REPLACE_AWS_REGION
-  roleArn: REPLACE_ESO_ROLE_ARN
+  # Empty with EKS Pod Identity: the association on the service account gives the pod its role directly; set to assume a further role
+  roleArn: ""
   # Empty means every namespace; set to restrict the store
   namespaceSelector: {}
 
@@ -27,4 +28,6 @@ networkPolicy:
   enabled: true
   apiServerCidrs: []
   awsEndpointCidrs: []
+  # Vault reached outside the cluster (other clusters of the VPC call its load balancer)
+  vaultCidrs: []
   vaultNamespace: vault

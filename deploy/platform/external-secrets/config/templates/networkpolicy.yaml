@@ -72,6 +72,16 @@ spec:
         - port: 8200
           protocol: TCP
     {{- end }}
+    {{- if and .Values.vault.enabled $np.vaultCidrs }}
+    - to:
+        {{- range $np.vaultCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: 8200
+          protocol: TCP
+    {{- end }}
     {{- if $np.apiServerCidrs }}
     - to:
         {{- range $np.apiServerCidrs }}

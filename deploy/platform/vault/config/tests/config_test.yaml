@@ -2,6 +2,9 @@ suite: vault config
 templates:
   - networkpolicy.yaml
   - snapshot.yaml
+  - bootstrap.yaml
+set:
+  snapshot.image.repository: registry.example.test/acme/vault-snapshot
 tests:
   - it: renders a default-deny policy and an explicit server policy
     template: networkpolicy.yaml
@@ -58,3 +61,127 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+  - it: runs the bootstrap as a PostSync hook that is never retried
+    template: bootstrap.yaml
+    documentIndex: 2
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: vault-bootstrap
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/vault-snapshot@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - it: takes the image digest from images.yaml
+    template: bootstrap.yaml
+    documentIndex: 2
+    set:
+      vault-snapshot:
+        image:
+          digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "@sha256:a{64}$"
+  - it: fails resolved rendering while the digest is the placeholder
+    template: bootstrap.yaml
+    set:
+      requireResolved: true
+      snapshot.repository: x
+      snapshot.bucket: b-b-b
+      snapshot.region: eu-central-1
+      bootstrap.region: eu-central-1
+      bootstrap.initSecretId: p/e/vault/init
+    asserts:
+      - failedTemplate: {}
+  - it: configures the first init only, with the recovery split and autopilot values
+    template: bootstrap.yaml
+    documentIndex: 1
+    asserts:
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: "vault operator init -recovery-shares="
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: "already initialized; nothing to do"
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: "vault operator raft autopilot set-config"
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: 'delete_version_after=0s'
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: "vault token revoke -self"
+      - matchRegex:
+          path: data["snapshot.hcl"]
+          pattern: "sys/storage/raft/snapshot"
+      - matchRegex:
+          path: data["external-secrets.hcl"]
+          pattern: "secret/data/\\*"
+  - it: passes the autopilot and KV values to the script
+    template: bootstrap.yaml
+    documentIndex: 2
+    set:
+      bootstrap.kvMaxVersions: 5
+      bootstrap.autopilot.minQuorum: 2
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KV_MAX_VERSIONS
+            value: "5"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AP_MIN_QUORUM
+            value: "2"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AP_THRESHOLD
+            value: 24h
+  - it: rejects a malformed autopilot duration
+    template: bootstrap.yaml
+    set:
+      bootstrap.autopilot.serverStabilizationTime: soon
+    asserts:
+      - failedTemplate: {}
+  - it: sets no role annotation by default (Pod Identity)
+    template: bootstrap.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: metadata.annotations
+  - it: sets the role annotation when a role ARN is given (IRSA)
+    template: bootstrap.yaml
+    documentIndex: 0
+    set:
+      bootstrap.roleArn: arn:aws:iam::111111111111:role/x
+    asserts:
+      - equal:
+          path: metadata.annotations["eks.amazonaws.com/role-arn"]
+          value: arn:aws:iam::111111111111:role/x
+  - it: sets no snapshot role annotation by default
+    template: snapshot.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: metadata.annotations
+  - it: allows the bootstrap pod to reach Vault and AWS only
+    template: networkpolicy.yaml
+    documentIndex: 3
+    asserts:
+      - equal:
+          path: metadata.name
+          value: vault-bootstrap

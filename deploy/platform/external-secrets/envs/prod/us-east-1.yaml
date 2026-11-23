@@ -1,0 +1,15 @@
+# prod us-east-1: the pod role comes from the Pod Identity association external-secrets/external-secrets
+requireResolved: true
+
+awsSecretsManager:
+  region: us-east-1
+
+vault:
+  server: https://vault.pay.example.com:8200
+
+networkPolicy:
+  awsEndpointCidrs:
+    - 10.151.0.0/18
+    - 10.151.64.0/19
+  vaultCidrs:
+    - 10.151.0.0/16

@@ -1,0 +1,19 @@
+# stage eu-central-1: names Terraform creates; pod roles come from Pod Identity associations vault/vault-snapshot and vault/vault-bootstrap
+requireResolved: true
+
+snapshot:
+  image:
+    repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/vault-snapshot
+  bucket: pay-stage-euc1-vault-snapshots
+  region: eu-central-1
+
+bootstrap:
+  region: eu-central-1
+  initSecretId: pay/stage/vault/init
+
+networkPolicy:
+  # Other clusters of the VPC call Vault through its load balancer
+  clientCidrs:
+    - 10.130.0.0/16
+  awsEndpointCidrs:
+    - 10.130.255.0/24
