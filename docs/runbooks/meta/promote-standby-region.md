@@ -1,6 +1,6 @@
 # PromoteStandbyRegion
 
-Layer backup-dr, service aurora, severity critical, owner data-platform-oncall.
+Layer meta (a procedure that no alert points to), service aurora, owner data-platform-oncall.
 
 ## Symptom
 

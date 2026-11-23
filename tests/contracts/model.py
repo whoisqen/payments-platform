@@ -62,6 +62,12 @@ def dependencies(chart):
     return [(d.get("alias", d["name"]), d["name"]) for d in deps]
 
 
+def conditions(chart):
+    # alias -> the values key that switches the dependency on or off (`condition: <alias>.enabled` in Chart.yaml)
+    deps = load_yaml(CHARTS / chart / "Chart.yaml").get("dependencies", [])
+    return {d.get("alias", d["name"]): d["condition"] for d in deps if d.get("condition")}
+
+
 def with_digest(vals):
     # image.digest comes from images.yaml in CI; a fixture digest stands in offline
     out = copy.deepcopy(vals)
@@ -80,6 +86,9 @@ def schema_targets(env, region, release):
             continue
         subvals = load_yaml(CHARTS / sub / "values.yaml")
         subvals = merge(subvals, vals.get(alias, {}))
+        # `<alias>.enabled` is read by Helm for the dependency condition and is not a value of the subchart
+        if conditions(chart).get(alias) == f"{alias}.enabled":
+            subvals.pop("enabled", None)
         subvals = merge(subvals, {"global": vals.get("global", {})})
         yield f"{label}:{alias}", sub, with_digest(subvals)
     if chart == "control-center":
