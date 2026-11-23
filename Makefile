@@ -29,6 +29,7 @@ lint-repo:
 	python3 tools/config/render_standby.py --check
 	python3 tools/config/render_central.py --check
 	python3 tools/config/render_vault.py --check
+	python3 tools/config/render_exporters.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

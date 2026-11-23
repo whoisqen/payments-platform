@@ -1,0 +1,87 @@
+suite: metric exporter add-ons run where the data is
+templates:
+  - addons/exporters/postgres.yaml
+  - addons/exporters/redis.yaml
+  - addons/exporters/kafka.yaml
+  - addons/exporters/clickhouse.yaml
+  - addons/exporters/blackbox.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: release
+  cluster.namePrefix: acme
+  cluster.region: us-east-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.dedupInterval: 30s
+tests:
+  - it: runs the database exporters in every cluster with add-ons
+    template: addons/exporters/postgres.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/addons"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.sources[0].chart
+          value: prometheus-postgres-exporter
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 8.3.0
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: $values/observability/exporters/postgres.yaml
+      - equal:
+          path: spec.template.spec.sources[2].path
+          value: 'deploy/platform/exporters/postgres/envs/{{ index .metadata.labels "payments-platform/environment" }}/{{ index .metadata.labels "payments-platform/region" }}'
+      - equal:
+          path: spec.template.spec.sources[3].ref
+          value: values
+  - it: runs the redis exporter in every cluster with add-ons and layers its overlay over the shared values
+    template: addons/exporters/redis.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/addons"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 6.38.0
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles
+          value:
+            - $values/observability/exporters/redis.yaml
+            - $values/deploy/platform/exporters/redis/values.yaml
+  - it: runs the kafka exporter only in clusters labelled for kafka
+    template: addons/exporters/kafka.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/kafka"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 4.1.2
+  - it: deploys only the monitor of ClickHouse, in clusters labelled for it
+    template: addons/exporters/clickhouse.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/clickhouse"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.source.path
+          value: deploy/platform/exporters/clickhouse/common
+      - notExists:
+          path: spec.template.spec.sources
+  - it: runs blackbox once, in the central cluster, with no environment layer
+    template: addons/exporters/blackbox.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 11.22.0
+      - equal:
+          path: spec.template.spec.sources[1].path
+          value: deploy/platform/exporters/blackbox/common
+      - lengthEqual:
+          path: spec.template.spec.sources
+          count: 3
