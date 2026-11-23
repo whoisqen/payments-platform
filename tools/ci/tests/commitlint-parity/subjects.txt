@@ -1,0 +1,16 @@
+# One commit subject per line, in addition to every subject of tools/lint/tests/test_gate.py.
+# The edge cases of the rules the gate and commitlint share: type, scope, `!`, case of the summary, 72 characters.
+feat(infra): add a module
+fix(deploy)!: change a default
+docs(docs): update the readme
+chore(vendor): import upstream
+revert(ci): undo a workflow change
+feat: no scope
+Feat(infra): upper case type
+feat(infra) missing colon
+feat(infra):
+feat(INFRA): upper case scope
+feat(infra,deploy): two scopes
+wip(infra): unknown type
+feat(infra): Upper case summary
+feat(infra): 1 starts with a digit
