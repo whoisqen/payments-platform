@@ -13,6 +13,8 @@ concurrency:
 
 jobs:
   plan:
+    # runs once the backend and App ids exist; set the repository variable to enable it
+    if: vars.DRIFT_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
