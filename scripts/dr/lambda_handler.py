@@ -25,9 +25,8 @@ def handler(event, _context):
     env = os.environ
     results = {}
     for cell in json.loads(env["CELLS"]):
-        argv = ["--mode", "warm", "--auto", "--cell", cell, "--run-id", f"{incident}-{cell}", "--name-prefix", env["NAME_PREFIX"],
-                "--source-region", env["SOURCE_REGION"], "--target-region", env["TARGET_REGION"], "--fallback-region", env["FALLBACK_REGION"],
-                "--lock-region", env["TARGET_REGION"], "--lock-table", env["LOCK_TABLE"], "--global-cluster", env["GLOBAL_CLUSTER_PATTERN"].format(cell=cell),
+        argv = ["--auto", "--cell", cell, "--run-id", f"{incident}-{cell}", "--name-prefix", env["NAME_PREFIX"], "--env", env["ENVIRONMENT"],
+                "--source-region", env["SOURCE_REGION"], "--target-region", env["TARGET_REGION"], "--lock-table", env["LOCK_TABLE"],
                 "--fence-rule-group", env["FENCE_RULE_GROUP"], "--deny-policy-arn", env.get("DENY_POLICY_ARN", "")]
         results[cell] = failover.main(argv)
     print(json.dumps({"event": "failover-finished", "results": results}, sort_keys=True))

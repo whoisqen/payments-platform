@@ -14,7 +14,6 @@ terraform {
 inputs = {
   source_region       = local.cfg.regions.working
   source_region_short = local.working_short
-  fallback_region     = local.cfg.regions.recovery[1]
   # Every Aurora global cluster that a cell or the locker owns.
   cells            = concat(local.env_cfg.cells, ["locker"])
   fence_rule_group = "${local.cfg.naming.prefix}-${local.env_cfg.environment}-${local.working_short}-psp-fence"

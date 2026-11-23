@@ -69,3 +69,17 @@ run "bad_domain_rejected" {
 
   expect_failures = [var.psp_domains]
 }
+
+run "fence_group_comes_before_the_allowlist" {
+  command = plan
+
+  assert {
+    condition     = aws_networkfirewall_rule_group.psp_fence.name == "pay-prod-euc1-psp-fence"
+    error_message = "the failover script finds the group by this name"
+  }
+
+  assert {
+    condition     = length([for r in aws_networkfirewall_firewall_policy.this.firewall_policy[0].stateful_rule_group_reference : r if r.priority <= 2]) == 2
+    error_message = "the fence is evaluated first"
+  }
+}

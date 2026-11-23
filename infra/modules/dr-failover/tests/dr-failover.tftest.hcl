@@ -33,7 +33,6 @@ variables {
   account_id          = "111111111111"
   source_region       = "eu-central-1"
   source_region_short = "euc1"
-  fallback_region     = "us-east-2"
   cells               = ["cell-0", "cell-1", "locker"]
   health_check_id     = "11111111-2222-3333-4444-555555555555"
   deny_policy_arn     = "arn:aws:iam::111111111111:policy/pay-stage-euc1-merchant-cell-map-deny-recovery-writes"
@@ -68,7 +67,7 @@ run "health_check_alarm_triggers_the_function" {
   }
 
   assert {
-    condition     = jsondecode(aws_lambda_function.failover.environment[0].variables.CELLS) == ["cell-0", "cell-1", "locker"] && aws_lambda_function.failover.environment[0].variables.GLOBAL_CLUSTER_PATTERN == "pay-stage-euc1-aurora-{cell}"
+    condition     = jsondecode(aws_lambda_function.failover.environment[0].variables.CELLS) == ["cell-0", "cell-1", "locker"] && aws_lambda_function.failover.environment[0].variables.ENVIRONMENT == "stage"
     error_message = "cells and the global cluster naming reach the function"
   }
 }

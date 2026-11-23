@@ -1,8 +1,6 @@
 locals {
-  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
-  # Aurora global clusters are named <prefix>-<env>-<working region short>-aurora-<cell>.
-  global_cluster_pattern = "${var.name_prefix}-${var.env}-${var.source_region_short}-aurora-{cell}"
-  lock_table             = "${var.name_prefix}-${var.env}-${var.region_short}-dr-lock"
+  name       = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
+  lock_table = "${var.name_prefix}-${var.env}-${var.region_short}-dr-lock"
 }
 
 data "aws_region" "current" {}
@@ -111,15 +109,14 @@ resource "aws_lambda_function" "failover" {
 
   environment {
     variables = {
-      NAME_PREFIX            = var.name_prefix
-      SOURCE_REGION          = var.source_region
-      TARGET_REGION          = data.aws_region.current.region
-      FALLBACK_REGION        = var.fallback_region
-      LOCK_TABLE             = aws_dynamodb_table.lock.name
-      GLOBAL_CLUSTER_PATTERN = local.global_cluster_pattern
-      FENCE_RULE_GROUP       = var.fence_rule_group
-      DENY_POLICY_ARN        = var.deny_policy_arn
-      CELLS                  = jsonencode(var.cells)
+      NAME_PREFIX      = var.name_prefix
+      ENVIRONMENT      = var.env
+      SOURCE_REGION    = var.source_region
+      TARGET_REGION    = data.aws_region.current.region
+      LOCK_TABLE       = aws_dynamodb_table.lock.name
+      FENCE_RULE_GROUP = var.fence_rule_group
+      DENY_POLICY_ARN  = var.deny_policy_arn
+      CELLS            = jsonencode(var.cells)
     }
   }
 
@@ -193,10 +190,10 @@ resource "aws_iam_role_policy" "function" {
         Resource = "arn:aws:network-firewall:${var.source_region}:${var.account_id}:stateful-rulegroup/${var.fence_rule_group}"
       },
       {
-        Sid      = "FenceRouters"
+        Sid      = "Reconcile"
         Effect   = "Allow"
-        Action   = ["ssm:StartAutomationExecution", "ssm:GetAutomationExecution"]
-        Resource = ["arn:aws:ssm:*:${var.account_id}:automation-definition/dr-*:*", "arn:aws:ssm:*:${var.account_id}:automation-execution/*"]
+        Action   = ["ssm:StartAutomationExecution"]
+        Resource = "arn:aws:ssm:${data.aws_region.current.region}:${var.account_id}:automation-definition/dr-psp-reconcile:*"
       },
       ], var.deny_policy_arn == "" ? [] : [{
         Sid      = "AllowStandbyDynamoDbWrites"

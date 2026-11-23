@@ -63,11 +63,6 @@ variable "source_region_short" {
   type        = string
 }
 
-variable "fallback_region" {
-  description = "Second recovery region that holds the lock record if the standby cannot be used."
-  type        = string
-}
-
 variable "cells" {
   description = "Names whose Aurora global cluster is promoted: the cells, the spare and locker."
   type        = list(string)

@@ -14,14 +14,20 @@ The Route 53 health check of the Frankfurt ingress fails and DNS answers with th
 
 ## Actions
 
-Promotion starts by itself: when the Route 53 health check of the Frankfurt ingress fails for five minutes, the alarm `*-working-region-down` invokes the Lambda of `infra/modules/dr-failover` (`scripts/dr/failover.py --mode warm --auto`). For every cell and the locker it fences what is reachable, runs `failover-global-cluster` on the Aurora global cluster, and removes us-east-1 from the DynamoDB deny-write policy. A lock record per cell prevents a second promotion. Route 53 has already moved the traffic.
+Promotion starts by itself: when the Route 53 health check of the Frankfurt ingress fails for five minutes, the alarm `*-working-region-down` invokes the Lambda of `infra/modules/dr-failover` (`scripts/dr/failover.py --auto`). For every cell and the locker it appends a drop rule to the `psp-fence` rule group of the working region when that region answers (best effort), runs `failover-global-cluster` on the Aurora global cluster, and removes us-east-1 from the DynamoDB deny-write policy. A lock record per cell prevents a second promotion. Route 53 has already moved the traffic.
 
 1. Check the Lambda log (`failover-finished` with a result per cell). Exit code 3 means another run holds the lock, which is not a failure.
-2. If a cell failed, re-run it: invoke the Lambda again with the same alarm event (the run id is the incident time, so the run resumes) or run `scripts/dr/failover.py --mode warm --auto --cell <cell> ...` by hand through `runbook-actions`.
+2. If a cell failed, re-run it: invoke the Lambda again with the same alarm event (the run id is the incident time, so the run resumes) or run `scripts/dr/failover.py --cell <cell> --confirmed-by <approver> ...` by hand.
 3. The standby releases already use the local cluster endpoints, which become writers on promotion; no values change. Enable migrations (`migrations.enabled`) only after the writer is stable and a migration is due.
-4. `fence-unverified` in the log means Frankfurt's control plane did not answer; Aurora keeps the old writer from rejoining as a writer, but check the PSP fence rule group once Frankfurt is reachable.
+4. `fence-unverified` in the log means Frankfurt's control plane did not answer; Aurora keeps the old writer from rejoining as a writer, but once Frankfurt is reachable, add the drop rule to `psp-fence` by hand or run the script again.
 
-Failing back is a planned switch in the opposite direction after Frankfurt is rebuilt from the replicated data; do not fail back during the incident.
+## Failback
+
+Planned, never during the incident, and only after Frankfurt is rebuilt and rejoined the Aurora global clusters as a replicating secondary. A person or an agent runs it after a human approves:
+
+`scripts/dr/failover.py --mode failback --cell <cell> --confirmed-by <approver> --name-prefix <prefix> --env <env> --source-region <working> --target-region <standby> --deny-policy-arn <arn>`
+
+Per cell and the locker it refuses unless the replication lag to Frankfurt is at most 1 s, then switches Aurora over without data loss, restores the DynamoDB deny-write policy version saved at the failover, removes the drop rule from `psp-fence` and releases the lock. Without `--confirmed-by` it refuses; it is never started by an alarm.
 
 ## Escalation
 
