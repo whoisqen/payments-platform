@@ -78,8 +78,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
 
     filter {}
 
-    expiration {
-      days = each.value.retention_days
+    # A bucket of incremental backups has no age expiry: a new backup reuses files of the earlier ones, and the tool deletes the files it no longer needs
+    dynamic "expiration" {
+      for_each = each.value.retention_days == null ? [] : [each.value.retention_days]
+
+      content {
+        days = expiration.value
+      }
     }
 
     noncurrent_version_expiration {

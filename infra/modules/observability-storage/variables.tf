@@ -46,19 +46,21 @@ variable "permissions_boundary_arn" {
 
 variable "buckets" {
   type = map(object({
-    retention_days  = number
+    retention_days  = optional(number)
     namespace       = string
     service_account = string
   }))
-  description = "Stores by component: days until objects expire, and the service account that gets the one role of the bucket."
+  description = "Stores by component: days until objects expire (null keeps them), and the service account that gets the one role of the bucket."
   default = {
     loki   = { retention_days = 30, namespace = "monitoring", service_account = "loki" }
     tempo  = { retention_days = 14, namespace = "monitoring", service_account = "tempo" }
     sentry = { retention_days = 90, namespace = "monitoring", service_account = "sentry" }
+    # Incremental backups of the metrics store (vmbackup): no age expiry, the tool removes what it no longer needs
+    vmbackup = { retention_days = null, namespace = "victoria-metrics", service_account = "vmbackup" }
   }
 
   validation {
-    condition     = alltrue([for b in values(var.buckets) : b.retention_days >= 1])
+    condition     = alltrue([for b in values(var.buckets) : b.retention_days == null || b.retention_days >= 1])
     error_message = "retention_days must be at least 1."
   }
 }

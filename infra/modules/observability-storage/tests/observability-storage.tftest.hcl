@@ -105,3 +105,22 @@ run "rejects_other_environment" {
 
   expect_failures = [var.environment]
 }
+
+run "backup_bucket_has_no_age_expiry_but_keeps_the_hygiene_rules" {
+  command = plan
+
+  assert {
+    condition     = length([for r in aws_s3_bucket_lifecycle_configuration.this["vmbackup"].rule : r if length(r.expiration) > 0 && r.id == "expire-objects"]) == 0
+    error_message = "incremental backups must not expire by age"
+  }
+
+  assert {
+    condition     = length([for r in aws_s3_bucket_lifecycle_configuration.this["vmbackup"].rule : r if r.id == "expire-objects" && length(r.abort_incomplete_multipart_upload) == 1 && length(r.noncurrent_version_expiration) == 1]) == 1
+    error_message = "old versions and unfinished uploads still expire"
+  }
+
+  assert {
+    condition     = output.bucket_names["vmbackup"] == "pay-shared-services-euc1-vmbackup"
+    error_message = "the name the backup job addresses"
+  }
+}
