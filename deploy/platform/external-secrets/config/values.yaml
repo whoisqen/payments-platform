@@ -1,0 +1,30 @@
+# REPLACE_* defaults are rejected when requireResolved is true; the environment layer sets it
+requireResolved: false
+
+serviceAccount:
+  name: external-secrets
+  namespace: external-secrets
+
+awsSecretsManager:
+  enabled: true
+  storeName: aws-secrets-manager
+  region: REPLACE_AWS_REGION
+  roleArn: REPLACE_ESO_ROLE_ARN
+  # Empty means every namespace; set to restrict the store
+  namespaceSelector: {}
+
+vault:
+  enabled: true
+  storeName: vault
+  server: http://vault-active.vault.svc:8200
+  path: secret
+  version: v2
+  authMount: kubernetes
+  authRole: external-secrets
+  namespaceSelector: {}
+
+networkPolicy:
+  enabled: true
+  apiServerCidrs: []
+  awsEndpointCidrs: []
+  vaultNamespace: vault

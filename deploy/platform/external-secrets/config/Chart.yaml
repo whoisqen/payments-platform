@@ -1,0 +1,6 @@
+apiVersion: v2
+name: external-secrets-config
+description: ClusterSecretStores for AWS Secrets Manager and Vault plus the network policy of the upstream external-secrets chart
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

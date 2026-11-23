@@ -1,0 +1,43 @@
+# REPLACE_* defaults are rejected when requireResolved is true; the environment layer sets it
+requireResolved: false
+
+vault:
+  serviceName: vault-active
+  port: 8200
+  clusterPort: 8201
+
+snapshot:
+  enabled: true
+  schedule: "0 * * * *"
+  # Needs the vault and aws CLIs; digest comes from the environment layer
+  image:
+    repository: REPLACE_SNAPSHOT_IMAGE_REPOSITORY
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  authMount: kubernetes
+  authRole: vault-snapshot
+  bucket: REPLACE_SNAPSHOT_BUCKET
+  prefix: raft
+  region: REPLACE_AWS_REGION
+  kmsKeyId: REPLACE_SNAPSHOT_KMS_KEY_ID
+  roleArn: REPLACE_SNAPSHOT_ROLE_ARN
+  serviceAccountName: vault-snapshot
+  scratchSizeLimit: 10Gi
+  activeDeadlineSeconds: 1800
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+networkPolicy:
+  enabled: true
+  # Namespaces whose pods may call the Vault API
+  clientNamespaces:
+    - external-secrets
+    - istio-system
+    - monitoring
+  # Cluster API server addresses (EKS control plane ENIs)
+  apiServerCidrs: []
+  # VPC endpoint addresses for KMS and S3
+  awsEndpointCidrs: []
