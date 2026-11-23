@@ -60,3 +60,40 @@ tests:
       vaults.enabled: true
     asserts:
       - failedTemplate: {}
+  - it: omits the assumed role by default (Pod Identity)
+    template: clustersecretstores.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: spec.provider.aws.role
+  - it: sets the assumed role when a role ARN is given
+    template: clustersecretstores.yaml
+    documentIndex: 0
+    set:
+      awsSecretsManager.roleArn: arn:aws:iam::111111111111:role/x
+    asserts:
+      - equal:
+          path: spec.provider.aws.role
+          value: arn:aws:iam::111111111111:role/x
+  - it: waits for the CRDs of the upstream chart
+    template: clustersecretstores.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "1"
+  - it: lets the operator reach a Vault outside the cluster
+    template: networkpolicy.yaml
+    documentIndex: 1
+    set:
+      networkPolicy.vaultCidrs: ["10.0.0.0/16"]
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to:
+              - ipBlock:
+                  cidr: 10.0.0.0/16
+            ports:
+              - port: 8200
+                protocol: TCP

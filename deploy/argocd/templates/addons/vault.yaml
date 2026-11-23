@@ -29,6 +29,19 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/vault/values.yaml
+              - $values/deploy/platform/vault/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/{{`{{ index .metadata.labels "payments-platform/region" }}`}}.yaml
+        # Companion chart: network policies and the objects the upstream chart cannot carry
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/vault/config
+          helm:
+            # A missing environment layer or digest must fail the render, not deploy placeholders
+            parameters:
+              - name: requireResolved
+                value: "true"
+            valueFiles:
+              - $values/deploy/platform/vault/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/{{`{{ index .metadata.labels "payments-platform/region" }}`}}.config.yaml
+              - $values/deploy/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/images.yaml
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values

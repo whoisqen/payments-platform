@@ -1,5 +1,10 @@
-# REPLACE_* defaults are rejected when requireResolved is true; the environment layer sets it
+# REPLACE_* defaults and the all-zero snapshot digest are rejected when requireResolved is true; the environment layer and ArgoCD set it
 requireResolved: false
+
+# Written by CI into deploy/envs/<env>/images.yaml and passed to this chart as a values file; overrides snapshot.image.digest
+vault-snapshot:
+  image:
+    digest: ""
 
 vault:
   serviceName: vault-active
@@ -18,8 +23,10 @@ snapshot:
   bucket: REPLACE_SNAPSHOT_BUCKET
   prefix: raft
   region: REPLACE_AWS_REGION
-  kmsKeyId: REPLACE_SNAPSHOT_KMS_KEY_ID
-  roleArn: REPLACE_SNAPSHOT_ROLE_ARN
+  # Empty: the bucket default encryption applies
+  kmsKeyId: ""
+  # Empty with EKS Pod Identity (the association binds the role to the service account); set only for IRSA
+  roleArn: ""
   serviceAccountName: vault-snapshot
   scratchSizeLimit: 10Gi
   activeDeadlineSeconds: 1800
@@ -30,6 +37,38 @@ snapshot:
     limits:
       memory: 512Mi
 
+bootstrap:
+  # PostSync hook: initialises Vault once and applies the baseline configuration; uses snapshot.image (vault, aws, jq)
+  enabled: true
+  serviceAccountName: vault-bootstrap
+  roleArn: ""
+  region: REPLACE_AWS_REGION
+  # Secrets Manager secret that receives the recovery keys
+  initSecretId: REPLACE_INIT_SECRET_ID
+  # Uninitialised nodes are not behind vault-active, so init goes to the first pod
+  initAddress: http://vault-0.vault-internal:8200
+  recoveryShares: 5
+  recoveryThreshold: 3
+  kvMount: secret
+  kvMaxVersions: 10
+  snapshotPolicy: vault-snapshot
+  externalSecrets:
+    authRole: external-secrets
+    serviceAccountName: external-secrets
+    namespace: external-secrets
+  autopilot:
+    cleanupDeadServers: true
+    deadServerLastContactThreshold: 24h
+    minQuorum: 3
+    serverStabilizationTime: 30s
+  activeDeadlineSeconds: 900
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
 networkPolicy:
   enabled: true
   # Namespaces whose pods may call the Vault API
@@ -39,5 +78,7 @@ networkPolicy:
     - monitoring
   # Cluster API server addresses (EKS control plane ENIs)
   apiServerCidrs: []
-  # VPC endpoint addresses for KMS and S3
+  # Callers outside the cluster that reach Vault through its load balancer (other clusters of the VPC)
+  clientCidrs: []
+  # VPC endpoint addresses for KMS, S3 and Secrets Manager
   awsEndpointCidrs: []

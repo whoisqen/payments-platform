@@ -7,8 +7,10 @@ metadata:
   name: {{ $s.serviceAccountName }}
   labels:
     {{- include "vault-config.labels" . | nindent 4 }}
+  {{- with $s.roleArn }}
   annotations:
-    eks.amazonaws.com/role-arn: {{ $s.roleArn | quote }}
+    eks.amazonaws.com/role-arn: {{ . | quote }}
+  {{- end }}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -43,7 +45,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: snapshot
-              image: {{ printf "%s@%s" $s.image.repository $s.image.digest | quote }}
+              image: {{ include "vault-config.image" . | quote }}
               command: ["/bin/sh", "-eu", "-c"]
               args:
                 - |
@@ -51,7 +53,11 @@ spec:
                   VAULT_TOKEN=$(vault write -field=token "auth/${AUTH_MOUNT}/login" role="${AUTH_ROLE}" jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token)
                   vault operator raft snapshot save /scratch/vault.snap
                   key="${PREFIX}/$(date -u +%Y/%m/%d)/vault-$(date -u +%H%M%S).snap"
-                  aws s3 cp /scratch/vault.snap "s3://${BUCKET}/${key}" --sse aws:kms --sse-kms-key-id "${KMS_KEY_ID}" --only-show-errors
+                  if [ -n "${KMS_KEY_ID}" ]; then
+                    aws s3 cp /scratch/vault.snap "s3://${BUCKET}/${key}" --sse aws:kms --sse-kms-key-id "${KMS_KEY_ID}" --only-show-errors
+                  else
+                    aws s3 cp /scratch/vault.snap "s3://${BUCKET}/${key}" --only-show-errors
+                  fi
                   rm -f /scratch/vault.snap
               env:
                 - name: VAULT_ADDR

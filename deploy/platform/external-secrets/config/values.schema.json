@@ -3,48 +3,117 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "requireResolved": {"type": "boolean"},
+    "requireResolved": {
+      "type": "boolean"
+    },
     "serviceAccount": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "namespace": {"type": "string", "minLength": 1}
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "awsSecretsManager": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean"},
-        "storeName": {"type": "string", "minLength": 1},
-        "region": {"type": "string", "pattern": "^(REPLACE_[A-Z0-9_]+|[a-z]{2}-[a-z]+-[0-9])$"},
-        "roleArn": {"type": "string", "pattern": "^(REPLACE_[A-Z0-9_]+|arn:aws:iam::[0-9]{12}:role/.+)$"},
-        "namespaceSelector": {"type": "object"}
+        "enabled": {
+          "type": "boolean"
+        },
+        "storeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^(REPLACE_[A-Z0-9_]+|[a-z]{2}-[a-z]+-[0-9])$"
+        },
+        "roleArn": {
+          "type": "string",
+          "pattern": "^(|REPLACE_[A-Z0-9_]+|arn:aws:iam::[0-9]{12}:role/.+)$"
+        },
+        "namespaceSelector": {
+          "type": "object"
+        }
       }
     },
     "vault": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean"},
-        "storeName": {"type": "string", "minLength": 1},
-        "server": {"type": "string", "pattern": "^(REPLACE_[A-Z0-9_]+|https?://.+)$"},
-        "path": {"type": "string", "minLength": 1},
-        "version": {"enum": ["v1", "v2"]},
-        "authMount": {"type": "string", "minLength": 1},
-        "authRole": {"type": "string", "minLength": 1},
-        "namespaceSelector": {"type": "object"}
+        "enabled": {
+          "type": "boolean"
+        },
+        "storeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "server": {
+          "type": "string",
+          "pattern": "^(REPLACE_[A-Z0-9_]+|https?://.+)$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "enum": [
+            "v1",
+            "v2"
+          ]
+        },
+        "authMount": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authRole": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespaceSelector": {
+          "type": "object"
+        }
       }
     },
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean"},
-        "vaultNamespace": {"type": "string", "minLength": 1},
-        "apiServerCidrs": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f.:]+/[0-9]{1,3}$"}},
-        "awsEndpointCidrs": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f.:]+/[0-9]{1,3}$"}}
+        "enabled": {
+          "type": "boolean"
+        },
+        "vaultNamespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiServerCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f.:]+/[0-9]{1,3}$"
+          }
+        },
+        "awsEndpointCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f.:]+/[0-9]{1,3}$"
+          }
+        },
+        "vaultCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f.:]+/[0-9]{1,3}$"
+          }
+        }
       }
     }
   }

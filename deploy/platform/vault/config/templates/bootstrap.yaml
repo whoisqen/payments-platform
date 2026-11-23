@@ -1,0 +1,199 @@
+{{- include "vault-config.guard" . -}}
+{{- if .Values.bootstrap.enabled }}
+{{- $b := .Values.bootstrap }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $b.serviceAccountName }}
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+  {{- with $b.roleArn }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ . | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-bootstrap
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+data:
+  snapshot.hcl: |
+    path "sys/storage/raft/snapshot" {
+      capabilities = ["read"]
+    }
+  external-secrets.hcl: |
+    path "{{ $b.kvMount }}/data/*" {
+      capabilities = ["read"]
+    }
+  bootstrap.sh: |
+    # Idempotent Vault bootstrap. Secrets live in shell variables and pipes only: nothing is written to disk, logged or put in git.
+    set -eu
+    umask 077
+    log() { printf 'vault-bootstrap: %s\n' "$*"; }
+    status_json() { VAULT_ADDR="$1" vault status -format=json 2>/dev/null || true; }
+
+    tries=0
+    while :; do
+      S=$(status_json "${INIT_ADDR}")
+      if [ -n "${S}" ] && printf '%s' "${S}" | jq -e 'has("initialized")' >/dev/null 2>&1; then break; fi
+      tries=$((tries + 1))
+      [ "${tries}" -lt 60 ] || { log "vault did not answer at ${INIT_ADDR}"; exit 1; }
+      sleep 5
+    done
+    if [ "$(printf '%s' "${S}" | jq -r .initialized)" = "true" ]; then
+      log "already initialized; nothing to do"
+      exit 0
+    fi
+
+    # The recovery keys must have a place to go before the one irreversible step: refuse to overwrite real keys, prove write access with a placeholder
+    if CUR=$(aws secretsmanager get-secret-value --secret-id "${INIT_SECRET_ID}" --query SecretString --output text 2>/dev/null); then
+      if printf '%s' "${CUR}" | jq -e 'has("recovery_keys_b64")' >/dev/null 2>&1; then
+        log "secret ${INIT_SECRET_ID} already holds recovery keys but Vault is uninitialized; refusing to overwrite"
+        exit 1
+      fi
+      unset CUR
+    elif ! aws secretsmanager describe-secret --secret-id "${INIT_SECRET_ID}" >/dev/null 2>&1; then
+      aws secretsmanager create-secret --name "${INIT_SECRET_ID}" --description "Vault recovery keys" --secret-string '{"state":"pending"}' --query Name --output text >/dev/null
+    fi
+
+    log "initializing"
+    INIT=$(VAULT_ADDR="${INIT_ADDR}" vault operator init -recovery-shares="${RECOVERY_SHARES}" -recovery-threshold="${RECOVERY_THRESHOLD}" -format=json)
+    n=0
+    until printf '%s' "${INIT}" | jq -c '{recovery_keys_b64: .recovery_keys_b64}' \
+        | aws secretsmanager put-secret-value --secret-id "${INIT_SECRET_ID}" --secret-string file:///dev/stdin --query VersionId --output text >/dev/null; do
+      n=$((n + 1))
+      [ "${n}" -lt 5 ] || { log "FATAL: could not store the recovery keys; Vault is initialized and its keys are lost with this pod"; exit 1; }
+      sleep 3
+    done
+    log "recovery keys stored in ${INIT_SECRET_ID}"
+    VAULT_TOKEN=$(printf '%s' "${INIT}" | jq -r .root_token)
+    unset INIT
+    export VAULT_TOKEN
+
+    # The root token never outlives this script, even on failure
+    revoke() { VAULT_ADDR="${ACTIVE_ADDR}" vault token revoke -self >/dev/null 2>&1 || VAULT_ADDR="${INIT_ADDR}" vault token revoke -self >/dev/null 2>&1 || true; }
+    trap revoke EXIT
+
+    export VAULT_ADDR="${ACTIVE_ADDR}"
+    tries=0
+    until vault status >/dev/null 2>&1; do
+      tries=$((tries + 1))
+      [ "${tries}" -lt 90 ] || { log "no active unsealed node at ${ACTIVE_ADDR}"; exit 1; }
+      sleep 5
+    done
+
+    vault audit list -format=json 2>/dev/null | jq -e 'has("file/")' >/dev/null || vault audit enable file file_path=stdout
+    vault secrets list -format=json | jq -e 'has("'"${KV_MOUNT}"'/")' >/dev/null || vault secrets enable -path="${KV_MOUNT}" -version=2 kv
+    vault write "${KV_MOUNT}/config" max_versions="${KV_MAX_VERSIONS}" delete_version_after=0s >/dev/null
+    vault operator raft autopilot set-config \
+      -cleanup-dead-servers="${AP_CLEANUP}" \
+      -dead-server-last-contact-threshold="${AP_THRESHOLD}" \
+      -min-quorum="${AP_MIN_QUORUM}" \
+      -server-stabilization-time="${AP_STABILIZATION}" >/dev/null
+
+    vault policy write "${SNAPSHOT_ROLE}" /bootstrap/snapshot.hcl
+    vault policy write "${ESO_ROLE}" /bootstrap/external-secrets.hcl
+    vault auth list -format=json | jq -e 'has("'"${AUTH_MOUNT}"'/")' >/dev/null || vault auth enable -path="${AUTH_MOUNT}" kubernetes
+    vault write "auth/${AUTH_MOUNT}/config" kubernetes_host="https://kubernetes.default.svc:443" >/dev/null
+    vault write "auth/${AUTH_MOUNT}/role/${SNAPSHOT_ROLE}" bound_service_account_names="${SNAPSHOT_SA}" bound_service_account_namespaces="${NAMESPACE}" policies="${SNAPSHOT_ROLE}" ttl=15m >/dev/null
+    vault write "auth/${AUTH_MOUNT}/role/${ESO_ROLE}" bound_service_account_names="${ESO_SA}" bound_service_account_namespaces="${ESO_NAMESPACE}" policies="${ESO_ROLE}" ttl=15m >/dev/null
+
+    vault token revoke -self >/dev/null
+    log "configured; root token revoked"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-bootstrap
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  # A retry would see an initialized Vault and report success over a half-finished run, so a failure stays a failure
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $b.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault-bootstrap
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/part-of: payments-platform
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $b.serviceAccountName }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: {{ include "vault-config.image" . | quote }}
+          command: ["/bin/sh", "/bootstrap/bootstrap.sh"]
+          env:
+            - name: INIT_ADDR
+              value: {{ $b.initAddress | quote }}
+            - name: ACTIVE_ADDR
+              value: {{ printf "http://%s.%s.svc:%v" .Values.vault.serviceName .Release.Namespace .Values.vault.port | quote }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: INIT_SECRET_ID
+              value: {{ $b.initSecretId | quote }}
+            - name: RECOVERY_SHARES
+              value: {{ $b.recoveryShares | quote }}
+            - name: RECOVERY_THRESHOLD
+              value: {{ $b.recoveryThreshold | quote }}
+            - name: KV_MOUNT
+              value: {{ $b.kvMount | quote }}
+            - name: KV_MAX_VERSIONS
+              value: {{ $b.kvMaxVersions | quote }}
+            - name: AUTH_MOUNT
+              value: {{ .Values.snapshot.authMount | quote }}
+            - name: SNAPSHOT_ROLE
+              value: {{ .Values.snapshot.authRole | quote }}
+            - name: SNAPSHOT_SA
+              value: {{ .Values.snapshot.serviceAccountName | quote }}
+            - name: ESO_ROLE
+              value: {{ $b.externalSecrets.authRole | quote }}
+            - name: ESO_SA
+              value: {{ $b.externalSecrets.serviceAccountName | quote }}
+            - name: ESO_NAMESPACE
+              value: {{ $b.externalSecrets.namespace | quote }}
+            - name: AP_CLEANUP
+              value: {{ $b.autopilot.cleanupDeadServers | quote }}
+            - name: AP_THRESHOLD
+              value: {{ $b.autopilot.deadServerLastContactThreshold | quote }}
+            - name: AP_MIN_QUORUM
+              value: {{ $b.autopilot.minQuorum | quote }}
+            - name: AP_STABILIZATION
+              value: {{ $b.autopilot.serverStabilizationTime | quote }}
+            - name: AWS_REGION
+              value: {{ $b.region | quote }}
+            - name: HOME
+              value: /tmp
+          resources:
+            {{- toYaml $b.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: script
+              mountPath: /bootstrap
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: script
+          configMap:
+            name: vault-bootstrap
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}
