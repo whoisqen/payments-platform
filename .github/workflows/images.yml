@@ -28,7 +28,7 @@ env:
 
 jobs:
   select:
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -67,7 +67,7 @@ jobs:
   build:
     needs: select
     if: needs.select.outputs.any == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_BUILD || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -197,7 +197,7 @@ jobs:
 
   collect:
     needs: build
-    runs-on: ${{ vars.RUNNER_RELEASE || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read

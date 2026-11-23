@@ -8,6 +8,8 @@ terraform {
 
 inputs = {
   account_id = local.env_cfg.account_id
+  # Images are <namespace>/<name>, the path of the workflows, charts and policies
+  repository_namespace = local.env_cfg.cfg.registry.ecr_repo_prefix
   tags = {
     team        = "platform"
     owner       = local.env_cfg.owner

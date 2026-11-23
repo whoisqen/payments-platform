@@ -1,6 +1,7 @@
 locals {
-  region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
-  prefix       = "pay-${var.environment}-${local.region_short}-"
+  # Images live under <namespace>/<name>, the path that the workflows, charts and policies use; the build cache under <namespace>-cache/<name>.
+  prefix       = "${var.repository_namespace}/"
+  cache_prefix = "${var.repository_namespace}-cache/"
 
   # CI pushes every build under its git sha, and cosign adds a signature, an SBOM and an attestation as sha256-<digest> tags.
   # Promotion tags v*, prod-*, stage-* and dev-* keep a history to roll back to. An image matching a rule cannot be expired by a lower
@@ -150,7 +151,7 @@ resource "aws_ecr_repository_creation_template" "replica" {
 resource "aws_ecr_repository" "cache" {
   for_each = toset(var.cache_repositories)
 
-  name                 = "${local.prefix}cache-${each.key}"
+  name                 = "${local.cache_prefix}${each.key}"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 
@@ -163,7 +164,7 @@ resource "aws_ecr_repository" "cache" {
     kms_key         = var.kms_key_arn
   }
 
-  tags = merge(var.tags, { Name = "${local.prefix}cache-${each.key}" })
+  tags = merge(var.tags, { Name = "${local.cache_prefix}${each.key}" })
 }
 
 resource "aws_ecr_lifecycle_policy" "cache" {

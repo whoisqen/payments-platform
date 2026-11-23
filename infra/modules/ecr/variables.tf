@@ -28,6 +28,16 @@ variable "account_id" {
   }
 }
 
+variable "repository_namespace" {
+  type        = string
+  description = "Namespace of the repositories: images are <namespace>/<name> and the build cache <namespace>-cache/<name>; registry.ecr_repo_prefix in config/platform.yaml."
+
+  validation {
+    condition     = can(regex("^[a-z0-9]+([._-][a-z0-9]+)*$", var.repository_namespace))
+    error_message = "repository_namespace must be a lower-case ECR repository path segment."
+  }
+}
+
 variable "repositories" {
   type        = list(string)
   default     = []
@@ -109,7 +119,7 @@ variable "retention" {
 variable "cache_repositories" {
   type        = list(string)
   default     = []
-  description = "Names of mutable repositories for the docker buildx registry cache (one per image), created as <prefix>cache-<name>."
+  description = "Names of mutable repositories for the docker buildx registry cache (one per image), created as <namespace>-cache/<name>."
 }
 
 variable "cache_unused_days" {

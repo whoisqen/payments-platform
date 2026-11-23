@@ -1,12 +1,13 @@
 mock_provider "aws" {}
 
 variables {
-  region              = "eu-central-1"
-  environment         = "prod"
-  account_id          = "333333333333"
-  repositories        = ["router", "locker", "drainer"]
-  kms_key_arn         = "arn:aws:kms:eu-central-1:333333333333:key/mrk-0123456789abcdef0123456789abcdef"
-  replication_regions = ["us-east-1", "us-east-2"]
+  region               = "eu-central-1"
+  environment          = "prod"
+  repository_namespace = "payments"
+  account_id           = "333333333333"
+  repositories         = ["router", "locker", "drainer"]
+  kms_key_arn          = "arn:aws:kms:eu-central-1:333333333333:key/mrk-0123456789abcdef0123456789abcdef"
+  replication_regions  = ["us-east-1", "us-east-2"]
   tags = {
     environment = "prod", team = "platform", owner = "platform@example.com", cost-center = "cc-100", cell = "shared"
     component   = "ecr", pci-scope = "connected", data-class = "internal", backup-tier = "silver", managed-by = "terraform", repo = "infra/modules/ecr"
@@ -21,8 +22,8 @@ run "immutable_scanned_encrypted" {
     error_message = "immutable tags, scan on push, KMS"
   }
   assert {
-    condition     = aws_ecr_repository.this["router"].name == "pay-prod-euc1-router"
-    error_message = "name follows pay-<env>-<region-short>-<name>"
+    condition     = aws_ecr_repository.this["router"].name == "payments/router"
+    error_message = "name follows <namespace>/<name>, the path of the workflows and charts"
   }
   assert {
     condition     = length(aws_ecr_lifecycle_policy.this) == 3
@@ -111,7 +112,7 @@ run "cache_repositories_are_mutable_and_expire_when_unused" {
   }
 
   assert {
-    condition     = aws_ecr_repository.cache["router"].image_tag_mutability == "MUTABLE" && aws_ecr_repository.cache["router"].name == "pay-prod-euc1-cache-router"
+    condition     = aws_ecr_repository.cache["router"].image_tag_mutability == "MUTABLE" && aws_ecr_repository.cache["router"].name == "payments-cache/router"
     error_message = "the buildx cache repository is mutable"
   }
   assert {
