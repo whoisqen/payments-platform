@@ -12,4 +12,4 @@ observability:
   grafanaUrl: ""
 arc:
   # Runner scale sets, one Application each; jobs select one with runs-on: <name>
-  scaleSets: [ci-build, ci-build-amd64, ci-test, ci-light, ci-pr]
+  scaleSets: [ci-build, ci-test, ci-light, ci-pr]

@@ -13,11 +13,6 @@ scaleSets:
     roleArn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/REPLACE_CI_BUILD_ROLE
     privileged: true
     quota: {pods: 8, cpu: "120", memory: 220Gi, ephemeralStorage: 1700Gi}
-  ci-build-amd64:
-    githubAppKey: REPLACE_SECRETS_MANAGER_KEY_GITHUB_APP_CI_BUILD_AMD64
-    roleArn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/REPLACE_CI_BUILD_AMD64_ROLE
-    privileged: true
-    quota: {pods: 2, cpu: "16", memory: 32Gi, ephemeralStorage: 220Gi}
   ci-test:
     githubAppKey: REPLACE_SECRETS_MANAGER_KEY_GITHUB_APP_CI_TEST
     roleArn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/REPLACE_CI_TEST_ROLE

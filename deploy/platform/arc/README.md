@@ -4,15 +4,14 @@ Actions Runner Controller on the shared-services cluster. Jobs from every workfl
 
 | Scale set (`runs-on`) | For | Node pool | Instances | Warm / max | Runner request |
 |---|---|---|---|---|---|
-| `ci-build` | cargo and image builds, trusted code | `ci-build` | arm64 `c7gd` 4xlarge to 8xlarge, NVMe, On-Demand | 1 / 8 | 14 CPU, 26 GiB |
-| `ci-build-amd64` | amd64 image build, trusted code | `ci-build-amd64` | x86 `c7id` 2xlarge to 4xlarge, NVMe, On-Demand | 0 / 2 | 7 CPU, 13 GiB |
+| `ci-build` | cargo and arm64 image builds, trusted code | `ci-build` | arm64 `c7gd` 4xlarge to 8xlarge, NVMe, On-Demand | 1 / 8 | 14 CPU, 26 GiB |
 | `ci-test` | unit, chart and policy tests | `ci-test` | arm64 `m7g` xlarge to 2xlarge, Spot or On-Demand | 1 / 16 | 3 CPU, 12 GiB |
 | `ci-light` | lint, commit checks, plan, promotion | `ci-light` | arm64 `m7g` large to xlarge, Spot or On-Demand | 1 / 20 | 1.5 CPU, 5 GiB |
 | `ci-pr` | every job of pull request code | `ci-pr` | arm64 `c7g` xlarge to 4xlarge, Spot or On-Demand | 1 / 20 | 3 CPU, 12 GiB |
 
-- Workflows pick a pool with repository variables: `RUNNER_BUILD` = `ci-build`, `RUNNER_BUILD_AMD64` = `ci-build-amd64`, `RUNNER_TEST` = `ci-test`, `RUNNER_LIGHT` = `ci-light` (promotion, tags, hotfix, nightly), `RUNNER_PR` = `ci-pr` (all jobs of pull requests); unset falls back to `ubuntu-latest`.
+- Workflows pick a pool with repository variables: `RUNNER_BUILD` = `ci-build`, `RUNNER_TEST` = `ci-test`, `RUNNER_LIGHT` = `ci-light` (promotion, tags, hotfix, nightly), `RUNNER_PR` = `ci-pr` (all jobs of pull requests); unset falls back to `ubuntu-latest`.
 - What a job may do comes from the service account of its scale set (cache write, image pull, plan role); `ci-pr` is untrusted: its own nodes, no role, private ranges denied, no ECR, no secrets.
-- Only the two build namespaces allow the privileged `dind` sidecar that `docker buildx` needs; they run trusted code on nodes of their own.
+- Only the build namespace allows the privileged `dind` sidecar that `docker buildx` needs; it runs trusted code on nodes of its own. Images are built for arm64 only (the platform runs on Graviton); developers build amd64 images locally with `make image-amd64`.
 - Build nodes use local NVMe as ephemeral storage (RAID0), so layers, the cargo target directory and the sccache working set never touch EBS.
 - `minRunners` keeps one idle runner per pool so a job starts without waiting for a node; raise it if the queue time of a pool is above 30 s, lower it to 0 to save cost.
 - Files: `deploy/argocd/templates/addons/arc.yaml` (controller, one Application per scale set from `arc.scaleSets`, and `config/`), `values-<scale set>.yaml` (upstream chart values; runner images are digest placeholders), `config/` (namespaces, service accounts, one ExternalSecret per scale set, quotas, limit ranges, NetworkPolicies).
