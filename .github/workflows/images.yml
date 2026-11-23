@@ -66,7 +66,8 @@ jobs:
 
   build:
     needs: select
-    if: needs.select.outputs.any == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    # Pushes to ECR: it needs the push role of the account (repository variable AWS_ROLE_ECR_PUSH), which exists only after the account is set up.
+    if: vars.AWS_ROLE_ECR_PUSH != '' && needs.select.outputs.any == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     runs-on: ${{ vars.RUNNER_BUILD || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
