@@ -14,6 +14,10 @@ spec:
         directories:
           - path: deploy/envs/*/*/cell-*
           - path: deploy/envs/*/*/spare
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/*
+            exclude: true
+{{- end }}
   # Migrations and rollouts go cell-0 first: a bad migration stops there (section 17)
   strategy:
     type: RollingSync

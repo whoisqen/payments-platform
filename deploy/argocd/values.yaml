@@ -7,3 +7,10 @@ cluster:
   region: ""
 observability:
   grafanaUrl: ""
+# Environments that are never synced from main: pinned to the release tag in gated.revision, no automated sync.
+# Without a revision they get no Application at all.
+gatedEnvironments:
+  - prod
+  - cde-prod
+gated:
+  revision: ""

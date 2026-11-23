@@ -7,3 +7,5 @@ cluster:
   region: eu-central-1
 observability:
   grafanaUrl: https://grafana.example.test
+gated:
+  revision: v1.0.0
