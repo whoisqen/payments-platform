@@ -5,6 +5,9 @@ set:
   cluster.namePrefix: acme
   cluster.region: us-east-1
   observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.dedupInterval: 30s
 tests:
   - it: layers the vault values by environment and region from the cluster labels
     template: addons/vault.yaml

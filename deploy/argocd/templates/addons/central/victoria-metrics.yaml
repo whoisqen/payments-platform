@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-victoria-metrics
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'victoria-metrics-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: victoria-metrics
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: victoria-metrics
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://victoriametrics.github.io/helm-charts
+          chart: victoria-metrics-cluster
+          targetRevision: 0.56.0
+          helm:
+            valueFiles:
+              - $values/deploy/platform/victoria-metrics/values.yaml
+            parameters:
+              # The two Prometheus replicas send the same samples; samples closer than this interval are one sample
+              - name: vmselect.extraArgs.dedup\.minScrapeInterval
+                value: {{ .Values.central.dedupInterval | quote }}
+              - name: vmstorage.extraArgs.dedup\.minScrapeInterval
+                value: {{ .Values.central.dedupInterval | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

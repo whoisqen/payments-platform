@@ -2,6 +2,7 @@
 """Print the values of deploy/argocd from config/platform.yaml: helm template deploy/argocd -f <(tools/config/argocd-values.py)."""
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -15,6 +16,11 @@ def values(cfg):
         "repo": {"url": f"https://github.com/{org}/{repo}", "revision": "main"},
         "cluster": {"namePrefix": cfg["storage"]["state_bucket_prefix"], "region": working},
         "observability": {"grafanaUrl": cfg["dns"]["grafana_url"]},
+        "central": {
+            "metricsRemoteWriteUrl": cfg["central"]["metrics_remote_write_url"],
+            "alertmanagerHost": urlparse(cfg["central"]["alertmanager_url"]).netloc,
+            "dedupInterval": cfg["central"]["dedup_interval"],
+        },
     }
 
 

@@ -1,0 +1,65 @@
+suite: the central stack deduplicates, replicates and receives what the clusters send
+templates:
+  - addons/kube-prometheus.yaml
+  - addons/central/victoria-metrics.yaml
+  - addons/central/alertmanager.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  cluster.regionShort: euc1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.dedupInterval: 45s
+tests:
+  - it: sends every sample of Prometheus to the central store
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.remoteWrite[0].url
+            value: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  - it: sends the alerts of Prometheus to the central Alertmanager over https
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].static_configs[0].targets[0]
+            value: alertmanager.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].scheme
+            value: https
+  - it: switches deduplication on in the query and storage nodes with the configured interval
+    template: addons/central/victoria-metrics.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: vmselect.extraArgs.dedup\.minScrapeInterval
+            value: 45s
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: vmstorage.extraArgs.dedup\.minScrapeInterval
+            value: 45s
+  - it: runs the central add-ons only in the central cluster
+    template: addons/central/victoria-metrics.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
+          value: enabled
+  - it: gives the Alertmanager its generated values and the secret manifests
+    template: addons/central/alertmanager.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: $values/deploy/platform/alertmanager/values.yaml
+      - equal:
+          path: spec.template.spec.sources[1].path
+          value: deploy/platform/alertmanager/manifests
