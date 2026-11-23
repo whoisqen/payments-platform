@@ -35,7 +35,7 @@ One new ADR (T11) records the region model of D6 and D7 and supersedes the warm 
 
 ## Rollout and rollback
 
-One pull request from the integration branch, merged by a human after the review. The baseline commit (T10) is the last commit of the pull request and starts only after T9 and T11 are done. Rollback is reverting the merge; nothing depends on the files yet. After the baseline exists, changes go through addenda and the gate refuses direct edits.
+One pull request per task, each from its own branch from `main` and merged by a human after CI and review. The baseline commit (T9) is the last commit of its pull request and starts only after T1 to T8 and T10 are done. Rollback is reverting the merge; nothing depends on the files yet. After the baseline exists, changes go through addenda and the gate refuses direct edits.
 
 ## Test plan
 

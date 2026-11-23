@@ -8,7 +8,7 @@ Working language is English for every file, commit and PR. Rules shared with all
 
 - Load on demand: never read the architecture source or a large file whole; the architecture is split by section under the memory directory (`architecture/README.md` index).
 - Agent prompts at most 25 lines: task, worktree path and branch `agent/<area>-<slug>`, owned paths, which manifests and which one architecture section to read, checks to run. Create the worktree yourself: `git worktree add .worktrees/<area>-<slug> -b agent/<area>-<slug>`; do not use the Agent tool's worktree isolation (it names branches by hash).
-- Agents do not commit; the orchestrator commits each package with Conventional Commits and pushes the integration branch.
+- Agents do not commit; the orchestrator commits each package with Conventional Commits and pushes one short-lived branch `<type>/<issue>-<slug>` from `main`. Each change is its own pull request to `main` and passes CI on its own; no branch collects several changes.
 - Reviewer agents are paused by the owner (cost) until the owner says otherwise; validate with local tools only.
 - Keep summaries short; do not relay agent reports in full.
 
