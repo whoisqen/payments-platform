@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix              = "pay"
   account_id               = "444444444444"
   environment              = "prod"
   github_repository        = "example-org/payments-platform"

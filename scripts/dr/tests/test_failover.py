@@ -11,7 +11,8 @@ SPEC.loader.exec_module(fo)
 MUTATING = {"update_rule_group", "update_endpoint_group", "update_item", "start_automation_execution",
             "failover_global_cluster", "stop_automation_execution"}
 SRC_EG, USE1_EG, USE2_EG = "arn:eg:src", "arn:eg:use1", "arn:eg:use2"
-ARGS = ["--cell", "cell-1", "--run-id", "inc-42", "--confirmed-by", "oncall-a", "--source-endpoint-group", SRC_EG,
+ARGS = ["--name-prefix", "pay", "--source-region", "eu-central-1", "--target-region", "us-east-1", "--fallback-region", "us-east-2",
+        "--lock-region", "us-east-1", "--cell", "cell-1", "--run-id", "inc-42", "--confirmed-by", "oncall-a", "--source-endpoint-group", SRC_EG,
         "--target-endpoint-group", f"us-east-1={USE1_EG}", "--target-endpoint-group", f"us-east-2={USE2_EG}", "--poll-s", "30"]
 
 

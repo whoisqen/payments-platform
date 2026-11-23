@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-kyverno
+  name: addon-argocd
   namespace: argocd
 spec:
   goTemplate: true
@@ -10,31 +10,31 @@ spec:
     - clusters:
         selector:
           matchLabels:
-            payments-platform/addons: enabled
+            payments-platform/argocd: enabled
   template:
     metadata:
-      name: 'kyverno-{{ .name }}'
+      name: 'argocd-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: kyverno
+        payments-platform/addon: argocd
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: kyverno
+        server: '{{`{{ .server }}`}}'
+        namespace: argocd
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://kyverno.github.io/kyverno/
-          chart: kyverno
-          targetRevision: 3.10.0
+        - repoURL: https://argoproj.github.io/argo-helm
+          chart: argo-cd
+          targetRevision: 10.18.2
           helm:
             valueFiles:
-              - $values/deploy/platform/kyverno/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/argocd/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:
-          prune: true
+          prune: false
           selfHeal: true
         syncOptions:
           - CreateNamespace=true

@@ -9,8 +9,8 @@ spec:
   generators:
     # One Application per environment x region x cell directory
     - git:
-        repoURL: https://github.com/whoisqen/payments-platform
-        revision: main
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ .Values.repo.revision }}
         directories:
           - path: deploy/envs/*/*/cell-*
           - path: deploy/envs/*/*/spare
@@ -37,28 +37,28 @@ spec:
               values: [cell-3, spare]
   template:
     metadata:
-      name: 'payments-cell-{{ index .path.segments 2 }}-{{ index .path.segments 3 }}-{{ .path.basename }}'
+      name: 'payments-cell-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}-{{`{{ .path.basename }}`}}'
       labels:
-        payments-platform/cell: '{{ .path.basename }}'
-        payments-platform/environment: '{{ index .path.segments 2 }}'
+        payments-platform/cell: '{{`{{ .path.basename }}`}}'
+        payments-platform/environment: '{{`{{ index .path.segments 2 }}`}}'
     spec:
       project: payments
       destination:
-        name: 'pay-{{ index .path.segments 2 }}-euc1-{{ .path.basename }}'
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{ .Values.cluster.regionShort }}-{{`{{ .path.basename }}`}}'
         namespace: payments
       sources:
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           path: deploy/charts/payments-cell
           helm:
             # Layers: environment, region, cell, then the digests written by CI
             valueFiles:
-              - $values/deploy/envs/{{ index .path.segments 2 }}/values.yaml
-              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/values.yaml
-              - $values/deploy/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}/{{ .path.basename }}/values.yaml
-              - $values/deploy/envs/{{ index .path.segments 2 }}/images.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/{{`{{ .path.basename }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/images.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

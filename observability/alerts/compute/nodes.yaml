@@ -22,8 +22,8 @@ spec:
         failure_mode: compute-karpenter-cannot-launch-nodes
       annotations:
         summary: Karpenter cannot create nodes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/karpenter-cannot-launch-nodes.md
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/karpenter-cannot-launch-nodes.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: NodeNotReady
       expr: kube_node_status_condition{condition="Ready",status="true"} == 0
       for: 5m
@@ -36,8 +36,8 @@ spec:
         failure_mode: compute-node-not-ready
       annotations:
         summary: A node is NotReady
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-not-ready
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#node-not-ready'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: SubnetFreeIpsLow
       expr: min by (subnet_id) (subnet_free_ip_ratio) < 0.2
       for: 10m
@@ -50,8 +50,8 @@ spec:
         failure_mode: compute-subnet-free-ips-low
       annotations:
         summary: A subnet has less than 20% free IP addresses
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#subnet-free-ips-low
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#subnet-free-ips-low'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: NodeImageStale
       expr: max by (nodepool) (node_os_image_age_seconds) > 30 * 86400
       for: 15m
@@ -64,8 +64,8 @@ spec:
         failure_mode: compute-node-image-stale
       annotations:
         summary: Nodes run an OS image older than 30 days
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-image-stale
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#node-image-stale'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: NodeClockDrift
       expr: max by (node) (abs(node_timex_offset_seconds)) > 0.1
       for: 5m
@@ -78,5 +78,5 @@ spec:
         failure_mode: compute-node-clock-drift
       annotations:
         summary: Node clock drifts more than 100 ms
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/compute/warnings.md#node-clock-drift
-        dashboard_url: https://grafana.payments.internal/d/kubernetes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/compute/warnings.md#node-clock-drift'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'

@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
     values: 0+1x19
@@ -22,9 +25,12 @@ tests:
         backup_vault: gold
       exp_annotations:
         summary: An AWS Backup job failed or expired
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
     values: 0+0x19
@@ -35,6 +41,9 @@ tests:
     alertname: BackupJobFailed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_last_success_timestamp_seconds{store="memorydb-cell-1"}
     values: '0x21'
@@ -54,9 +63,12 @@ tests:
         store: memorydb-cell-1
       exp_annotations:
         summary: The last successful backup of a store is older than twice its interval
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-missing.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/backup-missing.md
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_last_success_timestamp_seconds{store="memorydb-cell-1"}
     values: 0+60x21
@@ -67,6 +79,9 @@ tests:
     alertname: BackupMissing
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_backup_number_of_copy_jobs_failed_sum{backup_vault="gold"}
     values: 0+1x19
@@ -84,9 +99,12 @@ tests:
         backup_vault: gold
       exp_annotations:
         summary: A backup copy to a recovery region or to the backup account failed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#backup-copy-failed
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#backup-copy-failed
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: aws_backup_number_of_copy_jobs_failed_sum{backup_vault="gold"}
     values: 0+0x19
@@ -95,6 +113,9 @@ tests:
     alertname: BackupCopyFailed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
     values: '0x134'
@@ -113,9 +134,12 @@ tests:
         region: us-east-2
       exp_annotations:
         summary: The latest snapshot copy in a recovery region is older than 2 hours
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#snapshot-copy-stale
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#snapshot-copy-stale
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
     values: 0+60x134

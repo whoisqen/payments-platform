@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-argocd
+  name: addon-vault
   namespace: argocd
 spec:
   goTemplate: true
@@ -10,32 +10,31 @@ spec:
     - clusters:
         selector:
           matchLabels:
-            payments-platform/argocd: enabled
+            payments-platform/vault: enabled
   template:
     metadata:
-      name: 'argocd-{{ .name }}'
+      name: 'vault-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: argocd
+        payments-platform/addon: vault
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: argocd
+        server: '{{`{{ .server }}`}}'
+        namespace: vault
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://argoproj.github.io/argo-helm
-          chart: argo-cd
-          targetRevision: 10.18.2
+        - repoURL: https://helm.releases.hashicorp.com
+          chart: vault
+          targetRevision: 0.34.1
           helm:
             valueFiles:
-              - $values/deploy/platform/argocd/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/vault/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:
-          prune: false
+          prune: true
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
-          - ServerSideApply=true

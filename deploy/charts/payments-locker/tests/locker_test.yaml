@@ -3,6 +3,7 @@ templates:
   - charts/locker/templates/workload.yaml
   - charts/locker-migrations/templates/job.yaml
 set:
+  global.registry: registry.example.test/acme
   global.environment: dev
   global.region: eu-central-1
   global.dataCidrs: ["10.120.0.0/16"]

@@ -13,13 +13,13 @@ spec:
             payments-platform/addons: enabled
   template:
     metadata:
-      name: 'kube-prometheus-{{ .name }}'
+      name: 'kube-prometheus-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: kube-prometheus
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
+        server: '{{`{{ .server }}`}}'
         namespace: monitoring
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
@@ -29,8 +29,14 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/kube-prometheus/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+            # Alert annotations build their links from these labels, see observability/alerts
+            parameters:
+              - name: prometheus.prometheusSpec.externalLabels.runbook_base_url
+                value: {{ printf "%s/blob/%s" .Values.repo.url .Values.repo.revision | quote }}
+              - name: prometheus.prometheusSpec.externalLabels.grafana_url
+                value: {{ .Values.observability.grafanaUrl | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-cert-manager
+  name: addon-kyverno
   namespace: argocd
 spec:
   goTemplate: true
@@ -13,24 +13,24 @@ spec:
             payments-platform/addons: enabled
   template:
     metadata:
-      name: 'cert-manager-{{ .name }}'
+      name: 'kyverno-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: cert-manager
+        payments-platform/addon: kyverno
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: cert-manager
+        server: '{{`{{ .server }}`}}'
+        namespace: kyverno
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://charts.jetstack.io
-          chart: cert-manager
-          targetRevision: v1.21.3
+        - repoURL: https://kyverno.github.io/kyverno/
+          chart: kyverno
+          targetRevision: 3.10.0
           helm:
             valueFiles:
-              - $values/deploy/platform/cert-manager/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/kyverno/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

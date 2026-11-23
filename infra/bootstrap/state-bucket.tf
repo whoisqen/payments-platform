@@ -1,5 +1,5 @@
 locals {
-  state_bucket = "pay-${var.environment}-euc1-tf-state-${var.account_id}"
+  state_bucket = "${var.name_prefix}-${var.environment}-euc1-tf-state-${var.account_id}"
 }
 
 resource "aws_s3_bucket" "state" {

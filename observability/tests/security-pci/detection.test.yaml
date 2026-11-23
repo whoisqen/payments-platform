@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: guardduty_findings_total{severity="high",account="cde-prod"}
     values: 0+1x19
@@ -20,9 +23,12 @@ tests:
         account: cde-prod
       exp_annotations:
         summary: GuardDuty reports a high-severity finding
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/guard-duty-high-finding.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/guard-duty-high-finding.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: guardduty_findings_total{severity="high",account="cde-prod"}
     values: 0+0x19
@@ -31,6 +37,9 @@ tests:
     alertname: GuardDutyHighFinding
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: guardduty_runtime_findings_total{cde="true",cluster="cde-prod-euc1"}
     values: 0+1x19
@@ -48,9 +57,12 @@ tests:
         cluster: cde-prod-euc1
       exp_annotations:
         summary: GuardDuty Runtime Monitoring raised a finding in the CDE
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/guard-duty-runtime-cde-finding.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/guard-duty-runtime-cde-finding.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: guardduty_runtime_findings_total{cde="true",cluster="cde-prod-euc1"}
     values: 0+0x19
@@ -59,6 +71,9 @@ tests:
     alertname: GuardDutyRuntimeCdeFinding
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pan_detected_total{source="logs"}
     values: 0+1x19
@@ -76,9 +91,12 @@ tests:
         source: logs
       exp_annotations:
         summary: A PAN pattern was detected in telemetry or logs
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/pan-detected-in-logs.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/pan-detected-in-logs.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: pan_detected_total{source="logs"}
     values: 0+0x19
@@ -87,6 +105,9 @@ tests:
     alertname: PanDetectedInLogs
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="root_login"}
     values: 0+1x19
@@ -103,9 +124,12 @@ tests:
         failure_mode: security-pci-root-account-login
       exp_annotations:
         summary: An AWS root account login happened
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/root-account-login.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/root-account-login.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="root_login"}
     values: 0+0x19
@@ -114,6 +138,9 @@ tests:
     alertname: RootAccountLogin
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="break_glass"}
     values: 0+1x19
@@ -130,9 +157,12 @@ tests:
         failure_mode: security-pci-break-glass-role-used
       exp_annotations:
         summary: The BreakGlass role was assumed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/break-glass-role-used.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/break-glass-role-used.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="break_glass"}
     values: 0+0x19
@@ -141,6 +171,9 @@ tests:
     alertname: BreakGlassRoleUsed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="scp_change"}
     values: 0+1x19
@@ -157,9 +190,12 @@ tests:
         failure_mode: security-pci-scp-changed
       exp_annotations:
         summary: A service control policy changed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/scp-changed.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/scp-changed.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="scp_change"}
     values: 0+0x19
@@ -168,6 +204,9 @@ tests:
     alertname: ScpChanged
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="iam_change_outside_terraform"}
     values: 0+1x19
@@ -184,9 +223,12 @@ tests:
         failure_mode: security-pci-iam-change-outside-terraform
       exp_annotations:
         summary: An IAM change was made outside Terraform
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/iam-change-outside-terraform.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/iam-change-outside-terraform.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="iam_change_outside_terraform"}
     values: 0+0x19
@@ -195,6 +237,9 @@ tests:
     alertname: IamChangeOutsideTerraform
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: vault_core_unsealed{cluster="vault-main"}
     values: '0x19'
@@ -212,9 +257,12 @@ tests:
         cluster: vault-main
       exp_annotations:
         summary: Vault is sealed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/vault-sealed.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/vault-sealed.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: vault_core_unsealed{cluster="vault-main"}
     values: 1x19
@@ -223,6 +271,9 @@ tests:
     alertname: VaultSealed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: vault_audit_log_request_failure{cluster="vault-main"}
     values: 0+1x19
@@ -240,9 +291,12 @@ tests:
         cluster: vault-main
       exp_annotations:
         summary: Vault audit device fails
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/vault-audit-device-failing.md
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/vault-audit-device-failing.md
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: vault_audit_log_request_failure{cluster="vault-main"}
     values: 0+0x19
@@ -251,6 +305,9 @@ tests:
     alertname: VaultAuditDeviceFailing
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="cde_network_change"}
     values: 0+1x19
@@ -267,9 +324,12 @@ tests:
         failure_mode: security-pci-cde-network-policy-changed
       exp_annotations:
         summary: A CDE network control changed (security group, firewall or NACL)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/security-pci/warnings.md#cde-network-policy-changed
-        dashboard_url: https://grafana.payments.internal/d/edge
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/security-pci/warnings.md#cde-network-policy-changed
+        dashboard_url: https://grafana.example.test/d/edge
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="cde_network_change"}
     values: 0+0x19

@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix         = "pay"
   region              = "eu-central-1"
   environment         = "prod"
   vpc_id              = "vpc-0123456789abcdef0"

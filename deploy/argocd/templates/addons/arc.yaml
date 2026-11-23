@@ -13,13 +13,13 @@ spec:
             payments-platform/ci-runners: enabled
   template:
     metadata:
-      name: 'arc-controller-{{ .name }}'
+      name: 'arc-controller-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: arc
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
+        server: '{{`{{ .server }}`}}'
         namespace: arc-systems
       sources:
         # Upstream chart version is pinned here and bumped by Renovate
@@ -29,8 +29,8 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/arc/values-controller.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:
@@ -59,17 +59,17 @@ spec:
             payments-platform/ci-runners: enabled
   template:
     metadata:
-      name: 'arc-config-{{ .name }}'
+      name: 'arc-config-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: arc
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
+        server: '{{`{{ .server }}`}}'
         namespace: arc-systems
       source:
-        repoURL: https://github.com/whoisqen/payments-platform
-        targetRevision: main
+        repoURL: {{ .Values.repo.url }}
+        targetRevision: {{ .Values.repo.revision }}
         path: deploy/platform/arc/config
       syncPolicy:
         automated:
@@ -104,24 +104,27 @@ spec:
                 - scaleSet: ci-pr
   template:
     metadata:
-      name: 'arc-{{ .scaleSet }}-{{ .name }}'
+      name: 'arc-{{`{{ .scaleSet }}`}}-{{`{{ .name }}`}}'
       labels:
         payments-platform/addon: arc
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: 'arc-{{ .scaleSet }}'
+        server: '{{`{{ .server }}`}}'
+        namespace: 'arc-{{`{{ .scaleSet }}`}}'
       sources:
         - repoURL: ghcr.io/actions/actions-runner-controller-charts
           chart: gha-runner-scale-set
           targetRevision: 0.13.0
           helm:
-            releaseName: '{{ .scaleSet }}'
+            releaseName: '{{`{{ .scaleSet }}`}}'
             valueFiles:
-              - $values/deploy/platform/arc/values-{{ .scaleSet }}.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/arc/values-{{`{{ .scaleSet }}`}}.yaml
+            parameters:
+              - name: githubConfigUrl
+                value: {{ .Values.github.configUrl | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

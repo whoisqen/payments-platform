@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-external-secrets
+  name: addon-cert-manager
   namespace: argocd
 spec:
   goTemplate: true
@@ -13,24 +13,24 @@ spec:
             payments-platform/addons: enabled
   template:
     metadata:
-      name: 'external-secrets-{{ .name }}'
+      name: 'cert-manager-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: external-secrets
+        payments-platform/addon: cert-manager
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: external-secrets
+        server: '{{`{{ .server }}`}}'
+        namespace: cert-manager
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://charts.external-secrets.io
-          chart: external-secrets
-          targetRevision: 2.15.0
+        - repoURL: https://charts.jetstack.io
+          chart: cert-manager
+          targetRevision: v1.21.3
           helm:
             valueFiles:
-              - $values/deploy/platform/external-secrets/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/cert-manager/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

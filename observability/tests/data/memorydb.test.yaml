@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_memory_used_bytes{cell="cell-1",instance="shard-1"}
     values: 9x21
@@ -23,9 +26,12 @@ tests:
         instance: shard-1
       exp_annotations:
         summary: MemoryDB memory above 85%, evictions are near
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/memory-db-memory-critical.md
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/memory-db-memory-critical.md
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_memory_used_bytes{cell="cell-1",instance="shard-1"}
     values: 5x21
@@ -37,6 +43,9 @@ tests:
     alertname: MemoryDbMemoryCritical
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_memory_used_bytes{cell="cell-1",instance="shard-1"}
     values: 5x9 9x1 5x9
@@ -45,6 +54,9 @@ tests:
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_evicted_keys_total{cell="cell-1"}
     values: 0+5x21
@@ -62,9 +74,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: MemoryDB evicts keys
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/memory-db-evictions.md
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/memory-db-evictions.md
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: redis_evicted_keys_total{cell="cell-1"}
     values: 0+0x21
@@ -73,6 +88,9 @@ tests:
     alertname: MemoryDbEvictions
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: memorydb_failover_events_total{cell="cell-1",shard="1"}
     values: 0+1x19
@@ -91,9 +109,12 @@ tests:
         shard: '1'
       exp_annotations:
         summary: A MemoryDB shard failed over
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#memory-db-failover-detected
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#memory-db-failover-detected
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: memorydb_failover_events_total{cell="cell-1",shard="1"}
     values: 0+0x19
@@ -102,6 +123,9 @@ tests:
     alertname: MemoryDbFailoverDetected
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: cache_warm_ratio{cell="cell-1"}
     values: 0.4x21
@@ -119,9 +143,12 @@ tests:
         cell: cell-1
       exp_annotations:
         summary: Cache warm ratio stays below 75% five minutes after readiness (non-paging)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/data/warnings.md#cache-warm-ratio-low
-        dashboard_url: https://grafana.payments.internal/d/data-stores
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/warnings.md#cache-warm-ratio-low
+        dashboard_url: https://grafana.example.test/d/data-stores
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: cache_warm_ratio{cell="cell-1"}
     values: 0.95x21
@@ -131,6 +158,9 @@ tests:
     alertname: CacheWarmRatioLow
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: cache_warm_ratio{cell="cell-1"}
     values: 0.95x9 0.4x1 0.95x9

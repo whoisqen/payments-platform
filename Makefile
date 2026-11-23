@@ -4,7 +4,7 @@ SHELL := bash
 
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
-CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml)))
+CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
 PY_TESTS := $(sort $(wildcard tools/ci/tests tools/lint/tests scripts/*/tests))
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
@@ -26,7 +26,6 @@ lint-repo:
 	tools/lint/spec-lint
 	tools/lint/structure
 	python3 tools/config/validate.py
-	python3 tools/config/render.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

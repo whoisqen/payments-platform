@@ -1,4 +1,3 @@
-githubConfigUrl: https://github.com/whoisqen
 # Created by the ExternalSecret in config/, never inline
 githubConfigSecret: github-app
 runnerScaleSetName: ci-pr

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: addon-vault
+  name: addon-otel-collector
   namespace: argocd
 spec:
   goTemplate: true
@@ -10,27 +10,27 @@ spec:
     - clusters:
         selector:
           matchLabels:
-            payments-platform/vault: enabled
+            payments-platform/addons: enabled
   template:
     metadata:
-      name: 'vault-{{ .name }}'
+      name: 'otel-collector-{{`{{ .name }}`}}'
       labels:
-        payments-platform/addon: vault
+        payments-platform/addon: otel-collector
     spec:
       project: platform
       destination:
-        server: '{{ .server }}'
-        namespace: vault
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
       sources:
         # The upstream chart version is pinned here and bumped by Renovate
-        - repoURL: https://helm.releases.hashicorp.com
-          chart: vault
-          targetRevision: 0.34.1
+        - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+          chart: opentelemetry-collector
+          targetRevision: 0.182.0
           helm:
             valueFiles:
-              - $values/deploy/platform/vault/values.yaml
-        - repoURL: https://github.com/whoisqen/payments-platform
-          targetRevision: main
+              - $values/deploy/platform/otel-collector/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
           ref: values
       syncPolicy:
         automated:

@@ -22,8 +22,8 @@ spec:
         failure_mode: application-unknown-state-payments-stale
       annotations:
         summary: Payments stay in the unknown state for more than 15 minutes
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#unknown-state-payments-stale
-        dashboard_url: https://grafana.payments.internal/d/scheduler
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#unknown-state-payments-stale'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/scheduler'
     - alert: SyntheticPaymentFailing
       expr: count(synthetic_payment_success == 0) >= 2
       for: 3m
@@ -36,5 +36,5 @@ spec:
         failure_mode: application-synthetic-payment-failing
       annotations:
         summary: Synthetic payment fails from at least two of three probe points
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/synthetic-payment-failing.md
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/synthetic-payment-failing.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'

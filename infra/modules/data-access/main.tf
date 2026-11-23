@@ -1,6 +1,6 @@
 locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
-  name         = "pay-${var.environment}-${local.region_short}-${var.component}"
+  name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
 
   workload_sources = concat(
     [for i, id in var.client_security_group_ids : { key = "sg-${i}", sg = id, cidr = null }],

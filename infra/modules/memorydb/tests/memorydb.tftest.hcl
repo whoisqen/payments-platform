@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix        = "pay"
   env                = "prod"
   region_short       = "euc1"
   component          = "memorydb-cell-0"

@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: restore_test_success{store="aurora-cell-1"}
     values: '0x21'
@@ -20,9 +23,12 @@ tests:
         store: aurora-cell-1
       exp_annotations:
         summary: The automatic restore test of a store failed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/restore-test-failed.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/restore-test-failed.md
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: restore_test_success{store="aurora-cell-1"}
     values: 1x21
@@ -32,12 +38,18 @@ tests:
     alertname: RestoreTestFailed
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: restore_test_success{store="aurora-cell-1"}
     values: 1x9 0x1 1x9
   alert_rule_test:
   - *id001
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_restore_duration_seconds{store="aurora-cell-1"}
     values: 1500x19
@@ -57,9 +69,12 @@ tests:
         store: aurora-cell-1
       exp_annotations:
         summary: Restore duration passed 80% of its target
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-duration-near-target
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_restore_duration_seconds{store="aurora-cell-1"}
     values: 600x19
@@ -70,6 +85,9 @@ tests:
     alertname: RestoreDurationNearTarget
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_restore_duration_seconds{store="aurora-cell-1"}
     values: 2000x19
@@ -89,9 +107,12 @@ tests:
         store: aurora-cell-1
       exp_annotations:
         summary: Restore duration exceeded its target
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-too-slow
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#restore-too-slow
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: backup_restore_duration_seconds{store="aurora-cell-1"}
     values: 1500x19

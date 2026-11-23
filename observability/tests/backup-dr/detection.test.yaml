@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="backup_vault_policy_change"}
     values: 0+1x19
@@ -19,9 +22,12 @@ tests:
         failure_mode: backup-dr-backup-vault-policy-changed
       exp_annotations:
         summary: A backup vault access policy or lock changed
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/backup-dr/backup-vault-policy-changed.md
-        dashboard_url: https://grafana.payments.internal/d/backup
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/backup-vault-policy-changed.md
+        dashboard_url: https://grafana.example.test/d/backup
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: security_events_total{event="backup_vault_policy_change"}
     values: 0+0x19

@@ -1,5 +1,5 @@
 locals {
-  name_prefix = "pay-${var.environment}-glob"
+  name_prefix = "${var.name_prefix}-${var.environment}-glob"
   oidc_host   = "token.actions.githubusercontent.com"
   provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : (
     var.oidc_provider_arn != null ? var.oidc_provider_arn : "arn:aws:iam::${var.account_id}:oidc-provider/${local.oidc_host}"

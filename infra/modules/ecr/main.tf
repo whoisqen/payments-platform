@@ -1,6 +1,6 @@
 locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
-  prefix       = "pay-${var.environment}-${local.region_short}-"
+  prefix       = "${var.name_prefix}-${var.environment}-${local.region_short}-"
 
   lifecycle_policy = jsonencode({
     rules = [

@@ -23,8 +23,8 @@ spec:
         failure_mode: application-retry-storm
       annotations:
         summary: Retries exceed 10% of the traffic to a dependency
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#retry-storm
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#retry-storm'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: RetryBudgetExhausted
       expr: sum by (dependency) (rate(retry_budget_exhausted_total{dependency=~"psp-sync|router-locker"}[5m])) > 0
       for: 2m
@@ -37,8 +37,8 @@ spec:
         failure_mode: application-retry-budget-exhausted
       annotations:
         summary: The retry budget of the locker or PSP sync is exhausted
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/retry-budget-exhausted.md
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/retry-budget-exhausted.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: RetryBudgetExhaustedNonCritical
       expr: sum by (dependency) (rate(retry_budget_exhausted_total{dependency!~"psp-sync|router-locker"}[5m])) > 0
       for: 10m
@@ -51,5 +51,5 @@ spec:
         failure_mode: application-retry-budget-exhausted-non-critical
       annotations:
         summary: The retry budget of a dependency is exhausted
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#retry-budget-exhausted-non-critical
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#retry-budget-exhausted-non-critical'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'

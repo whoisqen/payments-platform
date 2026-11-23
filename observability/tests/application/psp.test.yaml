@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: psp_requests_total{psp="acme",outcome="technical_error"}
     values: 0+30x21
@@ -22,9 +25,12 @@ tests:
         psp: acme
       exp_annotations:
         summary: PSP technical errors exceed 5% of its calls
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/psp-degraded.md
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/psp-degraded.md
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: psp_requests_total{psp="acme",outcome="technical_error"}
     values: 0+1x21
@@ -35,6 +41,9 @@ tests:
     alertname: PSPDegraded
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: psp_request_duration_seconds_bucket{psp="acme",le="3"}
     values: 0+0x21
@@ -56,9 +65,12 @@ tests:
         psp: acme
       exp_annotations:
         summary: PSP p99 latency above 3 seconds
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#psp-latency-p99-high
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#psp-latency-p99-high
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: psp_request_duration_seconds_bucket{psp="acme",le="3"}
     values: 0+100x21
@@ -71,6 +83,9 @@ tests:
     alertname: PspLatencyP99High
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: circuit_breaker_state{dependency="psp-authorize",psp="acme"}
     values: 2x19
@@ -88,9 +103,12 @@ tests:
         psp: acme
       exp_annotations:
         summary: The circuit breaker of a PSP is open
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#psp-circuit-breaker-open
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#psp-circuit-breaker-open
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: circuit_breaker_state{dependency="psp-authorize",psp="acme"}
     values: '0x19'
@@ -99,6 +117,9 @@ tests:
     alertname: PspCircuitBreakerOpen
     exp_alerts: []
 - interval: 5m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: payment_attempts_total{psp="acme",outcome="authorized"}
     values: 0+95x2016 191520+70x200
@@ -118,9 +139,12 @@ tests:
         psp: acme
       exp_annotations:
         summary: Authorization rate is 5 points lower than the same time a week ago
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/application/warnings.md#authorization-rate-drop
-        dashboard_url: https://grafana.payments.internal/d/payments
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#authorization-rate-drop
+        dashboard_url: https://grafana.example.test/d/payments
 - interval: 5m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: payment_attempts_total{psp="acme",outcome="authorized"}
     values: 0+95x2200

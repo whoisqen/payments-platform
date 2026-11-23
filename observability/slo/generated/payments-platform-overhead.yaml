@@ -144,8 +144,8 @@ spec:
         slo: payments-platform-overhead-latency
       annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (14.4x over 1h/5m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/platform-overhead-latency.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsPlatformOverheadLatencyBurnSlow
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency"} > (6 * 0.001) and slo:sli_error:ratio_rate30m{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency"} > (6 * 0.001)
       labels:
@@ -158,8 +158,8 @@ spec:
         slo: payments-platform-overhead-latency
       annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (6x over 6h/30m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/platform-overhead-latency.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsPlatformOverheadLatencyBurnTicket
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency"} > (1 * 0.001) and slo:sli_error:ratio_rate6h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency"} > (1 * 0.001)
       labels:
@@ -172,5 +172,5 @@ spec:
         slo: payments-platform-overhead-latency
       annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (1x over 3d/6h)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/platform-overhead-latency.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'

@@ -8,7 +8,7 @@ SPEC = importlib.util.spec_from_file_location("migrate_merchant", Path(__file__)
 mm = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(mm)
 
-ARGS = ["--merchant", "m-1", "--source-cell", "cell-1", "--target-cell", "cell-2", "--run-id", "mig-7"]
+ARGS = ["--name-prefix", "pay", "--region", "eu-central-1", "--merchant", "m-1", "--source-cell", "cell-1", "--target-cell", "cell-2", "--run-id", "mig-7"]
 
 
 class ClientError(Exception):

@@ -1,5 +1,5 @@
 locals {
-  name    = "pay-${var.env}-${var.region_short}-${var.component}"
+  name    = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
   working = var.region_role == "working"
 
   reader_azs = [for az in var.availability_zones : az if az != var.writer_az]
@@ -147,7 +147,7 @@ resource "aws_rds_cluster" "secondary" {
   for_each = local.secondaries
 
   region                    = each.key
-  cluster_identifier        = "pay-${var.env}-${each.value.short}-${var.component}"
+  cluster_identifier        = "${var.name_prefix}-${var.env}-${each.value.short}-${var.component}"
   engine                    = "aurora-postgresql"
   engine_version            = var.engine_version
   global_cluster_identifier = local.working ? aws_rds_global_cluster.this[0].id : var.global_cluster_identifier
@@ -165,7 +165,7 @@ resource "aws_rds_cluster" "secondary" {
   copy_tags_to_snapshot     = true
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = false
-  final_snapshot_identifier = "pay-${var.env}-${each.value.short}-${var.component}-final"
+  final_snapshot_identifier = "${var.name_prefix}-${var.env}-${each.value.short}-${var.component}-final"
 
   enabled_cloudwatch_logs_exports = ["postgresql"]
 

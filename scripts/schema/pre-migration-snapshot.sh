@@ -5,12 +5,12 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 usage: pre-migration-snapshot.sh --store aurora|dynamodb|clickhouse --resource-arn ARN --label LABEL
-       [--vault NAME] [--role-arn ARN] [--region REGION] [--wait-seconds N] [--poll-seconds N] [--dry-run]
+       --vault NAME [--role-arn ARN] --region REGION [--wait-seconds N] [--poll-seconds N] [--dry-run]
 Starts an AWS Backup job with a 35-day lifecycle (a manual RDS snapshot never expires) tagged change=LABEL.
 EOF
 }
 
-store="" arn="" label="" vault="pay-prod-euc1-backup-gold" role="" region="eu-central-1" wait=1800 poll=15 dry=0
+store="" arn="" label="" vault="" role="" region="" wait=1800 poll=15 dry=0
 retention_days=35
 
 while [[ $# -gt 0 ]]; do
@@ -36,6 +36,8 @@ case $store in
   opensearch) echo "opensearch snapshots go through its snapshot API, not AWS Backup; not supported here" >&2; exit 2 ;;
   *) echo "--store must be aurora, dynamodb or clickhouse" >&2; exit 2 ;;
 esac
+[[ -n $vault ]] || { echo "--vault is required (the backup vault of the store)" >&2; exit 2; }
+[[ -n $region ]] || { echo "--region is required" >&2; exit 2; }
 [[ $arn =~ ^arn:aws:[a-z0-9-]+:[a-z0-9-]*:[0-9]{12}: ]] || { echo "--resource-arn is not an ARN" >&2; exit 2; }
 [[ $label =~ ^[a-z0-9][a-z0-9-]{2,62}$ ]] || { echo "--label must be kebab-case, 3 to 63 characters" >&2; exit 2; }
 [[ $dry -eq 1 || -n $role ]] || { echo "--role-arn is required unless --dry-run" >&2; exit 2; }

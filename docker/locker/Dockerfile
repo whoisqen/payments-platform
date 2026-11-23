@@ -22,7 +22,7 @@ ARG SOURCE_DATE_EPOCH
 ARG CARGO_PROFILE=release
 ARG RUSTFLAGS="-C strip=symbols --remap-path-prefix=/src=/build --remap-path-prefix=/usr/local/cargo=/cargo"
 ARG SCCACHE_BUCKET=""
-ARG SCCACHE_REGION="eu-central-1"
+ARG SCCACHE_REGION=""
 # build.rs runs vergen, which must not fail when .git is absent from the context
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} RUSTFLAGS=${RUSTFLAGS} CARGO_INCREMENTAL=0 VERGEN_IDEMPOTENT=true \
     RUSTC_WRAPPER=sccache SCCACHE_BUCKET=${SCCACHE_BUCKET} SCCACHE_REGION=${SCCACHE_REGION}

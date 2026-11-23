@@ -5,8 +5,9 @@
   "properties": {
     "global": {
       "type": "object",
-      "required": ["cell", "environment", "region", "dataCidrs", "endpointCidrs"],
+      "required": ["cell", "environment", "region", "dataCidrs", "endpointCidrs", "registry"],
       "properties": {
+        "registry": { "type": "string", "minLength": 1 },
         "cell": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" },
         "environment": { "enum": ["dev", "stage", "prod"] },
         "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },

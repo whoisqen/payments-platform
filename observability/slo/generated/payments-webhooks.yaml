@@ -144,8 +144,8 @@ spec:
         slo: payments-webhooks-delivery
       annotations:
         summary: Webhook delivery within 60 s is burning the 99.9% error budget (14.4x over 1h/5m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/merchant-webhook-delivery.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/merchant-webhook-delivery.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsWebhookDeliveryBurnSlow
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (6 * 0.001) and slo:sli_error:ratio_rate30m{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (6 * 0.001)
       labels:
@@ -158,8 +158,8 @@ spec:
         slo: payments-webhooks-delivery
       annotations:
         summary: Webhook delivery within 60 s is burning the 99.9% error budget (6x over 6h/30m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/merchant-webhook-delivery.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/merchant-webhook-delivery.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsWebhookDeliveryBurnTicket
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (1 * 0.001) and slo:sli_error:ratio_rate6h{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (1 * 0.001)
       labels:
@@ -172,5 +172,5 @@ spec:
         slo: payments-webhooks-delivery
       annotations:
         summary: Webhook delivery within 60 s is burning the 99.9% error budget (1x over 3d/6h)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/merchant-webhook-delivery.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/merchant-webhook-delivery.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'

@@ -6,6 +6,7 @@ templates:
   - producer/pdb.yaml
   - consumer/pdb.yaml
 set:
+  global.registry: registry.example.test/acme
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: runs two producers with Recreate and the producer flow

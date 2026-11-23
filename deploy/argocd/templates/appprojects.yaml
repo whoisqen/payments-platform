@@ -7,7 +7,7 @@ spec:
   # Assumes add-on charts create only these cluster kinds; add a kind here when a sync reports it as not permitted
   description: Cluster add-ons from pinned upstream charts
   sourceRepos:
-    - https://github.com/whoisqen/payments-platform
+    - {{ .Values.repo.url }}
     - https://charts.jetstack.io
     - https://charts.external-secrets.io
     - https://kyverno.github.io/kyverno/
@@ -45,7 +45,7 @@ metadata:
 spec:
   description: Platform components; namespaced resources only, so a chart cannot create cluster roles or CRDs
   sourceRepos:
-    - https://github.com/whoisqen/payments-platform
+    - {{ .Values.repo.url }}
   destinations:
     - server: '*'
       namespace: payments

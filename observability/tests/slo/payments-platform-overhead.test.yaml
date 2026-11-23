@@ -3,6 +3,9 @@ rule_files:
 evaluation_interval: 1m
 tests:
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate1h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.0288x15
@@ -25,9 +28,12 @@ tests:
         sloth_slo: latency
       exp_annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (14.4x over 1h/5m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
+        dashboard_url: https://grafana.example.test/d/slo-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate1h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.0288x15
@@ -38,6 +44,9 @@ tests:
     alertname: PaymentsPlatformOverheadLatencyBurnFast
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate6h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.012x15
@@ -60,9 +69,12 @@ tests:
         sloth_slo: latency
       exp_annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (6x over 6h/30m)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
+        dashboard_url: https://grafana.example.test/d/slo-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate6h{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.012x15
@@ -73,6 +85,9 @@ tests:
     alertname: PaymentsPlatformOverheadLatencyBurnSlow
     exp_alerts: []
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate3d{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.002x15
@@ -95,9 +110,12 @@ tests:
         sloth_slo: latency
       exp_annotations:
         summary: Platform overhead above 150 ms is burning the 99.9% error budget (1x over 3d/6h)
-        runbook_url: https://github.com/whoisqen/payments-platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
-        dashboard_url: https://grafana.payments.internal/d/slo-overview
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/slo/platform-overhead-latency.md
+        dashboard_url: https://grafana.example.test/d/slo-overview
 - interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
   input_series:
   - series: slo:sli_error:ratio_rate3d{sloth_id="payments-platform-overhead-latency",sloth_service="payments-platform-overhead",sloth_slo="latency",team="payments-core",owner="payments-core-oncall",layer="application"}
     values: 0.002x15

@@ -1,6 +1,7 @@
 mock_provider "aws" {}
 
 variables {
+  name_prefix = "pay"
   environment = "prod"
   zone_name   = "pay.example.com"
   certificates = {
