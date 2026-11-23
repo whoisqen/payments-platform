@@ -1,0 +1,35 @@
+# Cell spare in the standby region: local Aurora reader and MemoryDB, writes to the Frankfurt writer; endpoints are placeholders until infra/live exports them
+global:
+  cell: spare
+
+migrations:
+  enabled: false
+  database:
+    host: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+
+router:
+  container:
+    env:
+      ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+      ROUTER__REPLICA_DATABASE__HOST: pay-stage-use1-aurora-spare.cluster-ro-example.us-east-1.rds.amazonaws.com
+      ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com
+
+drainer:
+  container:
+    env:
+      DRAINER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+      DRAINER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com
+      REDIS_ADDRESS: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com:6379
+
+scheduler:
+  producer:
+    container:
+      env:
+        ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com
+  consumer:
+    container:
+      env:
+        ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com
+        REDIS_ADDRESS: clustercfg.pay-stage-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com:6379

@@ -3,23 +3,24 @@ mock_provider "aws" {}
 variables {
   zone_id     = "Z0123456789ABCDEFGHIJ"
   record_name = "api.stage.pay.example.com"
+  primary_key = "euc1"
   endpoints = {
-    euc1 = { region = "eu-central-1", target_dns = "api-euc1.stage.pay.example.com" }
-    use1 = { region = "us-east-1", target_dns = "api-use1.stage.pay.example.com" }
+    euc1 = { target_dns = "api-euc1.stage.pay.example.com" }
+    use1 = { target_dns = "api-use1.stage.pay.example.com" }
   }
 }
 
-run "latency_records_with_https_checks" {
+run "primary_and_secondary_with_https_checks" {
   command = plan
 
   assert {
     condition     = length(aws_route53_record.this) == 2 && length(aws_route53_health_check.this) == 2
-    error_message = "one latency record and one health check per endpoint"
+    error_message = "one failover record and one health check per endpoint"
   }
 
   assert {
-    condition     = aws_route53_record.this["use1"].latency_routing_policy[0].region == "us-east-1" && aws_route53_record.this["euc1"].latency_routing_policy[0].region == "eu-central-1"
-    error_message = "latency region equals the input region"
+    condition     = aws_route53_record.this["euc1"].failover_routing_policy[0].type == "PRIMARY" && aws_route53_record.this["use1"].failover_routing_policy[0].type == "SECONDARY"
+    error_message = "the working region is the primary, the other region the secondary"
   }
 
   assert {
@@ -28,13 +29,24 @@ run "latency_records_with_https_checks" {
   }
 }
 
-run "bad_region_rejected" {
+run "unknown_primary_rejected" {
+  command = plan
+
+  variables {
+    primary_key = "apse1"
+  }
+
+  expect_failures = [var.primary_key]
+}
+
+run "three_endpoints_rejected" {
   command = plan
 
   variables {
     endpoints = {
-      euc1 = { region = "EU", target_dns = "api-euc1.stage.pay.example.com" }
-      use1 = { region = "us-east-1", target_dns = "api-use1.stage.pay.example.com" }
+      euc1 = { target_dns = "a.example.com" }
+      use1 = { target_dns = "b.example.com" }
+      use2 = { target_dns = "c.example.com" }
     }
   }
 

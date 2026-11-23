@@ -22,11 +22,13 @@ locals {
     "us-east-2"    = ["us-east-2a", "us-east-2b", "us-east-2c"]
   }
 
-  vpc_cidrs   = { for region, cidr in local.cfg.network.stage : region => cidr if region != "egress" }
+  vpc_cidrs   = { for region, cidr in local.cfg.network.stage : region => cidr if !startswith(region, "egress") }
   egress_cidr = local.cfg.network.stage.egress
+  # Each region with workloads has its own egress VPC and transit gateway (no cross-region path for PSP traffic).
+  egress_cidrs = { "eu-central-1" = local.cfg.network.stage.egress, "us-east-1" = local.cfg.network.stage["egress-us-east-1"] }
 
   # Set after the first apply of tgw: the vpc stack needs the attachment before it may route through it (two-step by design).
-  transit_gateway_id = null
+  transit_gateway_ids = { "eu-central-1" = null, "us-east-1" = null }
 
   psp_domains = local.cfg.dns.psp_domains
   zone_name   = local.cfg.dns.stage_zone

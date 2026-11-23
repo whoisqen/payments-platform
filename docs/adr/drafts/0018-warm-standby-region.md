@@ -10,8 +10,10 @@ The recovery regions held only data and prepared networks; all compute was creat
 
 - eu-central-1 stays the only writing region. There is no active-active.
 - us-east-1 is a warm standby that runs: per cell a cluster, Karpenter pools, MemoryDB and Aurora reader instances. Replication between regions is asynchronous (Aurora Global Database, DynamoDB Global Tables).
-- Route 53 latency records with HTTPS health checks (`infra/modules/dns-routing`) send clients to the nearer healthy region. An unhealthy region drops out of the answer, which is the failover.
-- Reads are served locally in us-east-1. Writes are proxied to Frankfurt at application level.
+- Route 53 failover records with HTTPS health checks (`infra/modules/dns-routing`): Frankfurt is PRIMARY and serves 100% of traffic while its check passes; us-east-1 is SECONDARY and is answered only when the Frankfurt check fails. No traffic is split between regions in normal operation.
+- The standby runs the same releases; its router reads from the local Aurora readers and sends every write to the Frankfurt writer. After a failover and promotion (`docs/runbooks/backup-dr/promote-standby-region.md`) it serves reads and writes locally.
+- Each region has its own egress path (egress VPC, Network Firewall, transit gateway) so PSP traffic never crosses regions.
+- Data is replicated asynchronously to the standby: Aurora Global Database, DynamoDB Global Tables, S3 replication of backup and archive buckets, Backup copy jobs to the recovery vaults, Secrets Manager and ECR replicas, multi-Region KMS keys.
 - Promotion of the us-east-1 Aurora secondary stays semi-automatic with fencing (D6): one on-call confirmation, because two writers can charge a payment twice.
 - us-east-2 stays data and backups only; plan B of D7 is unchanged.
 - Environments opt in with `standby_enabled` in `env.hcl` (stage); dev has no standby.

@@ -1,0 +1,24 @@
+# Locker of the standby region; the database is the Frankfurt writer (D6)
+global:
+  environment: stage
+  region: us-east-1
+  dataCidrs:
+    - 10.131.96.0/22
+  endpointCidrs:
+    - 10.131.0.0/18
+    - 10.131.64.0/19
+
+locker:
+  container:
+    env:
+      RUN_ENV: sandbox
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 12
+
+# Migrations run only where the writer is
+locker-migrations:
+  enabled: false
+  database:
+    host: pay-stage-euc1-aurora-locker.cluster-example.eu-central-1.rds.amazonaws.com
+    name: locker

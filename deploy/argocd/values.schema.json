@@ -28,17 +28,12 @@
       "type": "object",
       "required": [
         "namePrefix",
-        "regionShort",
         "region"
       ],
       "properties": {
         "namePrefix": {
           "type": "string",
           "minLength": 1
-        },
-        "regionShort": {
-          "type": "string",
-          "pattern": "^[a-z]{3,4}[0-9]$"
         },
         "region": {
           "type": "string",

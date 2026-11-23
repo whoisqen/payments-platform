@@ -18,21 +18,25 @@ variable "record_name" {
   }
 }
 
+variable "primary_key" {
+  type        = string
+  description = "Key of the endpoint that serves all traffic while it is healthy (the working region)."
+
+  validation {
+    condition     = contains(keys(var.endpoints), var.primary_key)
+    error_message = "primary_key must be a key of endpoints."
+  }
+}
+
 variable "endpoints" {
   type = map(object({
-    region     = string
     target_dns = string
   }))
-  description = "Regional ingress names keyed by a short key; region is the AWS region of the latency record."
+  description = "Regional ingress names keyed by a short key; exactly one is the primary, the other is the standby."
 
   validation {
-    condition     = alltrue([for e in var.endpoints : can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", e.region))])
-    error_message = "endpoint region must be an AWS region name."
-  }
-
-  validation {
-    condition     = length(var.endpoints) >= 2
-    error_message = "at least two endpoints are needed for failover."
+    condition     = length(var.endpoints) == 2
+    error_message = "failover needs exactly two endpoints: a primary and a standby."
   }
 }
 

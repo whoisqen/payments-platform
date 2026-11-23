@@ -39,6 +39,11 @@ def check(cfg):
     for r in [regions.get("working"), *(regions.get("recovery") or [])]:
         if not r or not REGION.match(str(r)):
             errors.append(f"region `{r}` is not a valid AWS region name")
+    stage = (cfg.get("deploy") or {}).get("stage") or {}
+    endpoints = stage.get("ingress_endpoints")
+    wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
+    if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
+        errors.append("`deploy.stage.ingress_endpoints` needs an ingress host for the working region and the standby region")
     nets = {}
     for env, cidrs in (cfg.get("network") or {}).items():
         for region, cidr in cidrs.items():

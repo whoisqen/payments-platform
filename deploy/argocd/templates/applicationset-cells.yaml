@@ -44,7 +44,7 @@ spec:
     spec:
       project: payments
       destination:
-        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{ .Values.cluster.regionShort }}-{{`{{ .path.basename }}`}}'
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-{{`{{ .path.basename }}`}}'
         namespace: payments
       sources:
         - repoURL: {{ .Values.repo.url }}

@@ -17,3 +17,4 @@ dependencies:
   - name: migrations
     version: 0.1.0
     repository: file://../migrations
+    condition: migrations.enabled
