@@ -207,6 +207,34 @@ Ticket to payments-core and finance operations.
 
 `pay-runbook-reconciliation-mismatch`
 
+## orphan-payment-webhooks
+
+Alert `OrphanPaymentWebhooks`, severity warning, owner payments-core-oncall, dashboard https://grafana.payments.internal/d/payments.
+
+### Symptom
+
+A PSP sent a webhook for a payment that the database does not know (`WEBHOOK_PAYMENT_NOT_FOUND` rose). Right after a region failover this is the sign of a charge that was made at the PSP in the last seconds before the failure and was lost to the asynchronous replication of the database. The customer may pay again.
+
+### Diagnostics
+
+1. Collect one report: GitHub Actions `runbook-diagnose` (`workflow_dispatch`, input `alert=OrphanPaymentWebhooks`) runs the read-only step of SSM document `pay-runbook-orphan-payment-webhooks`.
+2. Check whether a failover ran: the Lambda log of `dr-failover` (`failover-finished`) and the event `reconcile-window` give the 5 minute window before the promotion.
+3. List the PSP payment references from the webhook log (no card data) and the merchants (`merchant_id` label).
+4. Payments that are in the database in a non-final state need nothing: the scheduler workflow `PaymentsSyncWorkflow` asks the PSP for them by itself.
+
+### Actions
+
+1. For every orphan reference found at the PSP, hand the list to finance operations: they decide a refund or a manual order record and make it through the PSP connector. Nothing is refunded automatically.
+2. Tell the merchant if a customer may have paid twice.
+
+### Escalation
+
+Ticket to payments-core and finance operations. More than one merchant, or within one hour after a failover, goes to the incident commander.
+
+### SSM document
+
+`pay-runbook-orphan-payment-webhooks`
+
 ## migration-job-failed
 
 Alert `MigrationJobFailed`, severity warning, owner payments-core-oncall, dashboard https://grafana.payments.internal/d/payments.

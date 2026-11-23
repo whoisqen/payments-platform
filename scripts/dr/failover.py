@@ -10,13 +10,12 @@ import argparse
 import json
 import sys
 import time
-import uuid
 
-TOKEN_NAMESPACE = uuid.UUID("6f2c1b7e-4d3a-5c1e-9a64-0d5b8e7f1a20")
 FENCE_SID = "sid:900001"
 FENCE_RULE = f'drop tcp any any -> any any (msg:"dr fence"; {FENCE_SID}; rev:1;)'
 EXIT_REFUSED, EXIT_LOCK_HELD = 2, 3
 MAX_FAILBACK_LAG_MS = 1000
+RECONCILE_WINDOW_MINUTES = 5
 
 
 def short(region):
@@ -35,11 +34,6 @@ class LockHeld(Exception):
 
 def error_code(exc):
     return getattr(exc, "response", {}).get("Error", {}).get("Code", "")
-
-
-def client_token(run_id, step):
-    # SSM requires a UUID, and uuid5 keeps one token per run and step across re-runs
-    return str(uuid.uuid5(TOKEN_NAMESPACE, f"{run_id}/{step}"))
 
 
 def log(event, **fields):
@@ -158,11 +152,11 @@ class Switch:
             iam.create_policy_version(PolicyArn=arn, PolicyDocument=json.dumps(doc), SetAsDefault=True)
 
     def reconcile(self):
-        if not self.a.reconcile:
-            return
-        if self.act("psp-reconcile", document="dr-psp-reconcile"):
-            self.client("ssm", self.a.target_region).start_automation_execution(
-                DocumentName="dr-psp-reconcile", Parameters={"Cell": [self.a.cell], "WindowMinutes": ["5"]}, ClientToken=client_token(self.a.run_id, "reconcile"))
+        # PSP reconciliation is done by people with the alert OrphanPaymentWebhooks and its runbook: charges lost to replication lag show up as
+        # webhooks for payments the database does not know. The window of data that may be missing ends at the promotion.
+        end = time.time()
+        log("reconcile-window", cell=self.a.cell, run_id=self.a.run_id, minutes=RECONCILE_WINDOW_MINUTES,
+            start=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(end - RECONCILE_WINDOW_MINUTES * 60)), end=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(end)))
 
     # failback ---------------------------------------------------------------------------------------------------------------------------
     def switchover_aurora(self):
@@ -224,7 +218,6 @@ def parse_args(argv):
     ap.add_argument("--global-cluster", help="default: <prefix>-<env>-<source short>-aurora-<cell>")
     ap.add_argument("--fence-rule-group", help="default: <prefix>-<env>-<source short>-psp-fence")
     ap.add_argument("--deny-policy-arn", default="", help="IAM policy that denies DynamoDB writes in the standby region")
-    ap.add_argument("--reconcile", action="store_true", help="also run the dr-psp-reconcile document of the target region")
     ap.add_argument("--dry-run", action="store_true")
     ns = ap.parse_args(argv)
     if ns.mode == "failback" and ns.auto:

@@ -189,12 +189,6 @@ resource "aws_iam_role_policy" "function" {
         Action   = ["network-firewall:DescribeRuleGroup", "network-firewall:UpdateRuleGroup"]
         Resource = "arn:aws:network-firewall:${var.source_region}:${var.account_id}:stateful-rulegroup/${var.fence_rule_group}"
       },
-      {
-        Sid      = "Reconcile"
-        Effect   = "Allow"
-        Action   = ["ssm:StartAutomationExecution"]
-        Resource = "arn:aws:ssm:${data.aws_region.current.region}:${var.account_id}:automation-definition/dr-psp-reconcile:*"
-      },
       ], var.deny_policy_arn == "" ? [] : [{
         Sid      = "AllowStandbyDynamoDbWrites"
         Effect   = "Allow"

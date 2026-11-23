@@ -140,13 +140,13 @@ class FailoverTest(unittest.TestCase):
         run(fake, FAILOVER)
         self.assertEqual([c[3]["VersionId"] for c in fake.calls if c[2] == "delete_policy_version"], ["v1"])
 
-    def test_reconcile_runs_only_when_asked(self):
+    def test_the_reconcile_window_is_logged_after_the_promotion(self):
         fake = Fake()
-        run(fake, FAILOVER)
+        code, out = run(fake, FAILOVER)
+        self.assertEqual(code, 0)
+        self.assertIn('"event": "reconcile-window"', out)
+        self.assertIn('"minutes": 5', out)
         self.assertNotIn("start_automation_execution", fake.names())
-        fake = Fake()
-        run(fake, FAILOVER + ["--reconcile"])
-        self.assertIn("start_automation_execution", fake.names())
 
     def test_dry_run_changes_nothing(self):
         fake = Fake()
