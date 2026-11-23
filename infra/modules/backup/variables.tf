@@ -38,7 +38,6 @@ variable "region_role" {
 variable "region_name" {
   description = "AWS region of the provider; the key of the local vault."
   type        = string
-  default     = "eu-central-1"
 }
 
 variable "tags" {

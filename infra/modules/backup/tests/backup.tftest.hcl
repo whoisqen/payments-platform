@@ -11,6 +11,7 @@ mock_provider "aws" {
 variables {
   env                = "prod"
   region_short       = "euc1"
+  region_name        = "eu-central-1"
   kms_key_arn        = "arn:aws:kms:eu-central-1:222222222222:key/mrk-0005"
   source_account_ids = ["111111111111"]
   sns_topic_arns     = { "eu-central-1" = "arn:aws:sns:eu-central-1:222222222222:backup" }

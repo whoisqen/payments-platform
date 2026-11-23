@@ -57,7 +57,6 @@ variable "account_id" {
 variable "region_name" {
   description = "AWS region of the provider."
   type        = string
-  default     = "eu-central-1"
 }
 
 variable "kms_key_arn" {

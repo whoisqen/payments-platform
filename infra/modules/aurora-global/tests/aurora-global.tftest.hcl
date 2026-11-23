@@ -3,6 +3,8 @@ mock_provider "aws" {}
 variables {
   env                      = "prod"
   region_short             = "euc1"
+  region_name              = "eu-central-1"
+  primary_region           = "eu-central-1"
   component                = "aurora-cell-0"
   kms_key_arn              = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0001"
   db_subnet_group_name     = "pay-prod-euc1-data"

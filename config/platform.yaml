@@ -1,0 +1,59 @@
+# The one place for deployment-specific values. A fork replaces every CHANGEME value and nothing else.
+# Validated by tools/config/validate.py in CI; read by the modules and charts that need an individual value.
+owner:
+  github_org: whoisqen
+  github_repo: payments-platform
+  contact_email: vladyslav.kozlov.it@gmail.com
+  cost_center_prefix: cc
+
+registry:
+  # ECR registry host prefix, for example 123456789012.dkr.ecr.eu-central-1.amazonaws.com
+  ecr_prefix: 123456789012.dkr.ecr.eu-central-1.amazonaws.com
+  ecr_repo_prefix: payments
+
+accounts:
+  shared_services: "222222222222"
+  dev: "111111111111"
+  stage: "333333333333"
+
+regions:
+  working: eu-central-1
+  recovery: [us-east-1, us-east-2]
+
+network:
+  # One non-overlapping /16 per environment and region; the module derives subnets from it.
+  dev:   {eu-central-1: 10.120.0.0/16, us-east-1: 10.121.0.0/16, us-east-2: 10.122.0.0/16, egress: 10.123.0.0/20}
+  stage: {eu-central-1: 10.130.0.0/16, us-east-1: 10.131.0.0/16, us-east-2: 10.132.0.0/16, egress: 10.133.0.0/20}
+
+dns:
+  dev_zone: dev.pay.example.com
+  stage_zone: stage.pay.example.com
+  psp_domains: [.psp-sandbox.example.com]
+
+storage:
+  # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
+  state_bucket_prefix: pay
+  # Output state_kms_key_arn of infra/bootstrap
+  state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
+
+access:
+  # Name of the IAM Identity Center permission set that gets view-only access to the clusters
+  sre_view_permission_set: AWSReservedSSO_SRE-View
+
+deploy:
+  # Values written into deploy/ by tools/config/render.py. The suffixes are the account-specific part of the
+  # Aurora and MemoryDB endpoints and are known only after the data stacks are applied.
+  dev:
+    data_cidrs: [10.120.8.0/22]
+    endpoint_cidrs: [10.120.255.0/24]
+    gateway_host: api.dev.payments.example.com
+    cluster_domain: dev.example.internal
+    rds_suffix: example
+    memorydb_suffix: example
+  stage:
+    data_cidrs: [10.130.8.0/22]
+    endpoint_cidrs: [10.130.255.0/24]
+    gateway_host: api.stage.payments.example.com
+    cluster_domain: stage.example.internal
+    rds_suffix: example
+    memorydb_suffix: example

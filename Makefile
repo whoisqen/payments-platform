@@ -25,6 +25,8 @@ lint: lint-repo lint-workflows lint-docker lint-terraform lint-helm lint-python 
 lint-repo:
 	tools/lint/spec-lint
 	tools/lint/structure
+	python3 tools/config/validate.py
+	python3 tools/config/render.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

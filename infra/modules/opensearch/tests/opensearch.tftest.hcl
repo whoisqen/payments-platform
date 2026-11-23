@@ -3,6 +3,7 @@ mock_provider "aws" {}
 variables {
   env                   = "prod"
   region_short          = "euc1"
+  region_name           = "eu-central-1"
   account_id            = "111111111111"
   kms_key_arn           = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0007"
   subnet_ids            = ["subnet-1", "subnet-2", "subnet-3"]

@@ -13,8 +13,8 @@ variable "region" {
   description = "Region of the provider this module instance runs in."
 
   validation {
-    condition     = contains(["eu-central-1", "us-east-1", "us-east-2"], var.region)
-    error_message = "region must be eu-central-1, us-east-1 or us-east-2."
+    condition     = can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", var.region))
+    error_message = "region must be an AWS region name such as eu-west-1."
   }
 }
 
