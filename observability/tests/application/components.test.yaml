@@ -337,6 +337,40 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
+  - series: WEBHOOK_PAYMENT_NOT_FOUND_total{merchant_id="m1"}
+    values: 0+1x30
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: OrphanPaymentWebhooks
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: payments-core
+        service: router
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-orphan-payment-webhooks
+        merchant_id: m1
+      exp_annotations:
+        summary: A PSP reports a payment that is not in the database
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/application/warnings.md#orphan-payment-webhooks
+        dashboard_url: https://grafana.example.test/d/payments
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: WEBHOOK_PAYMENT_NOT_FOUND_total{merchant_id="m1"}
+    values: 3+0x30
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: OrphanPaymentWebhooks
+    exp_alerts: []
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
   - series: kube_job_status_failed{job_name="migrate-router-20261120",namespace="payments-cell-1"}
     values: 1x19
   alert_rule_test:
