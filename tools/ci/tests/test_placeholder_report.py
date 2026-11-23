@@ -36,6 +36,31 @@ class PlaceholderReportTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("2 REPLACE_ placeholders", buf.getvalue())
 
+    def test_env_filter_keeps_only_that_environment_and_skips_chart_defaults(self):
+        self.write("deploy/charts/locker/values.yaml", "id: REPLACE_LOCKER_POD_SG_ID\n")
+        self.write("deploy/envs/dev/eu-central-1/locker/values.yaml", "id: REPLACE_LOCKER_POD_SG_ID\n")
+        self.write("deploy/envs/stage/eu-central-1/locker/values.yaml", "id: REPLACE_LOCKER_POD_SG_ID\n")
+        self.write("infra/live/dev/env.hcl", "x = \"REPLACE_ROLE_ARN\"\n")
+        self.assertEqual(len(pr.scan(self.root)), 4)
+        self.assertEqual([f for f, _, _ in pr.scan(self.root, env="dev")], ["deploy/envs/dev/eu-central-1/locker/values.yaml", "infra/live/dev/env.hcl"])
+
+    def test_strict_fails_only_when_a_placeholder_remains(self):
+        self.write("deploy/envs/dev/values.yaml", "id: REPLACE_X\n")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(pr.main([str(self.root), "--env", "dev", "--strict"]), 1)
+            self.assertEqual(pr.main([str(self.root), "--env", "stage", "--strict"]), 0)
+            self.assertEqual(pr.main([str(self.root), "--env", "dev"]), 0)
+
+    def test_each_line_names_where_the_value_comes_from_and_who_supplies_it(self):
+        self.write("deploy/envs/dev/a.yaml", "a: REPLACE_LOCKER_POD_SG_ID\nb: REPLACE_ACCOUNT_ID\n")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            pr.main([str(self.root), "--env", "dev"])
+        out = buf.getvalue()
+        self.assertIn("locker_pod_security_group_id of the eks stack", out)
+        self.assertIn("supplied by pipeline", out)
+        self.assertIn("REPLACE_ACCOUNT_ID (not in infra/live outputs; supplied by owner)", out)
+
 
 if __name__ == "__main__":
     unittest.main()

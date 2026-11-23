@@ -8,6 +8,10 @@ global:
     - 10.130.255.0/24
 
 locker:
+  # Set after the eks stack of the cluster that runs the locker is applied: output locker_pod_security_group_id.
+  securityGroupPolicy:
+    securityGroupIds:
+      - REPLACE_LOCKER_POD_SG_ID
   container:
     env:
       RUN_ENV: sandbox
