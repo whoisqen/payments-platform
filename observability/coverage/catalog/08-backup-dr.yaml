@@ -19,6 +19,15 @@ modes:
   signal: metric
   detect_within: 8m
 - layer: backup-dr
+  id: backup-dr-metrics-backup-stale
+  component: victoria-metrics
+  failure: metrics store backup stale
+  impact: the history of the metrics survives a lost volume only up to the last backup of its node
+  severity: warning
+  alert: MetricsBackupStale
+  signal: metric
+  detect_within: 8m
+- layer: backup-dr
   id: backup-dr-backup-copy-failed
   component: aws-backup
   failure: backup copy failed

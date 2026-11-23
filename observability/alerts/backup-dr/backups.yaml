@@ -50,6 +50,20 @@ spec:
         summary: A backup copy to a recovery region or to the backup account failed
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#backup-copy-failed'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
+    - alert: MetricsBackupStale
+      expr: time() - max by (cronjob) (kube_cronjob_status_last_successful_time{namespace="victoria-metrics", cronjob=~"vmbackup-.*"}) > 10800
+      for: 5m
+      labels:
+        severity: warning
+        team: data-platform
+        service: victoria-metrics
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-metrics-backup-stale
+      annotations:
+        summary: A node of the central metrics store has no successful backup for 3 hours
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#metrics-backup-stale'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: SnapshotCopyStale
       expr: time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds) > 2 * 3600
       for: 5m

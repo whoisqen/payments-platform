@@ -147,3 +147,37 @@ tests:
   - eval_time: 130m
     alertname: SnapshotCopyStale
     exp_alerts: []
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: kube_cronjob_status_last_successful_time{namespace="victoria-metrics",cronjob="vmbackup-1"}
+    values: '0x300'
+  alert_rule_test:
+  - eval_time: 200m
+    alertname: MetricsBackupStale
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: data-platform
+        service: victoria-metrics
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-metrics-backup-stale
+        cronjob: vmbackup-1
+      exp_annotations:
+        summary: A node of the central metrics store has no successful backup for 3 hours
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#metrics-backup-stale
+        dashboard_url: https://grafana.example.test/d/backup
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: kube_cronjob_status_last_successful_time{namespace="victoria-metrics",cronjob="vmbackup-1"}
+    values: 0+60x300
+  alert_rule_test:
+  - eval_time: 200m
+    alertname: MetricsBackupStale
+    exp_alerts: []
