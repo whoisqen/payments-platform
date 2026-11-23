@@ -35,6 +35,13 @@ spec:
                 value: {{ printf "%s/blob/%s" .Values.repo.url .Values.repo.revision | quote }}
               - name: prometheus.prometheusSpec.externalLabels.grafana_url
                 value: {{ .Values.observability.grafanaUrl | quote }}
+              # Both replicas push every sample to the central store, which keeps one of each pair; their alerts go to its Alertmanager cluster
+              - name: prometheus.prometheusSpec.remoteWrite[0].url
+                value: {{ .Values.central.metricsRemoteWriteUrl | quote }}
+              - name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].scheme
+                value: https
+              - name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].static_configs[0].targets[0]
+                value: {{ .Values.central.alertmanagerHost | quote }}
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values

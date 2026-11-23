@@ -11,6 +11,9 @@ set:
   cluster.region: eu-central-1
   cluster.regionShort: euc1
   observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.dedupInterval: 30s
   gated.revision: v1.4.0
 tests:
   - it: pins every gated Application to the release tag

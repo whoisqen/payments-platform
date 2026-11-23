@@ -4,7 +4,8 @@
   "required": [
     "repo",
     "cluster",
-    "observability"
+    "observability",
+    "central"
   ],
   "properties": {
     "repo": {
@@ -70,6 +71,29 @@
         "revision": {
           "type": "string",
           "pattern": "^(v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?)?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "central": {
+      "type": "object",
+      "required": [
+        "metricsRemoteWriteUrl",
+        "alertmanagerHost",
+        "dedupInterval"
+      ],
+      "properties": {
+        "metricsRemoteWriteUrl": {
+          "type": "string",
+          "pattern": "^https://[^/]+/.*$"
+        },
+        "alertmanagerHost": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+(:[0-9]+)?$"
+        },
+        "dedupInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m)$"
         }
       },
       "additionalProperties": false

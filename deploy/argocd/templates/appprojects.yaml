@@ -13,6 +13,7 @@ spec:
     - https://kyverno.github.io/kyverno/
     - https://helm.releases.hashicorp.com
     - https://prometheus-community.github.io/helm-charts
+    - https://victoriametrics.github.io/helm-charts
     - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm

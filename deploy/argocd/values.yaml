@@ -7,6 +7,11 @@ cluster:
   region: ""
 observability:
   grafanaUrl: ""
+# The central observability stack outside the CDE: where Prometheus pushes samples and sends alerts
+central:
+  metricsRemoteWriteUrl: ""
+  alertmanagerHost: ""
+  dedupInterval: 30s
 # Environments that are never synced from main: pinned to the release tag in gated.revision, no automated sync.
 # Without a revision they get no Application at all.
 gatedEnvironments:
