@@ -191,3 +191,25 @@ run "ci_and_payments_pools_cannot_mix" {
 
   expect_failures = [var.enabled_pools]
 }
+
+run "nodes_may_fill_the_pull_through_cache_only_under_its_prefixes" {
+  command = plan
+
+  variables {
+    pull_through_cache_prefixes = ["ecr-public", "quay"]
+  }
+
+  assert {
+    condition     = length(aws_iam_role_policy.pull_through) == 1 && alltrue([for r in jsondecode(aws_iam_role_policy.pull_through[0].policy).Statement[0].Resource : endswith(r, "/*") && (strcontains(r, "/ecr-public/") || strcontains(r, "/quay/"))]) && length(jsondecode(aws_iam_role_policy.pull_through[0].policy).Statement[0].Resource) == 2
+    error_message = "one statement scoped to the two cache prefixes"
+  }
+}
+
+run "no_pull_through_policy_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_iam_role_policy.pull_through) == 0
+    error_message = "nodes get no pull-through permission unless prefixes are given"
+  }
+}

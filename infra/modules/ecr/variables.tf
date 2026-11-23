@@ -79,16 +79,52 @@ variable "org_id" {
   description = "Organization ID allowed to pull; null keeps pulls inside the account."
 }
 
-variable "keep_tagged_images" {
-  type        = number
-  default     = 50
-  description = "Tagged images kept per repository."
+variable "retention" {
+  type = object({
+    releases      = number
+    prod          = number
+    stage         = number
+    dev           = number
+    signatures    = number
+    builds        = number
+    untagged_days = number
+  })
+  description = "Retention: image counts kept per tag class (v*, prod-*, stage-*, dev-* promotions and sha256-* signature artifacts), the latest builds kept under their git sha, and the age in days of untagged images."
+  default = {
+    releases      = 100
+    prod          = 50
+    stage         = 20
+    dev           = 10
+    signatures    = 800
+    builds        = 100
+    untagged_days = 3
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.retention) : v >= 1])
+    error_message = "every retention value must be at least 1."
+  }
 }
 
-variable "untagged_expire_days" {
+variable "cache_repositories" {
+  type        = list(string)
+  default     = []
+  description = "Names of mutable repositories for the docker buildx registry cache (one per image), created as <prefix>cache-<name>."
+}
+
+variable "cache_unused_days" {
   type        = number
   default     = 14
-  description = "Days after which untagged images expire."
+  description = "Days without a pull after which cache and pulled-through images expire."
+}
+
+variable "pull_through_cache" {
+  type = map(object({
+    upstream_registry_url = string
+    credential_arn        = optional(string)
+  }))
+  default     = {}
+  description = "Pull-through cache rules by repository prefix; registries that need credentials give a Secrets Manager credential_arn. Registry-wide, so set in one stack per account and region."
 }
 
 variable "tags" {

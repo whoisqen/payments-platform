@@ -71,3 +71,71 @@ run "cannot_replicate_to_itself" {
 
   expect_failures = [var.replication_regions]
 }
+
+run "retention_protects_promoted_images_and_signatures" {
+  command = plan
+
+  assert {
+    condition     = [for r in jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules : r.rulePriority] == [1, 2, 3, 4, 5, 10, 11]
+    error_message = "promotion and signature rules come before the build rule, so a lower rule cannot expire what a higher one keeps"
+  }
+  assert {
+    condition     = [for r in jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules : try(r.selection.tagPrefixList[0], "")] == ["v", "prod-", "stage-", "dev-", "sha256-", "", ""]
+    error_message = "release, prod, stage, dev and cosign artifact tags have a rule each"
+  }
+  assert {
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[1].selection.countNumber == 50 && jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules[5].selection.countNumber == 100
+    error_message = "prod keeps 50 images and unpromoted builds keep the latest 100 by default"
+  }
+  assert {
+    condition     = length([for r in jsondecode(aws_ecr_lifecycle_policy.this["router"].policy).rules : r if r.selection.tagStatus == "untagged"]) == 1
+    error_message = "ECR allows one rule that selects untagged images"
+  }
+}
+
+run "retention_values_are_validated" {
+  command = plan
+
+  variables {
+    retention = { releases = 0, prod = 50, stage = 20, dev = 10, signatures = 800, builds = 100, untagged_days = 3 }
+  }
+
+  expect_failures = [var.retention]
+}
+
+run "cache_repositories_are_mutable_and_expire_when_unused" {
+  command = plan
+
+  variables {
+    cache_repositories = ["router"]
+  }
+
+  assert {
+    condition     = aws_ecr_repository.cache["router"].image_tag_mutability == "MUTABLE" && aws_ecr_repository.cache["router"].name == "pay-prod-euc1-cache-router"
+    error_message = "the buildx cache repository is mutable"
+  }
+  assert {
+    condition     = jsondecode(aws_ecr_lifecycle_policy.cache["router"].policy).rules[0].selection.countType == "sinceImagePulled"
+    error_message = "unused cache expires"
+  }
+}
+
+run "pull_through_cache_rules_and_templates" {
+  command = plan
+
+  variables {
+    pull_through_cache = {
+      "ecr-public" = { upstream_registry_url = "public.ecr.aws" }
+      "quay"       = { upstream_registry_url = "quay.io" }
+    }
+  }
+
+  assert {
+    condition     = length(aws_ecr_pull_through_cache_rule.this) == 2 && aws_ecr_pull_through_cache_rule.this["quay"].upstream_registry_url == "quay.io"
+    error_message = "one rule per upstream registry"
+  }
+  assert {
+    condition     = alltrue([for t in aws_ecr_repository_creation_template.pull_through : contains(t.applied_for, "PULL_THROUGH_CACHE") && t.image_tag_mutability == "MUTABLE"])
+    error_message = "pulled-through repositories are created mutable with the disposable lifecycle"
+  }
+}

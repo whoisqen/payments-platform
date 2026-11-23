@@ -48,11 +48,12 @@ dependency "eks" {
 }
 
 inputs = {
-  cluster_name       = dependency.eks.outputs.cluster_name
-  subnet_ids         = dependency.vpc.outputs.subnet_ids["private"]
-  security_group_ids = [dependency.eks.outputs.node_security_group_id]
-  ebs_kms_key_arn    = dependency.kms.outputs.key_arns["ebs-nodes"]
-  enabled_pools      = include.envcommon.locals.env_cfg.enabled_pools
+  cluster_name                = dependency.eks.outputs.cluster_name
+  subnet_ids                  = dependency.vpc.outputs.subnet_ids["private"]
+  security_group_ids          = [dependency.eks.outputs.node_security_group_id]
+  ebs_kms_key_arn             = dependency.kms.outputs.key_arns["ebs-nodes"]
+  enabled_pools               = include.envcommon.locals.env_cfg.enabled_pools
+  pull_through_cache_prefixes = keys(include.envcommon.locals.env_cfg.pull_through_cache)
   extra_node_tags = {
     environment = include.root.locals.env
     cell        = include.root.locals.cell

@@ -92,7 +92,7 @@ variable "cpu_limits" {
     ci-build       = 128
     ci-build-amd64 = 32
     ci-test        = 64
-    ci-light       = 32
+    ci-light       = 48
     ci-pr          = 128
   }
 }
@@ -109,6 +109,12 @@ variable "enabled_pools" {
     condition     = !(anytrue([for n in var.enabled_pools : startswith(n, "ci-")]) && anytrue([for n in var.enabled_pools : !startswith(n, "ci-")]))
     error_message = "ci pools and payments pools must not share a cluster."
   }
+}
+
+variable "pull_through_cache_prefixes" {
+  type        = list(string)
+  default     = []
+  description = "ECR pull-through cache repository prefixes that nodes may import into on a first pull; empty grants nothing."
 }
 
 variable "tags" {

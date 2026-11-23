@@ -399,3 +399,19 @@ resource "aws_eks_pod_identity_association" "controller" {
   role_arn        = aws_iam_role.controller.arn
   tags            = var.tags
 }
+
+# The managed pull-only policy cannot fill a pull-through cache; this lets a node import and create only under the cache prefixes.
+resource "aws_iam_role_policy" "pull_through" {
+  count = length(var.pull_through_cache_prefixes) > 0 ? 1 : 0
+
+  name = "ecr-pull-through"
+  role = aws_iam_role.node.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ecr:BatchImportUpstreamImage", "ecr:CreateRepository"]
+      Resource = [for p in var.pull_through_cache_prefixes : "arn:aws:ecr:${var.region}:${var.account_id}:repository/${p}/*"]
+    }]
+  })
+}

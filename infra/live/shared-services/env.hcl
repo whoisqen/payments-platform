@@ -62,7 +62,7 @@ locals {
     ci-build       = 128
     ci-build-amd64 = 32
     ci-test        = 64
-    ci-light       = 32
+    ci-light       = 48
     ci-pr          = 128
   }
   enabled_pools = ["ci-build", "ci-build-amd64", "ci-test", "ci-light", "ci-pr"]
@@ -74,6 +74,13 @@ locals {
     ci-test        = { cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
     ci-light       = { cache_write = false, ecr_pull = false, assume_plan = true, untrusted = false }
     ci-pr          = { cache_write = false, ecr_pull = false, assume_plan = false, untrusted = true }
+  }
+
+  # Registries pulled through the own ECR: nodes get them closer and faster, and an upstream outage does not stop CI.
+  pull_through_cache = {
+    "ecr-public" = { upstream_registry_url = "public.ecr.aws" }
+    "k8s"        = { upstream_registry_url = "registry.k8s.io" }
+    "quay"       = { upstream_registry_url = "quay.io" }
   }
 
   deletion_protection = true
