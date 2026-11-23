@@ -54,14 +54,14 @@ class RoutingTest(unittest.TestCase):
     def test_every_alert_reaches_the_documented_receiver(self):
         for name, labels in LABELS.items():
             sev, team = labels["severity"], labels["team"]
-            expected = {"security": "pagerduty-security", "warning": "slack-payments-alerts", "none": "deadmans-switch" if name == "Watchdog" else "slack-payments-alerts"}.get(sev, f"pagerduty-{team}")
+            expected = {"security": "slack-security", "warning": "slack-payments-alerts", "critical": "slack-payments-critical", "none": "deadmans-switch" if name == "Watchdog" else "slack-payments-alerts"}.get(sev, "slack-payments-critical")
             with self.subTest(alert=name):
                 self.assertEqual(route(labels), expected)
 
     def test_documented_examples(self):
-        self.assertEqual(route({"severity": "critical", "team": "payments-core"}), "pagerduty-payments-core")
+        self.assertEqual(route({"severity": "critical", "team": "payments-core"}), "slack-payments-critical")
         self.assertEqual(route({"severity": "warning", "team": "payments-core"}), "slack-payments-alerts")
-        self.assertEqual(route({"severity": "security", "team": "security"}), "pagerduty-security")
+        self.assertEqual(route({"severity": "security", "team": "security"}), "slack-security")
         self.assertEqual(route({"alertname": "Watchdog", "severity": "none"}), "deadmans-switch")
 
     def test_cache_warm_alert_never_pages(self):
@@ -85,7 +85,8 @@ class RoutingTest(unittest.TestCase):
         text = (OBS / "alertmanager" / "alertmanager.yaml").read_text()
         for plain in ("routing_key:", "api_url:", "service_key:", "  url:"):
             self.assertNotIn(plain, text)
-        self.assertIn("routing_key_file:", text)
+        self.assertIn("api_url_file:", text)
+        self.assertNotIn("routing_key", text)
 
     def test_templates_referenced_by_the_config_are_defined(self):
         used = set(re.findall(r'template "([\w.]+)"', (OBS / "alertmanager" / "alertmanager.yaml").read_text()))
