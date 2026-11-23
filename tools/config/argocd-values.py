@@ -19,7 +19,6 @@ def values(cfg):
     return {
         "repo": {"url": f"https://github.com/{org}/{repo}", "revision": "main"},
         "cluster": {"namePrefix": cfg["storage"]["state_bucket_prefix"], "regionShort": region_short(working), "region": working},
-        "github": {"configUrl": f"https://github.com/{org}"},
         "observability": {"grafanaUrl": cfg["dns"]["grafana_url"]},
     }
 

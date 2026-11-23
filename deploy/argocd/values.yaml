@@ -6,10 +6,5 @@ cluster:
   namePrefix: ""
   regionShort: ""
   region: ""
-github:
-  configUrl: ""
 observability:
   grafanaUrl: ""
-arc:
-  # Runner scale sets, one Application each; jobs select one with runs-on: <name>
-  scaleSets: [ci-build, ci-test, ci-light, ci-pr]

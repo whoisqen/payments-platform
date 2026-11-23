@@ -6,9 +6,5 @@ cluster:
   namePrefix: acme
   regionShort: euc1
   region: eu-central-1
-github:
-  configUrl: https://git.example.test/acme
 observability:
   grafanaUrl: https://grafana.example.test
-arc:
-  scaleSets: [ci-build, ci-test]

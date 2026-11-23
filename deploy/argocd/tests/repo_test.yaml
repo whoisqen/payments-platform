@@ -2,16 +2,13 @@ suite: repository and cluster names come from values
 templates:
   - applicationset-cells.yaml
   - addons/kube-prometheus.yaml
-  - addons/arc.yaml
 set:
   repo.url: https://git.example.test/acme/platform
   repo.revision: release
   cluster.namePrefix: acme
   cluster.regionShort: use1
   cluster.region: us-east-1
-  github.configUrl: https://git.example.test/acme
   observability.grafanaUrl: https://grafana.example.test
-  arc.scaleSets: [ci-build, ci-test]
 tests:
   - it: reads the generator and chart repository and revision from values
     template: applicationset-cells.yaml
@@ -46,12 +43,3 @@ tests:
       repo.url: ""
     asserts:
       - failedTemplate: {}
-  - it: creates one runner Application per scale set from values
-    template: addons/arc.yaml
-    documentIndex: 2
-    asserts:
-      - equal:
-          path: spec.generators[0].matrix.generators[1].list.elements
-          value:
-            - scaleSet: ci-build
-            - scaleSet: ci-test
