@@ -4,7 +4,7 @@ include "root" {
 }
 
 include "envcommon" {
-  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/data/vault-snapshots.hcl"
+  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/security/vault-snapshots.hcl"
   expose = true
 }
 
