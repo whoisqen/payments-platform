@@ -1,0 +1,17 @@
+# dev deploys every workload at the lowest size: one cell is enough, no readers, no standby, Spot where allowed.
+aurora:
+  writer_class: db.r7g.large
+  reader_class: db.r7g.large
+  reader_count: 0
+memorydb:
+  node_type: db.t4g.small
+  shards: 1
+standby:
+  enabled: false
+  reader_count: 0
+eks:
+  log_retention_days: 30
+  cpu_limits: {payments: 32, stateful: 16, cde: 16, workers: 32}
+  spot_pools: [payments, stateful]
+protection:
+  deletion_protection: false

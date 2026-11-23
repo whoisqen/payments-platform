@@ -12,9 +12,6 @@ locker:
   container:
     env:
       RUN_ENV: sandbox
-  autoscaling:
-    minReplicas: 3
-    maxReplicas: 12
 
 # Migrations run only where the writer is; enable after promotion
 locker-migrations:

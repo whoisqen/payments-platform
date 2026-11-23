@@ -6,7 +6,25 @@ alertmanager:
   enabled: false
 
 prometheus:
+  # One replica may be down (a node drain, an upgrade) while the other keeps scraping and evaluating rules
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   prometheusSpec:
+    # An HA pair: both replicas scrape the same targets with the same external labels, so the central store drops the duplicate samples
+    # (VictoriaMetrics -dedup.minScrapeInterval equal to the scrape interval). No replica label is added: an empty value turns it off,
+    # because a differing label would keep the samples apart and defeat the deduplication.
+    replicas: 2
+    replicaExternalLabelName: ""
+    podAntiAffinity: hard
+    podAntiAffinityTopologyKey: kubernetes.io/hostname
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus
     retention: 6h
     # Every ServiceMonitor and rule of the platform charts is picked up, not only the ones with a release label
     serviceMonitorSelectorNilUsesHelmValues: false

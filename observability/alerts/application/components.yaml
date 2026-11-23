@@ -122,6 +122,20 @@ spec:
         summary: Daily PSP reconciliation found amount mismatches
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#reconciliation-mismatch'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
+    - alert: OrphanPaymentWebhooks
+      expr: sum by (merchant_id) (increase(WEBHOOK_PAYMENT_NOT_FOUND_total[15m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+        team: payments-core
+        service: router
+        owner: payments-core-oncall
+        layer: application
+        failure_mode: application-orphan-payment-webhooks
+      annotations:
+        summary: A PSP reports a payment that is not in the database
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#orphan-payment-webhooks'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: MigrationJobFailed
       expr: kube_job_status_failed{job_name=~".*migrat.*"} > 0
       for: 1m

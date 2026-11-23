@@ -6,6 +6,7 @@
     "ClickHouseAsyncMetrics_DiskTotal_default": "clickhouse",
     "ClickHouseAsyncMetrics_MaxPartCountForPartition": "clickhouse",
     "ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay": "clickhouse",
+    "WEBHOOK_PAYMENT_NOT_FOUND_total": "app-otel-sdk",
     "alertmanager_notifications_failed_total": "prometheus",
     "argocd_app_info": "argocd",
     "aws_backup_number_of_backup_jobs_expired_sum": "yace",

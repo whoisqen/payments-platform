@@ -19,7 +19,8 @@ Promotion starts by itself: when the Route 53 health check of the Frankfurt ingr
 1. Check the Lambda log (`failover-finished` with a result per cell). Exit code 3 means another run holds the lock, which is not a failure.
 2. If a cell failed, re-run it: invoke the Lambda again with the same alarm event (the run id is the incident time, so the run resumes) or run `scripts/dr/failover.py --cell <cell> --confirmed-by <approver> ...` by hand.
 3. The standby releases already use the local cluster endpoints, which become writers on promotion; no values change. Enable migrations (`migrations.enabled`) only after the writer is stable and a migration is due.
-4. `fence-unverified` in the log means Frankfurt's control plane did not answer; Aurora keeps the old writer from rejoining as a writer, but once Frankfurt is reachable, add the drop rule to `psp-fence` by hand or run the script again.
+4. The log event `reconcile-window` gives the five minutes before the promotion. Charges made at the PSP in that window may be missing from the promoted database; the alert `OrphanPaymentWebhooks` shows them as PSP webhooks for unknown payments (`docs/runbooks/application/warnings.md#orphan-payment-webhooks`). Refunds are decided by people, never automatic.
+5. `fence-unverified` in the log means Frankfurt's control plane did not answer; Aurora keeps the old writer from rejoining as a writer, but once Frankfurt is reachable, add the drop rule to `psp-fence` by hand or run the script again.
 
 ## Failback
 

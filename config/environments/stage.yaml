@@ -1,0 +1,3 @@
+# stage is a copy of prod in size and topology (tests of the whole platform run here); only the capacity type of its nodes differs.
+eks:
+  spot_pools: [payments, stateful]

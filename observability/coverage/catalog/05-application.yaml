@@ -127,6 +127,15 @@ modes:
   signal: metric
   detect_within: 13m
 - layer: application
+  id: application-orphan-payment-webhooks
+  component: webhooks
+  failure: PSP webhook for a payment that is not in the database
+  impact: 'a charge exists at the PSP but not in the database, for example lost to replication lag at a region failover: a customer may pay twice'
+  severity: warning
+  alert: OrphanPaymentWebhooks
+  signal: metric
+  detect_within: 8m
+- layer: application
   id: application-migration-job-failed
   component: migrations
   failure: migration job failed

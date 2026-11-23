@@ -1,0 +1,21 @@
+# Edge routing; one file holds everything because this release has no cell layer
+global:
+  environment: prod
+  region: eu-central-1
+
+gateway:
+  hosts:
+    - api.payments.example.com
+
+routing:
+  cells:
+    - name: cell-0
+      host: router.payments.svc.cell-0.prod.example.internal
+    - name: cell-1
+      host: router.payments.svc.cell-1.prod.example.internal
+    - name: cell-2
+      host: router.payments.svc.cell-2.prod.example.internal
+    - name: cell-3
+      host: router.payments.svc.cell-3.prod.example.internal
+    - name: spare
+      host: router.payments.svc.spare.prod.example.internal

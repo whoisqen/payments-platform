@@ -19,6 +19,7 @@ accounts:
   shared_services: "222222222222"
   dev: "111111111111"
   stage: "333333333333"
+  prod: "444444444444"
 
 regions:
   working: eu-central-1
@@ -28,11 +29,13 @@ network:
   # One non-overlapping /16 per environment and region; the module derives subnets from it.
   dev:   {eu-central-1: 10.120.0.0/16, us-east-1: 10.121.0.0/16, us-east-2: 10.122.0.0/16, egress: 10.123.0.0/20}
   stage: {eu-central-1: 10.130.0.0/16, us-east-1: 10.131.0.0/16, us-east-2: 10.132.0.0/16, egress: 10.133.0.0/20, egress-us-east-1: 10.134.0.0/20}
+  prod:  {eu-central-1: 10.150.0.0/16, us-east-1: 10.151.0.0/16, us-east-2: 10.152.0.0/16, egress: 10.153.0.0/20, egress-us-east-1: 10.154.0.0/20}
   shared_services: {eu-central-1: 10.140.0.0/16, egress: 10.143.0.0/20}
 
 dns:
   dev_zone: dev.pay.example.com
   stage_zone: stage.pay.example.com
+  prod_zone: pay.example.com
   psp_domains: [.psp-sandbox.example.com]
   grafana_url: https://grafana.payments.internal
 
@@ -74,6 +77,20 @@ deploy:
       us-east-1:
         data_cidrs: [10.131.96.0/22]
         endpoint_cidrs: [10.131.0.0/18, 10.131.64.0/19]
+  prod:
+    data_cidrs: [10.150.8.0/22]
+    endpoint_cidrs: [10.150.255.0/24]
+    gateway_host: api.payments.example.com
+    cluster_domain: prod.example.internal
+    rds_suffix: example
+    memorydb_suffix: example
+    ingress_endpoints:
+      eu-central-1: ingress-euc1.pay.example.com
+      us-east-1: ingress-use1.pay.example.com
+    standby:
+      us-east-1:
+        data_cidrs: [10.151.96.0/22]
+        endpoint_cidrs: [10.151.0.0/18, 10.151.64.0/19]
 
 runners:
   # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
