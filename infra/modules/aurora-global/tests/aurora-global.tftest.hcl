@@ -180,3 +180,29 @@ run "region_role_is_validated" {
 
   expect_failures = [var.region_role]
 }
+
+run "standby_readers_without_proxy_secret" {
+  command = plan
+
+  variables {
+    region_role               = "recovery"
+    region_name               = "us-east-1"
+    region_short              = "use1"
+    global_cluster_identifier = "pay-stage-euc1-aurora-cell-0"
+    recovery_regions          = {}
+    recovery_instance_count   = 1
+    recovery_instance_class   = "db.r7g.large"
+    availability_zones        = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  }
+
+  assert {
+    condition     = length(aws_rds_cluster_instance.recovery) == 1 && length(aws_db_proxy.this) == 0
+    error_message = "standby readers run without a proxy when no secret is given"
+  }
+
+  assert {
+    condition     = aws_rds_cluster_instance.recovery[0].instance_class == "db.r7g.large"
+    error_message = "standby readers use recovery_instance_class"
+  }
+}
+
