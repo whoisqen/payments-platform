@@ -74,7 +74,10 @@
       "Resource": "*",
       "Condition": {
         "ArnNotLike": {
-          "aws:PrincipalArn": "arn:aws:iam::*:role/terraform-apply"
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111111111111:role/pay-dev-glob-tf-apply-*",
+            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*"
+          ]
         }
       }
     },
@@ -100,7 +103,10 @@
       "Resource": "*",
       "Condition": {
         "ArnNotLike": {
-          "aws:PrincipalArn": "arn:aws:iam::*:role/terraform-apply"
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111111111111:role/pay-dev-glob-tf-apply-*",
+            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*"
+          ]
         }
       }
     },
