@@ -1,23 +1,23 @@
-# Cell cell-2 in the standby region: local Aurora reader and MemoryDB, writes to the working region writer; endpoints are placeholders until infra/live exports them
+# Cell cell-2 in the standby region: local Aurora secondary and MemoryDB, ready to become the writer on promotion; endpoints are placeholders until infra/live exports them
 global:
   cell: cell-2
 
 migrations:
   enabled: false
   database:
-    host: pay-stage-euc1-aurora-cell-2.cluster-example.eu-central-1.rds.amazonaws.com
+    host: pay-stage-use1-aurora-cell-2.cluster-example.us-east-1.rds.amazonaws.com
 
 router:
   container:
     env:
-      ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-cell-2.cluster-example.eu-central-1.rds.amazonaws.com
+      ROUTER__MASTER_DATABASE__HOST: pay-stage-use1-aurora-cell-2.cluster-example.us-east-1.rds.amazonaws.com
       ROUTER__REPLICA_DATABASE__HOST: pay-stage-use1-aurora-cell-2.cluster-ro-example.us-east-1.rds.amazonaws.com
       ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com
 
 drainer:
   container:
     env:
-      DRAINER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-cell-2.cluster-example.eu-central-1.rds.amazonaws.com
+      DRAINER__MASTER_DATABASE__HOST: pay-stage-use1-aurora-cell-2.cluster-example.us-east-1.rds.amazonaws.com
       DRAINER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com
       REDIS_ADDRESS: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com:6379
 
@@ -25,11 +25,11 @@ scheduler:
   producer:
     container:
       env:
-        ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-cell-2.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__MASTER_DATABASE__HOST: pay-stage-use1-aurora-cell-2.cluster-example.us-east-1.rds.amazonaws.com
         ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com
   consumer:
     container:
       env:
-        ROUTER__MASTER_DATABASE__HOST: pay-stage-euc1-aurora-cell-2.cluster-example.eu-central-1.rds.amazonaws.com
+        ROUTER__MASTER_DATABASE__HOST: pay-stage-use1-aurora-cell-2.cluster-example.us-east-1.rds.amazonaws.com
         ROUTER__REDIS__HOST: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com
         REDIS_ADDRESS: clustercfg.pay-stage-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com:6379

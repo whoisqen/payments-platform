@@ -4,7 +4,7 @@ Layer backup-dr, service aurora, severity critical, owner data-platform-oncall.
 
 ## Symptom
 
-The Route 53 health check of the Frankfurt ingress fails and DNS answers with the us-east-1 standby. The standby serves reads; writes still go to the Frankfurt writer, so they fail while Frankfurt is down.
+The Route 53 health check of the Frankfurt ingress fails and DNS answers with the us-east-1 standby. The standby databases are still read-only secondaries until promoted, so writes fail until step 2 is done.
 
 ## Diagnostics
 
@@ -16,7 +16,7 @@ The Route 53 health check of the Frankfurt ingress fails and DNS answers with th
 
 1. Fence Frankfurt first (SSM document `pay-runbook-region-down` does this); two writers can charge a payment twice.
 2. Promote the us-east-1 Aurora secondary of each cell and of the locker (global cluster failover), one cell at a time starting with `spare`.
-3. Point the standby releases at the local writer: set the master database hosts in `deploy/envs/<env>/us-east-1/<cell>/values.yaml` to the promoted cluster endpoint and enable migrations only after the writer is stable.
+3. The standby releases already use the local cluster endpoints, which become writers on promotion; no values change. Enable migrations (`migrations.enabled`) only after the writer is stable and a migration is due.
 4. Switch the DynamoDB deny-write regions (`deny_write_regions` of the dynamodb stack) so that us-east-1 may write.
 5. Traffic needs no change: Route 53 already answers with us-east-1.
 

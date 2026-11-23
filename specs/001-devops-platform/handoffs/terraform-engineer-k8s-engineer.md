@@ -5,5 +5,4 @@ What exists now (stage only, `standby_enabled = true`): per cell in `infra/live/
 What `deploy/` must add:
 - ApplicationSet destinations for the us-east-1 clusters: `<prefix>-stage-use1-<cell>` (same pattern as `<prefix>-<env>-euc1-<cell>`, region short from the region name).
 - `deploy/envs/stage/us-east-1/values.yaml` (CIDRs) and `cell-*/values.yaml` (Aurora reader and MemoryDB endpoints, known after apply).
-- A write path from us-east-1 to Frankfurt (router config: writes go to the Frankfurt writer endpoint; reads stay local).
 - The public ingress name per region (`config/platform.yaml` `deploy.stage.ingress_endpoints`) once the Istio gateways exist.

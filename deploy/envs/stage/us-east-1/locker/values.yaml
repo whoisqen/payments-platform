@@ -1,4 +1,4 @@
-# Locker of the standby region; the database is the working region writer (D6)
+# Locker of the standby region; its database is the local global-database secondary
 global:
   environment: stage
   region: us-east-1
@@ -16,9 +16,9 @@ locker:
     minReplicas: 3
     maxReplicas: 12
 
-# Migrations run only where the writer is
+# Migrations run only where the writer is; enable after promotion
 locker-migrations:
   enabled: false
   database:
-    host: pay-stage-euc1-aurora-locker.cluster-example.eu-central-1.rds.amazonaws.com
+    host: pay-stage-use1-aurora-locker.cluster-example.us-east-1.rds.amazonaws.com
     name: locker

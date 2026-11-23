@@ -28,18 +28,19 @@ def render(cfg):
     s = short(standby)
     cidrs = d["standby"][standby]
     host = lambda region, kind, name, suffix, tail="": f"{prefix}-{ENV}-{short(region)}-{kind}-{name}{suffix}{tail}"
-    writer = lambda name: f"{host(work, 'aurora', name, '')}.cluster-{d['rds_suffix']}.{work}.rds.amazonaws.com"
+    # The cluster endpoint of the local global-database secondary: read-only until promotion, then the writer, so promotion needs no values change.
+    writer = lambda name: f"{host(standby, 'aurora', name, '')}.cluster-{d['rds_suffix']}.{standby}.rds.amazonaws.com"
     reader = lambda name: f"{host(standby, 'aurora', name, '')}.cluster-ro-{d['rds_suffix']}.{standby}.rds.amazonaws.com"
     redis = lambda name: f"clustercfg.{prefix}-{ENV}-{s}-memorydb-{name}.{d['memorydb_suffix']}.memorydb.{standby}.amazonaws.com"
     base = ROOT / "deploy" / "envs" / ENV
     cells = sorted(p.name for p in (base / work).iterdir() if p.name.startswith("cell-") or p.name == "spare")
     files = {}
     files[f"{standby}/values.yaml"] = (
-        "# Warm standby: serves reads from the local Aurora readers; every write goes to the working region writer (D6)\n"
+        "# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values\n"
         f"global:\n  region: {standby}\n  dataCidrs:\n{lines(cidrs['data_cidrs'], 4)}  endpointCidrs:\n{lines(cidrs['endpoint_cidrs'], 4)}")
     for c in cells:
         w_host, r_host, r_redis = writer(c), reader(c), redis(c)
-        files[f"{standby}/{c}/values.yaml"] = f"""# Cell {c} in the standby region: local Aurora reader and MemoryDB, writes to the working region writer; endpoints are placeholders until infra/live exports them
+        files[f"{standby}/{c}/values.yaml"] = f"""# Cell {c} in the standby region: local Aurora secondary and MemoryDB, ready to become the writer on promotion; endpoints are placeholders until infra/live exports them
 global:
   cell: {c}
 
@@ -75,7 +76,7 @@ scheduler:
         ROUTER__REDIS__HOST: {r_redis}
         REDIS_ADDRESS: {r_redis}:6379
 """
-    files[f"{standby}/locker/values.yaml"] = f"""# Locker of the standby region; the database is the working region writer (D6)
+    files[f"{standby}/locker/values.yaml"] = f"""# Locker of the standby region; its database is the local global-database secondary
 global:
   environment: {ENV}
   region: {standby}
@@ -90,7 +91,7 @@ locker:
     minReplicas: 3
     maxReplicas: 12
 
-# Migrations run only where the writer is
+# Migrations run only where the writer is; enable after promotion
 locker-migrations:
   enabled: false
   database:

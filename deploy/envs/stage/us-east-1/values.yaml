@@ -1,4 +1,4 @@
-# Warm standby: serves reads from the local Aurora readers; every write goes to the working region writer (D6)
+# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values
 global:
   region: us-east-1
   dataCidrs:

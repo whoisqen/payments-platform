@@ -78,7 +78,7 @@ locals {
   aurora_writer_class = "db.r7g.xlarge"
   aurora_reader_class = "db.r7g.xlarge"
   aurora_reader_count = 1
-  # Warm standby: the us-east-1 Aurora clusters run readers; writes stay in eu-central-1.
+  # Warm standby: the us-east-1 Aurora secondaries keep reader instances and are promoted at a failover; they take no traffic before.
   ingress_endpoints    = local.cfg.deploy.stage.ingress_endpoints
   standby_enabled      = true
   standby_reader_count = 1
