@@ -16,5 +16,5 @@ spec:
     labelSelectors:
       app.kubernetes.io/name: router
   patterns:
-    - "*.memorydb.eu-central-1.amazonaws.com"
+    - "*.memorydb.${REGION}.amazonaws.com"
   duration: 5m

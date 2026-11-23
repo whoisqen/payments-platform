@@ -16,9 +16,9 @@
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:eu-central-1:${STAGE_ACCOUNT_ID}:alarm:pay-stage-euc1-chaos-stop" }
+    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
   ],
-  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/pay-stage-euc1-fis-experiment",
+  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
   "tags": { "Name": "chaos-node-loss", "environment": "stage", "failure-mode": "compute-node-notready" },
   "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
 }

@@ -5,16 +5,16 @@
       "actionId": "aws:ssm:send-automation-document",
       "description": "Reboot one broker of the stage MSK cluster",
       "parameters": {
-        "documentArn": "arn:aws:ssm:eu-central-1:${STAGE_ACCOUNT_ID}:document/pay-stage-chaos-msk-reboot-broker",
-        "documentParameters": "{\"ClusterName\":\"pay-stage-euc1-msk\",\"BrokerId\":\"1\"}",
+        "documentArn": "arn:aws:ssm:${REGION}:${STAGE_ACCOUNT_ID}:document/${NAME_PREFIX}-stage-chaos-msk-reboot-broker",
+        "documentParameters": "{\"ClusterName\":\"${NAME_PREFIX}-stage-${REGION_SHORT}-msk\",\"BrokerId\":\"1\"}",
         "maxDuration": "PT15M"
       }
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:eu-central-1:${STAGE_ACCOUNT_ID}:alarm:pay-stage-euc1-chaos-stop" }
+    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
   ],
-  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/pay-stage-euc1-fis-experiment",
+  "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
   "tags": { "Name": "chaos-msk-broker-loss", "environment": "stage", "failure-mode": "messaging-msk-broker-down" },
   "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
 }

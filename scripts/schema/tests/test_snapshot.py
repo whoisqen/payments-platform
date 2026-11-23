@@ -34,7 +34,7 @@ class SnapshotTest(unittest.TestCase):
         return subprocess.run(["bash", str(SCRIPT), *args], env={**self.env, **env}, capture_output=True, text=True)
 
     def base(self, *extra):
-        return ["--store", "aurora", "--resource-arn", ARN, "--label", "add-card-index", *extra]
+        return ["--store", "aurora", "--resource-arn", ARN, "--label", "add-card-index", "--vault", "vault-gold", "--region", "eu-central-1", *extra]
 
     def calls(self):
         return self.log.read_text().splitlines() if self.log.exists() else []

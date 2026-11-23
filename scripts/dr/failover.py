@@ -6,7 +6,14 @@ import time
 import uuid
 
 TOKEN_NAMESPACE = uuid.UUID("6f2c1b7e-4d3a-5c1e-9a64-0d5b8e7f1a20")
-SHORT = {"eu-central-1": "euc1", "us-east-1": "use1", "us-east-2": "use2"}
+
+
+def short(region):
+    # eu-central-1 -> euc1, the region short code of the naming scheme
+    a, b, c = region.split("-")
+    return f"{a}{b[0]}{c}"
+
+
 FENCE_SID = "sid:900001"
 FENCE_RULE = f'drop tcp any any -> any any (msg:"dr fence"; {FENCE_SID}; rev:1;)'
 WARM_TARGET = 0.75
@@ -133,7 +140,7 @@ class Failover:
         for i, region in enumerate(candidates):
             # plan B starts after the capacity wait; the last candidate gets the full step timeout
             wait = self.a.capacity_wait_s if i < len(candidates) - 1 else None
-            step = f"compute-{SHORT[region]}"
+            step = f"compute-{short(region)}"
             status = self.run_document(region, "dr-create-compute", {"Cell": [self.a.cell]}, step, timeout_s=wait)
             if self.a.dry_run or status == "Success":
                 if self.region != region:
@@ -231,13 +238,14 @@ def parse_args(argv):
     ap.add_argument("--cell", required=True)
     ap.add_argument("--run-id", required=True, help="stable per incident, so a re-run resumes the same switch")
     ap.add_argument("--confirmed-by", default="", help="on-call who confirmed the switch")
-    ap.add_argument("--source-region", default="eu-central-1")
-    ap.add_argument("--target-region", default="us-east-1")
-    ap.add_argument("--fallback-region", default="us-east-2")
-    ap.add_argument("--lock-region", default="us-east-1", help="never the region being failed away from")
-    ap.add_argument("--lock-table", default="pay-prod-use1-dr-lock")
-    ap.add_argument("--global-cluster", help="default: pay-prod-<cell>-aurora-payments")
-    ap.add_argument("--fence-rule-group", default="pay-prod-euc1-psp-fence")
+    ap.add_argument("--name-prefix", required=True, help="naming prefix of the platform, naming.prefix in config/platform.yaml")
+    ap.add_argument("--source-region", required=True)
+    ap.add_argument("--target-region", required=True)
+    ap.add_argument("--fallback-region", required=True)
+    ap.add_argument("--lock-region", required=True, help="never the region being failed away from")
+    ap.add_argument("--lock-table", help="default: <prefix>-prod-<lock region short>-dr-lock")
+    ap.add_argument("--global-cluster", help="default: <prefix>-prod-<cell>-aurora-payments")
+    ap.add_argument("--fence-rule-group", help="default: <prefix>-prod-<source region short>-psp-fence")
     ap.add_argument("--source-endpoint-group", required=True)
     ap.add_argument("--target-endpoint-group", action="append", default=[], metavar="REGION=ARN")
     ap.add_argument("--capacity-wait-s", type=int, default=600)
@@ -246,7 +254,9 @@ def parse_args(argv):
     ap.add_argument("--poll-s", type=int, default=15)
     ap.add_argument("--dry-run", action="store_true")
     ns = ap.parse_args(argv)
-    ns.global_cluster = ns.global_cluster or f"pay-prod-{ns.cell}-aurora-payments"
+    ns.lock_table = ns.lock_table or f"{ns.name_prefix}-prod-{short(ns.lock_region)}-dr-lock"
+    ns.global_cluster = ns.global_cluster or f"{ns.name_prefix}-prod-{ns.cell}-aurora-payments"
+    ns.fence_rule_group = ns.fence_rule_group or f"{ns.name_prefix}-prod-{short(ns.source_region)}-psp-fence"
     ns.target_endpoint_groups = dict(p.split("=", 1) for p in ns.target_endpoint_group)
     missing = {ns.target_region, ns.fallback_region} - set(ns.target_endpoint_groups)
     if missing:

@@ -7,3 +7,4 @@ Chaos experiments as code, stage only; each has a hypothesis and a stop conditio
 - `region-switch/`: quarterly full-switch scenario of D7 (us-east-1, then us-east-2) and the plan-B variant, with a dry-run runner.
 - `lib/`: guard (freeze, incident, environment) and the FIS template validator.
 - Offline proof: `python3 -m unittest discover -s tests` from this directory. Catalog: `docs/chaos/catalog.md`.
+- Templates and manifests carry `${STAGE_ACCOUNT_ID}`, `${NAME_PREFIX}`, `${REGION}` and `${REGION_SHORT}`; fill them with `envsubst` from `config/platform.yaml` before `aws fis create-experiment-template` or `kubectl apply`.
