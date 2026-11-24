@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "render"))
 import render_admin_gateway as r  # noqa: E402
 
 CFG = yaml.safe_load((r.ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))

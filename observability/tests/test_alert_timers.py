@@ -32,7 +32,7 @@ def hours(text):
 
 def rules():
     found = []
-    for path in sorted((OBS / "alerts").rglob("*.yaml")) + sorted((OBS / "slo" / "generated").glob("*.yaml")):
+    for path in sorted((OBS / "alerts").rglob("*.yaml")) + sorted((OBS / "slo" / "generated").rglob("*.yaml")):
         for doc in yaml.safe_load_all(path.read_text(encoding="utf-8")):
             if isinstance(doc, dict) and doc.get("kind") == "PrometheusRule":
                 for group in doc["spec"]["groups"]:

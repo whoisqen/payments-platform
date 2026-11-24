@@ -13,8 +13,13 @@ DOCS = {p.name: yaml.safe_load(p.read_text()) for p in generate.sources()}
 BUDGET_MINUTES = {"payments-authorization": 4.3, "payments-platform-overhead": 43.2, "payments-status": 21.6, "payments-webhooks": 43.2}
 
 
+def all_groups(doc):
+    """The rules of the in-cluster Prometheus and the ones of the central rule evaluator."""
+    return generate.build(doc)["spec"]["groups"] + generate.build(doc, central=True)["spec"]["groups"]
+
+
 def alerts(doc):
-    rules = generate.build(doc)["spec"]["groups"]
+    rules = all_groups(doc)
     return {r["alert"]: r for g in rules for r in g["rules"] if "alert" in r}
 
 
@@ -47,6 +52,15 @@ class GeneratedRulesTest(unittest.TestCase):
             fastest = [n for n in names if n.endswith("BurnFastest")]
             self.assertEqual(len(fastest), 1 if doc["service"] == "payments-authorization" else 0, doc["service"])
             self.assertEqual(len(names), 4 if fastest else 3)
+
+    def test_rules_that_look_back_beyond_the_local_retention_are_central_only(self):
+        for doc in DOCS.values():
+            local = {r.get("record") or r["alert"] for g in generate.build(doc)["spec"]["groups"] for r in g["rules"]}
+            far = {r.get("record") or r["alert"] for g in generate.build(doc, central=True)["spec"]["groups"] for r in g["rules"]}
+            self.assertFalse(local & far)
+            self.assertTrue({"slo:sli_error:ratio_rate3d", "slo:sli_error:ratio_rate30d", "slo:period_burn_rate:ratio"} <= far)
+            self.assertTrue(any(n.endswith("BurnTicket") for n in far))
+            self.assertFalse(any(n.endswith(("BurnFast", "BurnSlow")) for n in far))
 
     def test_burn_rates_and_window_pairs(self):
         auth = alerts(DOCS["authorization-availability.yaml"])
@@ -82,7 +96,7 @@ class GeneratedRulesTest(unittest.TestCase):
 
     def test_recording_rules_cover_every_window_used(self):
         for doc in DOCS.values():
-            spec = generate.build(doc)["spec"]["groups"]
+            spec = all_groups(doc)
             records = {r["record"] for g in spec for r in g["rules"] if "record" in r}
             for rule in alerts(doc).values():
                 for window in ("1m", "5m", "30m", "1h", "6h", "3d"):
