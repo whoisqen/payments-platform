@@ -1,8 +1,8 @@
 # Settings of the advisory AI review of pull requests (.github/workflows/ai-review.yml, tools/ai/review.py).
 model:
-  # CONFIRM: the owner must check this Bedrock inference-profile id for the Sonnet 5.5 family in the Bedrock console
+  # CONFIRM: the owner must check this Bedrock inference-profile id for the Opus 5.5 family in the Bedrock console
   # (Cross-region inference) before the first run; a wrong id fails with a warning and the review is skipped.
-  id: eu.anthropic.claude-sonnet-5-5-v1:0
+  id: eu.anthropic.claude-opus-5-5-v1:0
   region: eu-central-1
   max_tokens: 4096
   temperature: 0.1
