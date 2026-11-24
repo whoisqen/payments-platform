@@ -67,6 +67,24 @@ class GrafanaGroupsTest(unittest.TestCase):
         self.assertTrue(any("different group" in e for e in validate.check(cfg)))
 
 
+class OktaTest(unittest.TestCase):
+    def cfg(self):
+        return yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
+
+    def test_the_domain_is_a_host_name_of_an_okta_organization(self):
+        for bad in ("", "https://acme.okta.com", "acme.example.com"):
+            cfg = self.cfg()
+            cfg["access"]["okta_domain"] = bad
+            self.assertTrue(any("okta_domain" in e for e in validate.check(cfg)), bad)
+
+    def test_one_administrator_is_not_enough(self):
+        cfg = self.cfg()
+        cfg["access"]["admin_user_ids"] = ["00u1owner"]
+        self.assertTrue(any("admin_user_ids" in e for e in validate.check(cfg)))
+        cfg["access"]["admin_user_ids"] = ["00u1owner", "00u2reserve"]
+        self.assertFalse(any("admin_user_ids" in e for e in validate.check(cfg)))
+
+
 class ConfigTest(unittest.TestCase):
     def test_platform_config_is_valid_and_has_prod(self):
         cfg = yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
