@@ -1,0 +1,41 @@
+# global.registry, global.environment and global.cell come from the cell layers and a parameter of the ApplicationSet
+global:
+  registry: ""
+  environment: ""
+  cell: ""
+
+# CI writes images.smoke to deploy/envs/<env>/images.yaml. Without a real digest (missing, malformed or all-zero) the chart renders no object, so no PostSync hook exists
+images: {}
+
+smoke:
+  image:
+    repository: smoke
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  # Live mode of tests/smoke, reads only the environment below; to be provided by the test owner
+  command: ["python", "-m", "smoke.live"]
+  serviceAccountName: smoke
+  routerService: router
+  routerPort: 8080
+  cellHeader: x-payments-cell
+  # Matches the 90 second budget of the suite plus the start-up of the sidecar
+  testTimeoutSeconds: 90
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 600
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# Dummy connector credentials, never real card data. JSON keys of the Secrets Manager secret pay/<env>/smoke/dummy-connector
+credentials:
+  secretName: smoke-credentials
+  remoteKeyPattern: pay/%s/smoke/dummy-connector
+  refreshInterval: 1h
+  secretStore: aws-secrets-manager
+  properties: [api_key, merchant_id, profile_id, connector, payment_method_token]
+
+# Only the router of the cell, DNS and the sidecar control plane
+networkPolicy:
+  enabled: true

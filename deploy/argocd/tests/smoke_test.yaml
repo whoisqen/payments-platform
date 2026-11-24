@@ -1,0 +1,87 @@
+suite: smoke PostSync and notifications wiring
+templates:
+  - applicationset-cells.yaml
+  - applicationset-gated.yaml
+  - applicationset-shared.yaml
+  - addons/argocd.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: release
+  cluster.namePrefix: acme
+  cluster.region: us-east-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+  gated.revision: v1.0.0
+tests:
+  - it: adds the smoke chart as the last source of every cell with the environment layers and the cell
+    template: applicationset-cells.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[2].path
+          value: deploy/platform/smoke/job
+      - equal:
+          path: spec.template.spec.sources[2].helm.valueFiles[1]
+          value: '$values/deploy/envs/{{ index .path.segments 2 }}/images.yaml'
+      - equal:
+          path: spec.template.spec.sources[2].helm.parameters[0]
+          value:
+            name: global.cell
+            value: '{{ .path.basename }}'
+      - equal:
+          path: spec.template.spec.sources[1].ref
+          value: values
+  - it: hands the smoke chart the image layer, so the Job exists only with a real images.smoke digest
+    template: applicationset-cells.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[2].helm.valueFiles[1]
+          value: '$values/deploy/envs/{{ index .path.segments 2 }}/images.yaml'
+      - notExists:
+          path: spec.template.spec.sources[0].helm.parameters
+  - it: gives the gated production ApplicationSet no smoke source
+    template: applicationset-gated.yaml
+    documentSelector:
+      path: metadata.name
+      value: payments-cells-gated
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.sources
+          count: 2
+      - notMatchRegex:
+          path: spec.template.spec.sources[0].path
+          pattern: smoke
+  - it: gives no shared ApplicationSet a smoke source
+    template: applicationset-shared.yaml
+    asserts:
+      - notMatchRegexRaw:
+          pattern: platform/smoke/job
+  - it: never generates a cell Application, and so no smoke Job, for the gated environments
+    template: applicationset-cells.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/prod/*/*
+            exclude: true
+      - contains:
+          path: spec.generators[0].git.directories
+          content:
+            path: deploy/envs/cde-prod/*/*
+            exclude: true
+  - it: adds the notifications values last and the notifications chart as its own source
+    template: addons/argocd.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[1]
+          value: $values/deploy/platform/smoke/notifications/argocd-values.yaml
+      - equal:
+          path: spec.template.spec.sources[2].path
+          value: deploy/platform/smoke/notifications
+      - equal:
+          path: spec.template.spec.sources[1].ref
+          value: values

@@ -1,0 +1,5 @@
+webhook:
+  alertmanager:
+    method: POST
+    body: |
+      [{"labels": {"alertname": "SmokeFailedAfterSync", "severity": "warning", "environment": "{{index .app.metadata.labels "payments-platform/environment"}}", "cell": "{{index .app.metadata.labels "payments-platform/cell"}}", "app": "{{.app.metadata.name}}"}, "annotations": {"summary": "Smoke or sync failed: {{.app.status.operationState.message}}"}}]

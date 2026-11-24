@@ -1,0 +1,7 @@
+# Last value file of the argo-cd add-on: this chart owns the config map and the secret
+notifications:
+  enabled: true
+  cm:
+    create: false
+  secret:
+    create: false

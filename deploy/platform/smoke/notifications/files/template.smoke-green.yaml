@@ -1,0 +1,5 @@
+webhook:
+  github-dispatch:
+    method: POST
+    body: |
+      {"event_type": "smoke-green-{{index .app.metadata.labels "payments-platform/environment"}}", "client_payload": {"environment": "{{index .app.metadata.labels "payments-platform/environment"}}", "app": "{{.app.metadata.name}}", "cell": "{{index .app.metadata.labels "payments-platform/cell"}}", "revisions": {{toJson .app.status.operationState.syncResult.revisions}}}}

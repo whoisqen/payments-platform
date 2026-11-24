@@ -1,0 +1,149 @@
+suite: smoke PostSync job
+templates:
+  - job.yaml
+  - serviceaccount.yaml
+  - networkpolicy.yaml
+  - externalsecret.yaml
+set:
+  images.smoke: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.cell: cell-0
+release:
+  namespace: payments
+tests:
+  - it: is a PostSync hook replaced before each sync with a bounded lifetime
+    template: job.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: BeforeHookCreation
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 180
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 600
+  - it: runs hardened with its own service account and no API token
+    template: job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: smoke
+      - isNotEmpty:
+          path: spec.template.spec.containers[0].resources.limits.memory
+  - it: pulls the image by digest and targets the router of the cell
+    template: job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/smoke@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMOKE_ROUTER_URL
+            value: http://router.payments.svc:8080
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMOKE_CELL
+            value: cell-0
+  - it: reads the credentials from the secret keys
+    template: job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMOKE_PAYMENT_METHOD_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: smoke-credentials
+                key: payment_method_token
+  - it: renders nothing without a digest in images.yaml
+    set:
+      images: null
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: renders nothing for the all-zero placeholder
+    set:
+      images.smoke: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: falls back to the chart default digest only when it is real
+    set:
+      images: null
+      smoke.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    template: job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/smoke@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - it: is a PostSync hook pinned to the digest of images.yaml
+    template: job.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+  - it: rejects a malformed digest
+    template: job.yaml
+    set:
+      smoke.image.digest: latest
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+  - it: has no role binding, only a service account
+    template: serviceaccount.yaml
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+  - it: allows egress to DNS, istiod and the router only
+    template: networkpolicy.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 3
+      - equal:
+          path: spec.egress[2].ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ingress
+          value: []
+  - it: reads the dummy connector credentials of the environment
+    template: externalsecret.yaml
+    asserts:
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: pay/dev/smoke/dummy-connector
+      - lengthEqual:
+          path: spec.data
+          count: 5
+      - notContains:
+          path: spec.data
+          content:
+            secretKey: card_number

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["global", "smoke", "credentials", "networkPolicy"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["registry", "environment", "cell"],
+      "properties": {
+        "registry": {"type": "string"},
+        "environment": {"type": "string", "pattern": "^[a-z0-9-]*$"},
+        "cell": {"type": "string", "pattern": "^[a-z0-9-]*$"}
+      }
+    },
+    "images": {"type": "object", "properties": {"smoke": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}}},
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "command", "serviceAccountName", "routerService", "routerPort", "cellHeader", "testTimeoutSeconds", "activeDeadlineSeconds", "ttlSecondsAfterFinished", "resources"],
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "digest"],
+          "properties": {
+            "repository": {"type": "string", "minLength": 1},
+            "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+          }
+        },
+        "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "serviceAccountName": {"type": "string", "minLength": 1},
+        "routerService": {"type": "string", "minLength": 1},
+        "routerPort": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "cellHeader": {"type": "string", "minLength": 1},
+        "testTimeoutSeconds": {"type": "integer", "minimum": 1},
+        "activeDeadlineSeconds": {"type": "integer", "minimum": 30},
+        "ttlSecondsAfterFinished": {"type": "integer", "minimum": 60},
+        "resources": {
+          "type": "object",
+          "required": ["requests", "limits"],
+          "properties": {
+            "requests": {"type": "object", "required": ["cpu", "memory"]},
+            "limits": {"type": "object", "required": ["memory"]}
+          }
+        }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secretName", "remoteKeyPattern", "refreshInterval", "secretStore", "properties"],
+      "properties": {
+        "secretName": {"type": "string", "minLength": 1},
+        "remoteKeyPattern": {"type": "string", "pattern": "^pay/%s/smoke/[a-z0-9-]+$"},
+        "refreshInterval": {"type": "string"},
+        "secretStore": {"type": "string", "minLength": 1},
+        "properties": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z_]+$"}}
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {"enabled": {"type": "boolean"}}
+    }
+  }
+}
