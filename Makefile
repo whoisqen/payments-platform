@@ -9,7 +9,7 @@ PY_TESTS := $(sort $(wildcard tools/ci/tests tools/lint/tests scripts/*/tests te
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 
-.PHONY: help bootstrap lint test plan image-amd64 lint-workflows lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
+.PHONY: help bootstrap lint test plan image-amd64 lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
 	test-python test-terraform test-helm test-policy
 
 help:
@@ -20,7 +20,7 @@ bootstrap: ## install the pinned tools from mise.toml and the git hooks
 	mise install
 	git config core.hooksPath tools/scripts/git-hooks
 
-lint: lint-repo lint-workflows lint-docker lint-terraform lint-helm lint-python lint-secrets ## every static check CI runs
+lint: lint-repo lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets ## every static check CI runs
 
 lint-repo:
 	tools/lint/spec-lint
@@ -43,6 +43,9 @@ lint-repo:
 
 lint-workflows:
 	actionlint $(WORKFLOWS)
+
+lint-migrations: ## migrations added or changed against origin/main
+	python3 tools/ci/migration_check.py check --base origin/main --head HEAD
 
 lint-docker:
 	python3 tools/ci/dockerfile_check.py

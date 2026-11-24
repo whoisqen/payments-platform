@@ -1,0 +1,14 @@
+# Lints only the migrations a pull request adds or changes (tools/ci/migration_check.py list); upstream history is not re-linted.
+# Aurora PostgreSQL 16.8 (infra/modules/aurora-global).
+pg_version = "16"
+# assume_in_transaction is a CLI flag: the CI job passes it for every migration except those with run_in_transaction = false in metadata.toml.
+# Style rules of the upstream schema (timestamp, int, varchar) and timeouts, which the migrator role sets for the session.
+excluded_rules = [
+  "prefer-robust-stmts",
+  "prefer-text-field",
+  "prefer-bigint-over-int",
+  "prefer-bigint-over-smallint",
+  "prefer-identity",
+  "prefer-timestamptz",
+  "require-timeout-settings",
+]

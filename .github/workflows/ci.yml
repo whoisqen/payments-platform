@@ -33,6 +33,7 @@ jobs:
       area_policy: ${{ steps.paths.outputs.area_policy }}
       area_python: ${{ steps.paths.outputs.area_python }}
       area_docker: ${{ steps.paths.outputs.area_docker }}
+      area_migrations: ${{ steps.paths.outputs.area_migrations }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -279,10 +280,70 @@ jobs:
           install_args: hadolint shellcheck conftest python
       - run: make lint-docker
 
+  migrations:
+    needs: [changes, lint-fast]
+    if: needs.changes.outputs.area_migrations == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        # Aurora PostgreSQL 16.8; the digest is the multi-arch index of the tag
+        image: postgres:16.8@sha256:301bcb60b8a3ee4ab7e147932723e3abd1cef53516ce5210b39fd9fe5e3602ae
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: github:sbdchd/squawk python
+      - name: structure and expand-contract rules
+        env:
+          CONTRACT: ${{ contains(github.event.pull_request.labels.*.name, 'contract-migration') }}
+        run: |
+          flag=()
+          if [ "$CONTRACT" = true ]; then flag=(--contract); fi
+          python3 tools/ci/migration_check.py check --base "$BASE_SHA" --head "$HEAD_SHA" "${flag[@]}"
+      - name: squawk
+        env:
+          CONTRACT: ${{ contains(github.event.pull_request.labels.*.name, 'contract-migration') }}
+        run: |
+          # a contract-migration PR may drop and rename; migration_check.py has already required the label and the snapshot
+          exclude=()
+          if [ "$CONTRACT" = true ]; then exclude=("--exclude=ban-drop-column,ban-drop-table,renaming-column,renaming-table,changing-column-type,ban-drop-not-null"); fi
+          status=0
+          mapfile -t tx < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-tx)
+          mapfile -t notx < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-notx)
+          if [ "${#tx[@]}" -gt 0 ]; then squawk --assume-in-transaction "${exclude[@]}" "${tx[@]}" || status=1; fi
+          if [ "${#notx[@]}" -gt 0 ]; then squawk "${exclude[@]}" "${notx[@]}" || status=1; fi
+          echo "squawk: ${#tx[@]} transactional and ${#notx[@]} non-transactional migration(s) linted"
+          exit "$status"
+      - name: up, down, up
+        run: |
+          for r in vendor/hyperswitch vendor/card-vault; do
+            mapfile -t new < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope new --root "$r/migrations" | cut -d' ' -f2)
+            [ "${#new[@]}" -gt 0 ] || { echo "no new migration under $r"; continue; }
+            tools/ci/migration_roundtrip.sh "$r/migrations" "${new[@]}"
+          done
+
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, hotfix-guard, policy, docker]
+    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, hotfix-guard, policy, docker, migrations]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
