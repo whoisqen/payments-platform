@@ -1,0 +1,17 @@
+# Overlay of observability/exporters/kafka.yaml: the chart takes one TLS secret and labels pods by app, the monitor selects by app.kubernetes.io/name.
+tls:
+  enabled: true
+  secretName: msk-exporter-tls
+  mountPath: /secret/certs
+service:
+  labels: {app.kubernetes.io/name: prometheus-kafka-exporter}
+podLabels: {app.kubernetes.io/name: prometheus-kafka-exporter}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile: {type: RuntimeDefault}
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
