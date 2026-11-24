@@ -31,6 +31,7 @@ lint-repo:
 	python3 tools/config/render_victoria.py --check
 	python3 tools/config/render_vault.py --check
 	python3 tools/config/render_grafana.py --check
+	python3 tools/config/render_exporters.py --check
 	python3 tools/config/render_otel.py --check
 
 lint-workflows:
