@@ -183,7 +183,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -461,7 +461,7 @@
         "h": 9
       },
       "title": "nodes: CPU use (top 8 nodes), %",
-      "description": "",
+      "description": "Guidance (70%, 90%), not an alert.",
       "targets": [
         {
           "refId": "A",
@@ -540,7 +540,7 @@
         "h": 9
       },
       "title": "nodes: memory use (top 8 nodes), %",
-      "description": "",
+      "description": "Guidance (70%, 90%), not an alert.",
       "targets": [
         {
           "refId": "A",

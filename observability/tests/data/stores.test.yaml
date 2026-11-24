@@ -8,7 +8,7 @@ tests:
     grafana_url: https://grafana.example.test
   input_series:
   - series: aws_dynamodb_throttled_requests_sum{table_name="merchant-cell-map"}
-    values: 0+3x21
+    values: _x5 3x16
   alert_rule_test:
   - eval_time: 17m
     alertname: DynamoDbThrottling

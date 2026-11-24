@@ -6,11 +6,59 @@ tests:
   external_labels:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
+  # YACE exports the failed-job count of one period, then nothing; there is no expired-job series at all
   input_series:
   - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
-    values: 0+1x19
+    values: _x3 1x2 _x14
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-job-failed
+        backup_vault: gold
+      exp_annotations:
+        summary: An AWS Backup job failed or expired
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
+        dashboard_url: https://grafana.example.test/d/backup
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
   - series: aws_backup_number_of_backup_jobs_expired_sum{backup_vault="gold"}
-    values: 0+0x19
+    values: _x3 2x2 _x14
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: data-platform
+        service: aws-backup
+        owner: data-platform-oncall
+        layer: backup-dr
+        failure_mode: backup-dr-backup-job-failed
+        backup_vault: gold
+      exp_annotations:
+        summary: An AWS Backup job failed or expired
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/backup-job-failed.md
+        dashboard_url: https://grafana.example.test/d/backup
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  # a zero failed-job sample must not hide the expired jobs of the same vault
+  input_series:
+  - series: aws_backup_number_of_backup_jobs_failed_sum{backup_vault="gold"}
+    values: 0x19
+  - series: aws_backup_number_of_backup_jobs_expired_sum{backup_vault="gold"}
+    values: _x3 2x2 _x14
   alert_rule_test:
   - eval_time: 15m
     alertname: BackupJobFailed
@@ -84,7 +132,7 @@ tests:
     grafana_url: https://grafana.example.test
   input_series:
   - series: aws_backup_number_of_copy_jobs_failed_sum{backup_vault="gold"}
-    values: 0+1x19
+    values: _x3 1x2 _x14
   alert_rule_test:
   - eval_time: 15m
     alertname: BackupCopyFailed

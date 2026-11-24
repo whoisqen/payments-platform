@@ -49,6 +49,13 @@ config:
       repeat_interval: 8760h
     - receiver: slack-security
       matchers:
+      - team="security"
+      group_by:
+      - alertname
+      - region
+      repeat_interval: 8760h
+    - receiver: slack-security
+      matchers:
       - severity="security"
       group_by:
       - alertname
@@ -115,6 +122,12 @@ config:
     - alertname=~"CrashLoopBackOff"
     equal:
     - node
+  - source_matchers:
+    - alertname=~".*BurnFastest"
+    target_matchers:
+    - alertname=~".*BurnFast"
+    equal:
+    - slo
   - source_matchers:
     - alertname=~".*BurnFast|.*BurnFastest"
     target_matchers:

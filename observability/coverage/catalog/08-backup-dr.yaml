@@ -8,7 +8,7 @@ modes:
   severity: critical
   alert: BackupJobFailed
   signal: metric
-  detect_within: 3m
+  detect_within: 5m
 - layer: backup-dr
   id: backup-dr-backup-missing
   component: aws-backup
@@ -35,7 +35,7 @@ modes:
   severity: warning
   alert: BackupCopyFailed
   signal: metric
-  detect_within: 3m
+  detect_within: 8m
 - layer: backup-dr
   id: backup-dr-snapshot-copy-stale
   component: snapshot-copy
@@ -62,7 +62,7 @@ modes:
   severity: warning
   alert: RestoreDurationNearTarget
   signal: metric
-  detect_within: 3m
+  detect_within: 8m
 - layer: backup-dr
   id: backup-dr-restore-too-slow
   component: restore-test
@@ -71,7 +71,7 @@ modes:
   severity: warning
   alert: RestoreTooSlow
   signal: metric
-  detect_within: 3m
+  detect_within: 8m
 - layer: backup-dr
   id: backup-dr-latest-restorable-time-lag-high
   component: pitr
@@ -98,7 +98,7 @@ modes:
   severity: critical
   alert: AuroraGlobalLagRpoBudgetExceeded
   signal: metric
-  detect_within: 4m
+  detect_within: 5m
 - layer: backup-dr
   id: backup-dr-dynamo-db-global-table-lag-high
   component: global-tables
@@ -125,7 +125,7 @@ modes:
   severity: warning
   alert: RestoreTestStale
   signal: metric
-  detect_within: 3m
+  detect_within: 8m
 - layer: backup-dr
   id: backup-dr-dr-switch-test-overdue
   component: dr-test
@@ -134,7 +134,7 @@ modes:
   severity: warning
   alert: DrSwitchTestOverdue
   signal: metric
-  detect_within: 3m
+  detect_within: 8m
 - layer: backup-dr
   id: backup-dr-backup-vault-policy-changed
   component: backup-vault

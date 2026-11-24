@@ -32,6 +32,8 @@ spec:
             releaseName: grafana
             valueFiles:
               - $values/deploy/platform/grafana/values.yaml
+              # Who may log in and with which role, generated from config access.grafana_groups
+              - $values/deploy/platform/grafana/access.yaml
             parameters:
               # The Service names of the victoria-metrics and alertmanager add-ons hold the cluster name
               - name: env.VM_URL

@@ -35,7 +35,7 @@ modes:
   severity: warning
   alert: PodOOMKilled
   signal: metric
-  detect_within: 4m
+  detect_within: 8m
 - layer: compute
   id: compute-pods-pending-too-long
   component: scheduling

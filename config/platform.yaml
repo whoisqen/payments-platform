@@ -38,6 +38,8 @@ dns:
   prod_zone: pay.example.com
   psp_domains: [.psp-sandbox.example.com]
   grafana_url: https://grafana.payments.internal
+  # Zone of the admin tools (argocd, vault, alertmanager, vmui, prometheus, sentry); reached only through the internal gateway
+  admin_zone: payments.internal
 
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
@@ -46,8 +48,21 @@ storage:
   state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
 
 access:
+  # Okta organization that signs the administrators in to every admin tool (host name, no https://)
+  okta_domain: example.okta.com
+  # Okta user ids of the members of the administrator group: the owner and one reserve administrator
+  admin_user_ids: []
   # Name of the IAM Identity Center permission set that gets view-only access to the clusters
   sre_view_permission_set: AWSReservedSSO_SRE-View
+  # Groups of the identity provider (OIDC `groups` claim) that decide who may enter Grafana and with which role;
+  # a person in none of them cannot log in. The role of each group is fixed in tools/config/render_grafana.py.
+  grafana_groups:
+    admin: pay-grafana-admins      # Grafana server and organization administrators (few people)
+    sre: pay-sre                   # on-call and platform engineers: dashboards, Explore, silences
+    security: pay-security         # security engineers: dashboards, Explore for investigations
+    engineering: pay-engineering   # developers: dashboards
+    finance: pay-finance           # finance and FinOps: dashboards
+    audit: pay-audit               # assessors and auditors: dashboards
 
 deploy:
   # Values written into deploy/ by tools/config/render.py. The suffixes are the account-specific part of the
@@ -97,6 +112,8 @@ central:
   # Replace the example host names with the real ones.
   metrics_remote_write_url: https://metrics.observability.pay.example.com/insert/0/prometheus/api/v1/write
   alertmanager_url: https://alertmanager.observability.pay.example.com
+  # Sentry (error tracking, self-hosted, no card data); applications send events to the DSN host under this URL
+  sentry_url: https://sentry.observability.pay.example.com
   # the OTLP/HTTP exporter appends /v1/logs, and Loki serves it under /otlp
   logs_otlp_endpoint: https://logs.observability.pay.example.com:4318/otlp
   traces_otlp_endpoint: tempo.observability.pay.example.com:4317

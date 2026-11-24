@@ -33,6 +33,11 @@ spec:
             parameters:
               - name: prometheus.prometheusSpec.externalLabels.runbook_base_url
                 value: {{ printf "%s/blob/%s" .Values.repo.url .Values.repo.revision | quote }}
+              # Which environment and region an alert comes from: inhibition by region and the grouping of the Alertmanager need them
+              - name: prometheus.prometheusSpec.externalLabels.env
+                value: '{{`{{ index .metadata.labels "payments-platform/environment" }}`}}'
+              - name: prometheus.prometheusSpec.externalLabels.region
+                value: '{{`{{ index .metadata.labels "payments-platform/region" }}`}}'
               - name: prometheus.prometheusSpec.externalLabels.grafana_url
                 value: {{ .Values.observability.grafanaUrl | quote }}
               # Both replicas push every sample to the central store, which keeps one of each pair; their alerts go to its Alertmanager cluster

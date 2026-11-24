@@ -58,7 +58,7 @@ def red(d, name, err_thr):
     d.row("Overview")
     d.stat(f"{name}: requests per second", requests(""), "reqps", thr=steps(info=True), decimals=1)
     d.stat(f"{name}: 5xx share", err_ratio(""), "percent", hi=100, thr=err_thr, decimals=2)
-    d.stat(f"{name}: p99 latency", quantile(0.99, "http_server_request_duration_seconds", by="service"), "s", thr=steps(0.3, 1), decimals=3)
+    d.stat(f"{name}: p99 latency", quantile(0.99, "http_server_request_duration_seconds", by="service"), "s", thr=steps(0.3, 1), decimals=3, desc="Guidance (300 ms, 1 s), not an alert; the latency alerts are on the PSP and the SLO burn.")
     d.stat(f"{name}: ready replicas", f'sum(kube_deployment_status_replicas_ready{{{F},deployment=~"$service.*"}})', "short", thr=steps(None, 1, invert=True),
            desc="Pods ready to take traffic; red at zero.")
     d.row("Traffic")
@@ -74,7 +74,7 @@ def red(d, name, err_thr):
     d.row("Resources")
     d.ts(f"{name}: CPU use, % of limit (top 8 pods)", [(top("100 * " + ratio(f'sum by (pod) (rate(container_cpu_usage_seconds_total{{{F},{CADVISOR_CONTAINERS},pod=~"$service.*"}}[5m]))',
                                                                             f'sum by (pod) (kube_pod_container_resource_limits{{{F},pod=~"$service.*",resource="cpu"}})')), "{{pod}}")],
-         "percent", hi=100, thr=steps(70, 90))
+         "percent", hi=100, thr=steps(70, 90), desc="Guidance (70%, 90%), not an alert.")
     d.ts(f"{name}: memory working set (top 8 pods), bytes", [(top(f'sum by (pod) (container_memory_working_set_bytes{{{F},{CADVISOR_CONTAINERS},pod=~"$service.*"}})'), "{{pod}}")], "bytes")
 
 
@@ -238,8 +238,8 @@ def build_all():
     d.row("Resources")
     d.ts("cells: MemoryDB memory use by cell, %", [(f'100 * max by (cell) (redis_memory_used_bytes{{{FC}}} / redis_memory_max_bytes{{{FC}}})', "{{cell}}")], "percent", hi=100,
          thr=steps(T.MEMORYDB_MEM_WARN * 100, T.MEMORYDB_MEM_CRIT * 100), link=to("data-stores", "cell"))
-    d.ts("cells: HPA replicas (top 8), replicas", [(top(f'sum by (cell, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{{{FC}}})'),
-                                                    "{{cell}} {{horizontalpodautoscaler}}")], "short")
+    d.ts("cells: HPA replicas (top 8), replicas", [(top(f'sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{{{F}}})'),
+                                                    "{{horizontalpodautoscaler}}")], "short", desc="The cell filter does not apply: kube-state-metrics series carry no cell label.")
     out.append(("l2-platform", d))
 
     d = Dashboard("kubernetes", TITLES["kubernetes"], "l2", ["use", "kubernetes"], links=nav("platform-overview", "cells"), runbooks=["compute"], description="Is there enough capacity?")
@@ -249,8 +249,8 @@ def build_all():
     d.stat("subnets: lowest free IP share", f'100 * min(subnet_free_ip_ratio{{{F}}})', "percent", hi=100, thr=steps(T.SUBNET_FREE_IP_RATIO * 100, invert=True),
            desc="Pods and nodes take IPs from these subnets; SubnetFreeIpsLow warns below 20%.")
     d.row("Utilization")
-    d.ts("nodes: CPU use (top 8 nodes), %", [(top(f'100 * (1 - avg by (node) (rate(node_cpu_seconds_total{{{F},mode="idle"}}[5m])))'), "{{node}}")], "percent", hi=100, thr=steps(70, 90))
-    d.ts("nodes: memory use (top 8 nodes), %", [(top(f'100 * (1 - node_memory_MemAvailable_bytes{{{F}}} / node_memory_MemTotal_bytes{{{F}}})'), "{{node}}")], "percent", hi=100, thr=steps(70, 90))
+    d.ts("nodes: CPU use (top 8 nodes), %", [(top(f'100 * (1 - avg by (node) (rate(node_cpu_seconds_total{{{F},mode="idle"}}[5m])))'), "{{node}}")], "percent", hi=100, thr=steps(70, 90), desc="Guidance (70%, 90%), not an alert.")
+    d.ts("nodes: memory use (top 8 nodes), %", [(top(f'100 * (1 - node_memory_MemAvailable_bytes{{{F}}} / node_memory_MemTotal_bytes{{{F}}})'), "{{node}}")], "percent", hi=100, thr=steps(70, 90), desc="Guidance (70%, 90%), not an alert.")
     d.row("Saturation")
     d.ts("pods: container restarts per 15 min (top 8 namespaces)", [(top(f'sum by (namespace) (increase(kube_pod_container_status_restarts_total{{{F}}}[15m]))'), "{{namespace}}")], "short")
     d.ts("autoscaling: HPA replicas, % of the maximum (top 8)", [(top("100 * " + ratio(f'max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{{{F}}})',
@@ -333,7 +333,7 @@ def build_all():
     d.stat("probes: points failing", f"count({probe} == 0) or vector(0)", "short", thr=steps(1, 2), desc="RegionDown pages when two of the three independent points fail.")
     d.stat("dr test: days since last switch", f'(time() - max(dr_switch_test_last_success_timestamp_seconds{{env=~"$env"}})) / 86400', "suffix: days", thr=steps(T.DR_TEST_OVERDUE_D),
            decimals=0, desc="The test is quarterly, to us-east-1 and us-east-2 in turn; DrSwitchTestOverdue warns after 100 days.")
-    d.stat("dr test: last switch duration", f'max(dr_switch_test_duration_seconds{{env=~"$env"}}) / 60', "suffix: min", thr=steps(60, 75), decimals=0, desc="RTO target 60 minutes, 75 in plan B.")
+    d.stat("dr test: last switch duration", f'max(dr_switch_test_duration_seconds{{env=~"$env"}}) / 60', "suffix: min", thr=steps(60, 75), decimals=0, desc="RTO target 60 minutes, 75 in plan B; a target, not an alert.")
     d.stat("dr: lowest cache warm ratio", f'100 * min(cache_warm_ratio{{{F}}})', "percent", hi=100, thr=steps(T.CACHE_WARM_RATIO * 100, invert=True),
            desc="A cell takes traffic at 75% of the priority keys.")
     d.row("Replication")
@@ -382,7 +382,7 @@ def build_all():
            desc="Daily spend divided by the payment attempts of the last 24 hours, per 1000.")
     d.stat("finops: spend this month", 'sum(finops_cost_usd_month_to_date{env=~"$env"})', "currencyUSD", decimals=0)
     d.stat("finops: budget used", "100 * " + ratio('sum(finops_cost_usd_month_to_date{env=~"$env"})', 'sum(finops_budget_usd_month{env=~"$env"})'), "percent", hi=120, thr=steps(80, 100),
-           desc="Month-to-date spend against the monthly budget.")
+           desc="Month-to-date spend against the monthly budget; 80% and 100% are guidance, not an alert.")
     d.row("Spend")
     d.bars("finops: last daily spend by component, USD", 'sum by (component) (finops_cost_usd_per_day{env=~"$env"})', "{{component}}", "currencyUSD")
     d.ts("finops: daily spend by component over time, USD", [('sum by (component) (finops_cost_usd_per_day{env=~"$env"})', "{{component}}")], "currencyUSD")
