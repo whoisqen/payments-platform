@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-loki
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'loki-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: loki
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: loki
+          targetRevision: 7.7.0
+          helm:
+            # Fixed release name: the Services (loki-gateway, tempo-distributor) are what the front door and Grafana address
+            releaseName: loki
+            valueFiles:
+              - $values/deploy/platform/loki/values.yaml
+              - $values/deploy/platform/loki/storage.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

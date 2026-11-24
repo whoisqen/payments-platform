@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-sentry
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'sentry-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: sentry
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: sentry
+      sources:
+        # The upstream chart versions are pinned here and bumped by Renovate
+        - repoURL: https://sentry-kubernetes.github.io/charts
+          chart: sentry
+          targetRevision: 36.1.0
+          helm:
+            releaseName: sentry
+            valueFiles:
+              - $values/deploy/platform/sentry/values.yaml
+            parameters:
+              - name: system.url
+                value: {{ .Values.central.sentryUrl | quote }}
+              - name: ingress.hostname
+                value: {{ (urlParse .Values.central.sentryUrl).host | quote }}
+              - name: ingress.tls[0].hosts[0]
+                value: {{ (urlParse .Values.central.sentryUrl).host | quote }}
+        # ClickHouse is not part of the sentry chart; Snuba reaches it as sentry-clickhouse
+        - repoURL: registry-1.docker.io/bitnamicharts
+          chart: clickhouse
+          targetRevision: 9.4.4
+          helm:
+            releaseName: sentry-clickhouse
+            valueFiles:
+              - $values/deploy/platform/sentry/clickhouse-values.yaml
+        # The ExternalSecret with the credentials, the PodDisruptionBudgets and the primary service of PostgreSQL
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/sentry/manifests
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

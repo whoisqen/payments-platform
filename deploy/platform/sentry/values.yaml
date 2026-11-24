@@ -1,0 +1,162 @@
+# Values of the upstream sentry chart; secrets come from the ExternalSecret `sentry-secrets` (manifests/externalsecret.yaml).
+# system.url is set by the add-on parameter from central.sentry_url.
+# Release name is `sentry`: manifests/ select pods and name services after it.
+
+# Argo CD runs the init steps as sync waves; the chart must not generate or look up anything at render time
+useArgoCdCompatibleAnnotations: true
+asHook: false
+
+user:
+  create: true
+  email: admin@sentry.invalid
+  existingSecret: sentry-secrets
+  existingSecretKey: admin-password
+
+system:
+  public: false
+  adminEmail: admin@sentry.invalid
+
+sentry:
+  existingSecret: sentry-secrets
+  existingSecretKey: system-secret-key
+  singleOrganization: true
+  features:
+    # Replays record page content and can capture card data
+    enableSessionReplay: false
+    enableProfiling: false
+    enableSpan: false
+    enableUptime: false
+    enableFeedback: false
+  web:
+    replicas: 2
+    resources:
+      requests: {cpu: 500m, memory: 1Gi}
+      limits: {memory: 2Gi}
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector: {matchLabels: {app: sentry, release: sentry, role: web}}
+  taskWorker:
+    resources:
+      requests: {cpu: 500m, memory: 1Gi}
+      limits: {memory: 2Gi}
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                  - {key: app, operator: In, values: [sentry]}
+                  - {key: role, operator: In, values: [taskworker-default, taskworker-ingest, taskworker-long, taskworker-products]}
+    workers:
+      - {name: default, brokerName: default, brokerReplicas: 1, concurrency: 4, replicas: 2}
+      - {name: ingest, brokerName: ingest, brokerReplicas: 1, concurrency: 4, replicas: 2}
+      - {name: long, brokerName: long, brokerReplicas: 1, concurrency: 4, replicas: 2}
+      - {name: products, brokerName: products, brokerReplicas: 1, concurrency: 4, replicas: 2}
+
+relay:
+  asHook: false
+  replicas: 2
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {memory: 1Gi}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector: {matchLabels: {app: sentry, release: sentry, role: relay}}
+
+snuba:
+  api:
+    replicas: 2
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector: {matchLabels: {app: sentry, release: sentry, role: snuba-api}}
+
+# Events and attachments are written by every web and worker pod, so the volume must be shared (ReadWriteMany, for example EFS)
+filestore:
+  backend: filesystem
+  filesystem:
+    persistence:
+      enabled: true
+      accessMode: ReadWriteMany
+      storageClass: efs
+      size: 100Gi
+      persistentWorkers: true
+      lookupVolumeName: false
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  tls:
+    - secretName: sentry-tls
+
+# Data scrubbing for card data is set per organization (see README.md and pii-config.json); sensitive defaults of the server
+config:
+  sentryConfPy: |
+    SENTRY_OPTIONS["system.event-retention-days"] = 30
+    SENTRY_OPTIONS["auth.allow-registration"] = False
+    SENTRY_OPTIONS["sentry:require-scrub-defaults"] = True
+    SENTRY_OPTIONS["sentry:require-scrub-data"] = True
+    SENTRY_OPTIONS["sentry:require-scrub-ip-address"] = True
+auth:
+  register: false
+
+launchpadTaskWorker:
+  existingSecret: sentry-secrets
+  existingSecretKey: launchpad-rpc-secret
+
+geodata:
+  persistence:
+    lookupVolumeName: false
+
+externalClickhouse:
+  host: sentry-clickhouse
+  singleNode: false
+  clusterName: default
+  distributedClusterName: default
+  existingSecret: sentry-secrets
+  existingSecretKey: clickhouse-password
+
+postgresql:
+  enabled: true
+  architecture: replication
+  auth:
+    existingSecret: sentry-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: postgres-password
+      replicationPasswordKey: replication-password
+  readReplicas:
+    replicaCount: 2
+    persistence: {size: 50Gi}
+   
+  primary:
+    persistence: {size: 50Gi}
+    extendedConfiguration: |
+      max_connections=300
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    existingSecret: sentry-secrets
+    existingSecretPasswordKey: redis-password
+  master:
+    persistence: {enabled: true, size: 8Gi}
+  replica:
+    replicaCount: 2
+    persistence: {enabled: true, size: 8Gi}
+
+kafka:
+  enabled: true
+  controller:
+    replicaCount: 3
+    persistence: {size: 100Gi}
+  provisioning:
+    replicationFactor: 3

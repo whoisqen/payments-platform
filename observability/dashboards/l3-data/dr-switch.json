@@ -1,6 +1,6 @@
 {
   "uid": "dr-switch",
-  "title": "DR switch readiness",
+  "title": "L3 DR switch readiness",
   "description": "Recovery regions us-east-1 and us-east-2: replication, probes, test history.",
   "tags": [
     "payments-platform",
@@ -13,7 +13,10 @@
   "version": 1,
   "editable": false,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "1m",
+  "liveNow": false,
+  "weekStart": "",
+  "fiscalYearStartMonth": 0,
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -22,9 +25,10 @@
     "list": [
       {
         "name": "datasource",
-        "label": "datasource",
+        "label": "Data source",
         "type": "datasource",
         "query": "prometheus",
+        "hide": 0,
         "current": {
           "text": "default",
           "value": "default"
@@ -32,7 +36,7 @@
       },
       {
         "name": "env",
-        "label": "env",
+        "label": "Environment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -41,17 +45,17 @@
         "query": "label_values(up, env)",
         "refresh": 2,
         "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
+        "multi": false,
+        "includeAll": false,
         "current": {
           "text": "prod",
           "value": "prod"
-        }
+        },
+        "hide": 0
       },
       {
         "name": "region",
-        "label": "region",
+        "label": "Region",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -62,15 +66,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "eu-central-1",
           "value": "eu-central-1"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "cell",
-        "label": "cell",
+        "label": "Cell",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -81,15 +86,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "service",
-        "label": "service",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -100,30 +106,32 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "psp",
-        "label": "psp",
+        "label": "PSP",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(psp_requests_total{env=~\"$env\"}, psp)",
+        "query": "label_values(psp_requests_total{env=~\"$env\",region=~\"$region\"}, psp)",
         "refresh": 2,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       }
     ]
   },
@@ -133,14 +141,59 @@
       "title": "L0 Platform overview",
       "url": "/d/platform-overview",
       "icon": "dashboard",
-      "targetBlank": false
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "link",
+      "title": "L3 Backup and restore",
+      "url": "/d/backup",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
     },
     {
       "type": "link",
       "title": "L3 Data stores",
       "url": "/d/data-stores",
       "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "dashboards",
+      "title": "All dashboards",
+      "tags": [
+        "payments-platform"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": true,
       "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: backup-dr",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/backup-dr",
+      "icon": "doc",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: network",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/network",
+      "icon": "doc",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: meta",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/meta",
+      "icon": "doc",
+      "targetBlank": true
     }
   ],
   "annotations": {
@@ -153,7 +206,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -162,413 +215,18 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Replication",
+      "title": "Overview",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 2,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 12,
-        "h": 8
-      },
-      "title": "aurora global: replication lag by region, ms",
-      "description": "Alert above 5 s; the RPO budget is 10 s (D7).",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum{env=~\"$env\",region=~\"$region\"})",
-          "legendFormat": "{{global_cluster}} {{region}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5000
-              },
-              {
-                "color": "red",
-                "value": 10000
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 12,
-        "h": 8
-      },
-      "title": "dynamodb global tables: replication latency, ms",
-      "description": "",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum{env=~\"$env\",region=~\"$region\"})",
-          "legendFormat": "{{table_name}} {{receiving_region}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5000
-              },
-              {
-                "color": "red",
-                "value": 10000
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 12,
-        "h": 8
-      },
-      "title": "s3: replication latency, s",
-      "description": "Replication Time Control target is 15 minutes.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "max by (bucket, destination_region) (aws_s3_replication_latency_maximum{env=~\"$env\",region=~\"$region\"})",
-          "legendFormat": "{{bucket}} {{destination_region}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 600
-              },
-              {
-                "color": "red",
-                "value": 900
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 9,
-        "w": 12,
-        "h": 8
-      },
-      "title": "snapshot copies: age by region, s",
-      "description": "",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds{env=~\"$env\",region=~\"$region\"})",
-          "legendFormat": "{{store}} {{region}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 3600
-              },
-              {
-                "color": "red",
-                "value": 7200
-              }
-            ]
-          },
-          "min": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 6,
-      "type": "row",
-      "title": "Detection",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 17,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 12,
-        "h": 8
-      },
-      "title": "probes: region health from each probe point",
-      "description": "The switch is proposed when two of three independent points fail.",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "min by (probe_point) (probe_success{env=~\"$env\",probe_target=\"region-health\"})",
-          "legendFormat": "{{probe_point}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "min": 0,
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 18,
-        "w": 12,
-        "h": 8
-      },
-      "title": "synthetic payment: success by probe point",
-      "description": "",
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "min by (probe_point) (synthetic_payment_success{env=~\"$env\"})",
-          "legendFormat": "{{probe_point}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "min": 0,
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 9,
-      "type": "row",
-      "title": "Test history",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 26,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 10,
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -576,23 +234,24 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 27,
-        "w": 4,
+        "y": 1,
+        "w": 5,
         "h": 4
       },
-      "title": "dr test: days since the last full switch test",
-      "description": "The test is quarterly, to us-east-1 and us-east-2 in turn.",
+      "title": "aurora global: worst lag",
+      "description": "Pages above 5 s; the RPO budget is 10 s (D7).",
       "targets": [
         {
           "refId": "A",
-          "expr": "(time() - max(dr_switch_test_last_success_timestamp_seconds{env=~\"$env\"})) / 86400",
+          "expr": "max(aws_rds_aurora_global_db_replication_lag_maximum{env=~\"$env\",region=~\"$region\"})",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "d",
+          "unit": "ms",
           "color": {
             "mode": "thresholds"
           },
@@ -605,16 +264,30 @@
               },
               {
                 "color": "yellow",
-                "value": 92
+                "value": 2500.0
               },
               {
                 "color": "red",
-                "value": 100
+                "value": 5000
               }
             ]
           },
           "min": 0,
-          "decimals": 0
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -622,38 +295,202 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
-      "id": 11,
+      "id": 3,
       "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 4,
-        "y": 27,
-        "w": 4,
+        "x": 5,
+        "y": 1,
+        "w": 5,
         "h": 4
       },
-      "title": "dr test: last switch duration, min",
-      "description": "RTO target 60 minutes, 75 in plan B.",
+      "title": "probes: points failing",
+      "description": "RegionDown pages when two of the three independent points fail.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(min by (probe_point) (probe_success{env=~\"$env\",probe_target=\"region-health\"}) == 0) or vector(0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "title": "dr test: days since last switch",
+      "description": "The test is quarterly, to us-east-1 and us-east-2 in turn; DrSwitchTestOverdue warns after 100 days.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(time() - max(dr_switch_test_last_success_timestamp_seconds{env=~\"$env\"})) / 86400",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: days",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "title": "dr test: last switch duration",
+      "description": "RTO target 60 minutes, 75 in plan B; a target, not an alert.",
       "targets": [
         {
           "refId": "A",
           "expr": "max(dr_switch_test_duration_seconds{env=~\"$env\"}) / 60",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "m",
+          "unit": "suffix: min",
           "color": {
             "mode": "thresholds"
           },
@@ -675,7 +512,21 @@
             ]
           },
           "min": 0,
-          "decimals": 0
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -683,33 +534,39 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
-      "id": 12,
+      "id": 6,
       "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 8,
-        "y": 27,
+        "x": 20,
+        "y": 1,
         "w": 4,
         "h": 4
       },
-      "title": "dr: cache warm ratio, min %",
-      "description": "",
+      "title": "dr: lowest cache warm ratio",
+      "description": "A cell takes traffic at 75% of the priority keys.",
       "targets": [
         {
           "refId": "A",
           "expr": "100 * min(cache_warm_ratio{env=~\"$env\",region=~\"$region\"})",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -722,12 +579,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
                 "color": "yellow",
-                "value": 50
+                "value": null
               },
               {
                 "color": "green",
@@ -736,7 +589,22 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 1,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -744,10 +612,501 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Replication",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 9
+      },
+      "title": "aurora global: replication lag by region, ms",
+      "description": "Pages above 5 s; the RPO budget is 10 s (D7).",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum{env=~\"$env\",region=~\"$region\"})",
+          "legendFormat": "{{global_cluster}} {{region}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2500.0
+              },
+              {
+                "color": "red",
+                "value": 5000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 9
+      },
+      "title": "dynamodb global tables: replication latency (top 8), ms",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum{env=~\"$env\",region=~\"$region\"}))",
+          "legendFormat": "{{table_name}} {{receiving_region}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5000
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "title": "s3: replication latency (top 8 buckets), s",
+      "description": "Replication Time Control target is 15 minutes.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, max by (bucket, destination_region) (aws_s3_replication_latency_maximum{env=~\"$env\",region=~\"$region\"}))",
+          "legendFormat": "{{bucket}} {{destination_region}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 900
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "title": "snapshot copies: age by region, s",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds{env=~\"$env\",region=~\"$region\"}))",
+          "legendFormat": "{{store}} {{region}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 7200
+              }
+            ]
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "Open L3 Backup and restore",
+              "url": "/d/backup?${__url_time_range}&${env:queryparam}&${region:queryparam}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Detection",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 9
+      },
+      "title": "probes: region health by probe point, 1 = healthy",
+      "description": "The switch is proposed when two of three independent points fail.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min by (probe_point) (probe_success{env=~\"$env\",probe_target=\"region-health\"})",
+          "legendFormat": "{{probe_point}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 9
+      },
+      "title": "synthetic payment: success by probe point, 1 = success",
+      "description": "SyntheticPaymentFailing pages when two points fail.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min by (probe_point) (synthetic_payment_success{env=~\"$env\"})",
+          "legendFormat": "{{probe_point}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     }
   ]

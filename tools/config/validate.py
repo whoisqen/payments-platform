@@ -17,7 +17,7 @@ REQUIRED = {
     "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
-    "central": ["metrics_remote_write_url", "alertmanager_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
+    "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
 }
 STANDBY_ENVS = ("stage", "prod")
 ACCOUNT = re.compile(r"^\d{12}$")
@@ -47,7 +47,7 @@ def check(cfg):
         if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
             errors.append(f"`deploy.{env}.ingress_endpoints` needs an ingress host for the working region and the standby region")
     central = cfg.get("central") or {}
-    for key in ("metrics_remote_write_url", "alertmanager_url"):
+    for key in ("metrics_remote_write_url", "alertmanager_url", "sentry_url"):
         if central.get(key) and not str(central[key]).startswith("https://"):
             errors.append(f"`central.{key}` must be an https:// URL")
     if central.get("dedup_interval") and not re.match(r"^[0-9]+(s|m)$", str(central["dedup_interval"])):

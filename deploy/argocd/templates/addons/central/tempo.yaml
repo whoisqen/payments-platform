@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-tempo
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'tempo-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: tempo
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: tempo-distributed
+          targetRevision: 1.61.3
+          helm:
+            # Fixed release name: the Services (loki-gateway, tempo-distributor) are what the front door and Grafana address
+            releaseName: tempo
+            valueFiles:
+              - $values/deploy/platform/tempo/values.yaml
+              - $values/deploy/platform/tempo/storage.yaml
+            parameters:
+              # Span metrics go to vminsert of the victoria-metrics add-on, whose Service name holds the cluster name
+              - name: metricsGenerator.config.storage.remote_write[0].url
+                value: 'http://victoria-metrics-{{`{{ .name }}`}}-victoria-metrics-cluster-vminsert.victoria-metrics.svc:8480/insert/0/prometheus/api/v1/write'
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,6 +1,6 @@
 {
   "uid": "edge",
-  "title": "Edge and security",
+  "title": "L3 Edge and security",
   "description": "What happens at the entrance?",
   "tags": [
     "payments-platform",
@@ -13,7 +13,10 @@
   "version": 1,
   "editable": false,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "1m",
+  "liveNow": false,
+  "weekStart": "",
+  "fiscalYearStartMonth": 0,
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -22,9 +25,10 @@
     "list": [
       {
         "name": "datasource",
-        "label": "datasource",
+        "label": "Data source",
         "type": "datasource",
         "query": "prometheus",
+        "hide": 0,
         "current": {
           "text": "default",
           "value": "default"
@@ -32,7 +36,7 @@
       },
       {
         "name": "env",
-        "label": "env",
+        "label": "Environment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -41,17 +45,17 @@
         "query": "label_values(up, env)",
         "refresh": 2,
         "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
+        "multi": false,
+        "includeAll": false,
         "current": {
           "text": "prod",
           "value": "prod"
-        }
+        },
+        "hide": 0
       },
       {
         "name": "region",
-        "label": "region",
+        "label": "Region",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -62,15 +66,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "eu-central-1",
           "value": "eu-central-1"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "cell",
-        "label": "cell",
+        "label": "Cell",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -81,15 +86,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "service",
-        "label": "service",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -100,30 +106,32 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "psp",
-        "label": "psp",
+        "label": "PSP",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(psp_requests_total{env=~\"$env\"}, psp)",
+        "query": "label_values(psp_requests_total{env=~\"$env\",region=~\"$region\"}, psp)",
         "refresh": 2,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       }
     ]
   },
@@ -133,7 +141,43 @@
       "title": "L0 Platform overview",
       "url": "/d/platform-overview",
       "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "link",
+      "title": "L2 Kubernetes (USE)",
+      "url": "/d/kubernetes",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "dashboards",
+      "title": "All dashboards",
+      "tags": [
+        "payments-platform"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": true,
       "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: network",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/network",
+      "icon": "doc",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: security-pci",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/security-pci",
+      "icon": "doc",
+      "targetBlank": true
     }
   ],
   "annotations": {
@@ -146,7 +190,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -157,13 +201,13 @@
       "type": "row",
       "title": "Overview",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 2,
@@ -175,17 +219,18 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
-      "title": "edge: certificates expiring within 30 days",
-      "description": "",
+      "title": "edge: certs expiring in 14 days",
+      "description": "CertificateExpiryCritical pages below 14 days.",
       "targets": [
         {
           "refId": "A",
-          "expr": "count((min by (target) (probe_ssl_earliest_cert_expiry{env=~\"$env\"}) - time()) < 30 * 86400) or vector(0)",
+          "expr": "count((min by (target) (probe_ssl_earliest_cert_expiry{env=~\"$env\"}) - time()) / 86400 < 14) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -202,16 +247,27 @@
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 1
-              },
-              {
                 "color": "red",
-                "value": 3
+                "value": 1
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -219,10 +275,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -233,19 +294,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 4,
+        "x": 8,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
-      "title": "security: events in the last hour",
-      "description": "",
+      "title": "security: events, last hour",
+      "description": "Root login, break-glass, SCP or IAM change outside Terraform; each one pages security.",
       "targets": [
         {
           "refId": "A",
           "expr": "sum(increase(security_events_total{env=~\"$env\"}[1h])) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -262,16 +324,27 @@
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 1
-              },
-              {
                 "color": "red",
-                "value": 5
+                "value": 1
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -279,10 +352,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -293,19 +371,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 16,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
       "title": "security: PAN detections, 24 h",
-      "description": "",
+      "description": "Card numbers found in logs; any hit pages security.",
       "targets": [
         {
           "refId": "A",
           "expr": "sum(increase(pan_detected_total{env=~\"$env\"}[1d])) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -327,7 +406,22 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -335,10 +429,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -346,13 +445,13 @@
       "type": "row",
       "title": "Traffic",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 5,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 6,
@@ -365,14 +464,14 @@
         "x": 0,
         "y": 6,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "edge: rate-limited responses (429), reqps",
+      "title": "router: rate-limited responses (429) by cell, reqps",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=\"router\",code=\"429\"}[5m]))",
+          "expr": "sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=\"router\",code=\"429\"}[$__rate_interval]))",
           "legendFormat": "{{cell}}"
         }
       ],
@@ -380,7 +479,7 @@
         "defaults": {
           "unit": "reqps",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -390,21 +489,43 @@
                 "value": null
               }
             ]
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "Open L1 Router (RED)",
+              "url": "/d/router?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-cell=${__field.labels.cell}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -419,14 +540,14 @@
         "x": 12,
         "y": 6,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "waf: blocked requests, reqps",
+      "title": "waf: blocked requests by web ACL, reqps",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (web_acl) (rate(aws_wafv2_blocked_requests_sum{env=~\"$env\",region=~\"$region\"}[5m]))",
+          "expr": "sum by (web_acl) (rate(aws_wafv2_blocked_requests_sum{env=~\"$env\",region=~\"$region\"}[$__rate_interval]))",
           "legendFormat": "{{web_acl}}"
         }
       ],
@@ -434,7 +555,7 @@
         "defaults": {
           "unit": "reqps",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -445,28 +566,40 @@
               },
               {
                 "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "red",
                 "value": 100
               }
             ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -475,13 +608,13 @@
       "type": "row",
       "title": "Network",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 15,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 9,
@@ -492,16 +625,16 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 16,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "egress: NAT port allocation errors, per second",
-      "description": "",
+      "title": "egress: NAT port allocation errors per second",
+      "description": "Any error pages: outbound PSP calls fail.",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum{env=~\"$env\",region=~\"$region\"}[5m]))",
+          "expr": "sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum{env=~\"$env\",region=~\"$region\"}[$__rate_interval]))",
           "legendFormat": "{{nat_gateway_id}}"
         }
       ],
@@ -509,7 +642,7 @@
         "defaults": {
           "unit": "ops",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -523,21 +656,37 @@
                 "value": 0.001
               }
             ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -550,16 +699,16 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 15,
+        "y": 16,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "egress: firewall dropped packets, pps",
+      "title": "egress: firewall dropped packets by firewall, pps",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (firewall) (rate(aws_networkfirewall_dropped_packets_sum{env=~\"$env\",region=~\"$region\"}[5m]))",
+          "expr": "sum by (firewall) (rate(aws_networkfirewall_dropped_packets_sum{env=~\"$env\",region=~\"$region\"}[$__rate_interval]))",
           "legendFormat": "{{firewall}}"
         }
       ],
@@ -567,7 +716,7 @@
         "defaults": {
           "unit": "pps",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -578,28 +727,40 @@
               },
               {
                 "color": "yellow",
-                "value": 500
-              },
-              {
-                "color": "red",
                 "value": 1000
               }
             ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -612,24 +773,24 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 25,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "edge: certificate days left by target",
+      "title": "edge: certificate days left (soonest 8)",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "(min by (target) (probe_ssl_earliest_cert_expiry{env=~\"$env\"}) - time()) / 86400",
+          "expr": "bottomk(8, (min by (target) (probe_ssl_earliest_cert_expiry{env=~\"$env\"}) - time()) / 86400)",
           "legendFormat": "{{target}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "d",
+          "unit": "suffix: days",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -648,21 +809,36 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -675,11 +851,11 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 23,
+        "y": 25,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "edge: CloudFront 5xx share, %",
+      "title": "edge: CloudFront 5xx share by distribution, %",
       "description": "",
       "targets": [
         {
@@ -692,7 +868,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -703,30 +879,41 @@
               },
               {
                 "color": "yellow",
-                "value": 2
-              },
-              {
-                "color": "red",
                 "value": 5
               }
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -735,13 +922,13 @@
       "type": "row",
       "title": "Security",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 34,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 14,
@@ -752,11 +939,11 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 35,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "security: events by kind, per hour",
+      "title": "security: events per hour by kind",
       "description": "",
       "targets": [
         {
@@ -769,7 +956,7 @@
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -780,21 +967,36 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -807,11 +1009,11 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 32,
+        "y": 35,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "guardduty: findings by severity, per hour",
+      "title": "guardduty: findings per hour by severity",
       "description": "",
       "targets": [
         {
@@ -824,7 +1026,7 @@
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -835,21 +1037,36 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     }
