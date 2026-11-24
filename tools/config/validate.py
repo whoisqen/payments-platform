@@ -20,6 +20,7 @@ REQUIRED = {
     "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
 }
 STANDBY_ENVS = ("stage", "prod")
+GRAFANA_GROUPS = ("admin", "sre", "security", "engineering", "finance", "audit")
 ACCOUNT = re.compile(r"^\d{12}$")
 REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
 
@@ -46,6 +47,12 @@ def check(cfg):
         wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
         if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
             errors.append(f"`deploy.{env}.ingress_endpoints` needs an ingress host for the working region and the standby region")
+    groups = (cfg.get("access") or {}).get("grafana_groups") or {}
+    for role in GRAFANA_GROUPS:
+        if not re.match(r"^[a-z0-9][a-z0-9._-]*$", str(groups.get(role, ""))):
+            errors.append(f"`access.grafana_groups.{role}` must be a group name of the identity provider")
+    if len(set(groups.values())) != len(groups):
+        errors.append("`access.grafana_groups` must name a different group for every role")
     central = cfg.get("central") or {}
     for key in ("metrics_remote_write_url", "alertmanager_url", "sentry_url"):
         if central.get(key) and not str(central[key]).startswith("https://"):

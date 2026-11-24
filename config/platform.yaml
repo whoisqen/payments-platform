@@ -48,6 +48,15 @@ storage:
 access:
   # Name of the IAM Identity Center permission set that gets view-only access to the clusters
   sre_view_permission_set: AWSReservedSSO_SRE-View
+  # Groups of the identity provider (OIDC `groups` claim) that decide who may enter Grafana and with which role;
+  # a person in none of them cannot log in. The role of each group is fixed in tools/config/render_grafana.py.
+  grafana_groups:
+    admin: pay-grafana-admins      # Grafana server and organization administrators (few people)
+    sre: pay-sre                   # on-call and platform engineers: dashboards, Explore, silences
+    security: pay-security         # security engineers: dashboards, Explore for investigations
+    engineering: pay-engineering   # developers: dashboards
+    finance: pay-finance           # finance and FinOps: dashboards
+    audit: pay-audit               # assessors and auditors: dashboards
 
 deploy:
   # Values written into deploy/ by tools/config/render.py. The suffixes are the account-specific part of the

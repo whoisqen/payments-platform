@@ -52,6 +52,21 @@ class SizingTest(unittest.TestCase):
         self.assertEqual(dev["aurora"]["reader_count"], 0)
 
 
+class GrafanaGroupsTest(unittest.TestCase):
+    def cfg(self):
+        return yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
+
+    def test_every_role_needs_a_group(self):
+        cfg = self.cfg()
+        del cfg["access"]["grafana_groups"]["audit"]
+        self.assertTrue(any("grafana_groups.audit" in e for e in validate.check(cfg)))
+
+    def test_two_roles_cannot_share_a_group(self):
+        cfg = self.cfg()
+        cfg["access"]["grafana_groups"]["audit"] = cfg["access"]["grafana_groups"]["admin"]
+        self.assertTrue(any("different group" in e for e in validate.check(cfg)))
+
+
 class ConfigTest(unittest.TestCase):
     def test_platform_config_is_valid_and_has_prod(self):
         cfg = yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
