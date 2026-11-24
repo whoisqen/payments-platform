@@ -138,6 +138,10 @@ jobs:
           rustup toolchain install "$TOOLCHAIN" --profile minimal -c rustfmt,clippy
           rustup default "$TOOLCHAIN"
           cargo install --locked cargo-nextest
+      - name: protoc
+        if: needs.changes.outputs[matrix.area] == 'true'
+        # the gRPC API types of the connector service are generated at build time
+        run: command -v protoc >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq protobuf-compiler; }
       - name: fmt, clippy, tests
         if: needs.changes.outputs[matrix.area] == 'true'
         working-directory: ${{ matrix.dir }}
