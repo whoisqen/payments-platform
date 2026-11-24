@@ -13,6 +13,7 @@ spec:
     - alert: RestoreTestFailed
       expr: min by (store) (restore_test_success) == 0
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -26,6 +27,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: RestoreDurationNearTarget
       expr: max by (store) (backup_restore_duration_seconds) > 0.8 * max by (store) (backup_restore_target_seconds)
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -39,6 +42,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: RestoreTooSlow
       expr: max by (store) (backup_restore_duration_seconds) > max by (store) (backup_restore_target_seconds)
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

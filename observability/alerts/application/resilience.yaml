@@ -14,6 +14,7 @@ spec:
     - alert: RetryStorm
       expr: sum by (dependency) (rate(retry_total[5m])) / sum by (dependency) (rate(dependency_requests_total[5m])) > 0.1
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -28,6 +29,7 @@ spec:
     - alert: RetryBudgetExhausted
       expr: sum by (dependency) (rate(retry_budget_exhausted_total{dependency=~"psp-sync|router-locker"}[5m])) > 0
       for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -42,6 +44,7 @@ spec:
     - alert: RetryBudgetExhaustedNonCritical
       expr: sum by (dependency) (rate(retry_budget_exhausted_total{dependency!~"psp-sync|router-locker"}[5m])) > 0
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core

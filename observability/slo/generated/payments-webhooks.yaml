@@ -133,6 +133,7 @@ spec:
   - name: slo-alerts-payments-webhooks-delivery
     rules:
     - alert: PaymentsWebhookDeliveryBurnFast
+      keep_firing_for: 10m
       expr: slo:sli_error:ratio_rate1h{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (14.4 * 0.001) and slo:sli_error:ratio_rate5m{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (14.4 * 0.001)
       labels:
         team: payments-core
@@ -147,6 +148,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/merchant-webhook-delivery.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsWebhookDeliveryBurnSlow
+      keep_firing_for: 10m
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (6 * 0.001) and slo:sli_error:ratio_rate30m{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (6 * 0.001)
       labels:
         team: payments-core
@@ -161,6 +163,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/merchant-webhook-delivery.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsWebhookDeliveryBurnTicket
+      keep_firing_for: 30m
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (1 * 0.001) and slo:sli_error:ratio_rate6h{sloth_id="payments-webhooks-delivery",sloth_service="payments-webhooks",sloth_slo="delivery"} > (1 * 0.001)
       labels:
         team: payments-core

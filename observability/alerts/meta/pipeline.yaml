@@ -26,6 +26,7 @@ spec:
     - alert: AlertmanagerNotificationsFailing
       expr: sum by (integration) (rate(alertmanager_notifications_failed_total[5m])) > 0
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: observability
@@ -40,6 +41,7 @@ spec:
     - alert: PrometheusRuleEvaluationFailing
       expr: sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[10m])) > 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: observability
@@ -54,6 +56,7 @@ spec:
     - alert: ActiveSeriesBudgetExceeded
       expr: sum by (region) (prometheus_tsdb_head_series) > 2000000
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: observability

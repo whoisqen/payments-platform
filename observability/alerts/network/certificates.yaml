@@ -13,6 +13,7 @@ spec:
     - alert: CertificateExpiryCritical
       expr: min by (target) (probe_ssl_earliest_cert_expiry) - time() < 14 * 86400
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -27,6 +28,7 @@ spec:
     - alert: PspMtlsCertExpiring30d
       expr: min by (name) (certmanager_certificate_expiration_timestamp_seconds{name=~"psp-mtls-.*"}) - time() < 30 * 86400
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
