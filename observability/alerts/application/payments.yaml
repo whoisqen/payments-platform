@@ -13,6 +13,7 @@ spec:
     - alert: UnknownStatePaymentsStale
       expr: sum(payments_unknown_state_stale) > 0
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -27,6 +28,7 @@ spec:
     - alert: SyntheticPaymentFailing
       expr: count(synthetic_payment_success == 0) >= 2
       for: 3m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core

@@ -13,6 +13,7 @@ spec:
     - alert: KarpenterCannotLaunchNodes
       expr: sum(increase(karpenter_cloudprovider_errors_total{method="Create"}[15m])) > 5
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -27,6 +28,7 @@ spec:
     - alert: NodeNotReady
       expr: kube_node_status_condition{condition="Ready",status="true"} == 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
@@ -41,6 +43,7 @@ spec:
     - alert: SubnetFreeIpsLow
       expr: min by (subnet_id) (subnet_free_ip_ratio) < 0.2
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
@@ -55,6 +58,7 @@ spec:
     - alert: NodeImageStale
       expr: max by (nodepool) (node_os_image_age_seconds) > 30 * 86400
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
@@ -69,6 +73,7 @@ spec:
     - alert: NodeClockDrift
       expr: max by (node) (abs(node_timex_offset_seconds)) > 0.1
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform

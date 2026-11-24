@@ -56,5 +56,26 @@ locals {
     "quay"       = { upstream_registry_url = "quay.io" }
   }
 
+  # Central observability cluster (outside the CDE): same cluster build as a cell, without the cde pool.
+  kubernetes_version     = "1.34"
+  bottlerocket_version   = "v1.49.0"
+  eks_log_retention_days = 90
+  central_cpu_limits     = { workers = 200, stateful = 200 }
+  central_enabled_pools  = ["workers", "stateful"]
+  # The workers pool may use Spot; the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
+  central_spot_pools = []
+  access_entries = {
+    sre-view = {
+      principal_arn = "arn:aws:iam::${local.account_id}:role/aws-reserved/sso.amazonaws.com/${local.cfg.access.sre_view_permission_set}"
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+    }
+    argocd = {
+      principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.storage.state_bucket_prefix}-shared-services-argocd-controller"
+      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+      scope         = "namespace"
+      namespaces    = ["monitoring", "karpenter", "external-secrets"]
+    }
+  }
+
   deletion_protection = true
 }

@@ -13,6 +13,7 @@ spec:
     - alert: PSPDegraded
       expr: sum by (psp) (rate(psp_requests_total{outcome="technical_error"}[5m])) / sum by (psp) (rate(psp_requests_total[5m])) > 0.05
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -27,6 +28,7 @@ spec:
     - alert: PspLatencyP99High
       expr: histogram_quantile(0.99, sum by (psp, le) (rate(psp_request_duration_seconds_bucket[5m]))) > 3
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -40,7 +42,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: PspCircuitBreakerOpen
       expr: max by (psp) (circuit_breaker_state{dependency="psp-authorize"}) == 2
-      for: 2m
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -55,6 +58,7 @@ spec:
     - alert: AuthorizationRateDrop
       expr: sum by (psp) (rate(payment_attempts_total{outcome="authorized"}[15m])) / sum by (psp) (rate(payment_attempts_total[15m])) < (sum by (psp) (rate(payment_attempts_total{outcome="authorized"}[15m] offset 1w)) / sum by (psp) (rate(payment_attempts_total[15m] offset 1w))) - 0.05
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core

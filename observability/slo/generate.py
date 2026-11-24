@@ -20,6 +20,8 @@ WINDOWS = [
 # Only a 99.99% budget (4.3 min per 30 days) needs the extra fastest window
 FASTEST = ("BurnFastest", 50.0, "5m", "1m", "page")
 FASTEST_MIN_OBJECTIVE = 99.99
+# A burn alert stays firing this long after its windows clear, so that a rate at the threshold does not flap
+KEEP_FIRING = {"page": "10m", "ticket": "30m"}
 SUMMARY_SUFFIX = {
     "BurnFastest": "50x over 5m/1m",
     "BurnFast": "14.4x over 1h/5m",
@@ -84,6 +86,7 @@ def build(doc):
             sev = alerting[f"{kind}_alert"]["labels"]
             alert_rules.append({
                 "alert": alerting["name"] + suffix,
+                "keep_firing_for": KEEP_FIRING[kind],
                 "expr": f"slo:sli_error:ratio_rate{long_w}{{{sel}}} > {threshold} and slo:sli_error:ratio_rate{short_w}{{{sel}}} > {threshold}",
                 "labels": {**base_labels, **alerting.get("labels", {}), **sev, "failure_mode": failure_mode(slo), "layer": "application", "slo": sid},
                 "annotations": {**alerting["annotations"], "summary": f"{alerting['annotations']['summary']} ({SUMMARY_SUFFIX[suffix]})"},

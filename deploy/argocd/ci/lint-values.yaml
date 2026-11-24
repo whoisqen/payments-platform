@@ -11,5 +11,7 @@ central:
   metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   alertmanagerHost: alertmanager.example.test
   dedupInterval: 30s
+  logsOtlpEndpoint: https://logs.example.test:4318
+  tracesOtlpEndpoint: tempo.example.test:4317
 gated:
   revision: v1.0.0

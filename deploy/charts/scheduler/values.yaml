@@ -17,6 +17,10 @@ producer:
       SCHEDULER_FLOW: producer
       # The scheduler web server binds to 127.0.0.1 by default and the kubelet probe cannot reach it
       ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+      # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
+      ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
+      ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"
+      ROUTER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
     envFromSecrets: []
     resources:
       requests:
@@ -52,6 +56,16 @@ producer:
   networkPolicy:
     enabled: true
     dataPorts: [5432, 6379]
+    extraEgress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: monitoring
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: opentelemetry-collector
+        ports:
+          - {protocol: TCP, port: 4317}
   serviceMonitor:
     enabled: true
     path: /metrics
@@ -73,6 +87,10 @@ consumer:
     env:
       SCHEDULER_FLOW: consumer
       ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+      # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
+      ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
+      ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"
+      ROUTER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
       # Read by the KEDA trigger below, which runs outside the pod
       REDIS_ADDRESS: memorydb.invalid:6379
     envFromSecrets: []
@@ -124,6 +142,16 @@ consumer:
   networkPolicy:
     enabled: true
     dataPorts: [5432, 6379]
+    extraEgress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: monitoring
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: opentelemetry-collector
+        ports:
+          - {protocol: TCP, port: 4317}
   serviceMonitor:
     enabled: true
     path: /metrics
