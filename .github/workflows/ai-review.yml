@@ -1,0 +1,99 @@
+name: ai-review
+
+# Advisory only: one comment, updated in place; never a required check and never an approval.
+# The code that runs (tools/ai, config, policy) is always the base commit. The pull request head is fetched as git objects and
+# is only read through `git diff` and `git show`; it is never checked out, imported or executed.
+# When a push triggers a review is decided by `trigger` in config/ai-review.yaml.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
+
+permissions: {}
+
+# A queued run replaces an older queued run, but a running review is never cancelled by a push that the plan step then skips.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  plan:
+    # Labels other than the run label never start a review.
+    if: github.event.action != 'labeled' || github.event.label.name == 'ai-review:run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      AI_REVIEW_ROLE_ARN: ${{ vars.AI_REVIEW_ROLE_ARN }}
+    outputs:
+      skip: ${{ steps.plan.outputs.skip || 'true' }}
+      region: ${{ steps.plan.outputs.region }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the head as data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+      - id: deps
+        run: |
+          # the pull request that introduces tools/ai runs against a base without it: nothing to review with yet
+          if [ -f tools/ai/install-deps.sh ]; then bash tools/ai/install-deps.sh; else echo "tools/ai is not in the base commit: review skipped"; fi
+      - id: plan
+        if: steps.deps.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ai/review.py plan
+
+  review:
+    needs: plan
+    if: needs.plan.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    # The OIDC subject of this job is repo:<org>/<repo>:environment:ai-review; the role trusts only that.
+    environment: ai-review
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the head as data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+      - id: deps
+        run: |
+          # the pull request that introduces tools/ai runs against a base without it: nothing to review with yet
+          if [ -f tools/ai/install-deps.sh ]; then bash tools/ai/install-deps.sh; else echo "tools/ai is not in the base commit: review skipped"; fi
+      - if: steps.deps.outputs.ready == 'true'
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AI_REVIEW_ROLE_ARN }}
+          aws-region: ${{ needs.plan.outputs.region }}
+          role-session-name: ai-review-${{ github.run_id }}
+      - if: steps.deps.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ai/review.py run
