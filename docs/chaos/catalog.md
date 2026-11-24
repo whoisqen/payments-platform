@@ -16,6 +16,7 @@ Every experiment runs in stage under background load (`tests/load/scenarios/dail
 | DNS failure | `tests/chaos/chaos-mesh/dns-failure.yaml` | `edge-dns-resolution-failure` | `DnsResolutionErrorsHigh` | pooled connections keep serving, no retry of a charge |
 | Region switch to us-east-1 (D7) | `tests/chaos/region-switch/scenario.json` | `dr-region-switch` | `AuroraGlobalReplicationLagHigh` (lag over 5 s), `DrTestOverdue` | RTO 60 min, RPO 10 s plus drain lag p99 5 s, one writer, warm ratio 75% (D8) |
 | Region switch plan B to us-east-2 | `tests/chaos/region-switch/plan-b.json` | `dr-region-switch-plan-b` | same as above | RTO 75 min after 10 min without capacity in us-east-1 |
+| Hot merchant | `tests/chaos/hot-merchant.js` | `edge-ratelimit-hot-merchant` | `RateLimitHitsMerchant` | hot tenant gets 429 with `Retry-After`, never 5xx; other merchants keep SLOs |
 
 Region-switch runs are quarterly, once per recovery region in turn; the other experiments are weekly in stage and a monthly fire-drill (section 25.4) checks that the alert reaches the PagerDuty test service within `detect_within`.
 Results go to `docs/chaos/results.md` after each run.

@@ -1,0 +1,129 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alerts-network-rate-limit
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    prometheus: platform
+spec:
+  groups:
+  - name: network-rate-limit-records
+    rules:
+    - record: merchant:rate_limit_over_limit:rate5m
+      expr: sum by (env, cell, merchant_id) (rate(ratelimit_service_rate_limit_over_limit{domain="payments-edge"}[5m]))
+    - record: merchant:rate_limit_total_hits:rate5m
+      expr: sum by (env, cell, merchant_id) (rate(ratelimit_service_rate_limit_total_hits{domain="payments-edge"}[5m]))
+    - record: merchant:cell_share:ratio5m
+      expr: merchant:rate_limit_total_hits:rate5m / on (env, cell) group_left sum by (env, cell) (merchant:rate_limit_total_hits:rate5m)
+    - record: edge:rate_limited:rate5m
+      expr: sum by (env, route) (rate(envoy_http_local_rate_limiter_rate_limited[5m]))
+    - record: edge:rate_limit_enforced:rate5m
+      expr: sum by (env, route) (rate(envoy_http_local_rate_limiter_enforced[5m]))
+  - name: network-rate-limit
+    rules:
+    - alert: RateLimitHitsMerchant
+      expr: merchant:rate_limit_over_limit:rate5m > 0
+      for: 10m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-hits-merchant
+      annotations:
+        summary: A merchant has been rate limited at the edge for 10 minutes
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/rate-limit-warnings.md#rate-limit-hits-merchant'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: MerchantShareOfCellHigh
+      expr: merchant:cell_share:ratio5m > 0.3
+      for: 5m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-merchant-share-of-cell-high
+      annotations:
+        summary: One merchant sends more than 30% of the traffic of a cell
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/rate-limit-warnings.md#merchant-share-of-cell-high'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: LoadSheddingActive
+      expr: edge:rate_limit_enforced:rate5m{route="payments"} > 0
+      for: 2m
+      keep_firing_for: 5m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-load-shedding-active
+      annotations:
+        summary: The edge sheds the payments class (429)
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/load-shedding-active.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: LoadSheddingReadsActive
+      expr: edge:rate_limit_enforced:rate5m{route=~"lists|reports|status"} > 0
+      for: 5m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-load-shedding-reads-active
+      annotations:
+        summary: The edge sheds lists, reports or status polling (429)
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/rate-limit-warnings.md#load-shedding-reads-active'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: RateLimitServiceDown
+      expr: sum by (cell) (up{service="ratelimit"}) == 0
+      for: 5m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-service-down
+      annotations:
+        summary: The rate limit service of a cell is down; the edge fails open without per-merchant limits
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/rate-limit-warnings.md#rate-limit-service-down'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: RateLimitServiceErrors
+      expr: sum by (cell) (rate(ratelimit_service_call_should_rate_limit_error[5m])) > 0 or sum by (cell) (rate(envoy_http_ratelimit_failure_mode_allowed[5m])) > 0
+      for: 5m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-service-errors
+      annotations:
+        summary: Rate limit calls fail and the edge lets requests pass (fail-open)
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/rate-limit-warnings.md#rate-limit-service-errors'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
+    - alert: EdgeOverloadManagerActive
+      expr: max by (pod) (envoy_overload_actions_stop_accepting_requests_active) == 1
+      for: 2m
+      keep_firing_for: 5m
+      labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-edge-overload-manager-active
+      annotations:
+        summary: The gateway overload manager stops accepting requests
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/edge-overload-manager-active.md'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'

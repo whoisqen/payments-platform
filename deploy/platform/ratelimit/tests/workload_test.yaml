@@ -1,0 +1,120 @@
+suite: ratelimit workload
+templates:
+  - deployment.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - externalsecret.yaml
+  - servicemonitor.yaml
+  - service.yaml
+  - configmap.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: stage
+  redis.endpoint: rl.example.test:6379
+tests:
+  - it: pins the image by digest from the platform registry
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/envoyproxy/ratelimit@sha256:fa6b86d5a500f36d3584168fb49612418ee678a65add5ce9ee2e40dd4d98a8a7
+  - it: spreads pods across zones as a hard constraint
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].whenUnsatisfiable
+          value: DoNotSchedule
+  - it: leaves the replica count to the HPA with a floor of three
+    asserts:
+      - notExists:
+          path: spec.replicas
+        template: deployment.yaml
+      - equal:
+          path: spec.minReplicas
+          value: 3
+        template: hpa.yaml
+  - it: allows one pod to be disrupted
+    template: pdb.yaml
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+  - it: takes the Redis password from the secret and enables TLS
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_AUTH
+            valueFrom:
+              secretKeyRef:
+                name: ratelimit-redis
+                key: auth
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: REDIS_TLS, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: REDIS_URL, value: rl.example.test:6379}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: USE_PROMETHEUS, value: "true"}
+  - it: rolls the pods when the limit config changes
+    template: deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+  - it: reads the Redis auth from the environment secret key
+    template: externalsecret.yaml
+    asserts:
+      - equal:
+          path: spec.secretStoreRef.name
+          value: aws-secrets-manager
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: pay/stage/ratelimit/redis
+  - it: admits only the edge gateway and Prometheus
+    template: networkpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: istio-ingress
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels.istio
+          value: ingressgateway
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 8081
+      - equal:
+          path: spec.ingress[1].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: monitoring
+      - lengthEqual:
+          path: spec.ingress
+          count: 2
+  - it: allows egress to Redis only when the CIDRs are set
+    template: networkpolicy.yaml
+    set:
+      redis.egressCidrs: ["10.0.64.0/24"]
+    asserts:
+      - equal:
+          path: spec.egress[2].to[0].ipBlock.cidr
+          value: 10.0.64.0/24
+      - equal:
+          path: spec.egress[2].ports[0].port
+          value: 6379
+  - it: scrapes the metrics port
+    template: servicemonitor.yaml
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+  - it: serves gRPC on 8081
+    template: service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8081

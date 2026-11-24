@@ -4,10 +4,10 @@ from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "render"))
 import render_admin_sso  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 CFG = yaml.safe_load((ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
 OUT = render_admin_sso.render(CFG)
 GROUPS = CFG["access"]["grafana_groups"]

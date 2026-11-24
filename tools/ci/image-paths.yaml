@@ -38,6 +38,10 @@ areas:
     - .github/
   docker:
     - docker/
+  migrations:
+    - vendor/hyperswitch/migrations/
+    - vendor/card-vault/migrations/
+    - .squawk.toml
   shell:
     - scripts/
     - docker/

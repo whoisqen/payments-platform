@@ -1,0 +1,10 @@
+# Rate limit service
+
+Global rate limit for the edge gateway: `envoyproxy/ratelimit` (3 to 9 pods across zones, PDB, HPA) in namespace `ratelimit`, gRPC `ratelimit.ratelimit.svc:8081`. Argo CD deploys it from `deploy/argocd/templates/addons/ratelimit.yaml` only to the edge cluster of each `deploy/envs/<env>/<region>/edge` directory; production is pinned to the release tag.
+
+- Client contract (set in `deploy/charts/payments-edge`): domain `payments-edge`, descriptors `merchant` (header `x-merchant-id`) then `request_class` in `payments`, `read`, `list`; the client is fail-open.
+- Limits: `rateLimit` in `values.yaml` renders ConfigMap `ratelimit-config`. `defaults` apply to every merchant; `tiers` are complete limit sets; `overrides` name a merchant with an optional `tier` and per-class `limits`. A named merchant gets all classes (tier or defaults, then its own limits) because the service does not fall back to the wildcard after a merchant match. Merchant ids never become metric labels.
+- Redis: a dedicated small ElastiCache or MemoryDB endpoint, not the cell MemoryDB. `redis.endpoint` (`host:port`) is set per environment in `envs/<env>/<region>.yaml`; TLS is on. ExternalSecret `ratelimit-redis` reads `pay/<env>/ratelimit/redis` from store `aws-secrets-manager`; JSON key `auth` is the password, or `user:password` for an ACL user.
+- Image: `docker.io/envoyproxy/ratelimit` has no semver releases; tag `62db6639` and its index digest are pinned in `values.yaml`. Copy it index-preserving into the platform ECR (`crane copy`) so the digest stays valid under `restrict-registries`; Renovate bumps tag and digest.
+- Metrics: Prometheus exporter on port 9090, scraped by ServiceMonitor `ratelimit`. Names (default mapper, labels `domain`, `key1`, `key2`; confirm against the pinned image): `ratelimit_service_rate_limit_total_hits`, `_within_limit`, `_near_limit`, `_over_limit`, `_shadow_mode`, `ratelimit_service_should_rate_limit_error`, `ratelimit_service_config_load_error`.
+- Rollout: set `rateLimit.shadowMode: true` to count `over_limit` without rejecting, then switch it off.

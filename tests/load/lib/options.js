@@ -27,6 +27,15 @@ export function thresholdsFor(name) {
       'server_error{phase:beyond-slo}': ['rate<0.001'],
     };
   }
+  if (name === 'spike') {
+    // The first 2 min of the jump only need 5xx below 0.1%; the SLOs apply before it and after it.
+    return {
+      'platform_overhead_ms{phase:within-slo}': slo.platform_overhead_ms,
+      'http_req_duration{type:status,phase:within-slo}': slo['http_req_duration{type:status}'],
+      'server_error{type:confirm,phase:within-slo}': slo['server_error{type:confirm}'],
+      'server_error{phase:spike-start}': ['rate<0.001'],
+    };
+  }
   return slo;
 }
 

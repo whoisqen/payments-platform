@@ -1,0 +1,15 @@
+# Offline lint and chart-testing only; real values come from envs/<env>/<region>.yaml
+requireResolved: false
+global:
+  registry: registry.example.test/acme
+  environment: dev
+redis:
+  endpoint: ratelimit.example.test:6379
+rateLimit:
+  overrides:
+    - merchant: m_hot_0001
+      tier: hot
+    - merchant: m_ent_0002
+      tier: enterprise
+      limits:
+        list: {unit: minute, requestsPerUnit: 600}

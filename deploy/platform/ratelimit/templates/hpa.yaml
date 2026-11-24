@@ -1,0 +1,2 @@
+{{- include "platform-common.checkReplicas" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") }}
+{{- include "platform-common.autoscaling" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") }}

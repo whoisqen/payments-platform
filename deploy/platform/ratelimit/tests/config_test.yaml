@@ -1,0 +1,89 @@
+suite: ratelimit limit config
+templates:
+  - configmap.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+tests:
+  - it: renders a limit for every request class under the wildcard merchant
+    asserts:
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "domain: payments-edge"
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "(?s)- descriptors:.*value: payments.*value: read.*value: list.*key: merchant"
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "requests_per_unit: 100\\n\\s+unit: second\\n\\s+value: payments"
+  - it: renders a named merchant with its tier and a class override
+    set:
+      rateLimit.overrides:
+        - merchant: m_ent_1
+          tier: enterprise
+          limits:
+            list: {unit: minute, requestsPerUnit: 600}
+    asserts:
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "requests_per_unit: 400\\n\\s+unit: second\\n\\s+value: payments"
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "requests_per_unit: 600\\n\\s+unit: minute\\n\\s+value: list"
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "value: m_ent_1"
+  - it: sets shadow mode on every limit
+    set:
+      rateLimit.shadowMode: true
+    asserts:
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "shadow_mode: true"
+  - it: fails when a default class is missing
+    set:
+      rateLimit.requestClasses: [payments, read, list, export]
+    asserts:
+      - failedTemplate: {}
+  - it: fails on a unit that is not valid
+    set:
+      rateLimit.defaults.read.unit: week
+    asserts:
+      - failedTemplate:
+          errorPattern: unit of read must be
+  - it: fails on a tier that lacks a class
+    set:
+      rateLimit.tiers.thin: {payments: {unit: second, requestsPerUnit: 5}}
+    asserts:
+      - failedTemplate:
+          errorPattern: "tier thin: no limit for request class read"
+  - it: fails on an unknown tier
+    set:
+      rateLimit.overrides: [{merchant: m1, tier: gold}]
+    asserts:
+      - failedTemplate:
+          errorPattern: unknown tier gold
+  - it: fails on a duplicate merchant
+    set:
+      rateLimit.overrides: [{merchant: m1}, {merchant: m1, tier: hot}]
+    asserts:
+      - failedTemplate:
+          errorPattern: duplicate merchant m1
+  - it: fails on a malformed merchant id
+    set:
+      rateLimit.overrides: [{merchant: "bad id!"}]
+    asserts:
+      - failedTemplate:
+          errorPattern: merchant must match
+  - it: fails on an override of an unknown class
+    set:
+      rateLimit.overrides: [{merchant: m1, limits: {export: {unit: second, requestsPerUnit: 1}}}]
+    asserts:
+      - failedTemplate:
+          errorPattern: unknown request class export
+  - it: fails on a placeholder once the environment layer requires resolution
+    set:
+      requireResolved: true
+    asserts:
+      - failedTemplate:
+          errorPattern: unresolved REPLACE_

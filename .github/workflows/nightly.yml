@@ -16,6 +16,8 @@ env:
 
 jobs:
   rebuild:
+    # needs the rootless BuildKit namespace (repository variable BUILDKIT_NAMESPACE), which exists only after the build cluster is set up
+    if: vars.BUILDKIT_NAMESPACE != ''
     runs-on: ${{ vars.RUNNER_BUILD || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
@@ -32,7 +34,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - uses: ./.github/actions/setup-buildkit
+        with:
+          name: buildkit-nightly-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.service }}
+          namespace: ${{ vars.BUILDKIT_NAMESPACE }}
+          node-selector: ${{ vars.BUILDKIT_NODE_SELECTOR || 'kubernetes.io/arch=arm64,pay.io/pool=ci-build' }}
+          eks-cluster: ${{ vars.BUILDKIT_EKS_CLUSTER }}
+          aws-region: ${{ vars.AWS_REGION }}
       - name: clean rebuild without any cache
         run: |
           # same inputs and settings as images.yml, so a graph that skipped a needed build shows up as a different digest

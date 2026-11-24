@@ -1,0 +1,92 @@
+# Global rate limit service of the edge gateway: one Application per edge environment directory, on the edge cluster only
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-ratelimit
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ .Values.repo.revision }}
+        directories:
+          - path: deploy/envs/*/*/edge
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/*
+            exclude: true
+{{- end }}
+  template:
+    metadata:
+      name: 'ratelimit-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
+      labels:
+        payments-platform/addon: ratelimit
+    spec:
+      project: platform
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-edge'
+        namespace: ratelimit
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/ratelimit
+          helm:
+            # A missing environment layer or an unfilled endpoint must fail the render, not deploy placeholders
+            valueFiles:
+              - $values/deploy/platform/ratelimit/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+{{- if and .Values.gatedEnvironments .Values.gated.revision }}
+{{- $rev := .Values.gated.revision }}
+{{- if not (regexMatch "^v[0-9]+\\.[0-9]+\\.[0-9]+" $rev) }}{{ fail "gated.revision must be a release tag such as v1.4.0, never a branch" }}{{ end }}
+---
+# Production: pinned to the release tag, no automated sync
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-ratelimit-gated
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repo.url }}
+        revision: {{ $rev }}
+        directories:
+{{- range .Values.gatedEnvironments }}
+          - path: deploy/envs/{{ . }}/*/edge
+{{- end }}
+  template:
+    metadata:
+      name: 'ratelimit-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
+      labels:
+        payments-platform/addon: ratelimit
+        payments-platform/gated: "true"
+    spec:
+      project: platform
+      destination:
+        name: '{{ .Values.cluster.namePrefix }}-{{`{{ index .path.segments 2 }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .path.segments 3) "${1}${2}${3}" }}`}}-edge'
+        namespace: ratelimit
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          path: deploy/platform/ratelimit
+          helm:
+            valueFiles:
+              - $values/deploy/platform/ratelimit/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ $rev }}
+          ref: values
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+{{- end }}

@@ -9,7 +9,7 @@ PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ai/tests tools/lint/tests scr
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 
-.PHONY: help bootstrap lint test plan image-amd64 lint-workflows lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
+.PHONY: help bootstrap lint test plan image-amd64 lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
 	test-python test-terraform test-helm test-policy
 
 help:
@@ -20,7 +20,7 @@ bootstrap: ## install the pinned tools from mise.toml and the git hooks
 	mise install
 	git config core.hooksPath tools/scripts/git-hooks
 
-lint: lint-repo lint-workflows lint-docker lint-terraform lint-helm lint-python lint-secrets ## every static check CI runs
+lint: lint-repo lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets ## every static check CI runs
 
 lint-repo:
 	tools/lint/spec-lint
@@ -38,13 +38,18 @@ lint-repo:
 	python3 tools/config/render_grafana.py --check
 	python3 tools/config/render_exporters.py --check
 	python3 tools/config/render_otel.py --check
+	python3 tools/config/render/render_admin_gateway.py --check
 	python3 tools/config/render/render_admin_sso.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)
 
+lint-migrations: ## migrations added or changed against origin/main
+	python3 tools/ci/migration_check.py check --base origin/main --head HEAD
+
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
+	python3 tools/ci/buildkit_pin_check.py
 	shellcheck docker/_common/collect-libs.sh scripts/*/*.sh
 	@if command -v hadolint >/dev/null; then hadolint --failure-threshold warning --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi

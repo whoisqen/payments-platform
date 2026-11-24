@@ -1,0 +1,74 @@
+suite: ratelimit add-on
+templates:
+  - addons/ratelimit.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+tests:
+  - it: runs only where the edge runs and skips the gated environments
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.generators[0].git.directories[0].path
+          value: deploy/envs/*/*/edge
+      - equal:
+          path: spec.generators[0].git.directories[1].path
+          value: deploy/envs/prod/*/*
+      - equal:
+          path: spec.generators[0].git.directories[1].exclude
+          value: true
+  - it: deploys to the edge cluster in namespace ratelimit under the platform project
+    asserts:
+      - equal:
+          path: spec.template.spec.project
+          value: platform
+      - equal:
+          path: spec.template.spec.destination.namespace
+          value: ratelimit
+      - matchRegex:
+          path: spec.template.spec.destination.name
+          pattern: ^acme-.*-edge$
+      - equal:
+          path: spec.template.spec.sources[0].path
+          value: deploy/platform/ratelimit
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: '$values/deploy/platform/ratelimit/envs/{{ index .path.segments 2 }}/{{ index .path.segments 3 }}.yaml'
+      - equal:
+          path: spec.template.spec.syncPolicy.automated.selfHeal
+          value: true
+  - it: pins the production Application to the release tag without automated sync
+    set:
+      gated.revision: v1.4.0
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.generators[0].git.revision
+          value: v1.4.0
+        documentIndex: 1
+      - equal:
+          path: spec.generators[0].git.directories[0].path
+          value: deploy/envs/prod/*/edge
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: v1.4.0
+        documentIndex: 1
+      - notExists:
+          path: spec.template.spec.syncPolicy.automated
+        documentIndex: 1
+      - equal:
+          path: spec.template.metadata.labels["payments-platform/gated"]
+          value: "true"
+        documentIndex: 1

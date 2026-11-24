@@ -1,0 +1,10 @@
+# AWS access uses EKS Pod Identity (association aws-privateca-issuer/aws-privateca-issuer), so the service account carries no role annotation.
+replicaCount: 2
+serviceAccount:
+  create: true
+  name: aws-privateca-issuer
+podDisruptionBudget:
+  maxUnavailable: 1
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 128Mi}

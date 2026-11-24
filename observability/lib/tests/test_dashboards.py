@@ -141,7 +141,7 @@ class DashboardStandardTest(unittest.TestCase):
 
     def test_metrics_exist_in_catalog(self):
         catalog = set(json.loads((OBS / "coverage" / "metrics-catalog.json").read_text())["metrics"])
-        _, recorded = cov.load_rules([OBS / "slo" / "generated"])
+        _, recorded = cov.load_rules([OBS / "alerts", OBS / "slo" / "generated"])
         for path, doc in DOCS.items():
             for p in panels(doc):
                 for t in p["targets"]:
