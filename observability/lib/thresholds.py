@@ -15,6 +15,23 @@ CACHE_WARM_RATIO = 0.75
 RESTORABLE_LAG_S = 300
 RESTORE_TARGET_FRACTION = 0.8
 AURORA_CONNECTIONS_RATIO = 0.8
+LOCKER_5XX_RATIO = 0.01
+RETRY_RATIO = 0.1
+WEBHOOK_AGE_S = 300
+DR_TEST_OVERDUE_D = 100
+S3_REPLICATION_S = 900
+SNAPSHOT_COPY_STALE_S = 2 * 3600
+DYNAMODB_GLOBAL_LAG_MS = 5000
+AURORA_CPU_PCT = 80
+KAFKA_LAG = 100000
+CLICKHOUSE_DELAY_S = 300
+CLICKHOUSE_DISK_FREE_RATIO = 0.15
+SUBNET_FREE_IP_RATIO = 0.2
+CLOCK_DRIFT_S = 0.1
+CERT_EXPIRY_CRIT_D = 14
+WAF_BLOCKED_RPS = 100
+FIREWALL_DROPS_PPS = 1000
+CLOUDFRONT_5XX_PCT = 5
 
 # Alert name -> constant; tests assert the number appears in the alert expression.
 ALERT_LINKS = {
@@ -32,4 +49,20 @@ ALERT_LINKS = {
     "LatestRestorableTimeLagHigh": "RESTORABLE_LAG_S",
     "RestoreDurationNearTarget": "RESTORE_TARGET_FRACTION",
     "AuroraConnectionsHigh": "AURORA_CONNECTIONS_RATIO",
+    "LockerErrorRateHigh": "LOCKER_5XX_RATIO",
+    "RetryStorm": "RETRY_RATIO",
+    "WebhookBacklogOld": "WEBHOOK_AGE_S",
+    "DrSwitchTestOverdue": "DR_TEST_OVERDUE_D",
+    "S3ReplicationLagHigh": "S3_REPLICATION_S",
+    "DynamoDbGlobalTableLagHigh": "DYNAMODB_GLOBAL_LAG_MS",
+    "AuroraCpuHigh": "AURORA_CPU_PCT",
+    "KafkaConsumerLagHigh": "KAFKA_LAG",
+    "ClickHouseReplicationLag": "CLICKHOUSE_DELAY_S",
+    "ClickHouseDiskLow": "CLICKHOUSE_DISK_FREE_RATIO",
+    "SubnetFreeIpsLow": "SUBNET_FREE_IP_RATIO",
+    "NodeClockDrift": "CLOCK_DRIFT_S",
+    "CertificateExpiryCritical": "CERT_EXPIRY_CRIT_D",
+    "WafBlockedRequestsHigh": "WAF_BLOCKED_RPS",
+    "NetworkFirewallDropsHigh": "FIREWALL_DROPS_PPS",
+    "CloudFront5xxHigh": "CLOUDFRONT_5XX_PCT",
 }

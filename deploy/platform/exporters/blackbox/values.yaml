@@ -1,0 +1,3 @@
+# Overlay of observability/exporters/blackbox.yaml: restricted pod; the NetworkPolicy is in common/.
+podSecurityContext:
+  seccompProfile: {type: RuntimeDefault}

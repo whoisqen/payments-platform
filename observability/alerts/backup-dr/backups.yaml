@@ -54,6 +54,7 @@ spec:
     - alert: MetricsBackupStale
       expr: time() - max by (cronjob) (kube_cronjob_status_last_successful_time{namespace="victoria-metrics", cronjob=~"vmbackup-.*"}) > 10800
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

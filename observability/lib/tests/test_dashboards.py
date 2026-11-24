@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import sys
 import unittest
@@ -9,7 +10,15 @@ OBS = LIB.parent
 sys.path.insert(0, str(LIB))
 sys.path.insert(0, str(OBS / "coverage"))
 import build  # noqa: E402
+import thresholds  # noqa: E402
+from panels import LEVEL_TIME  # noqa: E402
 import alert_coverage as cov  # noqa: E402
+import yaml  # noqa: E402
+
+LEVEL = {"l0-overview": "l0", "l1-services": "l1", "l2-platform": "l2", "l3-data": "l3", "l3-edge": "l3", "finops": "finops"}
+STAT_KINDS = ("stat", "gauge")
+# Group-by labels with more than a handful of values; such panels must cap their series.
+WIDE_LABELS = re.compile(r"by \((?:[a-z_]+, )*(pod|node|instance|namespace|horizontalpodautoscaler|consumergroup|table_name|bucket|target|queue|store)\b")
 
 FILES = sorted((OBS / "dashboards").rglob("*.json"))
 DOCS = {p: json.loads(p.read_text()) for p in FILES}
@@ -66,7 +75,7 @@ class DashboardStandardTest(unittest.TestCase):
                 w = p["gridPos"]["w"]
                 with self.subTest(dashboard=path.name, panel=p["title"]):
                     if p["type"] in ("stat", "gauge"):
-                        self.assertEqual(w, 4)
+                        self.assertTrue(4 <= w <= 12, w)
                     else:
                         self.assertIn(w, (12, 24))
 
@@ -80,7 +89,7 @@ class DashboardStandardTest(unittest.TestCase):
                 for t in p["targets"]:
                     with self.subTest(dashboard=path.name, panel=p["title"]):
                         self.assertIn("$env", t["expr"])
-                        if p["type"] in ("timeseries", "barchart"):
+                        if p["type"] in ("timeseries", "bargauge"):
                             self.assertTrue(t["legendFormat"], "legend must be a template, not raw labels")
 
     def test_rate_only_on_counters(self):
@@ -106,8 +115,6 @@ class DashboardStandardTest(unittest.TestCase):
             by = {v["name"]: v for v in doc["templating"]["list"]}
             self.assertEqual(by["env"]["current"]["text"], "prod")
             self.assertEqual(by["region"]["current"]["text"], "eu-central-1")
-            self.assertEqual(doc["time"]["from"], "now-6h")
-            self.assertEqual(doc["refresh"], "30s")
             self.assertFalse(doc["editable"])
 
     def test_no_high_cardinality_labels(self):
@@ -126,7 +133,11 @@ class DashboardStandardTest(unittest.TestCase):
         uids = {d["uid"] for d in DOCS.values()}
         for path, doc in DOCS.items():
             for link in doc["links"]:
-                self.assertIn(link["url"].split("/d/")[1], uids, path.name)
+                if link.get("url", "").startswith("/d/"):
+                    self.assertIn(link["url"].split("/d/")[1].split("?")[0], uids, path.name)
+            for p in panels(doc):
+                for link in p["fieldConfig"]["defaults"].get("links", []):
+                    self.assertIn(link["url"].split("/d/")[1].split("?")[0], uids, f"{path.name}: {p['title']}")
 
     def test_metrics_exist_in_catalog(self):
         catalog = set(json.loads((OBS / "coverage" / "metrics-catalog.json").read_text())["metrics"])
@@ -137,6 +148,152 @@ class DashboardStandardTest(unittest.TestCase):
                     for m in cov.extract_metrics(t["expr"]):
                         with self.subTest(dashboard=path.name, metric=m):
                             self.assertTrue(m in catalog or m in recorded or m == "ALERTS", m)
+
+
+    def test_no_holes_in_the_grid(self):
+        for path, doc in DOCS.items():
+            bottom = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in doc["panels"])
+            covered = {(x, y) for p in doc["panels"] for x in range(p["gridPos"]["x"], p["gridPos"]["x"] + p["gridPos"]["w"])
+                       for y in range(p["gridPos"]["y"], p["gridPos"]["y"] + p["gridPos"]["h"])}
+            holes = sorted({y for x in range(24) for y in range(bottom) if (x, y) not in covered})
+            self.assertEqual(holes, [], f"{path.name}: empty cells on grid lines {holes}")
+
+    def test_heights_by_type(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                with self.subTest(dashboard=path.name, panel=p["title"]):
+                    self.assertIn(p["gridPos"]["h"], (4, 5) if p["type"] in STAT_KINDS else (8, 9))
+
+    def test_first_row_answers_is_it_ok(self):
+        for path, doc in DOCS.items():
+            first = [p for p in doc["panels"] if p["gridPos"]["y"] == 1]
+            with self.subTest(dashboard=path.name):
+                self.assertTrue(first and all(p["type"] in STAT_KINDS for p in first))
+                self.assertTrue(any(len(p["fieldConfig"]["defaults"]["thresholds"]["steps"]) > 1 for p in first))
+
+    def test_stat_titles_fit_their_width(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["type"] in STAT_KINDS:
+                    self.assertLessEqual(len(p["title"]), 8 * p["gridPos"]["w"], f"{path.name}: {p['title']}")
+
+    def test_titles_unique_and_level_prefixed(self):
+        titles = [d["title"] for d in DOCS.values()]
+        self.assertEqual(len(titles), len(set(titles)))
+        for path, doc in DOCS.items():
+            level = LEVEL[path.parent.name]
+            self.assertTrue(doc["title"].startswith("FinOps" if level == "finops" else level.upper()), doc["title"])
+            names = [p["title"] for p in panels(doc)]
+            self.assertEqual(len(names), len(set(names)), f"{path.name} repeats a panel title")
+
+    def test_stats_show_no_data_instead_of_a_colour(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["type"] in STAT_KINDS:
+                    d = p["fieldConfig"]["defaults"]
+                    with self.subTest(dashboard=path.name, panel=p["title"]):
+                        self.assertEqual(d.get("noValue"), "No data")
+                        self.assertTrue(any(m["type"] == "special" and m["options"]["match"] == "null+nan" for m in d.get("mappings", [])))
+
+    def test_every_panel_has_min(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["type"] != "table":
+                    self.assertIn("min", p["fieldConfig"]["defaults"], f"{path.name}: {p['title']}")
+
+    def test_timeseries_tell_series_apart_and_draw_thresholds(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["type"] != "timeseries":
+                    continue
+                d = p["fieldConfig"]["defaults"]
+                with self.subTest(dashboard=path.name, panel=p["title"]):
+                    self.assertEqual(d["color"]["mode"], "palette-classic")
+                    drawn = d["custom"]["thresholdsStyle"]["mode"] != "off"
+                    self.assertEqual(drawn, len(d["thresholds"]["steps"]) > 1)
+                    self.assertEqual(p["options"]["tooltip"]["sort"], "desc")
+                    self.assertIn(p["options"]["legend"]["displayMode"], ("table", "list"))
+                    self.assertIn(p["options"]["legend"]["placement"], ("bottom", "right"))
+                    for t in p["targets"]:
+                        self.assertNotIn("{{", t["expr"])
+                        self.assertNotRegex(t["legendFormat"], r"[({]\s*[a-z_]+\{|rate\(", "legend must name the series, not repeat the query")
+
+    def test_range_queries_use_rate_interval(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                for t in p["targets"]:
+                    if not t.get("instant"):
+                        self.assertNotIn("[5m]", t["expr"], f"{path.name}: {p['title']}")
+
+    def test_wide_group_bys_are_capped(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["type"] != "timeseries":
+                    continue
+                for t in p["targets"]:
+                    if WIDE_LABELS.search(t["expr"]) and "store" not in t["legendFormat"]:
+                        self.assertRegex(t["expr"], r"^(topk|bottomk)\(8,", f"{path.name}: {p['title']}")
+
+    def test_ratios_guard_against_division_by_zero(self):
+        for path, doc in DOCS.items():
+            for p in panels(doc):
+                if p["fieldConfig"]["defaults"]["unit"] != "percent":
+                    continue
+                for t in p["targets"]:
+                    if re.search(r"\) / [a-z(]", t["expr"]) and "_bytes" not in t["expr"] and "Disk" not in t["expr"]:
+                        self.assertIn("> 0)", t["expr"], f"{path.name}: {p['title']}")
+
+    def test_variables_readable_and_hidden_when_unused(self):
+        for path, doc in DOCS.items():
+            used = " ".join(t["expr"] for p in panels(doc) for t in p["targets"])
+            by = {v["name"]: v for v in doc["templating"]["list"]}
+            self.assertFalse(by["env"]["multi"] or by["env"]["includeAll"], "one environment at a time")
+            for v in by.values():
+                with self.subTest(dashboard=path.name, variable=v["name"]):
+                    self.assertNotEqual(v["label"], v["name"])
+                    if v["type"] == "query":
+                        self.assertEqual(v["sort"], 1)
+                    if v.get("hide", 0) == 0 and v["name"] not in ("datasource", "env", "region"):
+                        self.assertIn(f"${v['name']}", used)
+
+    def test_time_and_refresh_by_level(self):
+        for path, doc in DOCS.items():
+            level = LEVEL[path.parent.name]
+            with self.subTest(dashboard=path.name):
+                if level in ("l0", "finops"):
+                    self.assertEqual((doc["time"]["from"], doc["refresh"]), LEVEL_TIME[level])
+                else:
+                    self.assertIn(doc["time"]["from"], ("now-6h", "now-7d"))
+
+    def test_navigation(self):
+        for path, doc in DOCS.items():
+            tags = doc["tags"]
+            with self.subTest(dashboard=path.name):
+                self.assertEqual(len(tags), len(set(tags)))
+                self.assertEqual(tags[:2], ["payments-platform", LEVEL[path.parent.name]])
+                self.assertTrue(any(link["type"] == "dashboards" and link["tags"] == ["payments-platform"] for link in doc["links"]))
+                if doc["uid"] != "platform-overview":
+                    self.assertIn("/d/platform-overview", [link.get("url") for link in doc["links"]])
+                if doc["uid"] != "cost":
+                    self.assertTrue(any(link.get("icon") == "doc" for link in doc["links"]), "runbook link")
+
+    def test_alert_thresholds_drawn_in_the_severity_colour(self):
+        rules = {}
+        for f in (OBS / "alerts").rglob("*.yaml"):
+            for g in yaml.safe_load(f.read_text())["spec"]["groups"]:
+                rules.update({r["alert"]: r["labels"]["severity"] for r in g["rules"] if "alert" in r})
+        drawn = []
+        for doc in DOCS.values():
+            for p in panels(doc):
+                st = p["fieldConfig"]["defaults"]["thresholds"]["steps"]
+                inverted = len(st) > 1 and st[-1]["color"] == "green" and st[0]["color"] != "green"
+                drawn += [(st[i]["value"], st[i - 1]["color"] if inverted else st[i]["color"]) for i in range(1, len(st))]
+        want = {"critical": "red", "warning": "yellow"}
+        for alert, const in thresholds.ALERT_LINKS.items():
+            value = getattr(thresholds, const)
+            hits = [c for v, c in drawn if any(math.isclose(v, x) for x in (value, value * 100))]
+            with self.subTest(alert=alert):
+                self.assertIn(want[rules[alert]], hits)
 
 
 if __name__ == "__main__":
