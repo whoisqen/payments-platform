@@ -9,6 +9,7 @@ on:
 permissions: {}
 
 # a stale PR run is cancelled; merge queue and called runs never are
+# Every check job needs only `changes`; lint-fast runs beside them and ci-gate waits for all of them
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -92,7 +93,7 @@ jobs:
       - run: python3 tools/lint/spec-gate --range "${BASE_SHA}..${HEAD_SHA}"
 
   python:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_python == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 30
@@ -106,7 +107,7 @@ jobs:
       - run: make lint-python test-python
 
   rust:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 45
@@ -155,7 +156,7 @@ jobs:
           cargo nextest run --locked $FEATURES --no-fail-fast
 
   terraform:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_terraform == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 30
@@ -171,7 +172,7 @@ jobs:
       - run: make lint-terraform test-terraform
 
   helm:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_helm == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 30
@@ -248,7 +249,7 @@ jobs:
           echo "hotfix tier: ${tier}" >>"$GITHUB_STEP_SUMMARY"
 
   policy:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_policy == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 30
@@ -264,7 +265,7 @@ jobs:
       - run: make test-policy
 
   docker:
-    needs: [changes, lint-fast]
+    needs: [changes]
     if: needs.changes.outputs.area_docker == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 15
