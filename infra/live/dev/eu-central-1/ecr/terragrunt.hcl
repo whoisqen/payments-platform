@@ -29,7 +29,7 @@ dependency "kms" {
 }
 
 inputs = {
-  repositories        = ["router", "locker", "drainer", "scheduler", "control-center"]
+  repositories        = ["router", "locker", "drainer", "scheduler", "control-center", "vault-snapshot"]
   kms_key_arn         = dependency.kms.outputs.key_arns["shared"]
   replication_regions = ["us-east-1", "us-east-2"]
 }

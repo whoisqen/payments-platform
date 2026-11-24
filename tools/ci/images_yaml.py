@@ -7,7 +7,7 @@ from pathlib import Path
 
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 DIGEST_ANY = re.compile(r"sha256:[a-f0-9]{64}")
-SERVICES = ["router", "drainer", "scheduler", "locker", "control-center"]
+SERVICES = ["router", "drainer", "scheduler", "locker", "control-center", "vault-snapshot"]
 ENVS = ["dev", "stage", "prod"]
 
 
