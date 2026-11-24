@@ -206,7 +206,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -478,7 +478,7 @@
         "h": 4
       },
       "title": "dr test: last switch duration",
-      "description": "RTO target 60 minutes, 75 in plan B.",
+      "description": "RTO target 60 minutes, 75 in plan B; a target, not an alert.",
       "targets": [
         {
           "refId": "A",
