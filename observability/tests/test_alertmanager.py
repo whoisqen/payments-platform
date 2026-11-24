@@ -41,9 +41,17 @@ def matches(matchers, labels):
 def route(labels, node=None):
     node = node or CONFIG["route"]
     for child in node.get("routes", []):
-        if matches(child.get("matchers", []), labels):
+        # A route with continue also sends to its receiver but does not decide the main one
+        if not child.get("continue") and matches(child.get("matchers", []), labels):
             return route(labels, child)
     return node["receiver"]
+
+
+def receivers(labels):
+    """Every receiver that gets the alert, the ones of continue routes included."""
+    out = [route(labels)]
+    out += [c["receiver"] for c in CONFIG["route"].get("routes", []) if c.get("continue") and matches(c.get("matchers", []), labels)]
+    return out
 
 
 def inhibited(rule, source, target):
@@ -63,6 +71,12 @@ class RoutingTest(unittest.TestCase):
         self.assertEqual(route({"severity": "warning", "team": "payments-core"}), "slack-payments-alerts")
         self.assertEqual(route({"severity": "security", "team": "security"}), "slack-security")
         self.assertEqual(route({"alertname": "Watchdog", "severity": "none"}), "deadmans-switch")
+
+    def test_failure_of_delivery_has_a_second_channel(self):
+        got = receivers(LABELS["AlertmanagerNotificationsFailing"])
+        self.assertIn("slack-payments-critical", got)
+        self.assertIn("fallback-webhook", got)
+        self.assertEqual(receivers(LABELS["CacheWarmRatioLow"]), ["slack-payments-alerts"])
 
     def test_cache_warm_alert_never_pages(self):
         self.assertEqual(route(LABELS["CacheWarmRatioLow"]), "slack-payments-alerts")
