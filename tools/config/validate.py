@@ -14,7 +14,7 @@ REQUIRED = {
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
     "accounts": ["shared_services", "dev", "stage", "prod"],
     "regions": ["working", "recovery"],
-    "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url"],
+    "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url", "admin_zone"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
     "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
@@ -47,7 +47,13 @@ def check(cfg):
         wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
         if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
             errors.append(f"`deploy.{env}.ingress_endpoints` needs an ingress host for the working region and the standby region")
-    groups = (cfg.get("access") or {}).get("grafana_groups") or {}
+    access = cfg.get("access") or {}
+    if not re.match(r"^[a-z0-9.-]+\.(okta|oktapreview|okta-emea)\.com$", str(access.get("okta_domain", ""))):
+        errors.append("`access.okta_domain` must be the host name of an Okta organization, without https://")
+    admins = access.get("admin_user_ids") or []
+    if len(admins) == 1:
+        errors.append("`access.admin_user_ids` needs at least two administrators, or none")
+    groups = access.get("grafana_groups") or {}
     for role in GRAFANA_GROUPS:
         if not re.match(r"^[a-z0-9][a-z0-9._-]*$", str(groups.get(role, ""))):
             errors.append(f"`access.grafana_groups.{role}` must be a group name of the identity provider")

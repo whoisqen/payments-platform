@@ -38,6 +38,8 @@ dns:
   prod_zone: pay.example.com
   psp_domains: [.psp-sandbox.example.com]
   grafana_url: https://grafana.payments.internal
+  # Zone of the admin tools (argocd, vault, alertmanager, vmui, prometheus, sentry); reached only through the internal gateway
+  admin_zone: payments.internal
 
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
@@ -46,6 +48,10 @@ storage:
   state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
 
 access:
+  # Okta organization that signs the administrators in to every admin tool (host name, no https://)
+  okta_domain: example.okta.com
+  # Okta user ids of the members of the administrator group: the owner and one reserve administrator
+  admin_user_ids: []
   # Name of the IAM Identity Center permission set that gets view-only access to the clusters
   sre_view_permission_set: AWSReservedSSO_SRE-View
   # Groups of the identity provider (OIDC `groups` claim) that decide who may enter Grafana and with which role;
