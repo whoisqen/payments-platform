@@ -20,8 +20,10 @@ images:
   vault-snapshot:
     - docker/vault-snapshot/
 areas:
-  rust:
+  # one area per vendored workspace: a change of one must not run the checks of the other
+  rust_hyperswitch:
     - vendor/hyperswitch/
+  rust_card_vault:
     - vendor/card-vault/
   terraform:
     - infra/

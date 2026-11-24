@@ -26,7 +26,8 @@ jobs:
     outputs:
       images: ${{ steps.paths.outputs.images }}
       any_image: ${{ steps.paths.outputs.any_image }}
-      area_rust: ${{ steps.paths.outputs.area_rust }}
+      area_rust_hyperswitch: ${{ steps.paths.outputs.area_rust_hyperswitch }}
+      area_rust_card_vault: ${{ steps.paths.outputs.area_rust_card_vault }}
       area_terraform: ${{ steps.paths.outputs.area_terraform }}
       area_helm: ${{ steps.paths.outputs.area_helm }}
       area_policy: ${{ steps.paths.outputs.area_policy }}
@@ -106,7 +107,7 @@ jobs:
 
   rust:
     needs: [changes, lint-fast]
-    if: needs.changes.outputs.area_rust == 'true'
+    if: needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
@@ -118,14 +119,19 @@ jobs:
           - dir: vendor/hyperswitch
             toolchain: 1.94.1
             features: --features v1
+            area: area_rust_hyperswitch
           - dir: vendor/card-vault
             toolchain: 1.92.0
             features: ""
+            area: area_rust_card_vault
+    # Each entry runs only when its own workspace changed; the others finish at once
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - if: needs.changes.outputs[matrix.area] == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: toolchain
+        if: needs.changes.outputs[matrix.area] == 'true'
         env:
           TOOLCHAIN: ${{ matrix.toolchain }}
         run: |
@@ -133,6 +139,7 @@ jobs:
           rustup default "$TOOLCHAIN"
           cargo install --locked cargo-nextest
       - name: fmt, clippy, tests
+        if: needs.changes.outputs[matrix.area] == 'true'
         working-directory: ${{ matrix.dir }}
         env:
           FEATURES: ${{ matrix.features }}

@@ -1,6 +1,6 @@
 {
   "uid": "backup",
-  "title": "Backup and restore",
+  "title": "L3 Backup and restore",
   "description": "Can we restore, how fast, and how old is the newest recovery point?",
   "tags": [
     "payments-platform",
@@ -13,18 +13,22 @@
   "version": 1,
   "editable": false,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "5m",
+  "liveNow": false,
+  "weekStart": "",
+  "fiscalYearStartMonth": 0,
   "time": {
-    "from": "now-6h",
+    "from": "now-7d",
     "to": "now"
   },
   "templating": {
     "list": [
       {
         "name": "datasource",
-        "label": "datasource",
+        "label": "Data source",
         "type": "datasource",
         "query": "prometheus",
+        "hide": 0,
         "current": {
           "text": "default",
           "value": "default"
@@ -32,7 +36,7 @@
       },
       {
         "name": "env",
-        "label": "env",
+        "label": "Environment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -41,17 +45,17 @@
         "query": "label_values(up, env)",
         "refresh": 2,
         "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
+        "multi": false,
+        "includeAll": false,
         "current": {
           "text": "prod",
           "value": "prod"
-        }
+        },
+        "hide": 0
       },
       {
         "name": "region",
-        "label": "region",
+        "label": "Region",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -62,15 +66,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "eu-central-1",
           "value": "eu-central-1"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "cell",
-        "label": "cell",
+        "label": "Cell",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -81,15 +86,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "service",
-        "label": "service",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -100,30 +106,32 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "psp",
-        "label": "psp",
+        "label": "PSP",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(psp_requests_total{env=~\"$env\"}, psp)",
+        "query": "label_values(psp_requests_total{env=~\"$env\",region=~\"$region\"}, psp)",
         "refresh": 2,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       }
     ]
   },
@@ -133,14 +141,45 @@
       "title": "L0 Platform overview",
       "url": "/d/platform-overview",
       "icon": "dashboard",
-      "targetBlank": false
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
     },
     {
       "type": "link",
       "title": "L3 Data stores",
       "url": "/d/data-stores",
       "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "link",
+      "title": "L3 DR switch readiness",
+      "url": "/d/dr-switch",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "dashboards",
+      "title": "All dashboards",
+      "tags": [
+        "payments-platform"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": true,
       "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: backup-dr",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/backup-dr",
+      "icon": "doc",
+      "targetBlank": true
     }
   ],
   "annotations": {
@@ -164,13 +203,13 @@
       "type": "row",
       "title": "Recovery points",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 2,
@@ -182,7 +221,7 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
       "title": "backup: failed jobs, 24 h",
@@ -192,7 +231,8 @@
           "refId": "A",
           "expr": "sum(increase(aws_backup_number_of_backup_jobs_failed_sum{env=~\"$env\",region=~\"$region\"}[1d])) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -214,7 +254,22 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -222,10 +277,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -236,19 +296,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 4,
+        "x": 8,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
       "title": "restore test: stores failing",
-      "description": "",
+      "description": "Stores whose last daily restore failed its data check.",
       "targets": [
         {
           "refId": "A",
           "expr": "count(restore_test_success{env=~\"$env\",region=~\"$region\"} == 0) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -270,7 +331,22 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -278,10 +354,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -292,19 +373,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 16,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
-      "title": "pitr: worst restorable time lag, s",
+      "title": "PITR: worst restorable time lag",
       "description": "Data loss on a point-in-time restore is at most 5 minutes (D2).",
       "targets": [
         {
           "refId": "A",
           "expr": "max(database_latest_restorable_time_lag_seconds{env=~\"$env\",region=~\"$region\"})",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -330,7 +412,22 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 2,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -338,33 +435,39 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
       "id": 5,
-      "type": "barchart",
+      "type": "bargauge",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 12,
-        "h": 8
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 9
       },
       "title": "backup: age of the last successful backup by store, s",
-      "description": "",
+      "description": "BackupMissing pages when the age exceeds twice the backup interval of the store.",
       "targets": [
         {
           "refId": "A",
           "expr": "time() - max by (store) (backup_last_success_timestamp_seconds{env=~\"$env\",region=~\"$region\"})",
           "legendFormat": "{{store}}",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -382,14 +485,35 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
       "options": {
         "orientation": "horizontal",
-        "legend": {
-          "displayMode": "list"
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "left",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
       }
     },
@@ -398,13 +522,13 @@
       "type": "row",
       "title": "Restore speed",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 14,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 7,
@@ -415,9 +539,9 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 15,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "restore: duration against its target by store, s",
       "description": "Alerts fire at 80% of the target; the Aurora target is 30 minutes (D4).",
@@ -437,7 +561,7 @@
         "defaults": {
           "unit": "s",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -448,21 +572,36 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -475,16 +614,16 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 15,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "restore: duration share of the target by store, %",
+      "title": "restore: duration, % of the target by store",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * max by (store) (backup_restore_duration_seconds{env=~\"$env\",region=~\"$region\"}) / max by (store) (backup_restore_target_seconds{env=~\"$env\",region=~\"$region\"})",
+          "expr": "100 * max by (store) (backup_restore_duration_seconds{env=~\"$env\",region=~\"$region\"}) / (max by (store) (backup_restore_target_seconds{env=~\"$env\",region=~\"$region\"}) > 0)",
           "legendFormat": "{{store}}"
         }
       ],
@@ -492,7 +631,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -504,29 +643,40 @@
               {
                 "color": "yellow",
                 "value": 80.0
-              },
-              {
-                "color": "red",
-                "value": 100
               }
             ]
           },
           "min": 0,
-          "max": 150
+          "max": 150,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -539,12 +689,12 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 24,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "restore: duration against the data size, s",
-      "description": "Trend of the restore time against data growth.",
+      "title": "restore: duration against the data size",
+      "description": "Duration on the left axis, data size on the right: the restore time against data growth.",
       "targets": [
         {
           "refId": "A",
@@ -553,15 +703,15 @@
         },
         {
           "refId": "B",
-          "expr": "max by (store) (backup_source_size_bytes{env=~\"$env\",region=~\"$region\"}) / 1e9",
-          "legendFormat": "{{store}} size, GB"
+          "expr": "max by (store) (backup_source_size_bytes{env=~\"$env\",region=~\"$region\"})",
+          "legendFormat": "{{store}} size"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "s",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -572,21 +722,53 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".* size"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -599,18 +781,19 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 24,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "restore test: last result by store",
-      "description": "1 means the last daily restore passed its data check.",
+      "description": "Result of the last daily restore and its data check.",
       "targets": [
         {
           "refId": "A",
           "expr": "min by (store) (restore_test_success{env=~\"$env\",region=~\"$region\"})",
           "legendFormat": "",
           "instant": true,
+          "range": false,
           "format": "table"
         }
       ],
@@ -624,13 +807,48 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "failed",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "passed",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {
+            "cellOptions": {
+              "type": "color-background"
+            }
           }
         },
         "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Result",
+            "desc": true
+          }
+        ]
       },
       "transformations": [
         {
@@ -638,6 +856,9 @@
           "options": {
             "excludeByName": {
               "Time": true
+            },
+            "renameByName": {
+              "Value": "Result"
             }
           }
         }
@@ -648,13 +869,13 @@
       "type": "row",
       "title": "Copies",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 33,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 12,
@@ -665,16 +886,16 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 34,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "snapshot copies: age of the last successful copy by region, s",
-      "description": "",
+      "title": "snapshot copies: age of the last copy by region, s",
+      "description": "SnapshotCopyStale warns above 2 hours.",
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds{env=~\"$env\",region=~\"$region\"})",
+          "expr": "topk(8, time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds{env=~\"$env\",region=~\"$region\"}))",
           "legendFormat": "{{store}} {{region}}"
         }
       ],
@@ -682,7 +903,7 @@
         "defaults": {
           "unit": "s",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -693,29 +914,40 @@
               },
               {
                 "color": "yellow",
-                "value": 3600
-              },
-              {
-                "color": "red",
                 "value": 7200
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -728,11 +960,11 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 27,
+        "y": 34,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "backup: copy job failures, 24 h",
+      "title": "backup: copy job failures per 24 h by vault",
       "description": "",
       "targets": [
         {
@@ -745,7 +977,7 @@
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -755,26 +987,41 @@
                 "value": null
               },
               {
-                "color": "red",
+                "color": "yellow",
                 "value": 1
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     }

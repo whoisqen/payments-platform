@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-grafana
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'grafana-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: grafana
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: grafana
+          targetRevision: 10.5.15
+          helm:
+            # Fixed release name: the Services (loki-gateway, tempo-distributor) are what the front door and Grafana address
+            releaseName: grafana
+            valueFiles:
+              - $values/deploy/platform/grafana/values.yaml
+            parameters:
+              # The Service names of the victoria-metrics and alertmanager add-ons hold the cluster name
+              - name: env.VM_URL
+                value: 'http://victoria-metrics-{{`{{ .name }}`}}-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus'
+              - name: env.ALERTMANAGER_URL
+                value: 'http://alertmanager-{{`{{ .name }}`}}.monitoring.svc:9093'
+              - name: ingress.hosts[0]
+                value: {{ trimPrefix "https://" .Values.observability.grafanaUrl | quote }}
+              - name: grafana\.ini.server.root_url
+                value: {{ .Values.observability.grafanaUrl | quote }}
+        # The dashboards (one ConfigMap per folder) and the ExternalSecrets of the admin login and the OIDC client
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/grafana/manifests
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
