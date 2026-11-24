@@ -37,6 +37,7 @@ lint-repo:
 	python3 tools/config/render_grafana.py --check
 	python3 tools/config/render_exporters.py --check
 	python3 tools/config/render_otel.py --check
+	python3 tools/config/render/render_admin_gateway.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

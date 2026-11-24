@@ -19,6 +19,8 @@ spec:
     - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm
+    - https://aws.github.io/eks-charts
+    - https://cert-manager.github.io/aws-privateca-issuer
     - public.ecr.aws/karpenter
     - ghcr.io/actions/actions-runner-controller-charts
   destinations:
@@ -35,6 +37,7 @@ spec:
     - {group: admissionregistration.k8s.io, kind: ValidatingAdmissionPolicyBinding}
     - {group: scheduling.k8s.io, kind: PriorityClass}
     - {group: karpenter.sh, kind: NodePool}
+    - {group: awspca.cert-manager.io, kind: AWSPCAClusterIssuer}
     - {group: karpenter.k8s.aws, kind: EC2NodeClass}
     - {group: external-secrets.io, kind: ClusterSecretStore}
     - {group: cert-manager.io, kind: ClusterIssuer}
