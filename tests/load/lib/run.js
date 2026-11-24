@@ -2,7 +2,7 @@ import http from 'k6/http';
 import exec from 'k6/execution';
 import crypto from 'k6/crypto';
 import { Trend, Rate, Counter } from 'k6/metrics';
-import { MIX, PROFILES, SLO_RPS_LIMIT, pickType, targetRateAt } from './profiles.js';
+import { MIX, PROFILES, pickType, phaseAt } from './profiles.js';
 import { buildRequest, needsPayment, isServerError } from './requests.js';
 
 const overhead = new Trend('platform_overhead_ms', true);
@@ -37,7 +37,7 @@ export function makeIteration(profileName) {
   const profile = PROFILES[profileName];
   return function iteration() {
     const elapsed = (Date.now() - exec.scenario.startTime) / 1000;
-    const phase = targetRateAt(profile, elapsed) <= SLO_RPS_LIMIT ? 'within-slo' : 'beyond-slo';
+    const phase = phaseAt(profile, elapsed);
     const type = pickType(Math.random(), MIX);
     let id = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
     // A dependent call with an empty pool first creates a payment, tagged apart so the weights stay clean.
