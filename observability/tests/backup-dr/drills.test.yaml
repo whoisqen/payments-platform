@@ -46,7 +46,7 @@ tests:
   - series: dr_switch_test_last_success_timestamp_seconds{region="us-east-2"}
     values: 0+86400x110
   alert_rule_test:
-  - eval_time: 101d
+  - eval_time: 102d
     alertname: DrSwitchTestOverdue
     exp_alerts:
     - exp_labels:

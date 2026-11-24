@@ -33,7 +33,7 @@ config:
     - psp
     group_wait: 30s
     group_interval: 5m
-    repeat_interval: 4h
+    repeat_interval: 8760h
     routes:
     - receiver: deadmans-switch
       matchers:
@@ -47,7 +47,7 @@ config:
       group_by:
       - alertname
       - region
-      repeat_interval: 1h
+      repeat_interval: 8760h
     - receiver: slack-payments-critical
       matchers:
       - severity="critical"
@@ -55,7 +55,7 @@ config:
       - alertname
       - region
       - psp
-      repeat_interval: 1h
+      repeat_interval: 8760h
     - receiver: slack-payments-alerts
       matchers:
       - severity="warning"

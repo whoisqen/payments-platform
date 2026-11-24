@@ -26,6 +26,7 @@ spec:
     - alert: BackupMissing
       expr: time() - max by (store) (backup_last_success_timestamp_seconds) > 2 * max by (store) (backup_interval_seconds)
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -53,6 +54,7 @@ spec:
     - alert: SnapshotCopyStale
       expr: time() - max by (store, region) (snapshot_copy_last_success_timestamp_seconds) > 2 * 3600
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

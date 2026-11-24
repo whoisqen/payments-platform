@@ -13,6 +13,7 @@ spec:
     - alert: RegionDown
       expr: count by (region) (probe_success{probe_target="region-health"} == 0) >= 2
       for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -27,6 +28,7 @@ spec:
     - alert: GlobalAcceleratorEndpointUnhealthy
       expr: min by (accelerator, endpoint_group) (aws_globalaccelerator_healthy_endpoint_count_minimum) < 1
       for: 3m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -41,6 +43,7 @@ spec:
     - alert: NatPortAllocationErrors
       expr: sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum[5m])) > 0
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -55,6 +58,7 @@ spec:
     - alert: Route53HealthCheckFailing
       expr: min by (health_check_id) (aws_route53_health_check_status_minimum) < 1
       for: 3m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -69,6 +73,7 @@ spec:
     - alert: WafBlockedRequestsHigh
       expr: sum by (web_acl) (rate(aws_wafv2_blocked_requests_sum[5m])) > 100
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: security
@@ -83,6 +88,7 @@ spec:
     - alert: NetworkFirewallDropsHigh
       expr: sum by (firewall) (rate(aws_networkfirewall_dropped_packets_sum[5m])) > 1000
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
@@ -97,6 +103,7 @@ spec:
     - alert: CloudFront5xxHigh
       expr: max by (distribution) (aws_cloudfront_5xx_error_rate_average) > 5
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform

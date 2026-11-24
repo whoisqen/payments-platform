@@ -13,6 +13,7 @@ spec:
     - alert: AuroraWriterUnavailable
       expr: pg_up{role="writer"} == 0
       for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -27,6 +28,7 @@ spec:
     - alert: AuroraReplicationSlotLagHigh
       expr: max by (cell, slot_name) (pg_replication_slots_wal_lag_bytes) > 10 * 1024 ^ 3
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -41,6 +43,7 @@ spec:
     - alert: AuroraReplicaLagHigh
       expr: max by (cell) (aws_rds_aurora_replica_lag_maximum) > 1000
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -55,6 +58,7 @@ spec:
     - alert: AuroraConnectionsHigh
       expr: sum by (cell, instance) (pg_stat_database_numbackends) / max by (cell, instance) (pg_settings_max_connections) > 0.8
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -69,6 +73,7 @@ spec:
     - alert: AuroraCpuHigh
       expr: max by (cell, instance) (aws_rds_cpuutilization_average) > 80
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -83,6 +88,7 @@ spec:
     - alert: AuroraDeadlocks
       expr: sum by (cell) (rate(pg_stat_database_deadlocks[5m])) > 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -97,6 +103,7 @@ spec:
     - alert: AuroraTableGrowthFast
       expr: max by (cell, relname) (pg_table_size_bytes) / max by (cell, relname) (pg_table_size_bytes offset 1d) > 1.2
       for: 1h
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

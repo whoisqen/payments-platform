@@ -13,6 +13,7 @@ spec:
     - alert: MemoryDbMemoryCritical
       expr: max by (cell, instance) (redis_memory_used_bytes / redis_memory_max_bytes) > 0.85
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -27,6 +28,7 @@ spec:
     - alert: MemoryDbEvictions
       expr: sum by (cell) (rate(redis_evicted_keys_total[5m])) > 0
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -54,6 +56,7 @@ spec:
     - alert: CacheWarmRatioLow
       expr: min by (cell) (cache_warm_ratio) < 0.75
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
