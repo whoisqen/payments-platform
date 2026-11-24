@@ -1,0 +1,136 @@
+# Settings of the admin AI agent (tools/ai/admin_agent). Read and analysis tools plus named runbook actions that run only after a human confirms.
+# cde-prod is excluded entirely: it is not a valid environment and no pattern below may match it.
+bedrock:
+  # Private VPC interface endpoint of bedrock-runtime; must match https://vpce-*.bedrock-runtime.eu-*.vpce.amazonaws.com.
+  # CONFIRM: set the real endpoint DNS name of the vpce before the first run.
+  endpoint_url: https://vpce-confirm.bedrock-runtime.eu-central-1.vpce.amazonaws.com
+  region: eu-central-1
+  # CONFIRM: Bedrock guardrail; empty applies none and the agent warns. The Bedrock client uses the environment role like every other client.
+  guardrail_id: ""
+  guardrail_version: ""
+  timeout_seconds: 120
+  max_output_tokens: 2048
+  temperature: 0.0
+
+# Ordered cheapest first. The admin picks one with --model; without it the cheapest is used and the agent says so.
+# CONFIRM: check every inference-profile id in the Bedrock console before the first run.
+models:
+  - name: haiku
+    id: eu.anthropic.claude-haiku-4-5-v1:0
+  - name: sonnet
+    id: eu.anthropic.claude-sonnet-5-5-v1:0
+
+environments:
+  # Allowed environments only. Every AWS client, kubectl included, uses the session assumed from role_arn; GetCallerIdentity must return account_id.
+  # Namespaces are an ALLOW list; CDE workloads must not run in them (they are also excluded by name in cde_scope).
+  dev:
+    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
+    kube_context: payments-dev
+    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000001:cluster/payments-dev
+    role_arn: arn:aws:iam::000000000001:role/CONFIRM-admin-agent-dev
+    account_id: "000000000001"
+    tenant_id: payments-dev
+    namespaces: [payments, observability]
+    loki_url: https://loki-gateway.observability.svc:443
+    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.svc:9093
+    log_groups: [/payments/dev/application]
+    ssm_region: eu-central-1
+  stage:
+    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
+    kube_context: payments-stage
+    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000002:cluster/payments-stage
+    role_arn: arn:aws:iam::000000000002:role/CONFIRM-admin-agent-stage
+    account_id: "000000000002"
+    tenant_id: payments-stage
+    namespaces: [payments, observability]
+    loki_url: https://loki-gateway.observability.svc:443
+    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.svc:9093
+    log_groups: [/payments/stage/application]
+    ssm_region: eu-central-1
+  prod:
+    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
+    kube_context: payments-prod
+    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000003:cluster/payments-prod
+    role_arn: arn:aws:iam::000000000003:role/CONFIRM-admin-agent-prod
+    account_id: "000000000003"
+    tenant_id: payments-prod
+    namespaces: [payments, observability]
+    loki_url: https://loki-gateway.observability.svc:443
+    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.svc:9093
+    log_groups: [/payments/prod/application]
+    ssm_region: eu-central-1
+
+# PROD-IN-CDE-SCOPE: while true, prod is refused and only dev and stage are reachable. The owner must decide before this is set to false.
+prod_in_cde_scope: true
+# Environments where a confirmation also needs the environment name typed again (and --no-dry-run).
+require_env_retype: [prod]
+# CONFIRM: account ids of the CDE accounts; the agent refuses credentials of these accounts and configs that list them.
+cde_account_ids: []
+
+# Hosts the agent may call over https (Loki, VictoriaMetrics, Alertmanager).
+allowed_hosts:
+  - loki-gateway.observability.svc
+  - vmselect.observability.svc
+  - alertmanager.observability.svc
+
+# Structured queries: the model supplies values, never selectors. Names of labels and the metrics allowed (counter is wrapped in rate()).
+queries:
+  namespace_label: namespace
+  app_label: app
+  level_label: level
+  metrics:
+    container_cpu_usage_seconds_total: counter
+    kube_pod_container_status_restarts_total: counter
+    container_memory_working_set_bytes: gauge
+    kube_pod_status_phase: gauge
+    kube_deployment_status_replicas_available: gauge
+    http_requests_total: counter
+
+audit:
+  # Optional: ship audit lines (metadata only, no arguments or payloads) to this CloudWatch Logs group; empty keeps them local.
+  cloudwatch_log_group: ""
+
+# CDE scope: refused in arguments in every environment, also when folded from unicode or split by punctuation.
+# policy/cde-paths.yaml classes are added at load time (cards, storage-impl, redis-interface, arc, ...).
+cde_scope:
+  denied_workloads: [router, drainer, scheduler, locker, card-vault, cards, storage-impl, redis-interface]
+  denied_namespaces: [cde, card-vault, locker]
+
+kubectl:
+  # Read-only `kubectl get`. Secrets are never allowed, even if listed here.
+  resources: [pods, deployments, statefulsets, daemonsets, replicasets, services, horizontalpodautoscalers, events, nodes, configmaps, jobs, cronjobs, gateways, httproutes]
+  timeout_seconds: 20
+  # A ConfigMap with a key matching this has that value blocked; env values with a matching name are blocked too; base64-like blobs are always blocked.
+  secret_key_pattern: "(?i)(pass|passwd|passphrase|password|secret|token|dsn|auth|credentials?|api[_-]?key|private[_-]?key|access[_-]?key|cert|pem)"
+
+limits:
+  max_query_minutes: 180
+  max_log_lines: 2000
+  max_turns: 12
+  # Hard budgets in estimated tokens (4 characters per token).
+  tool_result_tokens: 2500
+  session_tool_tokens: 20000
+  default_session_tokens: 60000
+  top_templates: 15
+  max_template_examples_chars: 300
+  metric_points: 12
+  stack_frames_kept: 3
+
+# Named runbook actions the model may only propose. The admin types the exact id to confirm; dry-run is the default.
+actions:
+  restart-pod:
+    description: Restart one pod of a namespace through the SSM automation document.
+    document: Payments-RestartPod
+    params:
+      namespace: {type: string, pattern: "^[a-z0-9-]{1,63}$"}
+      pod: {type: string, pattern: "^[a-z0-9.-]{1,253}$"}
+  scale-deployment:
+    description: Scale one deployment within fixed bounds.
+    document: Payments-ScaleDeployment
+    params:
+      namespace: {type: string, pattern: "^[a-z0-9-]{1,63}$"}
+      deployment: {type: string, pattern: "^[a-z0-9.-]{1,253}$"}
+      replicas: {type: integer, min: 1, max: 10}
