@@ -27,6 +27,9 @@ lint-repo:
 	tools/lint/structure
 	python3 tools/config/validate.py
 	python3 tools/config/render_standby.py --check
+	python3 observability/lib/build.py --check
+	python3 observability/lib/gen_resilience.py --check
+	python3 observability/slo/generate.py --check
 	python3 tools/config/render_central.py --check
 	python3 tools/config/render_victoria.py --check
 	python3 tools/config/render_vault.py --check
