@@ -1,0 +1,31 @@
+# The chart creates no PodDisruptionBudget for these; selectors are the chart's pod labels (release `sentry`)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: sentry-web, namespace: sentry}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: sentry, release: sentry, role: web}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: sentry-relay, namespace: sentry}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: sentry, release: sentry, role: relay}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: sentry-snuba-api, namespace: sentry}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: sentry, release: sentry, role: snuba-api}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: sentry-taskworker, namespace: sentry}
+spec:
+  minAvailable: 4
+  selector:
+    matchLabels: {app: sentry, release: sentry}
+    matchExpressions:
+      - {key: role, operator: In, values: [taskworker-default, taskworker-ingest, taskworker-long, taskworker-products]}

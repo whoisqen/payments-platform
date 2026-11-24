@@ -14,6 +14,8 @@ spec:
     - https://helm.releases.hashicorp.com
     - https://prometheus-community.github.io/helm-charts
     - https://victoriametrics.github.io/helm-charts
+    - https://sentry-kubernetes.github.io/charts
+    - registry-1.docker.io/bitnamicharts
     - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm
