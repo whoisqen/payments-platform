@@ -1,0 +1,55 @@
+name: setup-buildkit
+description: Rootless BuildKit builder on Kubernetes (buildx kubernetes driver); no Docker daemon and no privileged container
+
+inputs:
+  name:
+    description: Builder name, unique per job; it becomes the Deployment name in the build namespace
+    required: true
+  namespace:
+    description: Namespace of the builder pods
+    default: ci-build
+  node-selector:
+    description: Node selector of the build pool, key=value pairs separated by commas
+    default: kubernetes.io/arch=arm64,pay.io/pool=ci-build
+  eks-cluster:
+    description: EKS cluster that hosts the builders; empty when the runner already runs in that cluster (in-cluster config)
+    default: ""
+  aws-region:
+    description: Region of the EKS cluster
+    default: ""
+  strict-pin:
+    description: Fail while the BuildKit digest is still a placeholder
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: BuildKit pin
+      shell: bash
+      env:
+        STRICT: ${{ inputs.strict-pin }}
+      run: |
+        set -euo pipefail
+        if [ "$STRICT" = true ]; then python3 tools/ci/buildkit_pin_check.py --strict; else python3 tools/ci/buildkit_pin_check.py; fi
+        grep '^BUILDKIT_IMAGE=' tools/ci/buildkit.env >>"$GITHUB_ENV"
+    - name: kubeconfig of the build cluster
+      if: inputs.eks-cluster != ''
+      shell: bash
+      env:
+        CLUSTER: ${{ inputs.eks-cluster }}
+        REGION: ${{ inputs.aws-region }}
+      run: aws eks update-kubeconfig --name "$CLUSTER" --region "$REGION" --alias buildkit
+    - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      with:
+        driver: kubernetes
+        name: ${{ inputs.name }}
+        driver-opts: |
+          namespace=${{ inputs.namespace }}
+          image=${{ env.BUILDKIT_IMAGE }}
+          rootless=true
+          replicas=1
+          nodeselector=${{ inputs.node-selector }}
+          requests.cpu=8
+          requests.memory=16Gi
+          limits.memory=24Gi
+          timeout=180s
