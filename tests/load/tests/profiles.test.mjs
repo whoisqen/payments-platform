@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MIX, PROFILES, CALLS_PER_PAYMENT, weightTotal, pickType, targetRateAt, peakRps, totalSeconds } from '../lib/profiles.js';
+import { MIX, PROFILES, CALLS_PER_PAYMENT, weightTotal, pickType, targetRateAt, peakRps, totalSeconds, phaseAt } from '../lib/profiles.js';
 import { buildOptions, thresholdsFor } from '../lib/options.js';
 import { buildRequest, isServerError } from '../lib/requests.js';
 
@@ -68,4 +68,30 @@ test('requests: confirm targets the payment and no card number is built in', () 
   assert.equal(buildRequest('status', cfg, 'pay_1').method, 'GET');
   assert.throws(() => buildRequest('nope', cfg, 'p'));
   assert.ok(isServerError(503) && !isServerError(429));
+});
+
+test('spike jumps from 3,300 to 10,000 RPS in 60 s and holds 15 min', () => {
+  const p = PROFILES.spike;
+  assert.equal(targetRateAt(p, 120), 3300);
+  assert.equal(targetRateAt(p, 180), 10000);
+  assert.equal(targetRateAt(p, 180 + 900), 10000);
+  assert.equal(peakRps(p), 10000);
+});
+
+test('spike has its own 2 min start phase; stress still splits at 10,000 RPS', () => {
+  const p = PROFILES.spike;
+  assert.equal(phaseAt(p, 60), 'within-slo');
+  assert.equal(phaseAt(p, 150), 'spike-start');
+  assert.equal(phaseAt(p, 239), 'spike-start');
+  assert.equal(phaseAt(p, 300), 'within-slo');
+  assert.equal(phaseAt(PROFILES.stress, 1700), 'beyond-slo');
+  assert.equal(phaseAt(PROFILES.stress, 600), 'within-slo');
+  const t = thresholdsFor('spike');
+  assert.deepEqual(t['server_error{phase:spike-start}'], ['rate<0.001']);
+});
+
+test('soak holds 2,500 RPS for 8 hours', () => {
+  const p = PROFILES.soak;
+  assert.equal(targetRateAt(p, 300 + 3600), 2500);
+  assert.equal(totalSeconds(p), 300 + 8 * 3600 + 60);
 });

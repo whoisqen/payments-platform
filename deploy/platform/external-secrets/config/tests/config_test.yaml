@@ -97,3 +97,46 @@ tests:
             ports:
               - port: 8200
                 protocol: TCP
+  - it: gives the central cluster only the aws-secrets-manager store, limited to the namespaces that use it
+    template: clustersecretstores.yaml
+    values:
+      - ../../envs/shared-services/eu-central-1.yaml
+    set:
+      networkPolicy.apiServerCidrs: ["10.0.0.0/28"]
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: aws-secrets-manager
+      - equal:
+          path: spec.provider.aws.region
+          value: eu-central-1
+      - equal:
+          path: spec.conditions[0].namespaceSelector.matchExpressions[0].values
+          value: [monitoring, argocd, sentry]
+  - it: opens the central egress to the shared-services VPC only
+    template: networkpolicy.yaml
+    values:
+      - ../../envs/shared-services/eu-central-1.yaml
+    set:
+      networkPolicy.apiServerCidrs: ["10.0.0.0/28"]
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to:
+              - ipBlock:
+                  cidr: 10.140.0.0/16
+            ports:
+              - port: 443
+                protocol: TCP
+        documentIndex: 1
+      - notContains:
+          path: spec.egress
+          content:
+            ports:
+              - port: 8200
+                protocol: TCP
+          any: true
+        documentIndex: 1

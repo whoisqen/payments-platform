@@ -1,0 +1,20 @@
+# shared-services eu-central-1 (central observability cluster): the pod role comes from the Pod Identity association external-secrets/external-secrets
+requireResolved: true
+
+awsSecretsManager:
+  region: eu-central-1
+  # Only the namespaces whose ExternalSecrets name aws-secrets-manager: grafana, alertmanager, otel-collector (monitoring), argocd, sentry
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: [monitoring, argocd, sentry]
+
+# No Vault runs in or is configured for this cluster (config/platform.yaml has no central Vault URL); nothing here uses the vault store
+vault:
+  enabled: false
+
+networkPolicy:
+  # config/platform.yaml has no endpoint CIDR for shared-services: the whole VPC (network.shared_services.eu-central-1) covers the interface endpoints
+  awsEndpointCidrs:
+    - 10.140.0.0/16

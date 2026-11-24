@@ -53,10 +53,7 @@ grafana.ini:
     allow_sign_up: false
 
 ingress:
-  enabled: true
-  ingressClassName: istio
-  path: /
-  pathType: Prefix
+  enabled: false  # the entry is the Gateway API (deploy/platform/admin-gateway); no Ingress objects
 
 sidecar:
   dashboards:
