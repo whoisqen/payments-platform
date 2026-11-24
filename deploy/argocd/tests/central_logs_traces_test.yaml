@@ -13,6 +13,7 @@ set:
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
   central.dedupInterval: 30s
+  central.sentryUrl: https://sentry.example.test
   central.logsOtlpEndpoint: https://logs.example.test:4318/otlp
   central.tracesOtlpEndpoint: tempo.example.test:4317
 tests:

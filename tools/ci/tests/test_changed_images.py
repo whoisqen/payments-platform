@@ -36,6 +36,14 @@ class ChangedImagesTest(unittest.TestCase):
         self.assertTrue(a["terraform"] and a["python"] and a["shell"])
         self.assertFalse(a["helm"] or a["policy"])
 
+    def test_each_vendored_rust_workspace_has_its_own_area(self):
+        hyperswitch = ci.areas_for(["vendor/hyperswitch/crates/router_env/src/logger.rs"], CFG)
+        self.assertTrue(hyperswitch["rust_hyperswitch"])
+        self.assertFalse(hyperswitch["rust_card_vault"])
+        vault = ci.areas_for(["vendor/card-vault/src/main.rs"], CFG)
+        self.assertTrue(vault["rust_card_vault"])
+        self.assertFalse(vault["rust_hyperswitch"])
+
     def test_directory_prefix_does_not_match_sibling(self):
         self.assertFalse(ci.matches("docker/router-x/Dockerfile", "docker/router/"))
 

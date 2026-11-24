@@ -1,6 +1,6 @@
 {
   "uid": "cells",
-  "title": "Cells",
+  "title": "L2 Cells",
   "description": "Compare the 4 cells and the spare.",
   "tags": [
     "payments-platform",
@@ -12,7 +12,10 @@
   "version": 1,
   "editable": false,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "1m",
+  "liveNow": false,
+  "weekStart": "",
+  "fiscalYearStartMonth": 0,
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -21,9 +24,10 @@
     "list": [
       {
         "name": "datasource",
-        "label": "datasource",
+        "label": "Data source",
         "type": "datasource",
         "query": "prometheus",
+        "hide": 0,
         "current": {
           "text": "default",
           "value": "default"
@@ -31,7 +35,7 @@
       },
       {
         "name": "env",
-        "label": "env",
+        "label": "Environment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -40,17 +44,17 @@
         "query": "label_values(up, env)",
         "refresh": 2,
         "sort": 1,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
+        "multi": false,
+        "includeAll": false,
         "current": {
           "text": "prod",
           "value": "prod"
-        }
+        },
+        "hide": 0
       },
       {
         "name": "region",
-        "label": "region",
+        "label": "Region",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -61,15 +65,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "eu-central-1",
           "value": "eu-central-1"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "cell",
-        "label": "cell",
+        "label": "Cell",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -80,15 +85,16 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 0,
+        "allValue": ".*"
       },
       {
         "name": "service",
-        "label": "service",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -99,30 +105,32 @@
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       },
       {
         "name": "psp",
-        "label": "psp",
+        "label": "PSP",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(psp_requests_total{env=~\"$env\"}, psp)",
+        "query": "label_values(psp_requests_total{env=~\"$env\",region=~\"$region\"}, psp)",
         "refresh": 2,
         "sort": 1,
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
-        }
+        },
+        "hide": 2,
+        "allValue": ".*"
       }
     ]
   },
@@ -132,21 +140,52 @@
       "title": "L0 Platform overview",
       "url": "/d/platform-overview",
       "icon": "dashboard",
-      "targetBlank": false
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
     },
     {
       "type": "link",
-      "title": "L1 Payments and PSP",
+      "title": "L1 Payments and PSP health",
       "url": "/d/payments",
       "icon": "dashboard",
-      "targetBlank": false
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
     },
     {
       "type": "link",
       "title": "L3 Data stores",
       "url": "/d/data-stores",
       "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "dashboards",
+      "title": "All dashboards",
+      "tags": [
+        "payments-platform"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": true,
       "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: application",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/application",
+      "icon": "doc",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: data",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/data",
+      "icon": "doc",
+      "targetBlank": true
     }
   ],
   "annotations": {
@@ -159,7 +198,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -170,13 +209,13 @@
       "type": "row",
       "title": "Overview",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 0,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 2,
@@ -188,17 +227,18 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
-      "title": "cells: cache warm ratio, min %",
+      "title": "cells: lowest cache warm ratio",
       "description": "A cell takes traffic at 75% of the priority keys; a lower value after 5 minutes raises a non-paging alert.",
       "targets": [
         {
           "refId": "A",
           "expr": "100 * min(cache_warm_ratio{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"})",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -211,12 +251,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
                 "color": "yellow",
-                "value": 50
+                "value": null
               },
               {
                 "color": "green",
@@ -225,7 +261,22 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 1,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -233,10 +284,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -247,19 +303,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 4,
+        "x": 8,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
       "title": "cells: HPAs at maximum",
-      "description": "",
+      "description": "Autoscalers that cannot add replicas any more.",
       "targets": [
         {
           "refId": "A",
           "expr": "count(kube_horizontalpodautoscaler_status_current_replicas{env=~\"$env\",region=~\"$region\"} == kube_horizontalpodautoscaler_spec_max_replicas{env=~\"$env\",region=~\"$region\"}) or vector(0)",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -278,14 +335,31 @@
               {
                 "color": "yellow",
                 "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 0,
+          "links": [
+            {
+              "title": "Open L2 Kubernetes (USE)",
+              "url": "/d/kubernetes?${__url_time_range}&${env:queryparam}&${region:queryparam}"
+            }
+          ],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -293,10 +367,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -307,19 +386,20 @@
         "uid": "${datasource}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 16,
         "y": 1,
-        "w": 4,
+        "w": 8,
         "h": 4
       },
-      "title": "cells: drain lag, max s",
+      "title": "cells: worst drain lag",
       "description": "",
       "targets": [
         {
           "refId": "A",
           "expr": "max(drain_lag_seconds{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"})",
           "legendFormat": "",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -337,15 +417,36 @@
               },
               {
                 "color": "yellow",
-                "value": 5
+                "value": 2.5
               },
               {
                 "color": "red",
-                "value": 10
+                "value": 5
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "decimals": 2,
+          "links": [
+            {
+              "title": "Open L1 Drainer (write-behind)",
+              "url": "/d/drainer?${__url_time_range}&${env:queryparam}&${region:queryparam}"
+            }
+          ],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -353,10 +454,15 @@
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
       }
     },
     {
@@ -364,13 +470,13 @@
       "type": "row",
       "title": "Traffic",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
         "y": 5,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 6,
@@ -383,14 +489,14 @@
         "x": 0,
         "y": 6,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "cells: payments per second by cell, reqps",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[5m]))",
+          "expr": "sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[$__rate_interval]))",
           "legendFormat": "{{cell}}"
         }
       ],
@@ -398,7 +504,7 @@
         "defaults": {
           "unit": "reqps",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -408,21 +514,43 @@
                 "value": null
               }
             ]
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "Open L1 Router (RED)",
+              "url": "/d/router?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-cell=${__field.labels.cell}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -437,14 +565,14 @@
         "x": 12,
         "y": 6,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "cells: traffic share by cell, %",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[5m])) / ignoring(cell) group_left sum(rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[5m]))",
+          "expr": "100 * sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[$__rate_interval])) / ignoring(cell) group_left (sum(rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[$__rate_interval])) > 0)",
           "legendFormat": "{{cell}}"
         }
       ],
@@ -452,7 +580,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -464,21 +592,36 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -487,13 +630,13 @@
       "type": "row",
       "title": "Errors",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 15,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 9,
@@ -504,16 +647,16 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 16,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "router: 5xx share by cell, %",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"router\",code=~\"5..\"}[5m])) / sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"router\"}[5m]))",
+          "expr": "100 * sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"router\",code=~\"5..\"}[$__rate_interval])) / (sum by (cell) (rate(http_server_requests_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"router\"}[$__rate_interval])) > 0)",
           "legendFormat": "{{cell}}"
         }
       ],
@@ -521,7 +664,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -533,29 +676,46 @@
               {
                 "color": "yellow",
                 "value": 1.0
-              },
-              {
-                "color": "red",
-                "value": 5
               }
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "links": [
+            {
+              "title": "Open L1 Router (RED)",
+              "url": "/d/router?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-cell=${__field.labels.cell}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -568,16 +728,16 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 15,
+        "y": 16,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "cells: authorization rate by cell, %",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",outcome=\"authorized\"}[15m])) / sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[15m]))",
+          "expr": "100 * sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",outcome=\"authorized\"}[15m])) / (sum by (cell) (rate(payment_attempts_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[15m])) > 0)",
           "legendFormat": "{{cell}}"
         }
       ],
@@ -585,7 +745,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -605,21 +765,42 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "links": [
+            {
+              "title": "Open L1 Payments and PSP health",
+              "url": "/d/payments?${__url_time_range}&${env:queryparam}&${region:queryparam}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -628,13 +809,13 @@
       "type": "row",
       "title": "Latency",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 25,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 12,
@@ -645,16 +826,16 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 26,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "router: p99 platform overhead by cell, s",
       "description": "",
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum by (cell, le) (rate(platform_overhead_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (cell, le) (rate(platform_overhead_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}[$__rate_interval])))",
           "legendFormat": "{{cell}}",
           "exemplar": true
         }
@@ -663,7 +844,7 @@
         "defaults": {
           "unit": "s",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -682,21 +863,43 @@
               }
             ]
           },
-          "decimals": 3
+          "min": 0,
+          "decimals": 3,
+          "links": [
+            {
+              "title": "Open L1 Router (RED)",
+              "url": "/d/router?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-cell=${__field.labels.cell}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -709,9 +912,9 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 24,
+        "y": 26,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "cells: cache warm ratio by cell, %",
       "description": "",
@@ -726,18 +929,14 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
                 "color": "yellow",
-                "value": 50
+                "value": null
               },
               {
                 "color": "green",
@@ -746,21 +945,36 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -769,13 +983,13 @@
       "type": "row",
       "title": "Resources",
       "collapsed": false,
+      "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 35,
         "w": 24,
         "h": 1
-      },
-      "panels": []
+      }
     },
     {
       "id": 15,
@@ -786,9 +1000,9 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 36,
         "w": 12,
-        "h": 8
+        "h": 9
       },
       "title": "cells: MemoryDB memory use by cell, %",
       "description": "",
@@ -803,7 +1017,7 @@
         "defaults": {
           "unit": "percent",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -823,21 +1037,42 @@
             ]
           },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "links": [
+            {
+              "title": "Open L3 Data stores",
+              "url": "/d/data-stores?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-cell=${__field.labels.cell}"
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
@@ -850,24 +1085,24 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 33,
+        "y": 36,
         "w": 12,
-        "h": 8
+        "h": 9
       },
-      "title": "cells: HPA current replicas by cell",
-      "description": "",
+      "title": "cells: HPA replicas (top 8), replicas",
+      "description": "The cell filter does not apply: kube-state-metrics series carry no cell label.",
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cell, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"})",
-          "legendFormat": "{{cell}} {{horizontalpodautoscaler}}"
+          "expr": "topk(8, sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{env=~\"$env\",region=~\"$region\"}))",
+          "legendFormat": "{{horizontalpodautoscaler}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "thresholds": {
             "mode": "absolute",
@@ -878,21 +1113,36 @@
               }
             ]
           },
-          "min": 0
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
-          "mode": "multi"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     }
