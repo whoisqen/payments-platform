@@ -42,6 +42,16 @@ spec:
                 value: https
               - name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].static_configs[0].targets[0]
                 value: {{ .Values.central.alertmanagerHost | quote }}
+        # The alert rules and the SLO rules. The rules that look back further than this Prometheus keeps are not here: the long-lookback alerts
+        # are evaluated twice (harmlessly empty here) and the SLO windows of 3 and 30 days are in slo/generated/central, run by vmalert
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: observability/alerts
+          directory:
+            recurse: true
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: observability/slo/generated
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
@@ -53,3 +63,5 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+          # The rules arrive in the same sync as the CRDs of their kind
+          - SkipDryRunOnMissingResource=true

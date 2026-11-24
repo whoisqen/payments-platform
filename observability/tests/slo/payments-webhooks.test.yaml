@@ -1,5 +1,6 @@
 rule_files:
 - ../../slo/generated/payments-webhooks.yaml
+- ../../slo/generated/central/payments-webhooks.yaml
 evaluation_interval: 1m
 tests:
 - interval: 1m

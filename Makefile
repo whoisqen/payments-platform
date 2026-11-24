@@ -32,6 +32,7 @@ lint-repo:
 	python3 observability/slo/generate.py --check
 	python3 tools/config/render_central.py --check
 	python3 tools/config/render_victoria.py --check
+	python3 tools/config/render_vmalert.py --check
 	python3 tools/config/render_vault.py --check
 	python3 tools/config/render_grafana.py --check
 	python3 tools/config/render_exporters.py --check

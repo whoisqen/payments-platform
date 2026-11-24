@@ -3,6 +3,7 @@ templates:
   - addons/kube-prometheus.yaml
   - addons/central/victoria-metrics.yaml
   - addons/central/alertmanager.yaml
+  - addons/central/vmalert.yaml
 set:
   repo.url: https://git.example.test/acme/platform
   repo.revision: main
@@ -65,3 +66,33 @@ tests:
       - equal:
           path: spec.template.spec.sources[1].path
           value: deploy/platform/alertmanager/manifests
+  - it: loads the alert and SLO rules into Prometheus
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources
+          content:
+            repoURL: https://git.example.test/acme/platform
+            targetRevision: main
+            path: observability/slo/generated
+      - contains:
+          path: spec.template.spec.sources
+          content:
+            repoURL: https://git.example.test/acme/platform
+            targetRevision: main
+            path: observability/alerts
+            directory:
+              recurse: true
+  - it: runs the long-lookback rules in vmalert against the central Alertmanager
+    template: addons/central/vmalert.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: server.notifier.url
+            value: https://alertmanager.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: server.extraArgs.external\.label[0]
+            value: runbook_base_url=https://git.example.test/acme/platform/blob/main
