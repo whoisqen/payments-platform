@@ -102,6 +102,10 @@ central:
   # Samples of the two Prometheus replicas that differ by less than this interval are one sample; it equals the scrape interval.
   dedup_interval: 30s
 
+vault:
+  # Cell whose cluster runs Vault in every region; External Secrets of the other clusters reach it at vault.<zone of the environment>.
+  cell: cell-0
+
 runners:
   # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
   version: 2.329.0
