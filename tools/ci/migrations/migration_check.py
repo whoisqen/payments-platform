@@ -5,6 +5,7 @@
   migration_check.py list --base B --head H --scope SCOPE    paths for the next step: squawk-tx, squawk-notx, new (directory names per root)
 """
 import argparse
+import datetime
 import re
 import subprocess
 import sys
@@ -48,6 +49,12 @@ def stamp(name):
     return m.group(1) if m else None
 
 
+def horizon(now=None):
+    """Stamp of now plus one day: upstream directories dated after it are future-dated and do not set the order."""
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    return (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d-%H%M%S")
+
+
 def snapshot_guard(values, job):
     errors = []
     block = re.search(r"^snapshot:\s*\n((?:[ \t]+.*\n|\n)*)", values + "\n", re.M)
@@ -83,10 +90,11 @@ def group_changes(changes):
     return out
 
 
-def check(existing, changes, read, exists, contract=False, guard=None):
+def check(existing, changes, read, exists, contract=False, guard=None, now=None):
     """existing: {root: set of directory names on the base}; read/exists work on the head tree."""
     errors, warnings = [], []
     grouped = group_changes(changes)
+    limit = horizon(now)
     seen = {r: {stamp(n): n for n in names if stamp(n)} for r, names in existing.items()}
     for (root, d), by in sorted(grouped.items()):
         where = f"{root}/{d}"
@@ -103,7 +111,8 @@ def check(existing, changes, read, exists, contract=False, guard=None):
                 errors.append(f"{where}: {f} is missing")
         if ts in seen.get(root, {}):
             errors.append(f"{where}: timestamp {ts} is already used by {seen[root][ts]}; one directory per timestamp")
-        newest = max(seen.get(root, {"": ""}))
+        # duplicates are checked against every directory; the order only against the ones that are not future-dated
+        newest = max((t for t in seen.get(root, {}) if t <= limit), default="")
         if ts < newest and ts not in seen.get(root, {}):
             errors.append(f"{where}: older than the newest migration on the base ({newest}); rebase and rename to avoid multiple heads")
         seen.setdefault(root, {})[ts] = d
