@@ -1,0 +1,33 @@
+suite: router error tracking
+templates:
+  - workload.yaml
+set:
+  global.registry: registry.example.test/acme
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: reads the DSN from a secret that may be missing, so the service starts without Sentry
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: router-sentry-dsn
+              optional: true
+  - it: renders no ExternalSecret while no remote key is set
+    asserts:
+      - hasDocuments:
+          count: 1
+  - it: renders the ExternalSecret of the DSN with the remote key of the environment
+    set:
+      container.sentryDsn.remoteKey: pay/stage/sentry/router-dsn
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: ExternalSecret
+      - equal:
+          path: spec.data[0]
+          value:
+            secretKey: ROUTER__LOG__SENTRY__DSN
+            remoteRef:
+              key: pay/stage/sentry/router-dsn

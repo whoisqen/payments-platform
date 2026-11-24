@@ -22,6 +22,10 @@ container:
     DRAINER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
     # Read by the KEDA trigger below, which runs outside the pod
     REDIS_ADDRESS: memorydb.invalid:6379
+  # Error tracking: the DSN comes from an ExternalSecret when remoteKey is set (<prefix>/<env>/sentry/<service>-dsn in the environment layer)
+  sentryDsn:
+    envName: DRAINER__LOG__SENTRY__DSN
+    remoteKey: ""
   envFromSecrets: []
   # 1500 rows/s per pod (section 8); batches are small, so memory stays low
   resources:

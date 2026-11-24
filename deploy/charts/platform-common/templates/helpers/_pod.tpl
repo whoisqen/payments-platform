@@ -81,11 +81,18 @@ spec:
         - name: CACHE_WARM_MAX_WAIT_SECONDS
           value: {{ $warm.maxWaitSeconds | quote }}
         {{- end }}
-      {{- with $cfg.container.envFromSecrets }}
+      {{- $dsn := $cfg.container.sentryDsn | default dict }}
+      {{- if or $cfg.container.envFromSecrets $dsn.envName }}
       envFrom:
-        {{- range . }}
+        {{- range $cfg.container.envFromSecrets }}
         - secretRef:
             name: {{ . }}
+        {{- end }}
+        {{- if $dsn.envName }}
+        # Optional: the service starts without the Sentry DSN and reports no errors until the secret exists
+        - secretRef:
+            name: {{ .name }}-sentry-dsn
+            optional: true
         {{- end }}
       {{- end }}
       resources:
