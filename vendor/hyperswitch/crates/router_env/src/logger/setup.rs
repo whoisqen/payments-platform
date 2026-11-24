@@ -13,6 +13,8 @@ use crate::{config, FormattingLayer, StorageSubscription};
 #[derive(Debug)]
 pub struct TelemetryGuard {
     _log_guards: Vec<WorkerGuard>,
+    // Sends the pending error events when the process stops; none while Sentry is not configured.
+    _sentry_guard: Option<crate::logger::sentry_setup::SentryGuard>,
 }
 
 /// Setup logging sub-system specifying the logging configuration, service (binary) name, and a
@@ -25,6 +27,24 @@ pub fn setup(
     crates_to_filter: impl AsRef<[&'static str]>,
 ) -> error_stack::Result<TelemetryGuard, ConfigError> {
     let mut guards = Vec::new();
+
+    // Setup error tracking: events of level error become Sentry events, the rest become breadcrumbs
+    let sentry_guard = crate::logger::sentry_setup::setup(&config.sentry, service_name);
+    // Warnings and infos become breadcrumbs of the next error; errors become events
+    let sentry_breadcrumbs = sentry_guard.as_ref().map(|_| {
+        sentry::integrations::tracing::BreadcrumbLayer::new().with_filter(
+            tracing_subscriber::filter::filter_fn(|metadata| {
+                matches!(
+                    *metadata.level(),
+                    tracing::Level::WARN | tracing::Level::INFO
+                )
+            }),
+        )
+    });
+    let sentry_errors = sentry_guard.as_ref().map(|_| {
+        sentry::integrations::tracing::ErrorLayer::new()
+            .with_filter(tracing_subscriber::filter::LevelFilter::ERROR)
+    });
 
     // Setup OpenTelemetry traces and metrics
     let traces_layer = if config.telemetry.traces_enabled {
@@ -64,7 +84,9 @@ pub fn setup(
 
     let subscriber = tracing_subscriber::registry()
         .with(traces_layer)
-        .with(StorageSubscription);
+        .with(StorageSubscription)
+        .with(sentry_breadcrumbs)
+        .with(sentry_errors);
     // Both deja layers are added only under the feature, so a feature-off
     // subscriber carries exactly the layers above and nothing else.
     #[cfg(feature = "deja")]
@@ -120,6 +142,7 @@ pub fn setup(
     // dropped
     Ok(TelemetryGuard {
         _log_guards: guards,
+        _sentry_guard: sentry_guard,
     })
 }
 

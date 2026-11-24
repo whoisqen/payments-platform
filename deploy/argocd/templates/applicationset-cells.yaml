@@ -64,7 +64,8 @@ spec:
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
-        # The PostSync smoke Job of the cell; last so the indices above stay stable
+        # The PostSync smoke Job of the cell; last so the indices above stay stable. The chart renders no object
+        # (so no hook) until images.yaml carries a real images.smoke digest; the ApplicationSet cannot read file contents without a files generator
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           path: deploy/platform/smoke/job

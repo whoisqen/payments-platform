@@ -11,14 +11,19 @@ app.kubernetes.io/name: smoke
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-{{/* The digest comes from images.yaml (smoke.image.digest); the zero digest is a placeholder */}}
+{{/* CI writes the digest to deploy/envs/<env>/images.yaml as images.smoke; smoke.image.digest is the fallback of the chart defaults */}}
+{{- define "smoke.digest" -}}
+{{- $img := .Values.images | default dict -}}
+{{- $img.smoke | default .Values.smoke.image.digest | default "" -}}
+{{- end }}
+
+{{/* Renders "true" only for a real digest: a missing, malformed or all-zero value yields no objects at all, so the cell syncs as before and no PostSync hook exists */}}
+{{- define "smoke.enabled" -}}
+{{- $d := include "smoke.digest" . -}}
+{{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $d) (ne $d (printf "sha256:%s" (repeat 64 "0"))) -}}true{{- end -}}
+{{- end }}
+
 {{- define "smoke.image" -}}
-{{- $d := .Values.smoke.image.digest -}}
-{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $d) -}}
-{{- fail "smoke.image.digest must match ^sha256:[a-f0-9]{64}$" -}}
-{{- end -}}
-{{- if and .Values.requireResolved (eq $d (printf "sha256:%s" (repeat 64 "0"))) -}}
-{{- fail "the smoke image digest is still the all-zero placeholder; CI writes it to deploy/envs/<env>/images.yaml" -}}
-{{- end -}}
+{{- $d := include "smoke.digest" . -}}
 {{- printf "%s/%s@%s" (required "global.registry is required" .Values.global.registry) .Values.smoke.image.repository $d -}}
 {{- end }}

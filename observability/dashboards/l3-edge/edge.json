@@ -606,7 +606,7 @@
     {
       "id": 8,
       "type": "row",
-      "title": "Network",
+      "title": "Rate limit and load shedding",
       "collapsed": false,
       "panels": [],
       "gridPos": {
@@ -626,6 +626,159 @@
       "gridPos": {
         "x": 0,
         "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "title": "edge: limited requests by class, reqps",
+      "description": "Local rate limit at the gateway; payments is shed last.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "edge:rate_limited:rate5m{env=~\"$env\"}",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "title": "edge: limited requests, top 5 merchants, reqps",
+      "description": "Over-limit descriptors of the rate limit service; merchant_id is a recorded aggregate, never a raw label.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(5, merchant:rate_limit_over_limit:rate5m{env=~\"$env\"})",
+          "legendFormat": "{{merchant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Network",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
         "w": 12,
         "h": 9
       },
@@ -691,7 +844,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 13,
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -699,7 +852,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 16,
+        "y": 26,
         "w": 12,
         "h": 9
       },
@@ -765,7 +918,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 14,
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -773,7 +926,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 25,
+        "y": 35,
         "w": 12,
         "h": 9
       },
@@ -843,7 +996,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 15,
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -851,7 +1004,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 25,
+        "y": 35,
         "w": 12,
         "h": 9
       },
@@ -918,20 +1071,20 @@
       }
     },
     {
-      "id": 13,
+      "id": 16,
       "type": "row",
       "title": "Security",
       "collapsed": false,
       "panels": [],
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 44,
         "w": 24,
         "h": 1
       }
     },
     {
-      "id": 14,
+      "id": 17,
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -939,7 +1092,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 45,
         "w": 12,
         "h": 9
       },
@@ -1001,7 +1154,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 18,
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1009,7 +1162,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 35,
+        "y": 45,
         "w": 12,
         "h": 9
       },

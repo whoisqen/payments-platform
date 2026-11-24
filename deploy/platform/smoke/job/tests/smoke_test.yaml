@@ -5,6 +5,7 @@ templates:
   - networkpolicy.yaml
   - externalsecret.yaml
 set:
+  images.smoke: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   global.registry: registry.example.test/acme
   global.environment: dev
   global.cell: cell-0
@@ -57,7 +58,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: registry.example.test/acme/smoke@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          value: registry.example.test/acme/smoke@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -79,13 +80,35 @@ tests:
               secretKeyRef:
                 name: smoke-credentials
                 key: payment_method_token
-  - it: rejects a tag or the zero digest once the layer is resolved
-    template: job.yaml
+  - it: renders nothing without a digest in images.yaml
     set:
-      requireResolved: true
+      images: null
     asserts:
-      - failedTemplate:
-          errorPattern: all-zero placeholder
+      - hasDocuments:
+          count: 0
+  - it: renders nothing for the all-zero placeholder
+    set:
+      images.smoke: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: falls back to the chart default digest only when it is real
+    set:
+      images: null
+      smoke.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    template: job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/smoke@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - it: is a PostSync hook pinned to the digest of images.yaml
+    template: job.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
   - it: rejects a malformed digest
     template: job.yaml
     set:

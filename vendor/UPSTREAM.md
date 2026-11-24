@@ -32,3 +32,11 @@ The code is not copied; the prebuilt upstream image is used, pinned by digest:
 `docker.juspay.io/juspaydotin/hyperswitch-control-center:v1.39.0@sha256:19a4c9c15b89865798b9730445cd5a1e84820896d6383c3eed97ad6e61ce18b0`
 
 This is a multi-arch index (linux/amd64 and linux/arm64).
+
+## Local patches
+
+Each patch is an explicit owner-directed change by the `rust-engineer` role; a refresh from upstream must keep it or drop it on purpose.
+
+| Date | Path | Change | Why |
+|---|---|---|---|
+| 2026-11-24 | `vendor/hyperswitch/crates/router_env` (`Cargo.toml`, `src/logger.rs`, `src/logger/config.rs`, `src/logger/setup.rs`, new `src/logger/sentry_setup.rs`), `vendor/hyperswitch/Cargo.lock` | Error tracking with the Sentry SDK (`sentry` 0.49, rustls transport): config `[log.sentry]` (`dsn`, `environment`, `release`, `sample_rate`), started by `logger::setup` for router, scheduler and drainer; tracing errors become events, warnings and infos become breadcrumbs. Nothing starts without a DSN. Request data, user data and the host name are dropped, and every text of an event and a breadcrumb is scrubbed of card numbers (13 to 19 digits) and secrets. Six unit tests. | Architecture section 7 requires Sentry for application errors; upstream has no integration in the payment path. The DSN comes from `ROUTER__LOG__SENTRY__DSN` / `DRAINER__LOG__SENTRY__DSN`, never from a file. |

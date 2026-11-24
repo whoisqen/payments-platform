@@ -12,7 +12,7 @@
         "cell": {"type": "string", "pattern": "^[a-z0-9-]*$"}
       }
     },
-    "requireResolved": {"type": "boolean"},
+    "images": {"type": "object", "properties": {"smoke": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}}},
     "smoke": {
       "type": "object",
       "additionalProperties": false,

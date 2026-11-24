@@ -207,6 +207,19 @@
             "requests",
             "limits"
           ]
+        },
+        "sentryDsn": {
+          "type": "object",
+          "properties": {
+            "envName": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "remoteKey": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false,

@@ -1,3 +1,4 @@
+{{- if include "smoke.enabled" . }}
 {{- $s := .Values.smoke }}
 apiVersion: batch/v1
 kind: Job
@@ -67,3 +68,4 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+{{- end }}

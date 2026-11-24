@@ -4,8 +4,8 @@ global:
   environment: ""
   cell: ""
 
-# CI writes smoke.image.digest to deploy/envs/<env>/images.yaml; the all-zero digest is rejected when requireResolved is true
-requireResolved: false
+# CI writes images.smoke to deploy/envs/<env>/images.yaml. Without a real digest (missing, malformed or all-zero) the chart renders no object, so no PostSync hook exists
+images: {}
 
 smoke:
   image:

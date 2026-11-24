@@ -1,6 +1,8 @@
 suite: smoke PostSync and notifications wiring
 templates:
   - applicationset-cells.yaml
+  - applicationset-gated.yaml
+  - applicationset-shared.yaml
   - addons/argocd.yaml
 set:
   repo.url: https://git.example.test/acme/platform
@@ -33,6 +35,31 @@ tests:
       - equal:
           path: spec.template.spec.sources[1].ref
           value: values
+  - it: hands the smoke chart the image layer, so the Job exists only with a real images.smoke digest
+    template: applicationset-cells.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[2].helm.valueFiles[1]
+          value: '$values/deploy/envs/{{ index .path.segments 2 }}/images.yaml'
+      - notExists:
+          path: spec.template.spec.sources[0].helm.parameters
+  - it: gives the gated production ApplicationSet no smoke source
+    template: applicationset-gated.yaml
+    documentSelector:
+      path: metadata.name
+      value: payments-cells-gated
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.sources
+          count: 2
+      - notMatchRegex:
+          path: spec.template.spec.sources[0].path
+          pattern: smoke
+  - it: gives no shared ApplicationSet a smoke source
+    template: applicationset-shared.yaml
+    asserts:
+      - notMatchRegexRaw:
+          pattern: platform/smoke/job
   - it: never generates a cell Application, and so no smoke Job, for the gated environments
     template: applicationset-cells.yaml
     asserts:
