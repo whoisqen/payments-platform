@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -61,6 +62,19 @@ class Guard(unittest.TestCase):
         self.assertTrue(guard.may_run({"environment": "stage"})[0])
         for ctx in ({"environment": "prod"}, {"environment": "stage", "freeze": True}, {"environment": "stage", "open_incidents": 1}):
             self.assertFalse(guard.may_run(ctx)[0], ctx)
+
+
+class GuardCli(unittest.TestCase):
+    def test_cli_exit_codes(self):
+        self.assertEqual(guard.main(["stage"]), 0)
+        self.assertEqual(guard.main(["prod"]), 1)
+        self.assertEqual(guard.main(["stage", "--freeze"]), 1)
+        self.assertEqual(guard.main(["stage", "--open-incidents", "2"]), 1)
+
+    def test_js_guard_allows_the_same_environments(self):
+        src = (ROOT.parent / "load" / "lib" / "stage-guard.js").read_text()
+        allowed = re.search(r"ALLOWED_ENVIRONMENTS = \[(.*?)\]", src).group(1)
+        self.assertEqual(set(re.findall(r"'([^']+)'", allowed)), guard.ALLOWED_ENVIRONMENTS)
 
 
 class RegionSwitch(unittest.TestCase):
