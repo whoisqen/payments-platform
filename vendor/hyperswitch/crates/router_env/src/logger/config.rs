@@ -21,6 +21,23 @@ pub struct Log {
     pub console: LogConsole,
     /// Telemetry / tracing.
     pub telemetry: LogTelemetry,
+    /// Error tracking with Sentry.
+    pub sentry: LogSentry,
+}
+
+/// Error tracking with Sentry. It is off while `dsn` is not set; the DSN comes from the environment
+/// (for example `ROUTER__LOG__SENTRY__DSN`) and is never kept in a file.
+#[derive(Debug, Deserialize, Clone, Default)]
+#[serde(default)]
+pub struct LogSentry {
+    /// DSN of the Sentry project.
+    pub dsn: Option<String>,
+    /// Environment name sent with every event, for example `production`.
+    pub environment: Option<String>,
+    /// Release of the running build.
+    pub release: Option<String>,
+    /// Share of the error events that are sent, from 0.0 to 1.0 (all when not set).
+    pub sample_rate: Option<f32>,
 }
 
 /// Logging to a file.

@@ -28,6 +28,10 @@ container:
     ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
     ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"
     ROUTER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
+  # Error tracking: the DSN comes from an ExternalSecret when remoteKey is set (<prefix>/<env>/sentry/<service>-dsn in the environment layer)
+  sentryDsn:
+    envName: ROUTER__LOG__SENTRY__DSN
+    remoteKey: ""
   envFromSecrets: []
   # 1 vCPU and 3 GiB per pod is the base capacity of section 8; CPU has no limit to avoid throttling during a PSP call
   resources:
