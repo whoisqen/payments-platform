@@ -99,3 +99,66 @@ modes:
   alert: null
   signal: metric
   reason: TGW attachment state metric is not in YACE config yet
+- layer: network
+  id: network-rate-limit-hits-merchant
+  component: rate limit
+  failure: a merchant is limited at the edge for 10 minutes
+  impact: the merchant gets 429; a legitimate burst or a retry loop of the merchant
+  severity: warning
+  alert: RateLimitHitsMerchant
+  signal: metric
+  detect_within: 13m
+- layer: network
+  id: network-merchant-share-of-cell-high
+  component: routing
+  failure: one merchant sends more than 30% of a cell
+  impact: hot merchant eats the 40% headroom of the cell before the hot-merchant controller splits it
+  severity: warning
+  alert: MerchantShareOfCellHigh
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-load-shedding-active
+  component: load shedding
+  failure: the edge sheds the payments class
+  impact: payments get 429 above the gateway capacity; the last class to be shed
+  severity: critical
+  alert: LoadSheddingActive
+  signal: metric
+  detect_within: 5m
+- layer: network
+  id: network-load-shedding-reads-active
+  component: load shedding
+  failure: the edge sheds lists, reports or status polling
+  impact: reads get 429; payments are still served
+  severity: warning
+  alert: LoadSheddingReadsActive
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-rate-limit-service-down
+  component: rate limit
+  failure: the rate limit service of a cell is down
+  impact: edge fails open, so payments flow but there is no per-merchant protection
+  severity: warning
+  alert: RateLimitServiceDown
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-rate-limit-service-errors
+  component: rate limit
+  failure: rate limit calls fail
+  impact: edge fails open for the failed calls; per-merchant protection is partial
+  severity: warning
+  alert: RateLimitServiceErrors
+  signal: metric
+  detect_within: 8m
+- layer: network
+  id: network-edge-overload-manager-active
+  component: overload manager
+  failure: the gateway overload manager stops accepting requests
+  impact: the gateway rejects new requests of every class
+  severity: critical
+  alert: EdgeOverloadManagerActive
+  signal: metric
+  detect_within: 5m
