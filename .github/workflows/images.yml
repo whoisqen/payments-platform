@@ -66,8 +66,8 @@ jobs:
 
   build:
     needs: select
-    # Pushes to ECR: it needs the push role of the account (repository variable AWS_ROLE_ECR_PUSH), which exists only after the account is set up.
-    if: vars.AWS_ROLE_ECR_PUSH != '' && needs.select.outputs.any == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    # Pushes to ECR: it needs the push role of the account (repository variable AWS_ROLE_ECR_PUSH) and the rootless BuildKit namespace (BUILDKIT_NAMESPACE); both exist only after the account is set up.
+    if: vars.AWS_ROLE_ECR_PUSH != '' && vars.BUILDKIT_NAMESPACE != '' && needs.select.outputs.any == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
     runs-on: ${{ vars.RUNNER_BUILD || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
@@ -88,8 +88,15 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: cosign syft trivy container-structure-test python
-      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+          install_args: cosign syft trivy container-structure-test crane python
+      # before the AWS role is assumed: the runner identity, not the ECR push role, reaches the build cluster
+      - uses: ./.github/actions/setup-buildkit
+        with:
+          name: buildkit-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.service }}
+          namespace: ${{ vars.BUILDKIT_NAMESPACE }}
+          node-selector: ${{ vars.BUILDKIT_NODE_SELECTOR || 'kubernetes.io/arch=arm64,pay.io/pool=ci-build' }}
+          eks-cluster: ${{ vars.BUILDKIT_EKS_CLUSTER }}
+          aws-region: ${{ vars.AWS_REGION }}
       - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ECR_PUSH }}
@@ -154,17 +161,18 @@ jobs:
           BUILT: ${{ steps.build.outputs.digest }}
           REUSED: ${{ steps.exists.outputs.digest }}
       - name: trivy blocks on critical findings
-        run: trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --format sarif --output "$RUNNER_TEMP/trivy.sarif" "${IMAGE}@${DIGEST}"
+        run: trivy image --image-src remote --exit-code 1 --severity CRITICAL --ignore-unfixed --format sarif --output "$RUNNER_TEMP/trivy.sarif" "${IMAGE}@${DIGEST}"
       - name: structure test
         if: matrix.service != 'control-center'
         run: |
           config=docker/_common/structure-test.yaml
           if [ -f "docker/${SERVICE}/structure-test.yaml" ]; then config="docker/${SERVICE}/structure-test.yaml"; fi
           sed "s|\${SERVICE}|${SERVICE}|" "$config" >"$RUNNER_TEMP/structure-test.yaml"
-          docker pull "${IMAGE}@${DIGEST}"
-          container-structure-test test --image "${IMAGE}@${DIGEST}" --config "$RUNNER_TEMP/structure-test.yaml"
+          # no Docker daemon on the runner: test the image from a tarball pulled from the registry
+          crane pull "${IMAGE}@${DIGEST}" "$RUNNER_TEMP/image.tar"
+          container-structure-test test --driver tar --image "$RUNNER_TEMP/image.tar" --config "$RUNNER_TEMP/structure-test.yaml"
       - name: sbom
-        run: syft "${IMAGE}@${DIGEST}" -o "cyclonedx-json=$RUNNER_TEMP/sbom.cdx.json"
+        run: syft "registry:${IMAGE}@${DIGEST}" -o "cyclonedx-json=$RUNNER_TEMP/sbom.cdx.json"
       - name: already signed by this workflow
         id: signed
         env:

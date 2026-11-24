@@ -9,11 +9,21 @@
   semanticCommitType: "build",
   semanticCommitScope: "ci",
   ignorePaths: ["vendor/**"],
+  customManagers: [
+    {
+      // the rootless BuildKit image of the buildx kubernetes driver, tag and digest
+      customType: "regex",
+      managerFilePatterns: ["/^tools/ci/buildkit\\.env$/"],
+      matchStrings: ["BUILDKIT_IMAGE=(?<depName>[^:\\s]+):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:\\S+)"],
+      datasourceTemplate: "docker",
+    },
+  ],
   packageRules: [
     { matchManagers: ["github-actions"], semanticCommitScope: "ci" },
     { matchManagers: ["terraform"], semanticCommitScope: "infra" },
     { matchManagers: ["helm-values", "helmv3", "kubernetes"], semanticCommitScope: "deploy" },
     { matchManagers: ["dockerfile"], semanticCommitScope: "docker" },
+    { matchManagers: ["custom.regex"], matchFileNames: ["tools/ci/buildkit.env"], semanticCommitScope: "docker", pinDigests: true },
   ],
   vulnerabilityAlerts: { labels: ["security"], schedule: ["at any time"] },
 }

@@ -46,6 +46,7 @@ lint-workflows:
 
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
+	python3 tools/ci/buildkit_pin_check.py
 	shellcheck docker/_common/collect-libs.sh scripts/*/*.sh
 	@if command -v hadolint >/dev/null; then hadolint --failure-threshold warning --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi

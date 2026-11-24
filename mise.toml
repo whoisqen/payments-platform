@@ -17,6 +17,7 @@ trivy = "0.69.3"
 syft = "1.28.0"
 cosign = "2.5.3"
 container-structure-test = "1.19.3"
+crane = "0.20.6"
 
 [settings]
 experimental = true
