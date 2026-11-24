@@ -175,7 +175,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -354,7 +354,7 @@
         "h": 4
       },
       "title": "finops: budget used",
-      "description": "Month-to-date spend against the monthly budget.",
+      "description": "Month-to-date spend against the monthly budget; 80% and 100% are guidance, not an alert.",
       "targets": [
         {
           "refId": "A",
