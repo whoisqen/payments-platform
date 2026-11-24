@@ -45,11 +45,11 @@ lint-workflows:
 	actionlint $(WORKFLOWS)
 
 lint-migrations: ## migrations added or changed against origin/main
-	python3 tools/ci/migration_check.py check --base origin/main --head HEAD
+	python3 tools/ci/migrations/migration_check.py check --base origin/main --head HEAD
 
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
-	python3 tools/ci/buildkit_pin_check.py
+	python3 tools/ci/buildkit/buildkit_pin_check.py
 	shellcheck docker/_common/collect-libs.sh scripts/*/*.sh
 	@if command -v hadolint >/dev/null; then hadolint --failure-threshold warning --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi

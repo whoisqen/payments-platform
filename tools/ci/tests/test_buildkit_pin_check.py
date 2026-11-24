@@ -5,7 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "buildkit"))
 import buildkit_pin_check as bp  # noqa: E402
 
 D = "sha256:" + "a" * 64
