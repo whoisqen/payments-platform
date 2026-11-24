@@ -1,3 +1,3 @@
 # Direct dependencies of tools/ai/review.py. The hashed lock file requirements.txt is generated from this file (tools/ai/README.md).
-pyyaml==6.0.2
+pyyaml==6.0.3
 boto3==1.40.0
