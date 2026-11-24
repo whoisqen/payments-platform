@@ -49,7 +49,9 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head"
           git cat-file -e "${HEAD_SHA}^{commit}"
       - id: deps
-        run: bash tools/ai/install-deps.sh
+        run: |
+          # the pull request that introduces tools/ai runs against a base without it: nothing to review with yet
+          if [ -f tools/ai/install-deps.sh ]; then bash tools/ai/install-deps.sh; else echo "tools/ai is not in the base commit: review skipped"; fi
       - id: plan
         if: steps.deps.outputs.ready == 'true'
         env:
@@ -82,7 +84,9 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head"
           git cat-file -e "${HEAD_SHA}^{commit}"
       - id: deps
-        run: bash tools/ai/install-deps.sh
+        run: |
+          # the pull request that introduces tools/ai runs against a base without it: nothing to review with yet
+          if [ -f tools/ai/install-deps.sh ]; then bash tools/ai/install-deps.sh; else echo "tools/ai is not in the base commit: review skipped"; fi
       - if: steps.deps.outputs.ready == 'true'
         uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
         with:
