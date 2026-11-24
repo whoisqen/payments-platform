@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Redact secrets and card data from text before it reaches any model. Importable library; the CLI filters stdin to stdout."""
-import argparse
+"""Redact secrets and card data from text before it reaches any model. Importable library."""
 import hashlib
 import re
-import sys
 from collections import Counter
 
 PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
@@ -115,16 +113,3 @@ def redact(text, redact_emails=False):
     r = Redactor(redact_emails=redact_emails)
     out = r.redact(text)
     return out, dict(r.counts)
-
-
-def main(argv=None):
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--emails", action="store_true", help="redact e-mail addresses too")
-    args = p.parse_args(argv)
-    r = Redactor(redact_emails=args.emails)
-    sys.stdout.write(r.redact(sys.stdin.read()))
-    print(f"redacted {int(r.total)} value(s) of {len(r.counts)} kind(s)", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
