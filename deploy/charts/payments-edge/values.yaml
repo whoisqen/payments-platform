@@ -4,11 +4,17 @@ global:
   region: ""
 
 gateway:
-  # Labels of the Istio ingress gateway pods, deployed by the istio add-on
-  selector:
-    istio: ingressgateway
+  # Istio creates the proxy Deployment and Service payments-edge-istio for this Gateway
+  className: istio
   hosts: []
   tlsCredentialName: payments-edge-tls
+  minTlsVersion: TLSv1_2
+  # Annotations for the generated Service (load balancer scheme and type)
+  serviceAnnotations: {}
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
 
 certificate:
   issuerName: payments-ca
@@ -19,11 +25,54 @@ certificate:
 routing:
   # Set by the cell lookup (merchant to cell map) before the route match
   cellHeader: x-payments-cell
+  merchantHeader: x-merchant-id
   timeout: 20s
   cells: []
 
-# Load shedding above the capacity of the gateway pod: 2000 RPS (section 8)
+# Request classes are assigned by path in this order; anything unmatched is payments, shed last
+classes:
+  header: x-payments-class
+  list:
+    prefixes: [/payments/list, /refunds/list, /payments/filter, /reports]
+  read:
+    methods: [GET, HEAD]
+    prefixes: [/payments, /refunds]
+
+# Local limits per gateway pod: total 2000 RPS (section 8), lists shed first, then reads
 rateLimit:
-  maxTokens: 2000
-  tokensPerFill: 2000
-  fillInterval: 1s
+  retryAfterSeconds: 1
+  local:
+    maxTokens: 2000
+    tokensPerFill: 2000
+    fillInterval: 1s
+    classes:
+      list: {maxTokens: 200, tokensPerFill: 200, fillInterval: 1s}
+      read: {maxTokens: 800, tokensPerFill: 800, fillInterval: 1s}
+      payments: {maxTokens: 2000, tokensPerFill: 2000, fillInterval: 1s}
+    # Runtime keys: set the enforced percentage to 0 for shadow mode without a deploy
+    enabledKey: local_rate_limit_enabled
+    enforcedKey: local_rate_limit_enforced
+  global:
+    enabled: true
+    domain: payments-edge
+    cluster: ratelimit.ratelimit.svc:8081
+    address: ratelimit.ratelimit.svc.cluster.local
+    port: 8081
+    timeout: 100ms
+    # Fail open: a limiter outage never blocks a payment
+    failureModeDeny: false
+
+# Envoy overload manager: last line of defence after the class limits
+overload:
+  enabled: true
+  refreshInterval: 0.25s
+  maxHeapBytes: 1073741824
+  maxDownstreamConnections: 50000
+  heap:
+    disableKeepalive: 0.85
+    stopAcceptingRequests: 0.92
+    stopAcceptingConnections: 0.95
+  connections:
+    disableKeepalive: 0.85
+    stopAcceptingRequests: 0.95
+    stopAcceptingConnections: 0.98

@@ -1,15 +1,65 @@
+{{- $l := .Values.rateLimit.local }}
+{{- $g := .Values.rateLimit.global }}
+{{- $o := .Values.overload }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: payments-edge-load-shedding
+  name: payments-edge-filters
   labels:
-    app.kubernetes.io/name: payments-edge
-    app.kubernetes.io/part-of: payments-platform
+    {{- include "payments-edge.labels" . | nindent 4 }}
 spec:
-  workloadSelector:
-    labels:
-      {{- toYaml .Values.gateway.selector | nindent 6 }}
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: payments-edge
   configPatches:
+    # TLS floor on every listener chain of the gateway
+    - applyTo: FILTER_CHAIN
+      match:
+        context: GATEWAY
+        listener:
+          portNumber: 443
+      patch:
+        operation: MERGE
+        value:
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+              common_tls_context:
+                tls_params:
+                  tls_minimum_protocol_version: {{ .Values.gateway.minTlsVersion }}
+    # Istio adds a default retry policy to Gateway API routes; a charge must never be repeated
+    - applyTo: HTTP_ROUTE
+      match:
+        context: GATEWAY
+      patch:
+        operation: MERGE
+        value:
+          route:
+            retry_policy:
+              retry_on: ""
+              num_retries: 0
+    # Cell guard (503), request class and Retry-After; first in the chain so local replies pass it
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            default_source_code:
+              inline_string: |
+                {{- include "payments-edge.lua" . | nindent 16 }}
+    # Per-pod limits: one bucket for the pod and one per class, lists shed first
     - applyTo: HTTP_FILTER
       match:
         context: GATEWAY
@@ -24,23 +74,142 @@ spec:
         value:
           name: envoy.filters.http.local_ratelimit
           typed_config:
-            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-            value:
-              stat_prefix: payments_edge_local_rate_limit
-              status:
-                code: TooManyRequests
-              token_bucket:
-                max_tokens: {{ .Values.rateLimit.maxTokens }}
-                tokens_per_fill: {{ .Values.rateLimit.tokensPerFill }}
-                fill_interval: {{ .Values.rateLimit.fillInterval }}
-              filter_enabled:
-                runtime_key: local_rate_limit_enabled
-                default_value:
-                  numerator: 100
-                  denominator: HUNDRED
-              filter_enforced:
-                runtime_key: local_rate_limit_enforced
-                default_value:
-                  numerator: 100
-                  denominator: HUNDRED
+            "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            stat_prefix: payments_edge_local_rate_limit
+            status:
+              code: TooManyRequests
+            response_headers_to_add:
+              - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                header:
+                  key: retry-after
+                  value: {{ .Values.rateLimit.retryAfterSeconds | quote }}
+            token_bucket:
+              max_tokens: {{ $l.maxTokens }}
+              tokens_per_fill: {{ $l.tokensPerFill }}
+              fill_interval: {{ $l.fillInterval }}
+            rate_limits:
+              - actions:
+                  - request_headers:
+                      header_name: {{ .Values.classes.header }}
+                      descriptor_key: request_class
+            descriptors:
+              {{- range $class := list "list" "read" "payments" }}
+              {{- $b := index $l.classes $class }}
+              - entries:
+                  - key: request_class
+                    value: {{ $class }}
+                token_bucket:
+                  max_tokens: {{ $b.maxTokens }}
+                  tokens_per_fill: {{ $b.tokensPerFill }}
+                  fill_interval: {{ $b.fillInterval }}
+              {{- end }}
+            filter_enabled:
+              runtime_key: {{ $l.enabledKey }}
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: {{ $l.enforcedKey }}
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+{{- if $g.enabled }}
+    # Global limit per merchant and class, enforced by the ratelimit service
+    - applyTo: CLUSTER
+      match:
+        context: GATEWAY
+      patch:
+        operation: ADD
+        value:
+          name: {{ $g.cluster }}
+          type: STRICT_DNS
+          connect_timeout: 1s
+          lb_policy: ROUND_ROBIN
+          typed_extension_protocol_options:
+            envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+              "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+              explicit_http_config:
+                http2_protocol_options: {}
+          load_assignment:
+            cluster_name: {{ $g.cluster }}
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ $g.address }}
+                          port_value: {{ $g.port }}
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.ratelimit
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
+            domain: {{ $g.domain }}
+            failure_mode_deny: {{ $g.failureModeDeny }}
+            timeout: {{ $g.timeout }}
+            enable_x_ratelimit_headers: DRAFT_VERSION_03
+            rate_limited_status:
+              code: TooManyRequests
+            rate_limit_service:
+              transport_api_version: V3
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: {{ $g.cluster }}
+                timeout: {{ $g.timeout }}
+    # Descriptors [merchant, request_class]; skipped when a header is absent
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: GATEWAY
+      patch:
+        operation: MERGE
+        value:
+          rate_limits:
+            - actions:
+                - request_headers:
+                    header_name: {{ .Values.routing.merchantHeader }}
+                    descriptor_key: merchant
+                    skip_if_absent: true
+                - request_headers:
+                    header_name: {{ .Values.classes.header }}
+                    descriptor_key: request_class
+                    skip_if_absent: true
+{{- end }}
+{{- if $o.enabled }}
+    # Stop taking requests and connections before the proxy runs out of heap or connections
+    - applyTo: BOOTSTRAP
+      patch:
+        operation: MERGE
+        value:
+          overload_manager:
+            refresh_interval: {{ $o.refreshInterval }}
+            resource_monitors:
+              - name: envoy.resource_monitors.fixed_heap
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+                  max_heap_size_bytes: {{ $o.maxHeapBytes }}
+              - name: envoy.resource_monitors.global_downstream_max_connections
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+                  max_active_downstream_connections: {{ $o.maxDownstreamConnections }}
+            actions:
+              {{- range $a := list (dict "name" "disable_http_keepalive" "key" "disableKeepalive") (dict "name" "stop_accepting_requests" "key" "stopAcceptingRequests") (dict "name" "stop_accepting_connections" "key" "stopAcceptingConnections") }}
+              - name: envoy.overload_actions.{{ $a.name }}
+                triggers:
+                  - name: envoy.resource_monitors.fixed_heap
+                    threshold:
+                      value: {{ index $o.heap $a.key }}
+                  - name: envoy.resource_monitors.global_downstream_max_connections
+                    threshold:
+                      value: {{ index $o.connections $a.key }}
+              {{- end }}
+{{- end }}
