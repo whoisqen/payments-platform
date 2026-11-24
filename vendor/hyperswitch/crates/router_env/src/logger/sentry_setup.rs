@@ -23,6 +23,8 @@ struct Patterns {
     secrets: Vec<Regex>,
 }
 
+// The patterns are constants that the unit tests compile, so the expectations cannot fail at run time
+#[allow(clippy::expect_used)]
 fn patterns() -> &'static Patterns {
     static PATTERNS: std::sync::OnceLock<Patterns> = std::sync::OnceLock::new();
     PATTERNS.get_or_init(|| Patterns {
@@ -190,11 +192,13 @@ mod tests {
 
     #[test]
     fn an_event_loses_request_user_host_and_card_data() {
-        let mut event = Event::default();
-        event.request = Some(Default::default());
-        event.user = Some(Default::default());
-        event.server_name = Some(Cow::Borrowed("node-1"));
-        event.message = Some("charge 4111111111111111 declined".into());
+        let mut event = Event {
+            request: Some(Default::default()),
+            user: Some(Default::default()),
+            server_name: Some(Cow::Borrowed("node-1")),
+            message: Some("charge 4111111111111111 declined".into()),
+            ..Default::default()
+        };
         event.extra.insert(
             "body".into(),
             Value::String("card 4111 1111 1111 1111".into()),
@@ -207,10 +211,13 @@ mod tests {
             Some("charge [REDACTED-PAN] declined")
         );
         assert_eq!(
-            event.extra["body"],
-            Value::String("card [REDACTED-PAN]".into())
+            event.extra.get("body"),
+            Some(&Value::String("card [REDACTED-PAN]".into()))
         );
-        assert_eq!(event.tags["note"], REDACTED_SECRET);
+        assert_eq!(
+            event.tags.get("note").map(String::as_str),
+            Some(REDACTED_SECRET)
+        );
     }
 
     #[test]
