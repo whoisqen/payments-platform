@@ -1,0 +1,21 @@
+# Audit first: after 7 days with no unexplained violations replace validationActions [Audit] with [Deny].
+# The entry into every cluster is the Gateway API (Gateway, HTTPRoute); no Ingress object is allowed.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-ingress
+  annotations:
+    policies.kyverno.io/title: Disallow Ingress
+    policies.kyverno.io/category: Network
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [networking.k8s.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [ingresses]
+  validations:
+    - expression: "false"
+      message: "Ingress objects are not used: expose a service with a Gateway API HTTPRoute instead."

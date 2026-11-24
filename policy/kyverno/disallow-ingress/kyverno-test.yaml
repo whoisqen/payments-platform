@@ -1,0 +1,10 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: disallow-ingress
+policies:
+  - disallow-ingress.yaml
+resources:
+  - resources.yaml
+results:
+  - {policy: disallow-ingress, isValidatingPolicy: true, kind: Ingress, resources: [legacy], result: fail}
