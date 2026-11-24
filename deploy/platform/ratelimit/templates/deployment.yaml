@@ -1,0 +1,137 @@
+{{- include "ratelimit.guard" . }}
+{{- $ctx := dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit" }}
+{{- $r := .Values.redis }}
+{{- $w := .Values.workload }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" $ctx | nindent 4 }}
+spec:
+  {{- /* the HPA owns the replica count when autoscaling is on */}}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  {{- end }}
+  minReadySeconds: {{ $w.minReadySeconds }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" $ctx | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "platform-common.labels" $ctx | nindent 8 }}
+        sidecar.istio.io/inject: "true"
+      annotations:
+        # The limit config is read at start, so a change rolls the pods
+        checksum/config: {{ include "ratelimit.config" . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "platform-common.serviceAccountName" $ctx }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ $w.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "platform-common.selectorLabels" $ctx | nindent 20 }}
+      topologySpreadConstraints:
+        # Zones are the unit of failure, so spreading across them is a hard constraint
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "platform-common.selectorLabels" $ctx | nindent 14 }}
+      containers:
+        - name: ratelimit
+          image: {{ include "ratelimit.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/ratelimit"]
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.ports.grpc }}
+            - name: http
+              containerPort: {{ .Values.ports.http }}
+            - name: metrics
+              containerPort: {{ .Values.ports.metrics }}
+          env:
+            - {name: HOST, value: "0.0.0.0"}
+            - {name: PORT, value: {{ .Values.ports.http | quote }}}
+            - {name: GRPC_HOST, value: "0.0.0.0"}
+            - {name: GRPC_PORT, value: {{ .Values.ports.grpc | quote }}}
+            - {name: DEBUG_HOST, value: "127.0.0.1"}
+            - {name: LOG_LEVEL, value: info}
+            - {name: LOG_FORMAT, value: json}
+            - {name: USE_STATSD, value: "false"}
+            - {name: USE_PROMETHEUS, value: "true"}
+            - {name: PROMETHEUS_ADDR, value: {{ printf ":%d" (int .Values.ports.metrics) | quote }}}
+            - {name: PROMETHEUS_PATH, value: /metrics}
+            - {name: RUNTIME_ROOT, value: /data}
+            - {name: RUNTIME_SUBDIRECTORY, value: ratelimit}
+            - {name: RUNTIME_WATCH_ROOT, value: "false"}
+            - {name: RUNTIME_IGNOREDOTFILES, value: "true"}
+            - {name: BACKEND_TYPE, value: redis}
+            - {name: REDIS_SOCKET_TYPE, value: tcp}
+            - {name: REDIS_TYPE, value: {{ $r.type }}}
+            - {name: REDIS_URL, value: {{ $r.endpoint | quote }}}
+            - {name: REDIS_TLS, value: {{ $r.tls | quote }}}
+            - {name: REDIS_POOL_SIZE, value: {{ $r.poolSize | quote }}}
+            - name: REDIS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $r.secret.name }}
+                  key: auth
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet: {path: /healthcheck, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: {path: /healthcheck, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /healthcheck, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ $w.preStopSeconds }}
+          volumeMounts:
+            - name: config
+              mountPath: /data/ratelimit/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: ratelimit-config
+        - name: tmp
+          emptyDir: {}

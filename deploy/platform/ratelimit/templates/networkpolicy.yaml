@@ -1,0 +1,64 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" (dict "root" . "component" "ratelimit") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Only the Envoy of the edge gateway calls the service
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.edgeNamespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.edgePodLabels | nindent 14 }}
+      ports:
+        - port: {{ .Values.ports.grpc }}
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: {{ .Values.ports.metrics }}
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Sidecar to istiod (xDS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - port: 15012
+          protocol: TCP
+    {{- if .Values.redis.egressCidrs }}
+    - to:
+        {{- range .Values.redis.egressCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - port: {{ (split ":" .Values.redis.endpoint)._1 | default "6379" | int }}
+          protocol: TCP
+    {{- end }}
+{{- end }}

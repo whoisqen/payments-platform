@@ -1,0 +1,21 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" (dict "root" . "component" "ratelimit") | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+      metricRelabelings:
+        - action: labeldrop
+          regex: (payment_id|customer_id|token|pan|card_number|cvv|idempotency_key)
+{{- end }}
