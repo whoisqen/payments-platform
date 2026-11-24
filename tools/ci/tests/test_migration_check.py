@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 CI = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(CI))
+sys.path.insert(0, str(CI / "migrations"))
 import migration_check as mc  # noqa: E402
 
 R = "vendor/hyperswitch/migrations"
