@@ -28,6 +28,19 @@ A person in several groups gets the strongest role. Dashboards are provisioned f
 
 The open-source Grafana has no team sync from the IdP and no folder or data source permissions by group (both are Enterprise features). Access is therefore by role, not by folder: everyone with a role sees every dashboard. If a dashboard must be hidden from some people, either move it to a separate Grafana instance or buy Enterprise (team sync and RBAC) and replace the role mapping with teams.
 
+## Identity provider: Okta
+
+Grafana logs in through Okta over OIDC (authorization code flow with PKCE); the group names are sent in the `groups` claim.
+
+1. In Okta create an *OIDC - Web Application* integration for Grafana with the grant type *Authorization Code*.
+2. Sign-in redirect URI: `<dns.grafana_url>/login/generic_oauth`; sign-out redirect URI: `<dns.grafana_url>/login`.
+3. Assign the six groups of `access.grafana_groups` to the integration; nobody is assigned directly.
+4. Groups claim of the integration: name `groups`, included in the ID token, filter *Matches regex* `pay-.*`, so that no other group of the organization reaches Grafana.
+5. Scopes: `openid profile email groups`.
+6. Endpoints of the org authorization server: `https://<okta-domain>/oauth2/v1/authorize`, `/oauth2/v1/token`, `/oauth2/v1/userinfo`; they are the `auth_url`, `token_url` and `api_url` of the secret below.
+7. **MFA is required.** Give the integration an authentication policy that demands two factors on every sign-in (a phishing-resistant factor for the administrators); Grafana does not ask for a second factor itself.
+8. `pay-grafana-admins` has two members: the owner and one reserve administrator, so that access can be restored when one of them is unavailable.
+
 ## Before the first login
 
 Create the six groups in the IdP (names in `access.grafana_groups`), make the IdP send them in the `groups` claim of the ID token, and fill the client id, secret and endpoints in the secret `<prefix>/shared-services/grafana/oidc`.
