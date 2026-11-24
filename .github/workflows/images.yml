@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$REQUESTED" ]; then
-            services=$(jq -c --argjson all '["router","drainer","scheduler","locker","control-center"]' '[.[] | select(. as $s | $all | index($s))]' <<<"$REQUESTED")
+            services=$(jq -c --argjson all '["router","drainer","scheduler","locker","control-center","vault-snapshot"]' '[.[] | select(. as $s | $all | index($s))]' <<<"$REQUESTED")
           else
             # the concurrency group can drop a pending run, so the base is the last green run and not the previous push
             base=$(gh run list --repo "$REPO" --workflow images.yml --branch "$BRANCH" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
@@ -158,7 +158,9 @@ jobs:
       - name: structure test
         if: matrix.service != 'control-center'
         run: |
-          sed "s|\${SERVICE}|${SERVICE}|" docker/_common/structure-test.yaml >"$RUNNER_TEMP/structure-test.yaml"
+          config=docker/_common/structure-test.yaml
+          if [ -f "docker/${SERVICE}/structure-test.yaml" ]; then config="docker/${SERVICE}/structure-test.yaml"; fi
+          sed "s|\${SERVICE}|${SERVICE}|" "$config" >"$RUNNER_TEMP/structure-test.yaml"
           docker pull "${IMAGE}@${DIGEST}"
           container-structure-test test --image "${IMAGE}@${DIGEST}" --config "$RUNNER_TEMP/structure-test.yaml"
       - name: sbom

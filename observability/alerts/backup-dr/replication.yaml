@@ -13,6 +13,7 @@ spec:
     - alert: LatestRestorableTimeLagHigh
       expr: max by (store) (database_latest_restorable_time_lag_seconds) > 300
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -27,6 +28,7 @@ spec:
     - alert: AuroraGlobalLagHigh
       expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 5000
       for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -40,7 +42,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'
     - alert: AuroraGlobalLagRpoBudgetExceeded
       expr: max by (global_cluster, region) (aws_rds_aurora_global_db_replication_lag_maximum) > 10000
-      for: 1m
+      for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -55,6 +58,7 @@ spec:
     - alert: DynamoDbGlobalTableLagHigh
       expr: max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum) > 5000
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -69,6 +73,7 @@ spec:
     - alert: S3ReplicationLagHigh
       expr: max by (bucket, destination_region) (aws_s3_replication_latency_maximum) > 900
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

@@ -24,6 +24,6 @@ dependency "kms" {
 inputs = {
   repositories       = []
   kms_key_arn        = dependency.kms.outputs.key_arns["shared"]
-  cache_repositories = ["router", "locker", "drainer", "scheduler", "control-center"]
+  cache_repositories = ["router", "locker", "drainer", "scheduler", "control-center", "vault-snapshot"]
   pull_through_cache = include.envcommon.locals.env_cfg.pull_through_cache
 }

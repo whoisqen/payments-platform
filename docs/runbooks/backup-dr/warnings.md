@@ -27,6 +27,32 @@ Ticket to data-platform; page if two copies in a row fail.
 
 `pay-runbook-backup-copy-failed`
 
+## metrics-backup-stale
+
+Alert `MetricsBackupStale`, severity warning, owner data-platform-oncall, dashboard https://grafana.payments.internal/d/backup.
+
+### Symptom
+
+The CronJob `vmbackup-<n>` of one vmstorage node of the central metrics store has not succeeded for 3 hours. If the volume of that node is lost now, the history since the last backup is lost.
+
+### Diagnostics
+
+1. Collect one report: GitHub Actions `runbook-diagnose` (`workflow_dispatch`, input `alert=MetricsBackupStale`) runs the read-only step of SSM document `pay-runbook-metrics-backup-stale`.
+2. Look at the last Job of the CronJob in the namespace `victoria-metrics`: a pod that stays Pending means the node of the vmstorage pod has no room (the job must run on that node because the volume is ReadWriteOnce); a failed pod shows the S3 or Pod Identity error in its log.
+3. Check that the Pod Identity association of the service account `victoria-metrics/vmbackup` and the bucket `<prefix>-shared-services-<short>-vmbackup` exist.
+
+### Actions
+
+1. Run the Job by hand from the CronJob once the cause is removed.
+
+### Escalation
+
+Ticket to data-platform; page nobody, the metrics are not a store of record.
+
+### SSM document
+
+`pay-runbook-metrics-backup-stale`
+
 ## snapshot-copy-stale
 
 Alert `SnapshotCopyStale`, severity warning, owner data-platform-oncall, dashboard https://grafana.payments.internal/d/backup.

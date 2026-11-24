@@ -20,6 +20,8 @@ def values(cfg):
             "metricsRemoteWriteUrl": cfg["central"]["metrics_remote_write_url"],
             "alertmanagerHost": urlparse(cfg["central"]["alertmanager_url"]).netloc,
             "dedupInterval": cfg["central"]["dedup_interval"],
+            "logsOtlpEndpoint": cfg["central"]["logs_otlp_endpoint"],
+            "tracesOtlpEndpoint": cfg["central"]["traces_otlp_endpoint"],
         },
     }
 

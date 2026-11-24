@@ -103,7 +103,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
     - alert: VaultSealed
       expr: max by (cluster) (vault_core_unsealed) == 0
-      for: 1m
+      for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: security
@@ -118,6 +119,7 @@ spec:
     - alert: VaultAuditDeviceFailing
       expr: sum by (cluster) (increase(vault_audit_log_request_failure[5m])) > 0
       for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: security

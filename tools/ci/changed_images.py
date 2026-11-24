@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(__file__).resolve().parent / "image-paths.yaml"
-SERVICES = ["router", "drainer", "scheduler", "locker", "control-center"]
+SERVICES = ["router", "drainer", "scheduler", "locker", "control-center", "vault-snapshot"]
 UNCLAIMED_ROOTS = ("docker/", "vendor/")
 
 

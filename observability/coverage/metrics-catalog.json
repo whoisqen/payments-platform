@@ -59,6 +59,7 @@
     "karpenter_interruption_received_messages_total": "karpenter",
     "kms_key_rotation_overdue_seconds": "kms-exporter",
     "kms_request_errors_total": "app-otel-sdk",
+    "kube_cronjob_status_last_successful_time": "kube-state-metrics",
     "kube_deployment_status_replicas_ready": "kube-state-metrics",
     "kube_horizontalpodautoscaler_spec_max_replicas": "kube-state-metrics",
     "kube_horizontalpodautoscaler_status_current_replicas": "kube-state-metrics",

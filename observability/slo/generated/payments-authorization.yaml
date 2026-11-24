@@ -133,6 +133,7 @@ spec:
   - name: slo-alerts-payments-authorization-availability
     rules:
     - alert: PaymentsAuthorizationAvailabilityBurnFastest
+      keep_firing_for: 10m
       expr: slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (50 * 0.0001) and slo:sli_error:ratio_rate1m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (50 * 0.0001)
       labels:
         team: payments-core
@@ -147,6 +148,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnFast
+      keep_firing_for: 10m
       expr: slo:sli_error:ratio_rate1h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (14.4 * 0.0001) and slo:sli_error:ratio_rate5m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (14.4 * 0.0001)
       labels:
         team: payments-core
@@ -161,6 +163,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnSlow
+      keep_firing_for: 10m
       expr: slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (6 * 0.0001) and slo:sli_error:ratio_rate30m{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (6 * 0.0001)
       labels:
         team: payments-core
@@ -175,6 +178,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/slo/authorization-availability.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/slo-overview'
     - alert: PaymentsAuthorizationAvailabilityBurnTicket
+      keep_firing_for: 30m
       expr: slo:sli_error:ratio_rate3d{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (1 * 0.0001) and slo:sli_error:ratio_rate6h{sloth_id="payments-authorization-availability",sloth_service="payments-authorization",sloth_slo="availability"} > (1 * 0.0001)
       labels:
         team: payments-core

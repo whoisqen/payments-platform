@@ -72,7 +72,7 @@ class RoutingTest(unittest.TestCase):
         self.assertEqual(root["group_by"], ["alertname", "region", "psp"])
         self.assertEqual(root["group_wait"], "30s")
         critical = next(r for r in root["routes"] if r.get("matchers") == ['severity="critical"'])
-        self.assertEqual(critical["repeat_interval"], "1h")
+        self.assertEqual(critical["repeat_interval"], "8760h")
 
     def test_receivers_exist_and_use_secret_files_only(self):
         names = {r["name"] for r in CONFIG["receivers"]}

@@ -13,6 +13,7 @@ spec:
     - alert: DynamoDbThrottling
       expr: sum by (table_name) (rate(aws_dynamodb_throttled_requests_sum[5m])) > 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -27,6 +28,7 @@ spec:
     - alert: ClickHouseReplicationLag
       expr: max by (cluster) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay) > 300
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -41,6 +43,7 @@ spec:
     - alert: ClickHouseMergeBacklog
       expr: max by (cluster) (ClickHouseAsyncMetrics_MaxPartCountForPartition) > 300
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -55,6 +58,7 @@ spec:
     - alert: ClickHouseDiskLow
       expr: min by (cluster, instance) (ClickHouseAsyncMetrics_DiskAvailable_default / ClickHouseAsyncMetrics_DiskTotal_default) < 0.15
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -69,6 +73,7 @@ spec:
     - alert: OpenSearchClusterRed
       expr: max by (domain_name) (aws_es_cluster_statusred_maximum) >= 1
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: security
@@ -83,6 +88,7 @@ spec:
     - alert: OpenSearchDiskLow
       expr: min by (domain_name) (aws_es_free_storage_space_minimum) < 20480
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: security

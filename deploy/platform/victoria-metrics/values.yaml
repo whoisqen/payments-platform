@@ -54,6 +54,8 @@ vmstorage:
   persistentVolume:
     enabled: true
     size: 500Gi
+    # Encrypted gp3, kept when a claim is deleted (manifests/storageclass.yaml)
+    storageClassName: gp3-encrypted
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:

@@ -13,6 +13,7 @@ spec:
     - alert: CrashLoopBackOff
       expr: max by (namespace, pod, node) (kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace=~"payments-.*"} * on (namespace, pod) group_left (node) kube_pod_info) == 1
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: platform
@@ -26,7 +27,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/kubernetes'
     - alert: PodOOMKilled
       expr: max by (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}) == 1 and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total[10m]) > 0
-      for: 1m
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -41,6 +43,7 @@ spec:
     - alert: PodsPendingTooLong
       expr: sum by (namespace) (kube_pod_status_phase{phase="Pending"}) > 0
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: platform
@@ -55,6 +58,7 @@ spec:
     - alert: HpaAtMaxReplicas
       expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core

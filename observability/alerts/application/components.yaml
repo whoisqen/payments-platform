@@ -13,6 +13,7 @@ spec:
     - alert: Router5xxRateHigh
       expr: sum by (cell) (rate(http_server_requests_total{service="router",code=~"5.."}[5m])) / sum by (cell) (rate(http_server_requests_total{service="router"}[5m])) > 0.01
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -27,6 +28,7 @@ spec:
     - alert: LockerErrorRateHigh
       expr: sum(rate(http_server_requests_total{service="locker",code=~"5.."}[5m])) / sum(rate(http_server_requests_total{service="locker"}[5m])) > 0.01
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -41,6 +43,7 @@ spec:
     - alert: DrainLagHigh
       expr: max by (cell) (drain_lag_seconds) > 5
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -55,6 +58,7 @@ spec:
     - alert: RedisStreamBacklog
       expr: max by (cell, stream) (redis_stream_length) > 50000
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -69,6 +73,7 @@ spec:
     - alert: SchedulerQueueDelayHigh
       expr: max by (cell) (scheduler_queue_oldest_task_age_seconds) > 600
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: payments-core
@@ -83,6 +88,7 @@ spec:
     - alert: DlqNotEmpty
       expr: sum by (queue) (dlq_depth) > 0
       for: 15m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -97,6 +103,7 @@ spec:
     - alert: WebhookBacklogOld
       expr: max by (cell) (webhook_queue_oldest_age_seconds) > 300
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -111,6 +118,7 @@ spec:
     - alert: ReconciliationMismatch
       expr: sum by (psp) (increase(reconciliation_amount_mismatch_total[1d])) > 0
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -123,8 +131,9 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/application/warnings.md#reconciliation-mismatch'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: OrphanPaymentWebhooks
-      expr: sum by (merchant_id) (increase(WEBHOOK_PAYMENT_NOT_FOUND_total[15m])) > 0
+      expr: sum(increase(WEBHOOK_PAYMENT_NOT_FOUND_total[15m])) > 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core
@@ -138,7 +147,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/payments'
     - alert: MigrationJobFailed
       expr: kube_job_status_failed{job_name=~".*migrat.*"} > 0
-      for: 1m
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: payments-core

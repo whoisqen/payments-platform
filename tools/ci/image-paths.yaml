@@ -17,6 +17,8 @@ images:
     - vendor/card-vault/
   control-center:
     - docker/control-center/
+  vault-snapshot:
+    - docker/vault-snapshot/
 areas:
   rust:
     - vendor/hyperswitch/
