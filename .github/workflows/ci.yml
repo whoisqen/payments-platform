@@ -118,7 +118,8 @@ jobs:
         include:
           - dir: vendor/hyperswitch
             toolchain: 1.94.1
-            features: --features v1
+            # upstream code: lint and test only the crate we patch (it has its own lint debt and needs the release features to build)
+            features: -p router_env
             area: area_rust_hyperswitch
           - dir: vendor/card-vault
             toolchain: 1.92.0
