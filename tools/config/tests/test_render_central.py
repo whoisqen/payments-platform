@@ -33,7 +33,8 @@ class RenderCentralTest(unittest.TestCase):
 
     def test_every_alert_goes_to_slack(self):
         for receiver in VALUES["config"]["receivers"]:
-            if receiver["name"] != "deadmans-switch":
+            # The heartbeat and the fallback for a failing Slack are webhooks by design
+            if receiver["name"] not in ("deadmans-switch", "fallback-webhook"):
                 self.assertIn("slack_configs", receiver, receiver["name"])
                 self.assertNotIn("pagerduty_configs", receiver)
 

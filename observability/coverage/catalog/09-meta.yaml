@@ -45,3 +45,12 @@ modes:
   alert: null
   signal: metric
   reason: needs the Alloy self-metrics in the metrics catalog
+- layer: meta
+  id: meta-target-down
+  component: prometheus
+  failure: scrape targets of a job are down
+  impact: alerts built on the metrics of the job cannot fire
+  severity: warning
+  alert: TargetDown
+  signal: metric
+  detect_within: 8m

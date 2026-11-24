@@ -38,6 +38,22 @@ spec:
         summary: Alertmanager cannot deliver notifications
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/meta/alertmanager-notifications-failing.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/platform-overview'
+    - alert: TargetDown
+      # A scrape target that is down silences every alert built on its metrics, so half of a job being down is already reported
+      expr: count by (job, namespace) (up == 0) / count by (job, namespace) (up) >= 0.5
+      for: 5m
+      keep_firing_for: 10m
+      labels:
+        severity: warning
+        team: observability
+        service: prometheus
+        owner: observability-oncall
+        layer: meta
+        failure_mode: meta-target-down
+      annotations:
+        summary: At least half of the scrape targets of a job are down; the alerts built on its metrics are blind
+        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/meta/warnings.md#target-down'
+        dashboard_url: '{{ $externalLabels.grafana_url }}/d/platform-overview'
     - alert: PrometheusRuleEvaluationFailing
       expr: sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[10m])) > 0
       for: 5m

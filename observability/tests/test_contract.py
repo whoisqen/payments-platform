@@ -85,7 +85,7 @@ class AlertContractTest(unittest.TestCase):
 
     def test_alert_names_are_unique(self):
         seen = []
-        for path in sorted((OBS / "alerts").rglob("*.yaml")) + sorted((OBS / "slo" / "generated").glob("*.yaml")):
+        for path in sorted((OBS / "alerts").rglob("*.yaml")) + sorted((OBS / "slo" / "generated").rglob("*.yaml")):
             for group in yaml.safe_load(path.read_text())["spec"]["groups"]:
                 seen += [r["alert"] for r in group["rules"] if "alert" in r]
         self.assertEqual(len(seen), len(set(seen)))
