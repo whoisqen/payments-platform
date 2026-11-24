@@ -1,0 +1,43 @@
+name: ai-review
+
+# Advisory only: one comment, updated in place; never a required check and never an approval.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    env:
+      AI_REVIEW_ROLE_ARN: ${{ vars.AI_REVIEW_ROLE_ARN }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 -m pip install --quiet pyyaml==6.0.2 boto3==1.40.0
+      - id: plan
+        run: python3 tools/ai/review.py plan
+      - if: steps.plan.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AI_REVIEW_ROLE_ARN }}
+          aws-region: ${{ steps.plan.outputs.region }}
+          role-session-name: ai-review-${{ github.run_id }}
+      - if: steps.plan.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ai/review.py run
