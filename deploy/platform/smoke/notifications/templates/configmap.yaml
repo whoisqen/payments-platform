@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  labels:
+    app.kubernetes.io/name: argocd-notifications-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  service.webhook.github-dispatch: |
+    {{- .Files.Get "files/service.github-dispatch.yaml" | nindent 4 }}
+  service.webhook.alertmanager: |
+    {{- .Files.Get "files/service.alertmanager.yaml" | nindent 4 }}
+  template.smoke-green: |
+    {{- .Files.Get "files/template.smoke-green.yaml" | nindent 4 }}
+  template.smoke-failed: |
+    {{- .Files.Get "files/template.smoke-failed.yaml" | nindent 4 }}
+  trigger.smoke-green: |
+    {{- .Files.Get "files/trigger.smoke-green.yaml" | replace "__ENVIRONMENTS__" (include "notifications.envList" .) | nindent 4 }}
+  trigger.smoke-failed: |
+    {{- .Files.Get "files/trigger.smoke-failed.yaml" | replace "__ENVIRONMENTS__" (include "notifications.envList" .) | nindent 4 }}
+  subscriptions: |
+    - recipients: [webhook:github-dispatch]
+      selector: payments-platform/cell={{ .Values.dispatchCell }},payments-platform/environment in {{ include "notifications.envSelector" . }}
+      triggers: [smoke-green]
+    - recipients: [webhook:alertmanager]
+      selector: payments-platform/environment in {{ include "notifications.envSelector" . }}
+      triggers: [smoke-failed]

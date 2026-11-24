@@ -1,0 +1,3 @@
+- when: app.status.operationState != nil and app.status.operationState.phase == 'Succeeded' and app.status.health.status == 'Healthy' and app.metadata.labels['payments-platform/environment'] in __ENVIRONMENTS__
+  oncePer: join(app.status.operationState.syncResult.revisions, '-')
+  send: [smoke-green]

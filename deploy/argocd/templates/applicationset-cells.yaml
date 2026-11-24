@@ -64,6 +64,17 @@ spec:
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
+        # The PostSync smoke Job of the cell; last so the indices above stay stable
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/smoke/job
+          helm:
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/values.yaml
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/images.yaml
+            parameters:
+              - name: global.cell
+                value: '{{`{{ .path.basename }}`}}'
       syncPolicy:
         automated:
           prune: true
