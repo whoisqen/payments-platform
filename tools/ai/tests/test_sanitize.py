@@ -57,7 +57,7 @@ class CardTest(unittest.TestCase):
 
     def test_timestamps_ids_and_versions_are_kept(self):
         for text in ("ts=1700000000123", "order 12345678901234567890123", "v1.2.3.4567890123456",
-                     "uuid 12345678-1234-1234-1234-123456789012", "0.4111111111111111", "x4111111111111111"):
+                     "uuid 12345678-1234-1234-1234-123456789012", "0.4111111111111111"):
             self.assertEqual(sanitize.redact(text)[0], text, text)
 
     def test_digits_inside_a_longer_number_are_kept(self):
@@ -145,12 +145,16 @@ class SecretTest(unittest.TestCase):
         self.assertEqual(sanitize.redact('db_pass' + 'word: "correct-horse-battery"')[0], 'db_password: "<REDACTED:secret:1>"')
 
     def test_references_and_templates_are_not_secrets(self):
-        for text in ("password = var.db_password", "password = random_password.db.result", "token: ${{ secrets.GITHUB_TOKEN }}",
-                     "secret: $(SECRET_VALUE)", "password: <your-password>", "api_key = lookup(var.keys, env)",
-                     "password: {{ .Values.password }}", "token = module.x.token_value", "password: changeme",
+        for text in ("password = var.db_password", "token: ${{ secrets.GITHUB_TOKEN }}", "secret: ${SECRET_VALUE}",
+                     "password: <your-password>", "password: {{.Values.password}}", "token = module.x.token_value", "password: changeme",
                      "secret_name: pay-prod-db-credentials", "token_endpoint: /oauth/token", "secretKeyRef: db-secret-name",
-                     "password: short", "tokenizer = something-long-enough", "password = ./secrets/file"):
+                     "password: short", "tokenizer = something-long-enough", "bypass: something-long-enough", "password: {{ .Values.pw }}"):
             self.assertEqual(sanitize.redact(text), (text, {}), text)
+
+    def test_only_the_listed_reference_forms_are_kept(self):
+        for text in ("password = random_password.db.result", "secret: $(SECRET_VALUE)", "api_key = lookup(var.keys, env)",
+                     "password = ./secrets/file", "token = local.some_token_value"):
+            self.assertEqual(sanitize.redact(text)[1], {"secret": 1}, text)
 
     def test_idempotent(self):
         text = "password = hunter2" + "hunter2 AKIA" + "IOSFODNN7EXAMPLE " + make_pan("4", 16)

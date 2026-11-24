@@ -1,4 +1,10 @@
 # Settings of the advisory AI review of pull requests (.github/workflows/ai-review.yml, tools/ai/review.py).
+#
+# AWS side (Terraform, owner): the job runs in the GitHub environment `ai-review`, so the OIDC token subject is
+#   repo:<org>/<repo>:environment:ai-review
+# The role trust policy must require `aud = sts.amazonaws.com` and `sub` equal to that exact value (StringEquals, no wildcard);
+# the pull request job never gets a `pull_request` or `ref:` subject. Role permissions: bedrock:InvokeModel on the inference
+# profile and the foundation models behind it, and bedrock:ApplyGuardrail on the guardrail below. Details: tools/ai/README.md.
 model:
   # CONFIRM: the owner must check this Bedrock inference-profile id for the Sonnet 5.5 family in the Bedrock console
   # (Cross-region inference) before the first run; a wrong id fails with a warning and the review is skipped.
@@ -7,6 +13,19 @@ model:
   max_tokens: 4096
   temperature: 0.1
   timeout_seconds: 120
+  # Bedrock guardrail attached to every call. Empty id = not set: the review still runs and logs a warning.
+  # The version is a string ("1" or "DRAFT"); keep it quoted.
+  guardrail:
+    id: ""
+    version: ""
+
+# When the review runs (the workflow also fires on every push; this decides).
+trigger:
+  # Always reviewed: opened and ready_for_review. This label starts a review at any time.
+  run_label: "ai-review:run"
+  # A push (new head sha) is reviewed again only when the last review comment was written at least this long ago;
+  # the comment carries the reviewed head sha in a hidden line. No earlier review comment = review.
+  min_minutes_between_reviews: 30
 
 limits:
   max_findings: 8

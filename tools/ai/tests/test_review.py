@@ -178,9 +178,9 @@ class FindingsTest(unittest.TestCase):
 
 class RenderTest(unittest.TestCase):
     def render(self, findings, **kw):
-        args = dict(summary="s", dropped=0, omitted=[], truncated=False, counts={})
+        args = dict(summary="s", dropped=0, omitted=[], truncated=False)
         args.update(kw)
-        return review.render(CFG, args["summary"], findings, args["dropped"], args["omitted"], args["truncated"], args["counts"], "model-x")
+        return review.render(CFG, args["summary"], findings, args["dropped"], args["omitted"], args["truncated"], "model-x")
 
     def test_marker_and_no_findings(self):
         body = self.render([])
@@ -196,11 +196,11 @@ class RenderTest(unittest.TestCase):
         self.assertIn("`a.py:5`", body)
 
     def test_notes(self):
-        body = self.render([], truncated=True, omitted=["x.py"], dropped=2, counts={"pan": 1})
+        body = self.render([], truncated=True, omitted=["x.py"], dropped=2)
         self.assertIn("highest-risk", body)
         self.assertIn("`x.py`", body)
         self.assertIn("2 finding(s) dropped", body)
-        self.assertIn("1 secret or card", body)
+        self.assertNotIn("redacted", body)
 
 
 if __name__ == "__main__":
