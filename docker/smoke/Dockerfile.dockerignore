@@ -1,0 +1,4 @@
+*
+!tests/smoke/
+**/__pycache__
+**/*.pyc

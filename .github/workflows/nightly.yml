@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [router, drainer, scheduler, locker, control-center, vault-snapshot]
+        service: [router, drainer, scheduler, locker, control-center, vault-snapshot, smoke]
     env:
       SERVICE: ${{ matrix.service }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
