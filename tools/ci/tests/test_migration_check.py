@@ -1,3 +1,4 @@
+import datetime
 import sys
 import unittest
 from pathlib import Path
@@ -12,6 +13,10 @@ GOOD_VALUES = "snapshot:\n  enabled: true\n  retentionDays: 35\nmigrate:\n  mode
 GOOD_JOB = "initContainers:\n  - name: pre-migration-snapshot\n    env:\n      - name: SNAPSHOT_RETENTION_DAYS\n"
 
 
+NOW = datetime.datetime(2026, 11, 25, 12, 0, tzinfo=datetime.timezone.utc)
+FUTURE = "2026-12-19-000000_add_sender_details_to_payment_intent"
+
+
 def run(files, up="ALTER TABLE t ADD COLUMN c text;", existing=(OLD,), contract=False, guard=None, meta=None, status="A"):
     """files: {dir: [file names]}; every dir is new unless listed in existing."""
     changes = [(status, f"{R}/{d}/{f}") for d, fs in files.items() for f in fs]
@@ -20,7 +25,7 @@ def run(files, up="ALTER TABLE t ADD COLUMN c text;", existing=(OLD,), contract=
     if meta is not None:
         text.update({f"{R}/{d}/metadata.toml": meta for d in files})
         present |= set(text)
-    return mc.check({R: set(existing), "vendor/card-vault/migrations": set()}, changes, lambda p: text.get(p, ""), lambda p: p in present, contract, guard)
+    return mc.check({R: set(existing), "vendor/card-vault/migrations": set()}, changes, lambda p: text.get(p, ""), lambda p: p in present, contract, guard, NOW)
 
 
 NEW = "2026-02-01-000000_add_c"
@@ -49,6 +54,22 @@ class CheckTest(unittest.TestCase):
 
     def test_out_of_order(self):
         errors, _ = run({"2025-12-31-235959_late": ["up.sql", "down.sql"]})
+        self.assertTrue(any("older than the newest" in e for e in errors))
+
+    def test_future_dated_upstream_directory_does_not_block(self):
+        self.assertEqual(run({"2026-11-25-000001_new": ["up.sql", "down.sql"]}, existing=(OLD, FUTURE)), ([], []))
+
+    def test_older_than_a_current_directory_still_fails_with_future_present(self):
+        errors, _ = run({"2025-12-31-235959_late": ["up.sql", "down.sql"]}, existing=(OLD, FUTURE))
+        self.assertTrue(any("older than the newest" in e and "2026-01-01-000000" in e for e in errors))
+
+    def test_duplicate_of_a_future_directory_fails(self):
+        errors, _ = run({"2026-12-19-000000_other": ["up.sql", "down.sql"]}, existing=(OLD, FUTURE))
+        self.assertTrue(any("one directory per timestamp" in e for e in errors))
+
+    def test_horizon_is_one_day_ahead(self):
+        self.assertEqual(mc.horizon(NOW), "2026-11-26-120000")
+        errors, _ = run({"2026-11-26-090000_x": ["up.sql", "down.sql"]}, existing=("2026-11-26-100000_cur", OLD))
         self.assertTrue(any("older than the newest" in e for e in errors))
 
     def test_destructive_needs_label(self):
