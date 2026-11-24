@@ -4,6 +4,8 @@ templates:
   - hpa.yaml
   - pdb.yaml
   - networkpolicy.yaml
+  - istio/peerauthentication.yaml
+  - istio/authorizationpolicy.yaml
   - externalsecret.yaml
   - servicemonitor.yaml
   - service.yaml
@@ -82,10 +84,10 @@ tests:
     asserts:
       - equal:
           path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
-          value: istio-ingress
+          value: payments-edge
       - equal:
-          path: spec.ingress[0].from[0].podSelector.matchLabels.istio
-          value: ingressgateway
+          path: spec.ingress[0].from[0].podSelector.matchLabels["gateway.networking.k8s.io/gateway-name"]
+          value: payments-edge
       - equal:
           path: spec.ingress[0].ports[0].port
           value: 8081
@@ -118,3 +120,41 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 8081
+  - it: requires mutual TLS on every port of the service
+    template: istio/peerauthentication.yaml
+    asserts:
+      - isKind:
+          of: PeerAuthentication
+      - equal:
+          path: spec.mtls.mode
+          value: STRICT
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: ratelimit
+  - it: admits the gateway proxy on gRPC and the metrics port without a principal
+    template: istio/authorizationpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.action
+          value: ALLOW
+      - equal:
+          path: spec.rules[0].from[0].source.principals[0]
+          value: cluster.local/ns/payments-edge/sa/payments-edge-istio
+      - equal:
+          path: spec.rules[0].to[0].operation.ports[0]
+          value: "8081"
+      - notExists:
+          path: spec.rules[1].from
+      - equal:
+          path: spec.rules[1].to[0].operation.ports[0]
+          value: "9090"
+      - lengthEqual:
+          path: spec.rules
+          count: 2
+  - it: renders no mesh policy when switched off
+    template: istio/authorizationpolicy.yaml
+    set:
+      istio.authorizationPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
