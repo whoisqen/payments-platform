@@ -1,0 +1,22 @@
+schemaVersion: 2.0.0
+metadataTest:
+  user: "10001:10001"
+  workdir: /app
+fileExistenceTests:
+  - name: smoke package
+    path: /app/smoke/__init__.py
+    shouldExist: true
+  - name: no shell
+    path: /bin/sh
+    shouldExist: false
+  - name: no pip
+    path: /usr/bin/pip
+    shouldExist: false
+  - name: only the smoke package in the app directory
+    path: /app/tests
+    shouldExist: false
+commandTests:
+  - name: package imports
+    command: /usr/bin/python3
+    args: ["-c", "import smoke; print('smoke-import-ok')"]
+    expectedOutput: ["smoke-import-ok"]

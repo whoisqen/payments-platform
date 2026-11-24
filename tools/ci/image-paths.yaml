@@ -19,6 +19,9 @@ images:
     - docker/control-center/
   vault-snapshot:
     - docker/vault-snapshot/
+  smoke:
+    - docker/smoke/
+    - tests/smoke/
 areas:
   # one area per vendored workspace: a change of one must not run the checks of the other
   rust_hyperswitch:
