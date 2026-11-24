@@ -6,3 +6,4 @@ budgets_mib:
   locker: 80
   control-center: 900
   vault-snapshot: 400
+  smoke: 80
