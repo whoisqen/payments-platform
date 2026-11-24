@@ -31,6 +31,7 @@ spec:
             releaseName: sentry
             valueFiles:
               - $values/deploy/platform/sentry/values.yaml
+              - $values/deploy/platform/sentry/oidc-values.yaml
             parameters:
               - name: system.url
                 value: {{ .Values.central.sentryUrl | quote }}
