@@ -198,11 +198,11 @@ def parse_findings(text, reviewed, max_findings):
         if not ok:
             dropped += 1
             continue
-        findings.append({"file": path, "line": line, "severity": sev, "title": str(f.get("title", ""))[:120],
-                         "evidence": str(f.get("evidence", ""))[:1000], "fix": str(f.get("fix", ""))[:1000]})
+        findings.append({"file": path, "line": line, "severity": sev, "title": str(f.get("title", ""))[:80],
+                         "evidence": str(f.get("evidence", ""))[:300], "fix": str(f.get("fix", ""))[:300]})
     findings.sort(key=lambda f: SEVERITIES.index(f["severity"]))
     dropped += max(0, len(findings) - max_findings)
-    return str(data.get("summary", ""))[:300], findings[:max_findings], dropped
+    return str(data.get("summary", ""))[:160], findings[:max_findings], dropped
 
 
 def clean(text):

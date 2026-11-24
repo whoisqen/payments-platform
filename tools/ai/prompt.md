@@ -12,6 +12,9 @@ Diff lines are `<new line number> <+ or space><text>`; removed lines have no num
 - IaC blast radius: changes that destroy or replace stateful resources, affect every environment or region at once, lock out access, or change shared modules without a rollout path.
 - Missing tests for changed behaviour.
 
+# Style
+Short and to the point: no introductions, no hedging, no repetition between title, evidence and fix. Evidence and fix are one sentence each, at most 200 characters; quote code only when it is the evidence. Report only what you are sure of.
+
 # Do not say
 - Style, naming, formatting, import order, or anything a linter or formatter already covers.
 - Speculation without evidence in the diff; if you cannot point at the line, drop it.
@@ -20,7 +23,7 @@ Diff lines are `<new line number> <+ or space><text>`; removed lines have no num
 
 # Output
 Reply with one JSON object and nothing else:
-{"summary": "<one sentence, at most 200 characters>", "findings": [{"file": "<path as in the diff>", "line": <new line number>, "severity": "high|medium|low", "title": "<at most 80 characters>", "evidence": "<what in the diff shows the problem>", "fix": "<concrete change>"}]}
+{"summary": "<one sentence, at most 120 characters>", "findings": [{"file": "<path as in the diff>", "line": <new line number>, "severity": "high|medium|low", "title": "<at most 60 characters>", "evidence": "<one sentence: what in the diff shows the problem>", "fix": "<one sentence: the concrete change>"}]}
 
 - At most {{MAX_FINDINGS}} findings, most severe first; `line` must be a numbered line of that file in the diff.
 - high: exploitable or data-loss or card-data exposure; medium: likely bug or weakened control; low: minor risk worth fixing.
