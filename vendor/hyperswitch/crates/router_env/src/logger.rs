@@ -11,6 +11,8 @@ pub use crate::config::Config;
 pub mod types;
 pub use types::{Category, Flow, Level, Tag};
 
+mod sentry_setup;
+pub use sentry_setup::scrub as scrub_sensitive_text;
 mod setup;
 pub use setup::{setup, TelemetryGuard};
 
