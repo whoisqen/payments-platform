@@ -40,8 +40,6 @@ spec:
                 value: 'http://victoria-metrics-{{`{{ .name }}`}}-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus'
               - name: env.ALERTMANAGER_URL
                 value: 'http://alertmanager-{{`{{ .name }}`}}.monitoring.svc:9093'
-              - name: ingress.hosts[0]
-                value: {{ trimPrefix "https://" .Values.observability.grafanaUrl | quote }}
               - name: grafana\.ini.server.root_url
                 value: {{ .Values.observability.grafanaUrl | quote }}
         # The dashboards (one ConfigMap per folder) and the ExternalSecrets of the admin login and the OIDC client

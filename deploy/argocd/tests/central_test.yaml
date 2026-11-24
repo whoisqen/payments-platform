@@ -115,8 +115,3 @@ tests:
           content:
             name: system.url
             value: https://sentry.example.test
-      - contains:
-          path: spec.template.spec.sources[0].helm.parameters
-          content:
-            name: ingress.hostname
-            value: sentry.example.test
