@@ -30,8 +30,8 @@ runs:
         STRICT: ${{ inputs.strict-pin }}
       run: |
         set -euo pipefail
-        if [ "$STRICT" = true ]; then python3 tools/ci/buildkit_pin_check.py --strict; else python3 tools/ci/buildkit_pin_check.py; fi
-        grep '^BUILDKIT_IMAGE=' tools/ci/buildkit.env >>"$GITHUB_ENV"
+        if [ "$STRICT" = true ]; then python3 tools/ci/buildkit/buildkit_pin_check.py --strict; else python3 tools/ci/buildkit/buildkit_pin_check.py; fi
+        grep '^BUILDKIT_IMAGE=' tools/ci/buildkit/buildkit.env >>"$GITHUB_ENV"
     - name: kubeconfig of the build cluster
       if: inputs.eks-cluster != ''
       shell: bash

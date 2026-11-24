@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check of the BuildKit pin in tools/ci/buildkit.env.
+"""Check of the BuildKit pin in tools/ci/buildkit/buildkit.env.
 
   buildkit_pin_check.py           unresolved digest is a warning, exit code 0
   buildkit_pin_check.py --strict  unresolved digest is an error, exit code 1 (the images workflow uses it)
@@ -10,8 +10,8 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-PIN = ROOT / "tools/ci/buildkit.env"
+ROOT = Path(__file__).resolve().parents[3]
+PIN = ROOT / "tools/ci/buildkit/buildkit.env"
 IMAGE = re.compile(r"^(?P<repo>[a-z0-9./_-]+):(?P<tag>[A-Za-z0-9._-]+)@(?P<digest>.+)$")
 DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 PLACEHOLDER = re.compile(r"^sha256:REPLACE_\w+$")

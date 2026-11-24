@@ -319,7 +319,7 @@ jobs:
         run: |
           flag=()
           if [ "$CONTRACT" = true ]; then flag=(--contract); fi
-          python3 tools/ci/migration_check.py check --base "$BASE_SHA" --head "$HEAD_SHA" "${flag[@]}"
+          python3 tools/ci/migrations/migration_check.py check --base "$BASE_SHA" --head "$HEAD_SHA" "${flag[@]}"
       - name: squawk
         env:
           CONTRACT: ${{ contains(github.event.pull_request.labels.*.name, 'contract-migration') }}
@@ -328,8 +328,8 @@ jobs:
           exclude=()
           if [ "$CONTRACT" = true ]; then exclude=("--exclude=ban-drop-column,ban-drop-table,renaming-column,renaming-table,changing-column-type,ban-drop-not-null"); fi
           status=0
-          mapfile -t tx < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-tx)
-          mapfile -t notx < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-notx)
+          mapfile -t tx < <(python3 tools/ci/migrations/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-tx)
+          mapfile -t notx < <(python3 tools/ci/migrations/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope squawk-notx)
           if [ "${#tx[@]}" -gt 0 ]; then squawk --assume-in-transaction "${exclude[@]}" "${tx[@]}" || status=1; fi
           if [ "${#notx[@]}" -gt 0 ]; then squawk "${exclude[@]}" "${notx[@]}" || status=1; fi
           echo "squawk: ${#tx[@]} transactional and ${#notx[@]} non-transactional migration(s) linted"
@@ -337,9 +337,9 @@ jobs:
       - name: up, down, up
         run: |
           for r in vendor/hyperswitch vendor/card-vault; do
-            mapfile -t new < <(python3 tools/ci/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope new --root "$r/migrations" | cut -d' ' -f2)
+            mapfile -t new < <(python3 tools/ci/migrations/migration_check.py list --base "$BASE_SHA" --head "$HEAD_SHA" --scope new --root "$r/migrations" | cut -d' ' -f2)
             [ "${#new[@]}" -gt 0 ] || { echo "no new migration under $r"; continue; }
-            tools/ci/migration_roundtrip.sh "$r/migrations" "${new[@]}"
+            tools/ci/migrations/migration_roundtrip.sh "$r/migrations" "${new[@]}"
           done
 
   ci-gate:
