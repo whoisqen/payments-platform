@@ -15,6 +15,8 @@ set:
   central.alertmanagerHost: alertmanager.example.test
   central.sentryUrl: https://sentry.example.test
   central.dedupInterval: 45s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
 tests:
   - it: sends every sample of Prometheus to the central store
     template: addons/kube-prometheus.yaml

@@ -12,5 +12,7 @@ central:
   alertmanagerHost: alertmanager.example.test
   sentryUrl: https://sentry.example.test
   dedupInterval: 30s
+  logsOtlpEndpoint: https://logs.example.test:4318
+  tracesOtlpEndpoint: tempo.example.test:4317
 gated:
   revision: v1.0.0

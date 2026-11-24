@@ -12,6 +12,8 @@ spec:
     rules:
     - alert: RestoreTestStale
       expr: time() - max by (store) (restore_test_last_run_timestamp_seconds) > 2 * 86400
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -25,6 +27,8 @@ spec:
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: DrSwitchTestOverdue
       expr: time() - max by (region) (dr_switch_test_last_success_timestamp_seconds) > 100 * 86400
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

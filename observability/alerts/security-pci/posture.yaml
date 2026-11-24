@@ -13,6 +13,7 @@ spec:
     - alert: KmsKeyRotationOverdue
       expr: max by (key_alias) (kms_key_rotation_overdue_seconds) > 0
       for: 30m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: security
@@ -27,6 +28,7 @@ spec:
     - alert: KyvernoAuditViolations
       expr: sum by (policy_name) (increase(kyverno_policy_results_total{rule_result="fail",policy_validation_mode="audit"}[1h])) > 0
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: security

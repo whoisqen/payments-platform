@@ -13,6 +13,7 @@ spec:
     - alert: KafkaConsumerLagHigh
       expr: sum by (consumergroup, topic) (kafka_consumergroup_lag) > 100000
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -27,6 +28,7 @@ spec:
     - alert: KafkaUnderReplicatedPartitions
       expr: max by (cluster) (kafka_server_replicamanager_underreplicatedpartitions) > 0
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform
@@ -41,6 +43,7 @@ spec:
     - alert: KafkaBrokerDiskHigh
       expr: max by (broker_id) (aws_kafka_kafka_data_logs_disk_used_average) > 80
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

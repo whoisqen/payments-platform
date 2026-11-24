@@ -80,8 +80,10 @@
       "required": [
         "metricsRemoteWriteUrl",
         "alertmanagerHost",
-        "sentryUrl",
-        "dedupInterval"
+        "dedupInterval",
+        "logsOtlpEndpoint",
+        "tracesOtlpEndpoint",
+        "sentryUrl"
       ],
       "properties": {
         "metricsRemoteWriteUrl": {
@@ -99,6 +101,14 @@
         "dedupInterval": {
           "type": "string",
           "pattern": "^[0-9]+(s|m)$"
+        },
+        "logsOtlpEndpoint": {
+          "type": "string",
+          "pattern": "^https://[^/]+(/.*)?$"
+        },
+        "tracesOtlpEndpoint": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+:[0-9]+$"
         }
       },
       "additionalProperties": false
