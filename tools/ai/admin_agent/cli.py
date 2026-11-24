@@ -97,8 +97,12 @@ def main(argv=None, client=None, sources=None, ask=input, out=print, executor=No
     transcript_file = open_private(args.transcript) if args.transcript else None
     files = [f for f in (audit_file, transcript_file) if f]
 
+    def emit(text):
+        """The only place text reaches the terminal; producers have already redacted and cleaned it."""
+        out(text)
+
     def write_audit(line):
-        out(line)
+        emit(line)
         if audit_file:
             audit_file.write(line + "\n")
             audit_file.flush()
@@ -124,13 +128,13 @@ def main(argv=None, client=None, sources=None, ask=input, out=print, executor=No
 
         def handle(question):
             tools.new_turn()
-            out(session.ask(question))
+            emit(session.ask(question))
             prop = tools.proposals.pop(0) if tools.proposals else None  # one proposal per turn
             tools.proposals.clear()
             if prop is None:
                 return
             if args.env in retype and args.dry_run:
-                out(f"{args.env} actions need --no-dry-run; the proposal was not offered")
+                emit(f"{args.env} actions need --no-dry-run; the proposal was not offered")
                 audit.log("action:" + prop.action_id, prop.params, "refused", detail="prod needs --no-dry-run")
                 return
             if actions_mod.confirm(prop, registry, args.dry_run, ask, retype):
@@ -140,10 +144,10 @@ def main(argv=None, client=None, sources=None, ask=input, out=print, executor=No
                 except Exception as e:  # noqa: BLE001
                     result = f"action failed: {type(e).__name__}"
                     audit.log("action:" + prop.action_id, prop.params, "failed")
-                out(clean(redactor.redact(result)))
+                emit(clean(redactor.redact(result)))
             else:
                 audit.log("action:" + prop.action_id, prop.params, "declined")
-                out("declined")
+                emit("declined")
 
         if args.question:
             handle(args.question)

@@ -56,5 +56,28 @@ class BudgetTest(unittest.TestCase):
         self.assertTrue(b.exhausted)
 
 
+class CleanTest(unittest.TestCase):
+    def test_newline_and_tab_stay(self):
+        self.assertEqual(compress.clean("a\tb\nc"), "a\tb\nc")
+
+    def test_c0_controls_removed(self):
+        self.assertEqual(compress.clean("a\x00b\x07c\rd\x1fe"), "abcde")
+
+    def test_c1_controls_removed(self):
+        self.assertEqual(compress.clean("a\x7fb\x85c\x9fd"), "abcd")
+
+    def test_zero_width_removed(self):
+        self.assertEqual(compress.clean("a​b‍c⁠d﻿e"), "abcde")
+
+    def test_bidi_removed(self):
+        self.assertEqual(compress.clean("a‮b⁦c⁩d؜e‏f"), "abcdef")
+
+    def test_ansi_escape_start_removed(self):
+        self.assertEqual(compress.clean("\x1b[31mred"), "[31mred")
+
+    def test_surrogate_removed(self):
+        self.assertEqual(compress.clean("a\ud800b"), "ab")
+
+
 if __name__ == "__main__":
     unittest.main()

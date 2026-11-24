@@ -2,6 +2,7 @@
 import json
 import math
 import re
+import unicodedata
 from collections import OrderedDict
 
 TS = re.compile(r"^\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s*")
@@ -158,12 +159,21 @@ class SessionBudget:
 
 
 # --- text hygiene: model text is untrusted when it reaches a terminal or a log ---------------------------------------
-UNSAFE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]")
+_KEEP = frozenset("\n\t")
+# bidi marks, embeddings, overrides and isolates; most are category Cf, listed so the intent stays explicit
+_BIDI = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
+_DROPPED_CATEGORIES = frozenset(("Cc", "Cf", "Cs"))
+
+
+def _unsafe(ch):
+    if ch in _KEEP:
+        return False
+    return ch in _BIDI or unicodedata.category(ch) in _DROPPED_CATEGORIES
 
 
 def clean(text):
-    """Remove control and bidi characters (newline and tab stay)."""
-    return UNSAFE.sub("", str(text))
+    """Remove control (C0, C1, ESC), format (zero-width, bidi) and surrogate characters; newline and tab stay."""
+    return "".join(ch for ch in str(text) if not _unsafe(ch))
 
 
 def one_line(text, limit=300):
