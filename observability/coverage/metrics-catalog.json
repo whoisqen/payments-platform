@@ -89,6 +89,7 @@
     "pg_table_size_bytes": "postgres-exporter",
     "pg_up": "postgres-exporter",
     "platform_overhead_seconds_bucket": "app-otel-sdk",
+    "platform_overhead_seconds_count": "app-otel-sdk",
     "probe_ssl_earliest_cert_expiry": "blackbox-exporter",
     "probe_success": "blackbox-exporter",
     "prometheus_rule_evaluation_failures_total": "prometheus",

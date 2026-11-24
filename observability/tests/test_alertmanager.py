@@ -55,6 +55,8 @@ class RoutingTest(unittest.TestCase):
         for name, labels in LABELS.items():
             sev, team = labels["severity"], labels["team"]
             expected = {"security": "slack-security", "warning": "slack-payments-alerts", "critical": "slack-payments-critical", "none": "deadmans-switch" if name == "Watchdog" else "slack-payments-alerts"}.get(sev, "slack-payments-critical")
+            if team == "security" and name != "Watchdog":
+                expected = "slack-security"  # the team route comes before the severity routes
             with self.subTest(alert=name):
                 self.assertEqual(route(labels), expected)
 
@@ -119,10 +121,26 @@ class InhibitionTest(unittest.TestCase):
         self.assertFalse(inhibited(rule, source, {"alertname": "AuthorizationRateDrop", "psp": "other"}))
 
     def test_burn_inhibition_stays_within_one_slo(self):
-        rule = next(r for r in CONFIG["inhibit_rules"] if r["equal"] == ["slo"])
+        rules = [r for r in CONFIG["inhibit_rules"] if r["equal"] == ["slo"]]
+
+        def any_inhibits(source, target):
+            return any(inhibited(r, source, target) for r in rules)
+
         fast = {"alertname": "PaymentsStatusReadBurnFast", "slo": "payments-status-read"}
-        self.assertTrue(inhibited(rule, fast, {"alertname": "PaymentsStatusReadBurnTicket", "slo": "payments-status-read"}))
-        self.assertFalse(inhibited(rule, fast, {"alertname": "PaymentsWebhookDeliveryBurnTicket", "slo": "payments-webhooks-delivery"}))
+        self.assertTrue(any_inhibits(fast, {"alertname": "PaymentsStatusReadBurnTicket", "slo": "payments-status-read"}))
+        self.assertFalse(any_inhibits(fast, {"alertname": "PaymentsWebhookDeliveryBurnTicket", "slo": "payments-webhooks-delivery"}))
+
+    def test_the_fastest_window_silences_the_fast_one_of_the_same_slo_only(self):
+        rules = [r for r in CONFIG["inhibit_rules"] if r["equal"] == ["slo"]]
+
+        def any_inhibits(source, target):
+            return any(inhibited(r, source, target) for r in rules)
+
+        fastest = {"alertname": "PaymentsAuthorizationAvailabilityBurnFastest", "slo": "payments-authorization"}
+        self.assertTrue(any_inhibits(fastest, {"alertname": "PaymentsAuthorizationAvailabilityBurnFast", "slo": "payments-authorization"}))
+        self.assertFalse(any_inhibits(fastest, {"alertname": "PaymentsStatusReadBurnFast", "slo": "payments-status-read"}))
+        # a fast alert does not silence the fastest one
+        self.assertFalse(any_inhibits({"alertname": "PaymentsAuthorizationAvailabilityBurnFast", "slo": "payments-authorization"}, fastest))
 
 
 if __name__ == "__main__":

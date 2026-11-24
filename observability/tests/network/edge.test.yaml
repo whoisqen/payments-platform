@@ -85,7 +85,7 @@ tests:
     grafana_url: https://grafana.example.test
   input_series:
   - series: aws_natgateway_error_port_allocation_sum{nat_gateway_id="nat-0a1"}
-    values: 0+10x21
+    values: _x5 10x16
   alert_rule_test:
   - eval_time: 17m
     alertname: NatPortAllocationErrors

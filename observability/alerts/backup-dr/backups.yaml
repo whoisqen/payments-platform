@@ -11,7 +11,10 @@ spec:
   - name: backup-dr-backups
     rules:
     - alert: BackupJobFailed
-      expr: sum by (backup_vault) (increase(aws_backup_number_of_backup_jobs_failed_sum[1h]) + increase(aws_backup_number_of_backup_jobs_expired_sum[1h])) > 0
+      # YACE exports each CloudWatch period sum as a gauge that appears only when a job ends, so increase() misses the first one and `+` needs both series
+      expr: sum by (backup_vault) ((max_over_time(aws_backup_number_of_backup_jobs_failed_sum[1h]) > 0) or (max_over_time(aws_backup_number_of_backup_jobs_expired_sum[1h]) > 0)) > 0
+      for: 2m
+      keep_firing_for: 5m
       labels:
         severity: critical
         team: data-platform
@@ -39,7 +42,9 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/backup-missing.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/backup'
     - alert: BackupCopyFailed
-      expr: sum by (backup_vault) (increase(aws_backup_number_of_copy_jobs_failed_sum[1h])) > 0
+      expr: sum by (backup_vault) (max_over_time(aws_backup_number_of_copy_jobs_failed_sum[1h])) > 0
+      for: 5m
+      keep_firing_for: 10m
       labels:
         severity: warning
         team: data-platform

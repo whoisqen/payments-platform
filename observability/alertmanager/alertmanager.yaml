@@ -18,6 +18,11 @@ route:
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1m
+    # Everything the security team owns goes to its channel, whatever the severity
+    - receiver: slack-security
+      matchers: [team="security"]
+      group_by: [alertname, region]
+      repeat_interval: 8760h
     - receiver: slack-security
       matchers: [severity="security"]
       group_by: [alertname, region]
@@ -67,6 +72,10 @@ inhibit_rules:
   - source_matchers: [alertname="NodeNotReady"]
     target_matchers: ['alertname=~"CrashLoopBackOff"']
     equal: [node]
+  # The fastest window of a 99.99% SLO and the fast one burn for the same cause: one message
+  - source_matchers: ['alertname=~".*BurnFastest"']
+    target_matchers: ['alertname=~".*BurnFast"']
+    equal: [slo]
   - source_matchers: ['alertname=~".*BurnFast|.*BurnFastest"']
     target_matchers: ['alertname=~".*BurnSlow|.*BurnTicket"']
     equal: [slo]
