@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 # a platform-owned migrations directory is added here
 ROOTS = ("vendor/hyperswitch/migrations", "vendor/card-vault/migrations")
 CHART = "deploy/charts/migrations"
