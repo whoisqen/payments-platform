@@ -364,6 +364,10 @@ def build_all():
     d.ts("router: rate-limited responses (429) by cell, reqps", [(f'sum by (cell) (rate(http_server_requests_total{{{FC},service="router",code="429"}}[5m]))', "{{cell}}")], "reqps",
          link=to("router", "cell"))
     d.ts("waf: blocked requests by web ACL, reqps", [(f'sum by (web_acl) (rate(aws_wafv2_blocked_requests_sum{{{F}}}[5m]))', "{{web_acl}}")], "reqps", thr=steps(T.WAF_BLOCKED_RPS))
+    d.row("Rate limit and load shedding")
+    d.ts("edge: limited requests by class, reqps", [('edge:rate_limited:rate5m{env=~"$env"}', "{{route}}")], "reqps", desc="Local rate limit at the gateway; payments is shed last.")
+    d.ts("edge: limited requests, top 5 merchants, reqps", [(top('merchant:rate_limit_over_limit:rate5m{env=~"$env"}', 5), "{{merchant_id}}")], "reqps",
+         desc="Over-limit descriptors of the rate limit service; merchant_id is a recorded aggregate, never a raw label.")
     d.row("Network")
     d.ts("egress: NAT port allocation errors per second", [(f'sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum{{{F}}}[5m]))', "{{nat_gateway_id}}")], "ops",
          thr=steps(None, 0.001), desc="Any error pages: outbound PSP calls fail.")

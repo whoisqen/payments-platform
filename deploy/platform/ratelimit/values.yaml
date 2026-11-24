@@ -1,0 +1,99 @@
+# REPLACE_* defaults are rejected when requireResolved is true; the environment layer sets it
+requireResolved: false
+
+global:
+  # Own ECR prefix (restrict-registries rejects Docker Hub); the environment layer sets it
+  registry: REPLACE_REGISTRY
+  environment: REPLACE_ENVIRONMENT
+
+# Mirror of docker.io/envoyproxy/ratelimit copied with the index preserved, so the digest matches upstream
+image:
+  repository: envoyproxy/ratelimit
+  # Upstream tag 62db6639 (commit tag; the project has no semver releases); Renovate bumps tag and digest together
+  tag: 62db6639
+  digest: sha256:fa6b86d5a500f36d3584168fb49612418ee678a65add5ce9ee2e40dd4d98a8a7
+  pullPolicy: IfNotPresent
+
+workload:
+  kind: Deployment
+  minReadySeconds: 10
+  terminationGracePeriodSeconds: 45
+  preStopSeconds: 15
+
+ports:
+  grpc: 8081
+  http: 8080
+  metrics: 9090
+
+serviceAccount:
+  create: true
+  name: ratelimit
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 9
+  targetCPU: 60
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+# Dedicated small Redis; the per-cell MemoryDB is not reachable from every region
+redis:
+  # host:port from the environment layer
+  endpoint: REPLACE_REDIS_ENDPOINT
+  # MemoryDB is always cluster mode; a plain ElastiCache replication group is single
+  type: cluster
+  tls: true
+  poolSize: 10
+  # ExternalSecret from store aws-secrets-manager, key pay/<environment>/ratelimit/redis, JSON key auth
+  secret:
+    name: ratelimit-redis
+    store: aws-secrets-manager
+    refreshInterval: 1h
+    property: auth
+  egressCidrs: []
+
+networkPolicy:
+  enabled: true
+  # Pods of the Istio ingress gateway run the Envoy that calls the service
+  edgeNamespace: istio-ingress
+  edgePodLabels:
+    istio: ingressgateway
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+
+# Limits of domain `domain`; descriptors are merchant (header x-merchant-id) then request_class
+rateLimit:
+  domain: payments-edge
+  requestClasses: [payments, read, list]
+  # Reject nothing yet: counts and exposes over_limit only (rollout aid)
+  shadowMode: false
+  # Starting values for the owner to tune against the 1 430 TPS peak
+  defaults:
+    payments: {unit: second, requestsPerUnit: 100}
+    read: {unit: second, requestsPerUnit: 200}
+    list: {unit: second, requestsPerUnit: 20}
+  # Every tier names every class
+  tiers:
+    enterprise:
+      payments: {unit: second, requestsPerUnit: 400}
+      read: {unit: second, requestsPerUnit: 800}
+      list: {unit: second, requestsPerUnit: 60}
+    hot:
+      payments: {unit: second, requestsPerUnit: 1600}
+      read: {unit: second, requestsPerUnit: 1600}
+      list: {unit: second, requestsPerUnit: 100}
+  # Named merchants: {merchant: <id>, tier: <tier, optional>, limits: {<class>: {unit, requestsPerUnit}, optional}}
+  overrides: []

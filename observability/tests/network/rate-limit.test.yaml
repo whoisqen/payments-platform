@@ -1,0 +1,238 @@
+rule_files:
+- ../../alerts/network/rate-limit.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  external_labels: &id001
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: ratelimit_service_rate_limit_over_limit{domain="payments-edge",cell="cell-1",merchant_id="m-1"}
+    values: 0+60x25
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: RateLimitHitsMerchant
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-hits-merchant
+        cell: cell-1
+        merchant_id: m-1
+      exp_annotations:
+        summary: A merchant has been rate limited at the edge for 10 minutes
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/rate-limit-warnings.md#rate-limit-hits-merchant
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: ratelimit_service_rate_limit_over_limit{domain="payments-edge",cell="cell-1",merchant_id="m-1"}
+    values: 0+60x3 180+0x22
+  alert_rule_test:
+  - eval_time: 22m
+    alertname: RateLimitHitsMerchant
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-1"}
+    values: 0+400x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-2"}
+    values: 0+200x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-3"}
+    values: 0+200x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-4"}
+    values: 0+200x25
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: MerchantShareOfCellHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-merchant-share-of-cell-high
+        cell: cell-1
+        merchant_id: m-1
+      exp_annotations:
+        summary: One merchant sends more than 30% of the traffic of a cell
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/rate-limit-warnings.md#merchant-share-of-cell-high
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-1"}
+    values: 0+100x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-2"}
+    values: 0+225x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-3"}
+    values: 0+225x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-4"}
+    values: 0+225x25
+  - series: ratelimit_service_rate_limit_total_hits{domain="payments-edge",cell="cell-1",merchant_id="m-5"}
+    values: 0+225x25
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: MerchantShareOfCellHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_local_rate_limiter_enforced{route="payments"}
+    values: 0+500x15
+  - series: envoy_http_local_rate_limiter_enforced{route="lists"}
+    values: 0+0x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LoadSheddingActive
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-load-shedding-active
+        route: payments
+      exp_annotations:
+        summary: The edge sheds the payments class (429)
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/load-shedding-active.md
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_local_rate_limiter_enforced{route="payments"}
+    values: 0+0x15
+  - series: envoy_http_local_rate_limiter_enforced{route="lists"}
+    values: 0+500x15
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LoadSheddingActive
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_local_rate_limiter_enforced{route="lists"}
+    values: 0+500x20
+  - series: envoy_http_local_rate_limiter_enforced{route="payments"}
+    values: 0+0x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LoadSheddingReadsActive
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-load-shedding-reads-active
+        route: lists
+      exp_annotations:
+        summary: The edge sheds lists, reports or status polling (429)
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/rate-limit-warnings.md#load-shedding-reads-active
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_local_rate_limiter_enforced{route="lists"}
+    values: 0+500x2 1000+0x18
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LoadSheddingReadsActive
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: up{service="ratelimit",cell="cell-1",pod="rl-0"}
+    values: 1x2 0x10
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: RateLimitServiceDown
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-service-down
+        cell: cell-1
+      exp_annotations:
+        summary: The rate limit service of a cell is down; the edge fails open without per-merchant limits
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/rate-limit-warnings.md#rate-limit-service-down
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: up{service="ratelimit",cell="cell-1",pod="rl-0"}
+    values: 1x2 0x1 1x9
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: RateLimitServiceDown
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_ratelimit_failure_mode_allowed{cell="cell-1"}
+    values: 0+10x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RateLimitServiceErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-rate-limit-service-errors
+        cell: cell-1
+      exp_annotations:
+        summary: Rate limit calls fail and the edge lets requests pass (fail-open)
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/rate-limit-warnings.md#rate-limit-service-errors
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_http_ratelimit_failure_mode_allowed{cell="cell-1"}
+    values: 0+10x2 20+0x18
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: RateLimitServiceErrors
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_overload_actions_stop_accepting_requests_active{pod="gw-0"}
+    values: 1x10
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: EdgeOverloadManagerActive
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: platform
+        service: edge
+        owner: platform-oncall
+        layer: network
+        failure_mode: network-edge-overload-manager-active
+        pod: gw-0
+      exp_annotations:
+        summary: The gateway overload manager stops accepting requests
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/network/edge-overload-manager-active.md
+        dashboard_url: https://grafana.example.test/d/edge
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: envoy_overload_actions_stop_accepting_requests_active{pod="gw-0"}
+    values: 0x1 1x1 0x8
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: EdgeOverloadManagerActive
+    exp_alerts: []

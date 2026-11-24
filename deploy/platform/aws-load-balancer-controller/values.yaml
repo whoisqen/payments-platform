@@ -1,0 +1,14 @@
+# AWS access uses EKS Pod Identity (association kube-system/aws-load-balancer-controller), so the service account carries no role annotation.
+replicaCount: 2
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+# Only Services that ask for the controller by annotation are handled; the other LoadBalancer Services stay as they are
+enableServiceMutatorWebhook: false
+# The entry points are Gateway API only
+createIngressClassResource: false
+podDisruptionBudget:
+  maxUnavailable: 1
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 256Mi}

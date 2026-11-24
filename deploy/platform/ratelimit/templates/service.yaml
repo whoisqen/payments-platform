@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+spec:
+  selector:
+    {{- include "platform-common.selectorLabels" (dict "root" . "component" "ratelimit") | nindent 4 }}
+  ports:
+    - name: grpc
+      port: {{ .Values.ports.grpc }}
+      targetPort: grpc
+      appProtocol: grpc
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+    - name: metrics
+      port: {{ .Values.ports.metrics }}
+      targetPort: metrics

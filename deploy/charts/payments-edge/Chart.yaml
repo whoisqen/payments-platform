@@ -1,6 +1,6 @@
 apiVersion: v2
 name: payments-edge
-description: Istio gateway, load shedding and routing of merchants to cells
+description: Gateway API entry, priority load shedding and routing of merchants to cells
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.0.0"

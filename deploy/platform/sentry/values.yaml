@@ -91,10 +91,7 @@ filestore:
       lookupVolumeName: false
 
 ingress:
-  enabled: true
-  ingressClassName: nginx
-  tls:
-    - secretName: sentry-tls
+  enabled: false  # the entry is the Gateway API (deploy/platform/admin-gateway); no Ingress objects
 
 # Data scrubbing for card data is set per organization (see README.md and pii-config.json); sensitive defaults of the server
 config:

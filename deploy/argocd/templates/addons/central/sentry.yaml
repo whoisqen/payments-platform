@@ -35,10 +35,6 @@ spec:
             parameters:
               - name: system.url
                 value: {{ .Values.central.sentryUrl | quote }}
-              - name: ingress.hostname
-                value: {{ (urlParse .Values.central.sentryUrl).host | quote }}
-              - name: ingress.tls[0].hosts[0]
-                value: {{ (urlParse .Values.central.sentryUrl).host | quote }}
         # ClickHouse is not part of the sentry chart; Snuba reaches it as sentry-clickhouse
         - repoURL: registry-1.docker.io/bitnamicharts
           chart: clickhouse
