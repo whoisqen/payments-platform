@@ -38,6 +38,8 @@ dns:
   prod_zone: pay.example.com
   psp_domains: [.psp-sandbox.example.com]
   grafana_url: https://grafana.payments.internal
+  # Zone of the admin tools (argocd, vault, alertmanager, vmui, prometheus, sentry); reached only through the internal gateway
+  admin_zone: payments.internal
 
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
@@ -46,8 +48,59 @@ storage:
   state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
 
 access:
+  # Okta organization that signs the administrators in to every admin tool (host name, no https://)
+  okta_domain: example.okta.com
+  # Okta user ids of the members of the administrator group: the owner and one reserve administrator
+  admin_user_ids: []
   # Name of the IAM Identity Center permission set that gets view-only access to the clusters
   sre_view_permission_set: AWSReservedSSO_SRE-View
+  # Groups of the identity provider (OIDC `groups` claim) that decide who may enter Grafana and with which role;
+  # a person in none of them cannot log in. Which organization and role a group gets is in grafana_orgs below; the roles in Argo CD and Vault are fixed in tools/config/render/render_admin_sso.py.
+  grafana_groups:
+    admin: pay-grafana-admins      # Grafana server and organization administrators (few people)
+    sre: pay-sre                   # on-call and platform engineers: dashboards, Explore, silences
+    security: pay-security         # security engineers: dashboards, Explore for investigations
+    engineering: pay-engineering   # developers: dashboards
+    finance: pay-finance           # finance and FinOps: dashboards
+    audit: pay-audit               # assessors and auditors: dashboards
+  # Grafana organizations: every organization has its own dashboards and data sources, so a group sees only what its organization holds.
+  # id: numeric id; the main organization is 1, the others are 2, 3, ... in the order they are created and are never reused or reordered.
+  # groups: key of grafana_groups -> role in the organization (GrafanaAdmin is Admin here plus server administrator, main organization only).
+  # dashboards: `all`, or folders of observability/dashboards and single dashboards by uid.
+  # provisioned: false creates the organization (bootstrap Job) but wires nothing to it and does not let its groups in; set true in a second
+  # change, after the Job has created the organization (Grafana may refuse to start when it provisions into an organization that does not exist).
+  grafana_orgs:
+    main:
+      id: 1
+      name: Main Org.
+      groups: {admin: GrafanaAdmin, sre: Editor, security: Editor}
+      dashboards: all
+    engineering:
+      id: 2
+      name: Engineering
+      provisioned: false
+      groups: {engineering: Viewer}
+      dashboards: {folders: [l0-overview, l1-services, l2-platform]}
+      datasources: [victoriametrics]
+    finance:
+      id: 3
+      name: Finance
+      provisioned: false
+      groups: {finance: Viewer}
+      dashboards: {folders: [finops]}
+      datasources: [victoriametrics]
+    audit:
+      id: 4
+      name: Audit
+      provisioned: false
+      groups: {audit: Viewer}
+      # Compliance evidence: backup and restore (backup), the edge controls (edge) and the failover switch (dr-switch), next to the overview
+      dashboards: {folders: [l0-overview], uids: [backup, edge, dr-switch]}
+      datasources: [victoriametrics]
+  # Image of the Job that creates the organizations (Python 3 standard library only; pinned by digest, filled in by the owner)
+  grafana_bootstrap_image:
+    repository: REPLACE_PYTHON_IMAGE_REPOSITORY
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 
 deploy:
   # Values written into deploy/ by tools/config/render.py. The suffixes are the account-specific part of the
@@ -97,6 +150,8 @@ central:
   # Replace the example host names with the real ones.
   metrics_remote_write_url: https://metrics.observability.pay.example.com/insert/0/prometheus/api/v1/write
   alertmanager_url: https://alertmanager.observability.pay.example.com
+  # Sentry (error tracking, self-hosted, no card data); applications send events to the DSN host under this URL
+  sentry_url: https://sentry.payments.internal
   # the OTLP/HTTP exporter appends /v1/logs, and Loki serves it under /otlp
   logs_otlp_endpoint: https://logs.observability.pay.example.com:4318/otlp
   traces_otlp_endpoint: tempo.observability.pay.example.com:4317

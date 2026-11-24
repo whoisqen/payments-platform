@@ -10,6 +10,7 @@ set:
   observability.grafanaUrl: https://grafana.example.test
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
   central.dedupInterval: 30s
   central.logsOtlpEndpoint: https://logs.example.test:4318
   central.tracesOtlpEndpoint: tempo.example.test:4317
@@ -35,12 +36,29 @@ tests:
   - it: gives Prometheus the runbook and Grafana bases as external labels
     template: addons/kube-prometheus.yaml
     asserts:
-      - equal:
-          path: spec.template.spec.sources[0].helm.parameters[0].value
-          value: https://git.example.test/acme/platform/blob/release
-      - equal:
-          path: spec.template.spec.sources[0].helm.parameters[1].value
-          value: https://grafana.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.externalLabels.runbook_base_url
+            value: https://git.example.test/acme/platform/blob/release
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.externalLabels.grafana_url
+            value: https://grafana.example.test
+  - it: tells every alert which environment and region it comes from
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.externalLabels.env
+            value: '{{ index .metadata.labels "payments-platform/environment" }}'
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: prometheus.prometheusSpec.externalLabels.region
+            value: '{{ index .metadata.labels "payments-platform/region" }}'
   - it: fails when the repository is not set
     template: applicationset-cells.yaml
     set:

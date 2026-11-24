@@ -11,6 +11,7 @@ observability:
 central:
   metricsRemoteWriteUrl: ""
   alertmanagerHost: ""
+  sentryUrl: ""
   dedupInterval: 30s
   logsOtlpEndpoint: ""
   tracesOtlpEndpoint: ""

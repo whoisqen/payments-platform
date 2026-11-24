@@ -18,6 +18,17 @@ route:
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1m
+    # Slack is the channel that fails: the alert also goes through a second, independent webhook (e.g. an SNS HTTPS endpoint or an on-call tool)
+    - receiver: fallback-webhook
+      matchers: [alertname="AlertmanagerNotificationsFailing"]
+      continue: true
+      group_wait: 0s
+      repeat_interval: 8760h
+    # Everything the security team owns goes to its channel, whatever the severity
+    - receiver: slack-security
+      matchers: [team="security"]
+      group_by: [alertname, region]
+      repeat_interval: 8760h
     - receiver: slack-security
       matchers: [severity="security"]
       group_by: [alertname, region]
@@ -51,6 +62,10 @@ receivers:
         send_resolved: true
         title: '{{ template "slack.title" . }}'
         text: '{{ template "slack.text" . }}'
+  - name: fallback-webhook
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/fallback-webhook-url
+        send_resolved: true
   - name: deadmans-switch
     webhook_configs:
       - url_file: /etc/alertmanager/secrets/deadmans-switch-url
@@ -67,6 +82,10 @@ inhibit_rules:
   - source_matchers: [alertname="NodeNotReady"]
     target_matchers: ['alertname=~"CrashLoopBackOff"']
     equal: [node]
+  # The fastest window of a 99.99% SLO and the fast one burn for the same cause: one message
+  - source_matchers: ['alertname=~".*BurnFastest"']
+    target_matchers: ['alertname=~".*BurnFast"']
+    equal: [slo]
   - source_matchers: ['alertname=~".*BurnFast|.*BurnFastest"']
     target_matchers: ['alertname=~".*BurnSlow|.*BurnTicket"']
     equal: [slo]

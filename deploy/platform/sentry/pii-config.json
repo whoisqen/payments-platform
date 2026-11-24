@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "pan": {
+      "type": "pattern",
+      "pattern": "\\b(?:\\d[ -]?){12,18}\\d\\b",
+      "redaction": {"method": "replace", "text": "[PAN]"}
+    },
+    "cvv-field": {
+      "type": "pattern",
+      "pattern": "(?i)(?:cvv2?|cvc2?|cid)[\"']?\\s*[:=]\\s*[\"']?\\d{3,4}",
+      "redaction": {"method": "replace", "text": "[CVV]"}
+    }
+  },
+  "applications": {
+    "$string": ["@creditcard:replace", "pan", "cvv-field"],
+    "$message": ["@creditcard:replace", "pan", "cvv-field"]
+  }
+}

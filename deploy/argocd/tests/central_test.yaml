@@ -3,6 +3,8 @@ templates:
   - addons/kube-prometheus.yaml
   - addons/central/victoria-metrics.yaml
   - addons/central/alertmanager.yaml
+  - addons/central/vmalert.yaml
+  - addons/central/sentry.yaml
 set:
   repo.url: https://git.example.test/acme/platform
   repo.revision: main
@@ -12,6 +14,7 @@ set:
   observability.grafanaUrl: https://grafana.example.test
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
   central.dedupInterval: 45s
   central.logsOtlpEndpoint: https://logs.example.test:4318
   central.tracesOtlpEndpoint: tempo.example.test:4317
@@ -65,3 +68,55 @@ tests:
       - equal:
           path: spec.template.spec.sources[1].path
           value: deploy/platform/alertmanager/manifests
+  - it: loads the alert and SLO rules into Prometheus
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources
+          content:
+            repoURL: https://git.example.test/acme/platform
+            targetRevision: main
+            path: observability/slo/generated
+      - contains:
+          path: spec.template.spec.sources
+          content:
+            repoURL: https://git.example.test/acme/platform
+            targetRevision: main
+            path: observability/alerts
+            directory:
+              recurse: true
+  - it: runs the long-lookback rules in vmalert against the central Alertmanager
+    template: addons/central/vmalert.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: server.notifier.url
+            value: https://alertmanager.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: server.extraArgs.external\.label[0]
+            value: runbook_base_url=https://git.example.test/acme/platform/blob/main
+  - it: runs Sentry in the central cluster only, from pinned charts, at the configured url
+    template: addons/central/sentry.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 36.1.0
+      - equal:
+          path: spec.template.spec.sources[1].chart
+          value: clickhouse
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: system.url
+            value: https://sentry.example.test
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: ingress.hostname
+            value: sentry.example.test

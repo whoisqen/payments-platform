@@ -32,10 +32,13 @@ lint-repo:
 	python3 observability/slo/generate.py --check
 	python3 tools/config/render_central.py --check
 	python3 tools/config/render_victoria.py --check
+	python3 tools/config/render/render_vmalert.py --check
 	python3 tools/config/render_vault.py --check
+	python3 tools/config/render_sentry.py --check
 	python3 tools/config/render_grafana.py --check
 	python3 tools/config/render_exporters.py --check
 	python3 tools/config/render_otel.py --check
+	python3 tools/config/render/render_admin_sso.py --check
 
 lint-workflows:
 	actionlint $(WORKFLOWS)

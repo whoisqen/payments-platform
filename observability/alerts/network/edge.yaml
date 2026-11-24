@@ -41,7 +41,7 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/network/global-accelerator-endpoint-unhealthy.md'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/edge'
     - alert: NatPortAllocationErrors
-      expr: sum by (nat_gateway_id) (rate(aws_natgateway_error_port_allocation_sum[5m])) > 0
+      expr: sum by (nat_gateway_id) (max_over_time(aws_natgateway_error_port_allocation_sum[5m])) > 0
       for: 5m
       keep_firing_for: 5m
       labels:

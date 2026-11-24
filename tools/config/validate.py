@@ -14,12 +14,13 @@ REQUIRED = {
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
     "accounts": ["shared_services", "dev", "stage", "prod"],
     "regions": ["working", "recovery"],
-    "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url"],
+    "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url", "admin_zone"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
-    "central": ["metrics_remote_write_url", "alertmanager_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
+    "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
 }
 STANDBY_ENVS = ("stage", "prod")
+GRAFANA_GROUPS = ("admin", "sre", "security", "engineering", "finance", "audit")
 ACCOUNT = re.compile(r"^\d{12}$")
 REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
 
@@ -46,8 +47,20 @@ def check(cfg):
         wanted = {regions.get("working"), *(regions.get("recovery") or [])[:1]}
         if not isinstance(endpoints, dict) or not wanted <= set(endpoints):
             errors.append(f"`deploy.{env}.ingress_endpoints` needs an ingress host for the working region and the standby region")
+    access = cfg.get("access") or {}
+    if not re.match(r"^[a-z0-9.-]+\.(okta|oktapreview|okta-emea)\.com$", str(access.get("okta_domain", ""))):
+        errors.append("`access.okta_domain` must be the host name of an Okta organization, without https://")
+    admins = access.get("admin_user_ids") or []
+    if len(admins) == 1:
+        errors.append("`access.admin_user_ids` needs at least two administrators, or none")
+    groups = access.get("grafana_groups") or {}
+    for role in GRAFANA_GROUPS:
+        if not re.match(r"^[a-z0-9][a-z0-9._-]*$", str(groups.get(role, ""))):
+            errors.append(f"`access.grafana_groups.{role}` must be a group name of the identity provider")
+    if len(set(groups.values())) != len(groups):
+        errors.append("`access.grafana_groups` must name a different group for every role")
     central = cfg.get("central") or {}
-    for key in ("metrics_remote_write_url", "alertmanager_url"):
+    for key in ("metrics_remote_write_url", "alertmanager_url", "sentry_url"):
         if central.get(key) and not str(central[key]).startswith("https://"):
             errors.append(f"`central.{key}` must be an https:// URL")
     if central.get("dedup_interval") and not re.match(r"^[0-9]+(s|m)$", str(central["dedup_interval"])):

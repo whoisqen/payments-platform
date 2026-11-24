@@ -193,7 +193,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -377,7 +377,7 @@
         "h": 4
       },
       "title": "locker: p99 latency",
-      "description": "",
+      "description": "Guidance (300 ms, 1 s), not an alert; the latency alerts are on the PSP and the SLO burn.",
       "targets": [
         {
           "refId": "A",
@@ -965,7 +965,7 @@
         "h": 9
       },
       "title": "locker: CPU use, % of limit (top 8 pods)",
-      "description": "",
+      "description": "Guidance (70%, 90%), not an alert.",
       "targets": [
         {
           "refId": "A",

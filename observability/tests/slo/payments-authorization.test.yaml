@@ -1,5 +1,6 @@
 rule_files:
 - ../../slo/generated/payments-authorization.yaml
+- ../../slo/generated/central/payments-authorization.yaml
 evaluation_interval: 1m
 tests:
 - interval: 1m

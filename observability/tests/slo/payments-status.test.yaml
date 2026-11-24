@@ -1,5 +1,6 @@
 rule_files:
 - ../../slo/generated/payments-status.yaml
+- ../../slo/generated/central/payments-status.yaml
 evaluation_interval: 1m
 tests:
 - interval: 1m

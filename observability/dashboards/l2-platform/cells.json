@@ -198,7 +198,7 @@
         },
         "enable": true,
         "iconColor": "blue",
-        "expr": "changes(argocd_app_info{env=~\"$env\"}[1m]) > 0",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
         "titleFormat": "deploy {{name}}"
       }
     ]
@@ -1090,12 +1090,12 @@
         "h": 9
       },
       "title": "cells: HPA replicas (top 8), replicas",
-      "description": "",
+      "description": "The cell filter does not apply: kube-state-metrics series carry no cell label.",
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(8, sum by (cell, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{env=~\"$env\",region=~\"$region\",cell=~\"$cell\"}))",
-          "legendFormat": "{{cell}} {{horizontalpodautoscaler}}"
+          "expr": "topk(8, sum by (horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{env=~\"$env\",region=~\"$region\"}))",
+          "legendFormat": "{{horizontalpodautoscaler}}"
         }
       ],
       "fieldConfig": {

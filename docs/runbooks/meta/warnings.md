@@ -78,3 +78,30 @@ Ticket to observability.
 ### SSM document
 
 `pay-runbook-active-series-budget-exceeded`
+
+## target-down
+
+Alert `TargetDown`, severity warning, owner observability-oncall, dashboard https://grafana.payments.internal/d/platform-overview.
+
+### Symptom
+
+At least half of the scrape targets of a job report `up == 0`; every alert built on the metrics of that job is blind.
+
+### Diagnostics
+
+1. Collect one report: GitHub Actions `runbook-diagnose` (`workflow_dispatch`, input `alert=TargetDown`) runs the read-only step of SSM document `pay-runbook-target-down`.
+2. Open the Prometheus targets page and read the scrape error of the job (connection refused, timeout, TLS or NetworkPolicy denial).
+3. Check the pods of the job and the ServiceMonitor or PodMonitor selector.
+
+### Actions
+
+1. Restore the exporter or the network path; the alert resolves 10 minutes after the targets are up.
+2. If the job was removed on purpose, delete its monitor through a pull request.
+
+### Escalation
+
+Ticket to observability; page the owner of the job when it is a payment-path service.
+
+### SSM document
+
+`pay-runbook-target-down`

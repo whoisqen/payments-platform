@@ -1,5 +1,6 @@
 rule_files:
 - ../../slo/generated/payments-platform-overhead.yaml
+- ../../slo/generated/central/payments-platform-overhead.yaml
 evaluation_interval: 1m
 tests:
 - interval: 1m

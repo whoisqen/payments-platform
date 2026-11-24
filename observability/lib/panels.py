@@ -234,6 +234,6 @@ class Dashboard:
             "fiscalYearStartMonth": 0, "time": {"from": self.time[0], "to": "now"},
             "templating": {"list": self.variables(used)},
             "links": links,
-            "annotations": {"list": [{"name": "deploys", "datasource": DS, "enable": True, "iconColor": COLORS["info"], "expr": 'changes(argocd_app_info{env=~"$env"}[1m]) > 0', "titleFormat": "deploy {{name}}"}]},
+            "annotations": {"list": [{"name": "deploys", "datasource": DS, "enable": True, "iconColor": COLORS["info"], "expr": 'increase(argocd_app_sync_total{env=~"$env",phase="Succeeded"}[2m]) > 0', "titleFormat": "deploy {{name}}"}]},
             "panels": panels,
         }
