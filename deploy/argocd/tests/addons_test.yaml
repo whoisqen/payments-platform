@@ -48,3 +48,11 @@ tests:
       - equal:
           path: spec.template.spec.sources[2].ref
           value: values
+  - it: reaches the central cluster through the addons label, which also selects the shared-services env layer
+    template: addons/external-secrets.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/addons"]
+          value: enabled
+      - notExists:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]

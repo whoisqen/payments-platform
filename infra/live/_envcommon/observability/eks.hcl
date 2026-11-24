@@ -9,6 +9,8 @@ terraform {
 # The cluster is pay-shared-services-<region-short>-central. Argo CD cluster labels (set on its cluster Secret by the deploy bootstrap):
 #   payments-platform/central: enabled
 #   payments-platform/addons: enabled
+#   payments-platform/environment: shared-services   (selects deploy/platform/*/envs/<environment>/<region>.yaml)
+#   payments-platform/region: eu-central-1
 inputs = {
   component                = "central"
   kubernetes_version       = local.env_cfg.kubernetes_version
