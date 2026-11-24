@@ -12,6 +12,8 @@ central:
   metricsRemoteWriteUrl: ""
   alertmanagerHost: ""
   dedupInterval: 30s
+  logsOtlpEndpoint: ""
+  tracesOtlpEndpoint: ""
 # Environments that are never synced from main: pinned to the release tag in gated.revision, no automated sync.
 # Without a revision they get no Application at all.
 gatedEnvironments:

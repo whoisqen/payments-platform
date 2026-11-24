@@ -14,6 +14,8 @@ set:
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
   central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
   gated.revision: v1.4.0
 tests:
   - it: pins every gated Application to the release tag

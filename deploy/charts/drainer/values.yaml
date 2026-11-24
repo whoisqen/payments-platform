@@ -16,6 +16,10 @@ container:
   port: 8080
   env:
     RUN_ENV: production
+    # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
+    DRAINER__LOG__TELEMETRY__TRACES_ENABLED: "true"
+    DRAINER__LOG__TELEMETRY__METRICS_ENABLED: "true"
+    DRAINER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
     # Read by the KEDA trigger below, which runs outside the pod
     REDIS_ADDRESS: memorydb.invalid:6379
   envFromSecrets: []
@@ -75,6 +79,16 @@ pdb:
 networkPolicy:
   enabled: true
   dataPorts: [5432, 6379]
+  extraEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - {protocol: TCP, port: 4317}
 
 serviceMonitor:
   enabled: true
