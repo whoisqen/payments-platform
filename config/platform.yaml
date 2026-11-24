@@ -128,3 +128,7 @@ runners:
   # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
   version: 2.329.0
   sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+
+ai:
+  # IAM role that the AI review workflow assumes by OIDC (repository variable AI_REVIEW_ROLE_ARN holds its ARN); account shared_services.
+  review_role_name: pay-shared-gha-ai-review
