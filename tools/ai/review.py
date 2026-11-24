@@ -309,8 +309,9 @@ def run(args):
     system, user = build_prompt(cfg, pr, reviewed, omitted, redactor, f"UNTRUSTED-{secrets.token_hex(8)}")
     m = cfg["model"]
     if args.dry_run:
-        print(json.dumps({"modelId": m["id"], "region": m["region"], "inferenceConfig": {"maxTokens": m["max_tokens"], "temperature": m["temperature"]},
-                          "system": system, "user": user, "files": list(reviewed), "omitted": omitted, "redacted": dict(redactor.counts)}, indent=2))
+        request = {"modelId": m["id"], "region": m["region"], "inferenceConfig": {"maxTokens": m["max_tokens"], "temperature": m["temperature"]},
+                   "system": system, "user": user, "files": list(reviewed), "omitted": omitted, "redacted": {k: int(v) for k, v in redactor.counts.items()}}
+        Path(args.dry_run).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
         return 0
     try:
         reply = call_bedrock(cfg, system, user)
@@ -334,7 +335,7 @@ def main(argv=None):
     p.add_argument("--event", default=os.environ.get("GITHUB_EVENT_PATH"))
     p.add_argument("--config", default=str(CONFIG))
     p.add_argument("--role-arn", default="", help="for local plan runs; CI uses AI_REVIEW_ROLE_ARN")
-    p.add_argument("--dry-run", action="store_true", help="print the request and exit without calling AWS or GitHub")
+    p.add_argument("--dry-run", metavar="FILE", help="write the request to FILE and exit without calling AWS or GitHub")
     args = p.parse_args(argv)
     if args.command == "plan":
         plan(args)

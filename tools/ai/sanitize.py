@@ -123,7 +123,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     r = Redactor(redact_emails=args.emails)
     sys.stdout.write(r.redact(sys.stdin.read()))
-    print(f"redacted {r.total} value(s): {dict(r.counts)}", file=sys.stderr)
+    print(f"redacted {int(r.total)} value(s) of {len(r.counts)} kind(s)", file=sys.stderr)
 
 
 if __name__ == "__main__":
