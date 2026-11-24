@@ -18,6 +18,7 @@ MIN_KEEP = {"critical": 5, "warning": 10}
 MIN_BURN_KEEP = {"critical": 10, "warning": 30}
 MIN_EVENT_WINDOW = 10
 NEVER_REPEAT_HOURS = 8760
+DETECTION_OVERHEAD = 3
 
 
 def minutes(text):
@@ -91,6 +92,14 @@ class TimerPolicy(unittest.TestCase):
                 self.assertIsNotNone(window)
                 held = minutes(window.group(1)) + minutes(rule.get("keep_firing_for", "0m"))
                 self.assertGreaterEqual(held, MIN_EVENT_WINDOW)
+
+    def test_catalog_detection_time_covers_the_pending_period(self):
+        # scrape, evaluation and group_wait need about 3 minutes on top of `for`
+        modes = {m["alert"]: m for p in sorted((OBS / "coverage" / "catalog").glob("*.yaml")) for m in yaml.safe_load(p.read_text(encoding="utf-8"))["modes"] if m.get("alert")}
+        for rule in RULES:
+            if rule["alert"] in modes:
+                with self.subTest(alert=rule["alert"]):
+                    self.assertGreaterEqual(minutes(modes[rule["alert"]]["detect_within"]), minutes(rule.get("for", "0m")) + DETECTION_OVERHEAD)
 
     def test_a_pending_period_is_never_longer_than_the_hold(self):
         for rule in RULES:

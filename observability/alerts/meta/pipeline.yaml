@@ -54,7 +54,8 @@ spec:
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/meta/warnings.md#prometheus-rule-evaluation-failing'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/platform-overview'
     - alert: ActiveSeriesBudgetExceeded
-      expr: sum by (region) (prometheus_tsdb_head_series) > 2000000
+      # Each replica of the HA pair scrapes both Prometheus pods, so a sum would count every series twice
+      expr: max(prometheus_tsdb_head_series) > 2000000
       for: 15m
       keep_firing_for: 10m
       labels:

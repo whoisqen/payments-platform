@@ -71,7 +71,7 @@ modes:
   severity: critical
   alert: VaultSealed
   signal: metric
-  detect_within: 4m
+  detect_within: 5m
 - layer: security-pci
   id: security-pci-vault-audit-device-failing
   component: vault-audit

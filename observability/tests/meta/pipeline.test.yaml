@@ -95,7 +95,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+  - series: prometheus_tsdb_head_series{pod="prometheus-platform-0"}
     values: 2500000x31
   alert_rule_test:
   - eval_time: 27m
@@ -108,7 +108,6 @@ tests:
         owner: observability-oncall
         layer: meta
         failure_mode: meta-active-series-budget-exceeded
-        region: eu-central-1
       exp_annotations:
         summary: Active series exceed the budget of 2 million per region
         runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/meta/warnings.md#active-series-budget-exceeded
@@ -118,7 +117,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+  - series: prometheus_tsdb_head_series{pod="prometheus-platform-0"}
     values: 900000x31
   alert_rule_test:
   - &id001
@@ -130,7 +129,19 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: prometheus_tsdb_head_series{region="eu-central-1"}
+  - series: prometheus_tsdb_head_series{pod="prometheus-platform-0"}
     values: 900000x9 2500000x1 900000x19
+  alert_rule_test:
+  - *id001
+- interval: 1m
+  external_labels:
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  # both replicas of the HA pair report the same 1.2 million series: the region holds 1.2 million, not 2.4
+  input_series:
+  - series: prometheus_tsdb_head_series{pod="prometheus-platform-0"}
+    values: 1200000x31
+  - series: prometheus_tsdb_head_series{pod="prometheus-platform-1"}
+    values: 1200000x31
   alert_rule_test:
   - *id001
