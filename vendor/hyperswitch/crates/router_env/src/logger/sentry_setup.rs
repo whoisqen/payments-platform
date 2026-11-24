@@ -90,7 +90,12 @@ pub fn scrub_event(mut event: Event<'static>) -> Event<'static> {
     }
     event.extra.values_mut().for_each(scrub_value);
     event.tags.values_mut().for_each(|tag| *tag = scrub(tag));
-    event.breadcrumbs.values = event.breadcrumbs.values.into_iter().filter_map(scrub_breadcrumb).collect();
+    event.breadcrumbs.values = event
+        .breadcrumbs
+        .values
+        .into_iter()
+        .filter_map(scrub_breadcrumb)
+        .collect();
     event
 }
 
@@ -116,7 +121,9 @@ pub fn setup(config: &config::LogSentry, service_name: &str) -> Option<SentryGua
     // The builder panics outside 0.0..=1.0, and a bad value in a file must not stop the service
     let rate = config.sample_rate.unwrap_or(1.0).clamp(0.0, 1.0);
     // No performance traces: they are sent to OpenTelemetry
-    let mut options = ClientOptions::default().sample_rate(rate).traces_sample_rate(0.0);
+    let mut options = ClientOptions::default()
+        .sample_rate(rate)
+        .traces_sample_rate(0.0);
     // The environment is the RUN_ENV of the deployment when the config names none
     options.environment = config
         .environment
@@ -138,8 +145,16 @@ mod tests {
 
     #[test]
     fn card_numbers_are_redacted_with_or_without_separators() {
-        for pan in ["4111111111111111", "4111 1111 1111 1111", "4111-1111-1111-1111", "378282246310005"] {
-            assert_eq!(scrub(&format!("payment failed for {pan} today")), "payment failed for [REDACTED-PAN] today");
+        for pan in [
+            "4111111111111111",
+            "4111 1111 1111 1111",
+            "4111-1111-1111-1111",
+            "378282246310005",
+        ] {
+            assert_eq!(
+                scrub(&format!("payment failed for {pan} today")),
+                "payment failed for [REDACTED-PAN] today"
+            );
         }
     }
 
@@ -180,19 +195,31 @@ mod tests {
         event.user = Some(Default::default());
         event.server_name = Some(Cow::Borrowed("node-1"));
         event.message = Some("charge 4111111111111111 declined".into());
-        event.extra.insert("body".into(), Value::String("card 4111 1111 1111 1111".into()));
+        event.extra.insert(
+            "body".into(),
+            Value::String("card 4111 1111 1111 1111".into()),
+        );
         event.tags.insert("note".into(), "cvv=123".into());
         let event = scrub_event(event);
         assert!(event.request.is_none() && event.user.is_none() && event.server_name.is_none());
-        assert_eq!(event.message.as_deref(), Some("charge [REDACTED-PAN] declined"));
-        assert_eq!(event.extra["body"], Value::String("card [REDACTED-PAN]".into()));
+        assert_eq!(
+            event.message.as_deref(),
+            Some("charge [REDACTED-PAN] declined")
+        );
+        assert_eq!(
+            event.extra["body"],
+            Value::String("card [REDACTED-PAN]".into())
+        );
         assert_eq!(event.tags["note"], REDACTED_SECRET);
     }
 
     #[test]
     fn nothing_starts_without_a_dsn() {
         assert!(setup(&config::LogSentry::default(), "router").is_none());
-        let empty = config::LogSentry { dsn: Some(String::new()), ..Default::default() };
+        let empty = config::LogSentry {
+            dsn: Some(String::new()),
+            ..Default::default()
+        };
         assert!(setup(&empty, "router").is_none());
     }
 }

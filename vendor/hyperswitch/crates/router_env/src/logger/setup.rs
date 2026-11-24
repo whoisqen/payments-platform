@@ -34,7 +34,10 @@ pub fn setup(
     let sentry_breadcrumbs = sentry_guard.as_ref().map(|_| {
         sentry::integrations::tracing::BreadcrumbLayer::new().with_filter(
             tracing_subscriber::filter::filter_fn(|metadata| {
-                matches!(*metadata.level(), tracing::Level::WARN | tracing::Level::INFO)
+                matches!(
+                    *metadata.level(),
+                    tracing::Level::WARN | tracing::Level::INFO
+                )
             }),
         )
     });
