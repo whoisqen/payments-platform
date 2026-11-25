@@ -5,9 +5,13 @@ templates:
   - pdb.yaml
 set:
   global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: rolls with maxSurge 25 percent and no unavailable pod
+    documentIndex: 0
     template: workload.yaml
     asserts:
       - isKind:
@@ -22,6 +26,7 @@ tests:
           path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
           value: workers
   - it: scales on the Redis stream between 3 and 6
+    documentIndex: 0
     template: autoscaling.yaml
     asserts:
       - isKind:
@@ -33,6 +38,7 @@ tests:
           path: spec.maxReplicaCount
           value: 6
   - it: has a PodDisruptionBudget
+    documentIndex: 0
     template: pdb.yaml
     asserts:
       - isKind:

@@ -12,10 +12,31 @@ workload:
     maxSurge: 25%
     maxUnavailable: 0
 
+# Cell-wide settings (database, MemoryDB, KMS, tenant, stream name) come from global.hyperswitch through platform-common
+hyperswitch:
+  prefix: DRAINER
+  redisUser: drainer
+  # bb8 pool of 4 per pod (section 5)
+  poolSize: 4
+  # Defaults of the drainer only; the router file would bring connector settings the drainer never reads
+  configFile: drainer.toml
+
+# Variable -> {key, property} under <kvMount>/<env>/<cell>/ in Vault; the values never appear in git
+secrets:
+  DRAINER__MASTER_DATABASE__PASSWORD: {key: drainer/database, property: password}
+  DRAINER__REDIS__PRIMARY_PASSWORD: {key: drainer/redis, property: password}
+
 container:
   port: 8080
   env:
     RUN_ENV: production
+    DRAINER__SERVER__HOST: 0.0.0.0
+    DRAINER__SERVER__PORT: "8080"
+    DRAINER__SERVER__WORKERS: "1"
+    # 100 entries per read every 500 ms; the stream name and partition count are cell-wide (global.hyperswitch.drainer)
+    DRAINER__DRAINER__MAX_READ_COUNT: "100"
+    DRAINER__DRAINER__LOOP_INTERVAL: "500"
+    DRAINER__DRAINER__SHUTDOWN_INTERVAL: "1000"
     # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
     DRAINER__LOG__TELEMETRY__TRACES_ENABLED: "true"
     DRAINER__LOG__TELEMETRY__METRICS_ENABLED: "true"

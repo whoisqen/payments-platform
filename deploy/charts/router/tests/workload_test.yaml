@@ -3,9 +3,13 @@ templates:
   - workload.yaml
 set:
   global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: renders a canary Rollout pinned by digest
+    documentIndex: 0
     asserts:
       - isKind:
           of: Rollout
@@ -19,6 +23,7 @@ tests:
           path: spec.strategy.canary.steps[6].setWeight
           value: 50
   - it: has no Spot toleration and runs on the payments pool
+    documentIndex: 0
     asserts:
       - notExists:
           path: spec.template.spec.tolerations
@@ -26,6 +31,7 @@ tests:
           path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
           value: payments
   - it: spreads pods over three AZs
+    documentIndex: 0
     asserts:
       - equal:
           path: spec.template.spec.topologySpreadConstraints[0].topologyKey
@@ -34,6 +40,7 @@ tests:
           path: spec.template.spec.topologySpreadConstraints[0].whenUnsatisfiable
           value: DoNotSchedule
   - it: drains for 15 s inside a 60 s grace period
+    documentIndex: 0
     asserts:
       - equal:
           path: spec.template.spec.containers[0].lifecycle.preStop.sleep.seconds
@@ -42,6 +49,7 @@ tests:
           path: spec.template.spec.terminationGracePeriodSeconds
           value: 60
   - it: runs non-root with a read-only root file system
+    documentIndex: 0
     asserts:
       - equal:
           path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
@@ -53,6 +61,7 @@ tests:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop
           value: ["ALL"]
   - it: passes the cache warm-up gate to the readiness endpoint
+    documentIndex: 0
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -68,6 +77,7 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.httpGet.path
           value: /health/ready
   - it: renders a Deployment when the kind is switched
+    documentIndex: 0
     set:
       workload.kind: Deployment
       workload.strategy.type: RollingUpdate
