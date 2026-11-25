@@ -1,0 +1,10 @@
+apiVersion: v2
+name: k6-runs
+description: Scheduled k6 TestRuns of the stage cluster; the scripts are read from tests/load and tests/chaos through symlinks
+type: application
+version: 0.1.0
+appVersion: "1.7.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../../../charts/platform-common

@@ -1,0 +1,29 @@
+# Upstream grafana/k6-operator chart; the namespace comes from the Application, the CRDs from this chart
+namespace:
+  create: false
+installCRDs: true
+
+manager:
+  replicas: 1
+  logging:
+    development: false
+  image:
+    repository: grafana/k6-operator
+    # Tag and digest together, so the pull is pinned while the chart still builds registry/repository:tag
+    tag: controller-v1.7.0@sha256:f56440a22e8fc84cf43353c2411d6463e2a8a3f5fd2f1cf3199353db00287a5c
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+

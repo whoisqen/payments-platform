@@ -7,7 +7,7 @@ import re
 import unicodedata
 from collections import Counter
 
-PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
+PEM_BLOCK = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)")
 JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*")
 URL_PASSWORD = re.compile(r"(\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s:/@'\"]+:)([^\s@/'\"]+)(@)")
 BEARER = re.compile(r"(?i)(\b(?:Bearer|Basic)\s+)([A-Za-z0-9._~+/=-]{16,})")
@@ -242,7 +242,7 @@ class Redactor:
         return "".join(out)
 
     def _rules(self, text, k8s_secret):
-        text = PRIVATE_KEY.sub(self._whole("private-key"), text)
+        text = PEM_BLOCK.sub(self._whole("private-key"), text)
         text = JWT.sub(self._whole("jwt"), text)
         text = URL_PASSWORD.sub(lambda m: m.group(1) + self._placeholder("url-password", m.group(2)) + m.group(3)
                                 if looks_literal(m.group(2)) else m.group(0), text)

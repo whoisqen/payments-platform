@@ -1,0 +1,2 @@
+{{- /* A failing template fails the whole release, so this one check keeps every object off dev, prod and the CDE */ -}}
+{{- include "k6.checkStage" . -}}

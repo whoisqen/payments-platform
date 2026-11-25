@@ -1,0 +1,33 @@
+# The scheduler may only create TestRuns in its own namespace; the operator does the rest
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.scheduler.serviceAccountName }}
+  labels:
+    {{- include "k6.labels" (dict "root" . "component" "scheduler") | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k6-testrun-creator
+  labels:
+    {{- include "k6.labels" (dict "root" . "component" "scheduler") | nindent 4 }}
+rules:
+  - apiGroups: [k6.io]
+    resources: [testruns]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: k6-testrun-creator
+  labels:
+    {{- include "k6.labels" (dict "root" . "component" "scheduler") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: k6-testrun-creator
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.scheduler.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}
