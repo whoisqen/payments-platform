@@ -164,6 +164,15 @@
       "includeVars": true
     },
     {
+      "type": "link",
+      "title": "L1 Slow requests",
+      "url": "/d/slow-requests",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
       "type": "dashboards",
       "title": "All dashboards",
       "tags": [

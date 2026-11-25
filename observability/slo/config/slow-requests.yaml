@@ -1,0 +1,33 @@
+# Slow thresholds per request type, matched on the server span; tests hold observability/otel/collector.yaml and the dashboard to them.
+# measure own: the collector cannot subtract the PSP child span, so it marks on total duration above threshold_ms + psp_allowance_ms.
+psp_allowance_ms: 1000
+types:
+  status:
+    method: GET
+    routes: ["/payments/{payment_id}", "/refunds/{id}"]
+    measure: total
+    threshold_ms: 50
+  create:
+    method: POST
+    routes: ["/payments"]
+    measure: own
+    threshold_ms: 150
+  confirm:
+    method: POST
+    routes: ["/payments/{payment_id}/confirm"]
+    measure: own
+    threshold_ms: 150
+  capture:
+    method: POST
+    routes: ["/payments/{payment_id}/capture"]
+    measure: own
+    threshold_ms: 150
+  refund:
+    method: POST
+    routes: ["/refunds"]
+    measure: own
+    threshold_ms: 150
+other:
+  threshold_ms: 300
+  # Route -> ms for routes slow by design, effective max(threshold_ms, value); each needs its own transform/slow statement.
+  routes: {}
