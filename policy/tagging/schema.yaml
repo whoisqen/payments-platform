@@ -2,7 +2,7 @@
 tag_schema:
   environment:
     required: true
-    values: [dev, stage, prod, shared-services]
+    values: [dev, stage, prod, shared-services, management, security]
   team:
     required: true
     values: [payments-core, platform, security, data]
@@ -17,7 +17,7 @@ tag_schema:
     values: [cell-0, cell-1, cell-2, cell-3, spare, shared]
   component:
     required: true
-    values: [router, locker, drainer, scheduler, control-center, aurora, dynamodb, memorydb, msk, clickhouse, opensearch, vault, eks, network, backup, observability, ci, shared]
+    values: [router, locker, drainer, scheduler, control-center, aurora, dynamodb, memorydb, msk, clickhouse, opensearch, vault, eks, network, backup, observability, ci, shared, log-archive, org-policies, org-trail, org-security-services, org-config]
   pci-scope:
     required: true
     values: [cde, connected, out-of-scope]
