@@ -6,7 +6,7 @@
 {{- $router := eq $p "ROUTER" -}}
 {{- $g := .root.Values.global | default dict -}}
 {{- $ce := .cfg.container.env | default dict -}}
-{{- /* An explicit host in container.env (the generated standby layer) wins, and the derived values follow it */ -}}
+{{- /* An explicit host in container.env wins (an override for one release); every generated layer, standby included, sets global.hyperswitch instead */ -}}
 {{- $db := index $ce (printf "%s__MASTER_DATABASE__HOST" $p) | default $c.database.host | default "aurora-proxy.invalid" -}}
 {{- $reader := index $ce (printf "%s__REPLICA_DATABASE__HOST" $p) | default $c.database.readerHost | default $db -}}
 {{- $redis := index $ce (printf "%s__REDIS__HOST" $p) | default $c.redis.host | default "memorydb.invalid" -}}
