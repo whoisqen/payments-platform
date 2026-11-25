@@ -1,0 +1,14 @@
+# Only the k6 scripts travel with the chart; the rest of tests/ stays out of the ConfigMap
+scripts/load/node_modules/
+scripts/load/mock-psp/
+scripts/load/tests/
+scripts/load/package*.json
+scripts/load/lib/README.md
+scripts/load/scenarios/README.md
+scripts/load/README.md
+scripts/chaos/fis/
+scripts/chaos/chaos-mesh/
+scripts/chaos/region-switch/
+scripts/chaos/lib/
+scripts/chaos/tests/
+scripts/chaos/README.md

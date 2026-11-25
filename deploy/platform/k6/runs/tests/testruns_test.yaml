@@ -1,0 +1,73 @@
+suite: TestRun manifests and scripts
+templates:
+  - configmap-testruns.yaml
+  - configmap-scripts.yaml
+  - externalsecret.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: stage
+  target.baseUrl: https://api.stage.payments.example.com
+  remoteWrite.url: https://metrics.example.test/api/v1/write
+release:
+  namespace: loadgen
+tests:
+  - it: ships every scenario and library file from tests/ with its imports
+    template: configmap-scripts.yaml
+    asserts:
+      - exists: {path: 'data["load_scenarios_daily-peak.js"]'}
+      - exists: {path: 'data["load_lib_run.js"]'}
+      - exists: {path: 'data["load_lib_stage-guard.js"]'}
+      - exists: {path: 'data["chaos_hot-merchant.js"]'}
+      - notExists: {path: 'data["load_mock-psp_server.mjs"]'}
+      - matchRegex:
+          path: 'data["load_scenarios_soak.js"]'
+          pattern: makeIteration\('soak'\)
+  - it: runs the nightly load on the loadgen pool with its parallelism and remote write
+    template: configmap-testruns.yaml
+    asserts:
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'parallelism: 4\n'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'localFile: /scripts/load/scenarios/daily-peak.js'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'karpenter.sh/nodepool: loadgen'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'effect: NoSchedule\n\s+key: workload\n\s+operator: Equal\n\s+value: loadgen'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'K6_PROMETHEUS_RW_SERVER_URL\n\s+value: "https://metrics.example.test/api/v1/write"'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: '--out experimental-prometheus-rw --tag testid=__RUN__ --tag scenario=load'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: '-e TARGET_ENV=stage'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'secretRef:\n\s+name: k6-test-merchants'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'path: load/lib/run.js'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'cleanup: post'}
+  - it: scales stress to 16 runners
+    template: configmap-testruns.yaml
+    asserts:
+      - matchRegex: {path: 'data["stress.yaml"]', pattern: 'parallelism: 16\n'}
+  - it: pins every image by digest in the own registry
+    template: configmap-testruns.yaml
+    asserts:
+      - notMatchRegex: {path: 'data["load.yaml"]', pattern: 'image: "(ghcr\.io|docker\.io|registry\.k8s\.io)/'}
+      - matchRegex: {path: 'data["load.yaml"]', pattern: 'image: "registry.example.test/acme/grafana/k6:1.7.0@sha256:[a-f0-9]{64}"'}
+  - it: keeps the guard variables of the scenario from overriding the stage ones
+    template: configmap-testruns.yaml
+    set:
+      scenarios.load.env.TARGET_ENV: prod
+    asserts:
+      - matchRegex: {path: 'data["load.yaml"]', pattern: '-e TARGET_ENV=stage'}
+      - notMatchRegex: {path: 'data["load.yaml"]', pattern: 'TARGET_ENV=prod'}
+  - it: reads the test merchants from the Vault store, never from values
+    template: externalsecret.yaml
+    asserts:
+      - equal: {path: spec.secretStoreRef, value: {kind: ClusterSecretStore, name: vault}}
+      - contains:
+          path: spec.data
+          content:
+            secretKey: MERCHANT_API_KEY
+            remoteRef: {key: loadgen/test-merchants, property: merchant_api_key}
+      - contains:
+          path: spec.data
+          content:
+            secretKey: TEST_PAYMENT_TOKEN
+            remoteRef: {key: loadgen/test-merchants, property: test_payment_token}
+  - it: rejects a credential placed in the plain scenario settings
+    template: configmap-testruns.yaml
+    set:
+      scenarios.load.env.MERCHANT_API_KEY: snk_live_123
+    asserts:
+      - failedTemplate: {}

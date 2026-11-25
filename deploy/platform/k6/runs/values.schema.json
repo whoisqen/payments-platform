@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["global", "images", "target", "remoteWrite", "credentials", "placement", "runner", "scheduler", "scenarios"],
+  "properties": {
+    "requireResolved": {"type": "boolean"},
+    "global": {
+      "type": "object",
+      "required": ["registry", "environment"],
+      "properties": {
+        "registry": {"type": "string", "minLength": 1},
+        "environment": {"type": "string", "minLength": 1}
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["k6", "starter", "kubectl"],
+      "additionalProperties": {
+        "type": "object",
+        "required": ["repository", "tag", "digest"],
+        "additionalProperties": false,
+        "properties": {
+          "repository": {"type": "string", "minLength": 1},
+          "tag": {"type": "string", "minLength": 1},
+          "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["baseUrl", "freeze"],
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": {"type": "string", "pattern": "^(https://[a-z0-9.-]+(:[0-9]+)?(/.*)?|REPLACE_BASE_URL)$"},
+        "freeze": {"type": "boolean"}
+      }
+    },
+    "remoteWrite": {
+      "type": "object",
+      "required": ["url"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {"type": "string", "pattern": "^(https?://.+|REPLACE_REMOTE_WRITE_URL)$"},
+        "trendStats": {"type": "string"},
+        "pushInterval": {"type": "string", "pattern": "^[0-9]+(ms|s|m)$"}
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "required": ["secretName", "secretStore", "remoteKey", "properties"],
+      "additionalProperties": false,
+      "properties": {
+        "secretName": {"type": "string"},
+        "secretStore": {"type": "string"},
+        "remoteKey": {"type": "string"},
+        "refreshInterval": {"type": "string"},
+        "properties": {
+          "type": "object",
+          "description": "Environment variable name -> Vault property name; never a secret value",
+          "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$"},
+          "additionalProperties": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}
+        }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "required": ["nodePool", "tolerations"],
+      "properties": {
+        "nodePool": {"type": "string", "minLength": 1},
+        "tolerations": {"type": "array"}
+      }
+    },
+    "runner": {
+      "type": "object",
+      "required": ["resources", "separate"],
+      "properties": {
+        "resources": {"type": "object"},
+        "separate": {"type": "boolean"}
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "required": ["serviceAccountName", "timeZone"],
+      "properties": {
+        "serviceAccountName": {"type": "string"},
+        "timeZone": {"type": "string"},
+        "startingDeadlineSeconds": {"type": "integer", "minimum": 60},
+        "activeDeadlineSeconds": {"type": "integer", "minimum": 30}
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,19}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["script", "parallelism"],
+        "additionalProperties": false,
+        "properties": {
+          "script": {"type": "string", "pattern": "^(load|chaos)/[a-z0-9/-]+\\.js$"},
+          "schedule": {"type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"},
+          "onDemand": {"type": "boolean"},
+          "parallelism": {"type": "integer", "minimum": 1, "maximum": 32},
+          "resources": {"type": "object"},
+          "env": {
+            "type": "object",
+            "description": "Plain settings only; credentials come from the ExternalSecret",
+            "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$", "not": {"pattern": "(KEY|TOKEN|SECRET|PASSWORD)"}},
+            "additionalProperties": {"type": "string"}
+          }
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "operatorNamespace": {"type": "string"}
+      }
+    }
+  }
+}

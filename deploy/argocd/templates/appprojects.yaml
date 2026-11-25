@@ -19,6 +19,7 @@ spec:
     - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm
+    - https://grafana.github.io/helm-charts
     - https://aws.github.io/eks-charts
     - https://cert-manager.github.io/aws-privateca-issuer
     - public.ecr.aws/karpenter
