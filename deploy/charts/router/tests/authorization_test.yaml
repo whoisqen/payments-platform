@@ -1,0 +1,15 @@
+suite: router authorization policy
+templates:
+  - istio/authorizationpolicy.yaml
+set:
+  global.registry: registry.example.test/acme
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: admits the Gateway API proxy of payments-edge and the old ingress gateway
+    asserts:
+      - equal:
+          path: spec.rules[0].from[0].source.principals[0]
+          value: cluster.local/ns/payments-edge/sa/payments-edge-istio
+      - contains:
+          path: spec.rules[0].from[0].source.principals
+          content: cluster.local/ns/istio-system/sa/istio-ingressgateway

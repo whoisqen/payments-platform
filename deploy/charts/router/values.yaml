@@ -118,4 +118,7 @@ istio:
   authorizationPolicy:
     enabled: true
     principals:
+      # Proxy of Gateway payments-edge (Gateway API): service account payments-edge-istio in namespace payments-edge
+      - cluster.local/ns/payments-edge/sa/payments-edge-istio
+      # Old istio: ingressgateway deployment; drop it with deploy/platform/istio/values-gateway.yaml
       - cluster.local/ns/istio-system/sa/istio-ingressgateway
