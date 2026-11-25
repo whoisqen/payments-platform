@@ -1,0 +1,4 @@
+url: $alertmanager-url
+headers:
+  - name: Content-Type
+    value: application/json

@@ -29,9 +29,15 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/argocd/values.yaml
+              # Hands the notifications config map and secret to the smoke notifications chart
+              - $values/deploy/platform/smoke/notifications/argocd-values.yaml
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
+        # Smoke notifications: GitHub dispatch on a green smoke (dev, stage), Alertmanager on a failed one
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/smoke/notifications
       syncPolicy:
         automated:
           prune: false

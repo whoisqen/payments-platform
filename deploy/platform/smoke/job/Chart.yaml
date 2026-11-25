@@ -1,0 +1,6 @@
+apiVersion: v2
+name: smoke
+description: Argo CD PostSync Job that runs the live smoke tests against the router of one cell
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
