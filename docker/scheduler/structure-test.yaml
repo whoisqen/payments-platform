@@ -1,0 +1,35 @@
+schemaVersion: 2.0.0
+# replaces docker/_common/structure-test.yaml for scheduler: the common checks plus the Kafka TLS runtime (rdkafka with OpenSSL).
+# Library paths are arm64 only (PLATFORMS in images.yml); the tar driver runs no commands, so collect-libs.sh checks
+# at build time that every library resolves.
+metadataTest:
+  user: "10001:10001"
+  entrypoint: ["/app/${SERVICE}"]
+  envVars:
+    - key: SSL_CERT_FILE
+      value: /etc/ssl/certs/ca-certificates.crt
+    - key: SCHEDULER_FLOW
+      value: consumer
+fileExistenceTests:
+  - name: no shell
+    path: /bin/sh
+    shouldExist: false
+  - name: no package manager
+    path: /usr/bin/apt
+    shouldExist: false
+  - name: no compiler
+    path: /usr/bin/gcc
+    shouldExist: false
+  - name: libssl for rdkafka and openssl
+    path: /usr/lib/aarch64-linux-gnu/libssl.so.3
+    shouldExist: true
+  - name: libcrypto for rdkafka and openssl
+    path: /usr/lib/aarch64-linux-gnu/libcrypto.so.3
+    shouldExist: true
+  - name: CA bundle named by SSL_CERT_FILE
+    path: /etc/ssl/certs/ca-certificates.crt
+    shouldExist: true
+fileContentTests:
+  - name: CA bundle holds certificates
+    path: /etc/ssl/certs/ca-certificates.crt
+    expectedContents: ["-----BEGIN CERTIFICATE-----"]

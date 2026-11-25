@@ -1,4 +1,4 @@
-# Management account: Organizations, billing and IAM Identity Center only, no workloads; values come from config/platform.yaml.
+# Management account: Organizations, billing, IAM Identity Center, the organization policies and trail and the delegated-administrator designations; no workloads. Values come from config/platform.yaml.
 locals {
   cfg = yamldecode(file("${get_repo_root()}/config/platform.yaml"))
 

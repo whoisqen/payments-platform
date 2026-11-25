@@ -1,3 +1,17 @@
 # Trivy waivers; every entry needs a statement (the reason) and should carry expired_at (YYYY-MM-DD).
 vulnerabilities: []
-misconfigurations: []
+misconfigurations:
+  - id: DS-0031
+    paths:
+      - docker/vault-snapshot/Dockerfile
+    statement: AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE hold file paths under /tmp, not credentials; the pod gets IRSA tokens.
+  - id: GIT-0003
+    paths:
+      - infra/github/modules/repository/main.tf
+    statement: vulnerability alerts are enabled by the separate github_repository_vulnerability_alerts resource in the same file.
+  - id: AWS-0104
+    paths:
+      - infra/modules/eks/main.tf
+    statement: node egress to 0.0.0.0/0 is tcp/443 only and leaves through the transit gateway, where Network Firewall allows PSP domains only.
+    # accepted risk, not a false positive: review again when it expires
+    expired_at: 2027-05-25

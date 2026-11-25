@@ -12,3 +12,8 @@ output "acl_name" {
   description = "ACL attached to the cluster."
   value       = aws_memorydb_acl.this.name
 }
+
+output "user_names" {
+  description = "MemoryDB user name of each service key; the Helm value redisUser of the service must match it."
+  value       = { for k, u in aws_memorydb_user.this : k => u.user_name }
+}
