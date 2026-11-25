@@ -31,6 +31,15 @@ class ChangedImagesTest(unittest.TestCase):
     def test_docs_and_readme_build_nothing(self):
         self.assertEqual(ci.images_for(["docs/a.md", "docker/README.md", "infra/x.tf"], CFG), ([], False))
 
+    def test_compose_stack_builds_nothing(self):
+        self.assertEqual(ci.images_for(["docker/compose/compose.yaml", "docker/compose/migrate.sh"], CFG), ([], False))
+        self.assertTrue(ci.areas_for(["docker/compose/compose.yaml"], CFG)["compose"])
+
+    def test_node_and_workflows_areas(self):
+        a = ci.areas_for(["tests/load/lib/run.js", ".github/workflows/ci.yml"], CFG)
+        self.assertTrue(a["node"] and a["workflows"])
+        self.assertFalse(ci.areas_for(["tools/ci/images_yaml.py"], CFG)["node"])
+
     def test_areas(self):
         a = ci.areas_for(["infra/github/main.tf", "scripts/dr/failover.py"], CFG)
         self.assertTrue(a["terraform"] and a["python"] and a["shell"])

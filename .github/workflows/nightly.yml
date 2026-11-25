@@ -15,6 +15,32 @@ env:
   PLATFORMS: linux/arm64
 
 jobs:
+  full-ci:
+    # unit and component checks of every area and every crate, not only the changed ones
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      full: true
+
+  alert-full-ci:
+    needs: full-ci
+    if: failure()
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: full CI issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$REPO" --label incident --title "nightly: full unit and component run failed" --body "See ${RUN_URL}."
+
   rebuild:
     # needs the rootless BuildKit namespace (repository variable BUILDKIT_NAMESPACE), which exists only after the build cluster is set up
     if: vars.BUILDKIT_NAMESPACE != ''

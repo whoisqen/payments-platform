@@ -19,6 +19,13 @@ syft = "1.28.0"
 cosign = "2.5.3"
 container-structure-test = "1.19.3"
 crane = "0.20.6"
+# linters in report mode (LINT_STRICT) and the test runners of the pull request stage
+ruff = "0.17.6"
+yamllint = "1.37.1"
+tflint = "0.66.0"
+kube-linter = "0.8.3"
+cargo-nextest = "0.9.152"
+promtool = "3.16.0"
 # scanners of .github/workflows/security.yml
 "pipx:semgrep" = "1.131.0"
 "pipx:checkov" = "3.2.450"

@@ -1,0 +1,14 @@
+# Security checks only; style and best-practice checks stay off.
+checks:
+  doNotAutoAddDefaults: true
+  include:
+    - run-as-non-root
+    - privileged-container
+    - privilege-escalation-container
+    - unset-cpu-requirements
+    - unset-memory-requirements
+    - host-ipc
+    - host-network
+    - host-pid
+    - sensitive-host-mounts
+    - docker-sock

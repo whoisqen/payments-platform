@@ -29,7 +29,7 @@ def validate(action, raw):
     try:
         payload = json.loads(raw or "")
     except ValueError as e:
-        raise PayloadError(f"client_payload is not JSON: {e}")
+        raise PayloadError(f"client_payload is not JSON: {e}") from None
     if not isinstance(payload, dict):
         raise PayloadError("client_payload is not an object")
     if payload.get("environment") != m.group(1):

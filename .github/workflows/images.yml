@@ -224,3 +224,132 @@ jobs:
           name: digests
           path: digests.json
           retention-days: 14
+
+  # ---- stage 2 (commit): on the digests of this run; a red job makes the run red, so promote.yml
+  # (workflow_run on a green images run) never writes deploy/envs/dev/images.yaml for these digests ----
+
+  integration:
+    # image smoke, API scenarios and contract tests; pulls the arm64 images from ECR with the read role
+    # and needs a Docker host of that architecture (RUNNER_COMMIT)
+    needs: collect
+    if: vars.AWS_ROLE_ECR_READ != '' && vars.ECR_REPO_PREFIX != ''
+    runs-on: ${{ vars.RUNNER_COMMIT || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      COMPOSE_FILE: docker/compose/compose.yaml
+      COMPOSE_PROJECT_NAME: pay-ci
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: digests
+          path: ${{ runner.temp }}/digests
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ECR_READ }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+      - name: images by digest and per-run keys
+        id: env
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          PREFIX: ${{ vars.ECR_REPO_PREFIX }}
+        run: |
+          umask 077
+          if ! python3 tools/ci/compose/compose_env.py --registry "${REGISTRY}/${PREFIX}" \
+            --digests "$RUNNER_TEMP/digests/digests.json" --images deploy/envs/dev/images.yaml --keys >docker/compose/.env; then
+            echo "::notice::not every service has a digest yet; the commit stage is skipped"
+            echo "ready=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          admin=$(grep '^ADMIN_API_KEY=' docker/compose/.env | cut -d= -f2)
+          echo "::add-mask::${admin}"
+          echo "::add-mask::$(grep '^LOCKER_MASTER_KEY=' docker/compose/.env | cut -d= -f2)"
+          echo "INTEGRATION_ADMIN_API_KEY=${admin}" >>"$GITHUB_ENV"
+          echo "ready=true" >>"$GITHUB_OUTPUT"
+      - name: start the stack
+        if: steps.env.outputs.ready == 'true'
+        run: docker compose up -d --wait --wait-timeout 300 router drainer scheduler locker mock-psp
+      - name: image smoke, every service answers /health
+        if: steps.env.outputs.ready == 'true'
+        run: |
+          for port in 8080 8081 3000 3001; do
+            ok=false
+            for _ in $(seq 60); do
+              if curl -fsS -o /dev/null "http://127.0.0.1:${port}/health"; then ok=true; break; fi
+              sleep 2
+            done
+            [ "$ok" = true ] || { echo "::error::port ${port} has no healthy service"; exit 1; }
+          done
+      - name: API scenarios with the dummy connector
+        if: steps.env.outputs.ready == 'true'
+        env:
+          INTEGRATION_API_URL: http://127.0.0.1:8080
+          INTEGRATION_HEALTH_URLS: http://127.0.0.1:8081/health,http://127.0.0.1:3000/health,http://127.0.0.1:3001/health
+        run: python3 tests/integration/run.py
+      - name: contract tests
+        if: steps.env.outputs.ready == 'true'
+        run: |
+          python3 -m pip install --quiet pyyaml==6.0.2
+          python3 -m unittest discover -s tests/contracts
+      - name: service logs
+        if: failure() && steps.env.outputs.ready == 'true'
+        run: docker compose logs --no-color --tail 200 router drainer scheduler locker migrate
+      - name: stop the stack
+        if: always() && steps.env.outputs.ready == 'true'
+        run: |
+          docker compose down -v --remove-orphans
+          rm -f docker/compose/.env
+
+  terraform-plan:
+    # read-only plan of the stacks this push changed; cde-* stacks are planned by their own Atlantis
+    if: vars.AWS_ROLE_TF_PLAN != ''
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: stacks
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          dirs=()
+          if [ -n "$BEFORE" ] && [[ ! $BEFORE =~ ^0+$ ]] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            mapfile -t dirs < <(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- infra/live \
+              | grep -vE '^infra/live/cde-|/_envcommon/' | cut -d/ -f1-5 | sort -u \
+              | while read -r d; do [ -f "$d/terragrunt.hcl" ] && echo "$d"; done)
+          fi
+          echo "dirs=${dirs[*]}" >>"$GITHUB_OUTPUT"
+          echo "changed stacks: ${#dirs[@]}"
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        if: steps.stacks.outputs.dirs != ''
+        with:
+          install_args: terraform terragrunt
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        if: steps.stacks.outputs.dirs != ''
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TF_PLAN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: plan
+        if: steps.stacks.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.stacks.outputs.dirs }}
+        run: |
+          status=0
+          for d in $DIRS; do
+            echo "::group::${d}"
+            terragrunt run --non-interactive --working-dir "$d" -- plan -input=false -lock=false || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
