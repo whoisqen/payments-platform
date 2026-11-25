@@ -5,7 +5,7 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts observability/tests observability/slo/tests observability/lib/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 
@@ -87,6 +87,7 @@ test-helm:
 
 test-policy:
 	@if [ -d policy/opa ]; then opa test policy/opa -v; else echo "skip opa: policy/opa does not exist"; fi
+	opa test policy/tagging policy/scp/tag-policies
 	@if [ -d policy/kyverno ]; then kyverno test policy/kyverno; else echo "skip kyverno: policy/kyverno does not exist"; fi
 
 plan: ## terraform plan of every component of ENV (default dev); needs AWS credentials of the plan role

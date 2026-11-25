@@ -88,17 +88,23 @@ class SecurityBaseline(unittest.TestCase):
         self.assertIn("public-read", self.s["DenyPublicS3Acls"]["Condition"]["StringEquals"]["s3:x-amz-acl"])
 
 
+WORKLOAD_SIDS = ("DenyChangingImdsOptionsExceptTerraform", "DenyPublicS3AccessBlockChanges")
+SECURITY_SIDS = ("DenyDeletingConfigRulesExceptSecurityTerraform", "DenyUpdatingGuardDutyDetectorExceptSecurityTerraform")
+
+
 class ApplyRoleException(unittest.TestCase):
     """The exception for the Terraform apply role names the role of each account, not any account."""
 
     def setUp(self):
         cfg = yaml.safe_load((ROOT.parent.parent / "config" / "platform.yaml").read_text())
         self.cfg = cfg
+        self.prefix, self.accounts = cfg["naming"]["prefix"], cfg["accounts"]
+        # Same resolution as infra/live/security/env.hcl: the audit account runs the org-config and org-security-services stacks.
+        self.audit = str(self.accounts.get("audit", "000000000003"))
+        # The log-archive stack sets the public access block of its bucket.
+        self.log_archive = str(self.accounts.get("log_archive", "000000000002"))
         s = statements(load(ROOT / "security-baseline.json"))
-        self.patterns = {
-            sid: s[sid]["Condition"]["ArnNotLike"]["aws:PrincipalArn"]
-            for sid in ("DenyChangingImdsOptionsExceptTerraform", "DenyPublicS3AccessBlockChanges")
-        }
+        self.patterns = {sid: s[sid]["Condition"]["ArnNotLike"]["aws:PrincipalArn"] for sid in WORKLOAD_SIDS + SECURITY_SIDS}
 
     def excepted(self, sid, arn):
         return any(fnmatch.fnmatchcase(arn, p) for p in self.patterns[sid])
@@ -111,26 +117,82 @@ class ApplyRoleException(unittest.TestCase):
                     self.assertRegex(p, r"^arn:aws:iam::\d{12}:role/")
 
     def test_patterns_are_derived_from_the_platform_config(self):
-        prefix, accounts = self.cfg["naming"]["prefix"], self.cfg["accounts"]
-        want = sorted(f"arn:aws:iam::{accounts[env]}:role/{prefix}-{env}-glob-tf-apply-*" for env in ("dev", "stage", "prod") if env in accounts)
-        for sid, patterns in self.patterns.items():
-            self.assertEqual(sorted(patterns), want, sid)
+        want = sorted(
+            f"arn:aws:iam::{self.accounts[env]}:role/{self.prefix}-{env}-glob-tf-apply-*" for env in ("dev", "stage", "prod") if env in self.accounts
+        )
+        self.assertEqual(sorted(self.patterns["DenyChangingImdsOptionsExceptTerraform"]), want)
+        log_archive = f"arn:aws:iam::{self.log_archive}:role/{self.prefix}-security-glob-tf-apply-*"
+        self.assertEqual(sorted(self.patterns["DenyPublicS3AccessBlockChanges"]), sorted(want + [log_archive]))
+        for sid in SECURITY_SIDS:
+            self.assertEqual(self.patterns[sid], [f"arn:aws:iam::{self.audit}:role/{self.prefix}-security-glob-tf-apply-*"], sid)
 
     def test_apply_role_of_its_own_account_is_excepted(self):
-        prefix, accounts = self.cfg["naming"]["prefix"], self.cfg["accounts"]
-        for sid in self.patterns:
-            self.assertTrue(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/{prefix}-stage-glob-tf-apply-network"))
+        for sid in WORKLOAD_SIDS:
+            self.assertTrue(self.excepted(sid, f"arn:aws:iam::{self.accounts['stage']}:role/{self.prefix}-stage-glob-tf-apply-network"))
+        for sid in SECURITY_SIDS:
+            self.assertTrue(self.excepted(sid, f"arn:aws:iam::{self.audit}:role/{self.prefix}-security-glob-tf-apply-org-config"))
 
     def test_same_role_name_in_another_account_is_not_excepted(self):
-        prefix = self.cfg["naming"]["prefix"]
-        for sid in self.patterns:
-            self.assertFalse(self.excepted(sid, f"arn:aws:iam::999999999999:role/{prefix}-stage-glob-tf-apply-network"))
+        for sid in WORKLOAD_SIDS:
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::999999999999:role/{self.prefix}-stage-glob-tf-apply-network"))
+        for sid in SECURITY_SIDS:
+            for account in ("999999999999", self.accounts["dev"], self.accounts["prod"]):
+                self.assertFalse(self.excepted(sid, f"arn:aws:iam::{account}:role/{self.prefix}-security-glob-tf-apply-org-config"))
 
     def test_other_roles_of_the_account_are_not_excepted(self):
-        accounts = self.cfg["accounts"]
-        for sid in self.patterns:
-            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/terraform-apply"))
-            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{accounts['stage']}:role/{self.cfg['naming']['prefix']}-stage-glob-tf-plan"))
+        for sid in WORKLOAD_SIDS:
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{self.accounts['stage']}:role/terraform-apply"))
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{self.accounts['stage']}:role/{self.prefix}-stage-glob-tf-plan"))
+        for sid in SECURITY_SIDS:
+            for role in ("AWSReservedSSO_SecurityAudit_0123456789abcdef", f"{self.prefix}-security-glob-tf-plan", "terraform-apply"):
+                self.assertFalse(self.excepted(sid, f"arn:aws:iam::{self.audit}:role/{role}"), role)
+
+    def test_log_archive_apply_role_is_excepted_only_for_the_public_access_block(self):
+        arn = f"arn:aws:iam::{self.log_archive}:role/{self.prefix}-security-glob-tf-apply-log-archive"
+        self.assertTrue(self.excepted("DenyPublicS3AccessBlockChanges", arn))
+        for sid in ("DenyChangingImdsOptionsExceptTerraform",) + SECURITY_SIDS:
+            self.assertFalse(self.excepted(sid, arn), sid)
+        for arn in (
+            f"arn:aws:iam::{self.accounts['dev']}:role/{self.prefix}-security-glob-tf-apply-log-archive",
+            f"arn:aws:iam::{self.log_archive}:role/AWSReservedSSO_SecurityAudit_0123456789abcdef",
+            f"arn:aws:iam::{self.audit}:role/{self.prefix}-security-glob-tf-apply-org-config",
+        ):
+            self.assertFalse(self.excepted("DenyPublicS3AccessBlockChanges", arn), arn)
+
+    def test_workload_apply_roles_cannot_touch_config_or_guardduty(self):
+        for sid in SECURITY_SIDS:
+            self.assertFalse(self.excepted(sid, f"arn:aws:iam::{self.accounts['prod']}:role/{self.prefix}-prod-glob-tf-apply-network"))
+
+
+class SecurityServicesException(unittest.TestCase):
+    """Only rule deletes and detector updates are excepted; disabling the recorder or the detector stays denied for everyone."""
+
+    def setUp(self):
+        self.s = statements(load(ROOT / "security-baseline.json"))
+
+    def actions(self, sid):
+        a = self.s[sid]["Action"]
+        return [a] if isinstance(a, str) else a
+
+    def test_excepted_actions_are_only_the_ones_the_security_stacks_need(self):
+        self.assertEqual(
+            sorted(self.actions("DenyDeletingConfigRulesExceptSecurityTerraform")),
+            ["config:DeleteConfigRule", "config:DeleteConformancePack", "config:DeleteOrganizationConfigRule", "config:DeleteOrganizationConformancePack"],
+        )
+        self.assertEqual(self.actions("DenyUpdatingGuardDutyDetectorExceptSecurityTerraform"), ["guardduty:UpdateDetector"])
+
+    def test_disabling_actions_stay_unconditional(self):
+        for sid in ("DenyDisablingCloudTrail", "DenyDisablingConfig", "DenyDisablingGuardDuty"):
+            self.assertNotIn("Condition", self.s[sid], sid)
+        for a in ("config:StopConfigurationRecorder", "config:DeleteConfigurationRecorder", "config:DeleteDeliveryChannel"):
+            self.assertIn(a, self.actions("DenyDisablingConfig"))
+        for a in ("guardduty:DeleteDetector", "guardduty:DisassociateFromAdministratorAccount", "guardduty:StopMonitoringMembers"):
+            self.assertIn(a, self.actions("DenyDisablingGuardDuty"))
+
+    def test_every_config_and_guardduty_action_is_still_denied_once(self):
+        denied = [a for sid in ("DenyDisablingConfig", "DenyDisablingGuardDuty") + SECURITY_SIDS for a in self.actions(sid)]
+        self.assertEqual(len(denied), len(set(denied)))
+        self.assertEqual(len(denied), 13)
 
 
 class DenyTagEdit(unittest.TestCase):

@@ -2,7 +2,7 @@
   "tags": {
     "environment": {
       "tag_key": {"@@assign": "environment"},
-      "tag_value": {"@@assign": ["dev", "stage", "prod", "shared-services"]},
+      "tag_value": {"@@assign": ["dev", "stage", "prod", "shared-services", "management", "security"]},
       "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
     },
     "team": {
@@ -23,7 +23,7 @@
     },
     "component": {
       "tag_key": {"@@assign": "component"},
-      "tag_value": {"@@assign": ["router", "locker", "drainer", "scheduler", "control-center", "aurora", "dynamodb", "memorydb", "msk", "clickhouse", "opensearch", "vault", "eks", "network", "backup", "observability", "ci", "shared"]},
+      "tag_value": {"@@assign": ["router", "locker", "drainer", "scheduler", "control-center", "aurora", "dynamodb", "memorydb", "msk", "clickhouse", "opensearch", "vault", "eks", "network", "backup", "observability", "ci", "shared", "log-archive", "org-policies", "org-trail", "org-security-services", "org-config"]},
       "enforced_for": {"@@assign": ["ec2:instance", "ec2:volume", "rds:db", "rds:cluster", "s3:bucket", "dynamodb:table"]}
     },
     "pci-scope": {
