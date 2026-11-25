@@ -1,0 +1,3 @@
+# Trivy waivers; every entry needs a statement (the reason) and should carry expired_at (YYYY-MM-DD).
+vulnerabilities: []
+misconfigurations: []

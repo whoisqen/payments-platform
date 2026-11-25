@@ -1,0 +1,13 @@
+# Blocking gate of `trivy config`: high and critical misconfigurations fail the job; the report run widens severity and sets exit-code 0.
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1
+scan:
+  scanners:
+    - misconfig
+misconfiguration:
+  scanners:
+    - terraform
+    - kubernetes
+    - dockerfile

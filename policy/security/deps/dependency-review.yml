@@ -1,0 +1,25 @@
+# warn-only: Trivy (fixable high or critical) and license_check.py are the gates; set false to block here too.
+fail-on-severity: high
+fail-on-scopes:
+  - runtime
+  - development
+warn-only: true
+comment-summary-in-pr: never
+license-check: true
+vulnerability-check: true
+# must equal deny of licenses.toml (tools/ci/tests/security)
+deny-licenses:
+  - AGPL-1.0-only
+  - AGPL-1.0-or-later
+  - AGPL-3.0-only
+  - AGPL-3.0-or-later
+  - BUSL-1.1
+  - CC-BY-NC-4.0
+  - CC-BY-NC-SA-4.0
+  - GPL-1.0-only
+  - GPL-1.0-or-later
+  - GPL-2.0-only
+  - GPL-2.0-or-later
+  - GPL-3.0-only
+  - GPL-3.0-or-later
+  - SSPL-1.0

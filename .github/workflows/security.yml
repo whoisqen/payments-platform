@@ -1,0 +1,432 @@
+name: security
+
+# Called by ci.yml per changed area; schedule and dispatch scan everything; gates and thresholds live in policy/security.
+on:
+  workflow_call:
+    inputs:
+      base_sha:
+        type: string
+        default: ""
+      head_sha:
+        type: string
+        required: true
+      rust:
+        type: boolean
+        default: false
+      python:
+        type: boolean
+        default: false
+      node:
+        type: boolean
+        default: false
+      terraform:
+        type: boolean
+        default: false
+      helm:
+        type: boolean
+        default: false
+      docker:
+        type: boolean
+        default: false
+      workflows:
+        type: boolean
+        default: false
+      policy:
+        type: boolean
+        default: false
+  schedule:
+    - cron: "37 2 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+# a called run is grouped by the caller run; direct (nightly or manual) runs queue behind each other
+concurrency:
+  group: ${{ inputs.head_sha && format('security-call-{0}', github.run_id) || 'security-full' }}
+  cancel-in-progress: false
+
+env:
+  SEMGREP_SEND_METRICS: "off"
+  SEMGREP_ENABLE_VERSION_CHECK: "0"
+
+jobs:
+  scope:
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      full: ${{ steps.s.outputs.full }}
+      rust: ${{ steps.s.outputs.rust }}
+      python: ${{ steps.s.outputs.python }}
+      node: ${{ steps.s.outputs.node }}
+      iac: ${{ steps.s.outputs.iac }}
+      workflows: ${{ steps.s.outputs.workflows }}
+      code: ${{ steps.s.outputs.code }}
+      deps: ${{ steps.s.outputs.deps }}
+    steps:
+      - id: s
+        env:
+          HEAD: ${{ inputs.head_sha }}
+          RUST: ${{ inputs.rust }}
+          PYTHON: ${{ inputs.python }}
+          NODE: ${{ inputs.node }}
+          TERRAFORM: ${{ inputs.terraform }}
+          HELM: ${{ inputs.helm }}
+          DOCKER: ${{ inputs.docker }}
+          WORKFLOWS: ${{ inputs.workflows }}
+          POLICY: ${{ inputs.policy }}
+        run: |
+          # only a call from ci.yml passes head_sha; github.event_name is the caller's event there, so it cannot tell the modes apart
+          t() { [ "$1" = true ] && echo true || echo false; }
+          any() { for v in "$@"; do [ "$v" = true ] && { echo true; return; }; done; echo false; }
+          if [ -z "$HEAD" ]; then
+            full=true; RUST=true; PYTHON=true; NODE=true; TERRAFORM=true; HELM=true; DOCKER=true; WORKFLOWS=true; POLICY=true
+          else
+            full=false
+          fi
+          {
+            echo "full=${full}"
+            echo "rust=$(t "$RUST")"
+            echo "python=$(t "$PYTHON")"
+            echo "node=$(t "$NODE")"
+            echo "workflows=$(t "$WORKFLOWS")"
+            echo "iac=$(any "$TERRAFORM" "$HELM" "$DOCKER")"
+            echo "deps=$(any "$RUST" "$PYTHON" "$NODE")"
+            echo "code=$(any "$RUST" "$PYTHON" "$NODE" "$WORKFLOWS" "$DOCKER" "$POLICY")"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  semgrep:
+    needs: [scope]
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python pipx:semgrep
+      - name: repo rules pass their own tests
+        run: semgrep --test --metrics=off policy/semgrep
+      - name: scan
+        env:
+          FULL: ${{ needs.scope.outputs.full }}
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          mapfile -t args < <(python3 tools/ci/security/gates.py semgrep-args policy/security/code/semgrep.toml)
+          # on a change only findings new against the base block; the nightly run reports the whole tree
+          if [ "$FULL" != true ] && [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            args+=(--baseline-commit "$BASE_SHA")
+          fi
+          semgrep scan --metrics=off --disable-version-check "${args[@]}" --sarif --output "$RUNNER_TEMP/semgrep.sarif" .
+      - name: upload to code scanning
+        if: ${{ !cancelled() }}
+        # reporting never fails the job (code scanning may be unavailable on the plan)
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/semgrep.sarif
+          category: semgrep
+      - name: gate on repo rules and ERROR registry rules
+        if: ${{ !cancelled() }}
+        run: python3 tools/ci/security/gates.py sarif-gate policy/security/code/semgrep.toml "$RUNNER_TEMP/semgrep.sarif"
+
+  iac:
+    needs: [scope]
+    if: needs.scope.outputs.iac == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python helm trivy pipx:checkov
+      - name: tree to scan
+        run: |
+          # one tree keeps one SARIF run per tool; infra/ and docker/ keep their repository paths
+          mkdir -p "$RUNNER_TEMP/iac"
+          cp -r infra docker "$RUNNER_TEMP/iac/"
+          tools/ci/security/render_charts.sh "$RUNNER_TEMP/iac/rendered"
+      - name: trivy config (high and critical block)
+        run: trivy config --config policy/security/iac/trivy-config.yaml --ignorefile policy/security/trivyignore.yaml --tf-exclude-downloaded-modules "$RUNNER_TEMP/iac"
+      - name: trivy config report
+        if: ${{ !cancelled() }}
+        run: |
+          trivy config --config policy/security/iac/trivy-config.yaml --ignorefile policy/security/trivyignore.yaml --tf-exclude-downloaded-modules \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --exit-code 0 --format sarif --output "$RUNNER_TEMP/trivy-config.sarif" "$RUNNER_TEMP/iac"
+      - name: checkov (hard-fail-on list blocks)
+        if: ${{ !cancelled() }}
+        working-directory: ${{ runner.temp }}/iac
+        env:
+          CONFIG: ${{ github.workspace }}/policy/security/iac/checkov.yaml
+        run: checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov"
+      - name: upload trivy to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/trivy-config.sarif
+          category: trivy-config
+      - name: upload checkov to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/checkov/results_sarif.sarif
+          category: checkov
+
+  dependencies:
+    needs: [scope]
+    if: needs.scope.outputs.deps == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python node trivy pipx:pip-audit github:EmbarkStudios/cargo-deny
+      - name: trivy fs (high and critical with a fix block)
+        run: trivy fs --config policy/security/deps/trivy-vuln.yaml --ignorefile policy/security/trivyignore.yaml .
+      - name: trivy fs report
+        if: ${{ !cancelled() }}
+        run: |
+          trivy fs --config policy/security/deps/trivy-vuln.yaml --ignorefile policy/security/trivyignore.yaml \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --ignore-unfixed=false --exit-code 0 --format sarif --output "$RUNNER_TEMP/trivy-vuln.sarif" .
+      - name: upload to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/trivy-vuln.sarif
+          category: trivy-vuln
+      - name: cargo-deny (report only)
+        if: ${{ !cancelled() && needs.scope.outputs.rust == 'true' }}
+        env:
+          CONFIG: ${{ github.workspace }}/policy/security/deps/deny.toml
+        run: |
+          # vendor code is scanned, never edited; the blocking vulnerability and license gates are trivy and the licenses job
+          for ws in vendor/hyperswitch vendor/card-vault; do
+            status=0
+            out=$(cargo deny --manifest-path "$ws/Cargo.toml" --color never check --config "$CONFIG" advisories bans licenses sources 2>&1) || status=$?
+            printf '### cargo-deny %s (exit %s)\n\n<pre>\n%s\n</pre>\n' "$ws" "$status" "$(tail -n 60 <<<"$out")" >>"$GITHUB_STEP_SUMMARY"
+            [ "$status" -eq 0 ] || echo "::warning::cargo-deny reported findings in ${ws}; see the job summary"
+          done
+      - name: pip-audit (report only)
+        if: ${{ !cancelled() && needs.scope.outputs.python == 'true' }}
+        run: |
+          mapfile -t files < <(git ls-files '*requirements*.txt')
+          for f in "${files[@]}"; do
+            status=0
+            # a hashed file is audited exactly as pinned; an unhashed one resolves its dependencies
+            if grep -q -- '--hash=' "$f"; then mode=(--require-hashes --disable-pip); else mode=(); fi
+            out=$(pip-audit --progress-spinner off "${mode[@]}" -r "$f" 2>&1) || status=$?
+            printf '### pip-audit %s (exit %s)\n\n<pre>\n%s\n</pre>\n' "$f" "$status" "$(tail -n 40 <<<"$out")" >>"$GITHUB_STEP_SUMMARY"
+            [ "$status" -eq 0 ] || echo "::warning::pip-audit reported findings in ${f}; see the job summary"
+          done
+      - name: npm audit (report only)
+        if: ${{ !cancelled() && needs.scope.outputs.node == 'true' }}
+        working-directory: tests/load
+        run: |
+          if ! jq -e '(.dependencies // {}) + (.devDependencies // {}) | length > 0' package.json >/dev/null; then
+            echo "npm audit: tests/load has no npm dependencies" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [ -f package-lock.json ] || npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          status=0
+          out=$(npm audit --audit-level=high 2>&1) || status=$?
+          printf '### npm audit tests/load (exit %s)\n\n<pre>\n%s\n</pre>\n' "$status" "$(tail -n 40 <<<"$out")" >>"$GITHUB_STEP_SUMMARY"
+          [ "$status" -eq 0 ] || echo "::warning::npm audit reported findings in tests/load; see the job summary"
+
+  dependency-review:
+    needs: [scope]
+    if: needs.scope.outputs.full != 'true' && inputs.base_sha != '' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        # report only: a missing dependency graph must not fail the gate
+        continue-on-error: true
+        with:
+          config-file: ./policy/security/deps/dependency-review.yml
+          base-ref: ${{ inputs.base_sha }}
+          head-ref: ${{ inputs.head_sha }}
+
+  workflows:
+    needs: [scope]
+    if: needs.scope.outputs.workflows == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python pipx:zizmor
+      - name: zizmor report
+        run: |
+          # exit codes 10-14 only say that findings exist; the gate below decides
+          zizmor --config policy/security/workflows/zizmor.yml --format sarif .github >"$RUNNER_TEMP/zizmor.sarif" || [ $? -ge 10 ]
+      - name: upload to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/zizmor.sarif
+          category: zizmor
+      - name: zizmor gate
+        if: ${{ !cancelled() }}
+        run: |
+          min=$(python3 tools/ci/security/gates.py get policy/security/workflows/zizmor-gate.toml min_severity)
+          zizmor --config policy/security/workflows/zizmor.yml --min-severity "$min" .github
+
+  scorecard:
+    needs: [scope]
+    if: needs.scope.outputs.full == 'true' && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        # report only: Scorecard never fails the run
+        continue-on-error: true
+        with:
+          results_file: ${{ runner.temp }}/scorecard.sarif
+          results_format: sarif
+          publish_results: false
+      - name: upload to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/scorecard.sarif
+          category: scorecard
+
+  secrets:
+    needs: [scope]
+    # the PR range is scanned by ci.yml lint-fast
+    if: needs.scope.outputs.full == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: gitleaks
+      - name: gitleaks over the full history
+        run: gitleaks detect --no-banner --redact --config .github/gitleaks.toml --report-format sarif --report-path "$RUNNER_TEMP/gitleaks.sarif"
+      - name: upload to code scanning
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
+        with:
+          sarif_file: ${{ runner.temp }}/gitleaks.sarif
+          category: gitleaks
+
+  licenses:
+    needs: [scope]
+    if: needs.scope.outputs.deps == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python syft
+      - name: sbom
+        # Rust licenses come from cargo metadata below; syft has none for Cargo.lock offline
+        run: syft scan dir:. --exclude './**/Cargo.lock' --exclude './**/target/**' --exclude './**/node_modules/**' -o "cyclonedx-json=$RUNNER_TEMP/sbom.cdx.json"
+      - name: cargo metadata
+        if: needs.scope.outputs.rust == 'true'
+        run: |
+          for ws in hyperswitch card-vault; do
+            cargo metadata --format-version 1 --locked --manifest-path "vendor/${ws}/Cargo.toml" >"$RUNNER_TEMP/cargo-${ws}.json"
+          done
+      - name: deny list blocks, the rest is reported
+        run: |
+          args=(--cyclonedx "$RUNNER_TEMP/sbom.cdx.json")
+          for f in "$RUNNER_TEMP"/cargo-*.json; do [ -f "$f" ] && args+=(--cargo-metadata "$f"); done
+          python3 tools/ci/security/license_check.py --policy policy/security/deps/licenses.toml "${args[@]}" --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: repo-sbom-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sbom.cdx.json
+          retention-days: 30
+
+  dast:
+    needs: [scope]
+    # stage only; a full run without the STAGE_DAST_URL repository variable skips it
+    if: needs.scope.outputs.full == 'true' && vars.STAGE_DAST_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: target is the stage router, never prod
+        env:
+          TARGET: ${{ vars.STAGE_DAST_URL }}
+        run: |
+          host=$(sed -E 's#^https://([^/:]+).*#\1#' <<<"$TARGET")
+          if [[ ! "$TARGET" =~ ^https:// ]] || [[ "$host" == *prod* ]] || [[ "$host" != *stage* ]]; then
+            echo "::error::STAGE_DAST_URL must be an https URL of a stage host"
+            exit 1
+          fi
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: ${{ vars.STAGE_DAST_URL }}
+          rules_file_name: policy/security/dast/zap-rules.tsv
+          cmd_options: -a
+          # report only: warnings go to the uploaded report and the job log
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-baseline
