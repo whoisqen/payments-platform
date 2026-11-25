@@ -1,0 +1,116 @@
+# REPLACE_* defaults are rejected when requireResolved is true; the environment layer sets it
+requireResolved: false
+
+global:
+  # Own ECR prefix (restrict-registries rejects Docker Hub); the environment layer sets it
+  registry: REPLACE_REGISTRY
+  # Set by the ApplicationSet from the payments-platform/environment label of the cluster; anything but stage fails the render
+  environment: REPLACE_ENVIRONMENT
+
+# Mirrors copied with the index preserved, so the digests match upstream; Renovate bumps tag and digest together
+images:
+  k6:
+    repository: grafana/k6
+    tag: 1.7.0
+    digest: sha256:ae824aa6906ce242156163462367cbcba7065efc2d365969ae41b282f1acc9f5
+  # The starter only tells the paused runners to begin; upstream publishes it under a moving tag, so the digest is the pin
+  starter:
+    repository: grafana/k6-operator
+    tag: latest-starter
+    digest: sha256:cc530bc90311d11f16549b6ee517d96d3b5f4e8e4ae99a20242edcbdb3f06304
+  kubectl:
+    repository: kubectl
+    tag: v1.35.0
+    digest: sha256:0bb95b2a450875fc8ceaea2f9987a99fe27c228846e2e00b93b65ebb0d59034e
+
+target:
+  # Public entry of the stage edge, never a prod or CDE host (the guard and stage-guard.js both check it)
+  baseUrl: REPLACE_BASE_URL
+  # Operator switch: true makes every CronJob refuse to start, as the freeze does for chaos
+  freeze: false
+
+# Central VictoriaMetrics write endpoint; the ApplicationSet passes central.metricsRemoteWriteUrl
+remoteWrite:
+  url: REPLACE_REMOTE_WRITE_URL
+  trendStats: "p(50),p(95),p(99),max"
+  pushInterval: 5s
+
+# Test merchants on the dummy connector, never real card data. Vault KV v2 secret with these properties
+credentials:
+  secretName: k6-test-merchants
+  secretStore: vault
+  remoteKey: loadgen/test-merchants
+  refreshInterval: 1h
+  # Environment variable of the scripts -> property of the Vault secret
+  properties:
+    MERCHANT_API_KEY: merchant_api_key
+    TEST_PAYMENT_TOKEN: test_payment_token
+    MERCHANT_ID: merchant_id
+    WEBHOOK_SECRET: webhook_secret
+    HOT_MERCHANT_ID: hot_merchant_id
+    OTHER_MERCHANT_IDS: other_merchant_ids
+
+# The loadgen NodePool of Karpenter: label and taint workload=loadgen, On-Demand only
+placement:
+  nodePool: loadgen
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: loadgen
+      effect: NoSchedule
+
+runner:
+  resources:
+    requests:
+      cpu: "2"
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  # One runner per node keeps the NIC and the conntrack table of a node to one generator
+  separate: true
+
+scheduler:
+  serviceAccountName: k6-scheduler
+  timeZone: Etc/UTC
+  startingDeadlineSeconds: 900
+  activeDeadlineSeconds: 300
+
+# Section 8 schedule, UTC; the windows never overlap (load 01:00-01:36 daily, stress Wed 03:00-03:31,
+# soak Sat 02:00-10:06, spike on the 1st 23:00-23:19). On-demand runs are suspended: kubectl create job --from=cronjob/k6-<name>
+scenarios:
+  load:
+    script: load/scenarios/daily-peak.js
+    schedule: "0 1 * * *"
+    parallelism: 4
+  stress:
+    script: load/scenarios/stress.js
+    schedule: "0 3 * * 3"
+    parallelism: 16
+  spike:
+    script: load/scenarios/spike.js
+    schedule: "0 23 1 * *"
+    parallelism: 8
+  soak:
+    script: load/scenarios/soak.js
+    schedule: "0 2 * * 6"
+    parallelism: 4
+  breakpoint:
+    script: load/scenarios/breakpoint.js
+    onDemand: true
+    parallelism: 16
+  hot-merchant:
+    script: chaos/hot-merchant.js
+    onDemand: true
+    parallelism: 2
+    env:
+      TOTAL_RPS: "1000"
+  shedding:
+    script: load/scenarios/shedding.js
+    onDemand: true
+    parallelism: 4
+    env:
+      PODS: "1"
+
+networkPolicy:
+  enabled: true
+  operatorNamespace: k6-operator

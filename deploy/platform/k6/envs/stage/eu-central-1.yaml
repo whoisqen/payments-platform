@@ -1,0 +1,8 @@
+# stage eu-central-1: the cluster labelled payments-platform/loadgen=enabled; the remote write URL and the environment come from the ApplicationSet
+requireResolved: true
+
+global:
+  registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
+
+target:
+  baseUrl: https://api.stage.payments.example.com

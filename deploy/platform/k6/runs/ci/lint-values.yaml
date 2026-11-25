@@ -1,0 +1,8 @@
+# Offline lint only; the real layer is envs/<env>/<region>.yaml
+global:
+  registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
+  environment: stage
+target:
+  baseUrl: https://api.stage.payments.example.com
+remoteWrite:
+  url: https://metrics.example.test/insert/0/prometheus/api/v1/write

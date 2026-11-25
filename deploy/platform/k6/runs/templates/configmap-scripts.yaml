@@ -1,0 +1,14 @@
+# Single source of truth: scripts/load and scripts/chaos are symlinks to tests/load and tests/chaos
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-scripts
+  labels:
+    {{- include "k6.labels" (dict "root" . "component" "scripts") | nindent 4 }}
+data:
+  {{- $files := include "k6.scriptFiles" . | fromYamlArray }}
+  {{- if not $files }}{{ fail "no k6 scripts found under scripts/: the symlinks to tests/load and tests/chaos are missing" }}{{ end }}
+  {{- range $files }}
+  {{ include "k6.scriptKey" . }}: |-
+    {{- $.Files.Get . | nindent 4 }}
+  {{- end }}

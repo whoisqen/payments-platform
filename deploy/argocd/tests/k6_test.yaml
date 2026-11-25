@@ -1,0 +1,82 @@
+suite: k6 Operator and scheduled load tests
+templates:
+  - addons/loadgen/k6.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: release
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+  gated.revision: v1.0.0
+tests:
+  - it: selects only the stage cluster opted in as load generator, for the operator and the runs
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels
+          value:
+            payments-platform/environment: stage
+            payments-platform/loadgen: enabled
+      - notExists:
+          path: spec.generators[0].clusters.selector.matchExpressions
+  - it: never generates for dev, prod or the CDE
+    asserts:
+      - notMatchRegex:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/environment"]
+          pattern: ^(dev|prod|cde-.*)$
+  - it: pins the upstream operator chart and applies the CRD server-side
+    documentSelector:
+      path: metadata.name
+      value: addon-k6-operator
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].repoURL
+          value: https://grafana.github.io/helm-charts
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 4.7.0
+      - contains:
+          path: spec.template.spec.syncPolicy.syncOptions
+          content: ServerSideApply=true
+      - equal:
+          path: spec.template.spec.destination.namespace
+          value: k6-operator
+  - it: hands the runs chart the environment label and the central remote write URL
+    documentSelector:
+      path: metadata.name
+      value: addon-k6-runs
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].path
+          value: deploy/platform/k6/runs
+      - equal:
+          path: spec.template.spec.sources[0].helm.parameters
+          value:
+            - name: global.environment
+              value: '{{ index .metadata.labels "payments-platform/environment" }}'
+            - name: remoteWrite.url
+              value: https://metrics.example.test/insert/0/prometheus/api/v1/write
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: '$values/deploy/platform/k6/envs/{{ index .metadata.labels "payments-platform/environment" }}/{{ index .metadata.labels "payments-platform/region" }}.yaml'
+      - equal:
+          path: spec.template.spec.destination.namespace
+          value: loadgen
+  - it: passes no credential as a parameter
+    documentSelector:
+      path: metadata.name
+      value: addon-k6-runs
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.sources[0].helm.parameters[0].name
+          pattern: (?i)(key|token|secret|password)
+      - notMatchRegex:
+          path: spec.template.spec.sources[0].helm.parameters[1].name
+          pattern: (?i)(key|token|secret|password)
