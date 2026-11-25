@@ -20,10 +20,44 @@ workload:
     maxP99DeltaMs: 150
     authorizationRate: true
 
+# Cell-wide settings (database, MemoryDB, KMS, tenant, locker, events) come from global.hyperswitch through platform-common
+hyperswitch:
+  prefix: ROUTER
+  # MemoryDB ACL user of the service (infra memorydb_users)
+  redisUser: router
+  poolSize: 10
+  replicaPoolSize: 5
+
+# Variable -> {key, property} under <kvMount>/<env>/<cell>/ in Vault; the values never appear in git
+secrets:
+  ROUTER__MASTER_DATABASE__PASSWORD: {key: router/database, property: password}
+  ROUTER__REPLICA_DATABASE__PASSWORD: {key: router/database, property: password}
+  ROUTER__ANALYTICS__SQLX__PASSWORD: {key: router/database, property: password}
+  ROUTER__REDIS__PRIMARY_PASSWORD: {key: router/redis, property: password}
+  ROUTER__SECRETS__MASTER_ENC_KEY: {key: shared/app, property: master_enc_key}
+  ROUTER__SECRETS__ADMIN_API_KEY: {key: shared/app, property: admin_api_key}
+  ROUTER__SECRETS__JWT_SECRET: {key: shared/app, property: jwt_secret}
+  ROUTER__API_KEYS__HASH_KEY: {key: shared/app, property: api_keys_hash_key}
+  ROUTER__USER_AUTH_METHODS__ENCRYPTION_KEY: {key: shared/app, property: user_auth_encryption_key}
+  ROUTER__JWEKEY__VAULT_ENCRYPTION_KEY: {key: shared/locker, property: vault_encryption_key}
+  ROUTER__JWEKEY__VAULT_PRIVATE_KEY: {key: shared/locker, property: vault_private_key}
+  ROUTER__JWEKEY__TUNNEL_PRIVATE_KEY: {key: shared/locker, property: tunnel_private_key}
+
 container:
   port: 8080
   env:
     RUN_ENV: production
+    ROUTER__SERVER__HOST: 0.0.0.0
+    ROUTER__SERVER__PORT: "8080"
+    # Two actix workers per requested vCPU; the request body limit and timeouts stay at the upstream defaults
+    ROUTER__SERVER__WORKERS: "2"
+    # Below the 60 s grace period so in-flight PSP calls finish before SIGKILL
+    ROUTER__SERVER__SHUTDOWN_TIMEOUT: "30"
+    # Origins are the panel of the environment (environment layer); never a wildcard
+    ROUTER__CORS__ORIGINS: https://panel.invalid
+    ROUTER__CORS__ALLOWED_METHODS: GET,POST,PUT,DELETE
+    ROUTER__CORS__MAX_AGE: "30"
+    ROUTER__CORS__WILDCARD_ORIGIN: "false"
     # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
     ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
     ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"
@@ -118,4 +152,9 @@ istio:
   authorizationPolicy:
     enabled: true
     principals:
+      # Proxy of Gateway payments-edge (Gateway API): service account payments-edge-istio in namespace payments-edge
+      - cluster.local/ns/payments-edge/sa/payments-edge-istio
+      # Old istio: ingressgateway deployment; drop it with deploy/platform/istio/values-gateway.yaml
       - cluster.local/ns/istio-system/sa/istio-ingressgateway
+      # PostSync smoke Job of the cell (deploy/platform/smoke)
+      - cluster.local/ns/payments/sa/smoke

@@ -1,1 +1,1 @@
-{{- include "platform-common.workload" (dict "root" . "cfg" .Values "name" "router" "component" "router") }}
+{{- include "platform-common.workload" (dict "root" . "cfg" .Values "name" "router" "component" "router" "hyperswitch" .Values.hyperswitch "secrets" .Values.secrets) }}

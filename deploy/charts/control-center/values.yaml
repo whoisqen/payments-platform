@@ -13,7 +13,14 @@ workload:
 
 container:
   port: 9000
-  env: {}
+  # Overrides of the upstream dashboard config.toml; the browser calls the router API directly and logs in with the router user JWT, so the panel holds no secret
+  env:
+    default__endpoints__api_url: https://api.invalid
+    default__endpoints__sdk_url: ""
+    default__features__email: "false"
+    default__features__totp: "true"
+    default__features__is_live_mode: "false"
+    default__features__test_live_toggle: "false"
   envFromSecrets: []
   # Not sized in the architecture; the panel is a thin web server in front of the router API
   resources:
@@ -69,3 +76,13 @@ serviceAccount:
 
 istio:
   inject: true
+
+# Entry of the panel: CloudFront VPC origin (Terraform) -> internal NLB of the Gateway panel -> HTTPRoute panel -> this Service
+panel:
+  enabled: true
+  hostname: panel.invalid
+  gatewayClassName: istio
+  certificate:
+    # Public ACME issuer with DNS-01, so CloudFront can verify the origin certificate
+    issuerKind: ClusterIssuer
+    issuerName: acme-dns01

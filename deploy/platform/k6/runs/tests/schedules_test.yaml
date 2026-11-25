@@ -1,0 +1,62 @@
+suite: section 8 schedules
+templates:
+  - cronjobs.yaml
+  - rbac.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: stage
+  target.baseUrl: https://api.stage.payments.example.com
+  remoteWrite.url: https://metrics.example.test/api/v1/write
+release:
+  namespace: loadgen
+tests:
+  - it: runs load nightly
+    template: cronjobs.yaml
+    documentSelector: {path: metadata.name, value: k6-load}
+    asserts:
+      - equal: {path: spec.schedule, value: "0 1 * * *"}
+      - equal: {path: spec.suspend, value: false}
+  - it: runs stress weekly
+    template: cronjobs.yaml
+    documentSelector: {path: metadata.name, value: k6-stress}
+    asserts:
+      - equal: {path: spec.schedule, value: "0 3 * * 3"}
+  - it: runs soak weekly at night
+    template: cronjobs.yaml
+    documentSelector: {path: metadata.name, value: k6-soak}
+    asserts:
+      - equal: {path: spec.schedule, value: "0 2 * * 6"}
+  - it: runs spike monthly
+    template: cronjobs.yaml
+    documentSelector: {path: metadata.name, value: k6-spike}
+    asserts:
+      - equal: {path: spec.schedule, value: "0 23 1 * *"}
+  - it: keeps breakpoint, hot-merchant and shedding on demand
+    template: cronjobs.yaml
+    documentSelector: {path: metadata.name, value: k6-breakpoint}
+    asserts:
+      - equal: {path: spec.suspend, value: true}
+      - equal: {path: spec.schedule, value: "0 0 31 2 *"}
+  - it: never overlaps a run with itself and keeps UTC
+    template: cronjobs.yaml
+    asserts:
+      - equal: {path: spec.concurrencyPolicy, value: Forbid}
+      - equal: {path: spec.timeZone, value: Etc/UTC}
+      - equal: {path: spec.jobTemplate.spec.backoffLimit, value: 0}
+      - equal: {path: spec.jobTemplate.spec.template.spec.serviceAccountName, value: k6-scheduler}
+  - it: lets the scheduler create TestRuns and nothing else
+    template: rbac.yaml
+    documentSelector: {path: kind, value: Role}
+    asserts:
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [k6.io]
+              resources: [testruns]
+              verbs: [create]
+  - it: binds the role only in its own namespace
+    template: rbac.yaml
+    documentSelector: {path: kind, value: RoleBinding}
+    asserts:
+      - equal: {path: roleRef.kind, value: Role}
+      - equal: {path: 'subjects[0].namespace', value: loadgen}

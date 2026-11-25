@@ -1,0 +1,92 @@
+# k6 Operator and the scheduled load tests: stage only, on the one cluster opted in as the load generator
+{{- $selector := dict "payments-platform/environment" "stage" "payments-platform/loadgen" "enabled" }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-k6-operator
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            {{- toYaml $selector | nindent 12 }}
+  template:
+    metadata:
+      name: 'k6-operator-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: k6
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: k6-operator
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: k6-operator
+          targetRevision: 4.7.0
+          helm:
+            valueFiles:
+              - $values/deploy/platform/k6/values-k6-operator.yaml
+              - $values/deploy/platform/k6/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/{{`{{ index .metadata.labels "payments-platform/region" }}`}}.operator.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # The TestRun CRD exceeds the client-side apply annotation limit
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-k6-runs
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            {{- toYaml $selector | nindent 12 }}
+  template:
+    metadata:
+      name: 'k6-runs-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: k6
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: loadgen
+      sources:
+        # The chart reads tests/load and tests/chaos through in-repo symlinks, so the scripts have one source
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/k6/runs
+          helm:
+            # The chart fails the render for anything but stage and for an unresolved layer
+            valueFiles:
+              - $values/deploy/platform/k6/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/{{`{{ index .metadata.labels "payments-platform/region" }}`}}.yaml
+            parameters:
+              - name: global.environment
+                value: '{{`{{ index .metadata.labels "payments-platform/environment" }}`}}'
+              - name: remoteWrite.url
+                value: {{ .Values.central.metricsRemoteWriteUrl | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

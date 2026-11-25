@@ -1,0 +1,27 @@
+{{- if .Values.istio.authorizationPolicy.enabled }}
+{{- $ap := .Values.istio.authorizationPolicy }}
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" (dict "root" . "component" "ratelimit") | nindent 6 }}
+  action: ALLOW
+  rules:
+    # The gateway proxy calls the gRPC port
+    - from:
+        - source:
+            principals:
+              - {{ $ap.gatewayPrincipal | quote }}
+      to:
+        - operation:
+            ports: [{{ .Values.ports.grpc | quote }}]
+    # Prometheus scrapes the metrics port in plain text: no principal exists, the NetworkPolicy limits who reaches it
+    - to:
+        - operation:
+            ports: [{{ .Values.ports.metrics | quote }}]
+{{- end }}

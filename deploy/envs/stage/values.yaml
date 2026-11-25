@@ -2,10 +2,18 @@
 global:
   registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
   environment: stage
+  hyperswitch:
+    # PSP test endpoints
+    configFile: sandbox.toml
+    logLevel: INFO
+    tenant:
+      baseUrl: https://api.stage.payments.example.com
+      controlCenterUrl: https://panel.stage.payments.example.com
 
 router:
   container:
     env:
+      ROUTER__CORS__ORIGINS: https://panel.stage.payments.example.com
       RUN_ENV: sandbox
 
 drainer:

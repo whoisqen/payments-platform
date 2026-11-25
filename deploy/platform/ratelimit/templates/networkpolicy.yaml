@@ -26,7 +26,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: monitoring
+              kubernetes.io/metadata.name: {{ $np.monitoringNamespace }}
       ports:
         - port: {{ .Values.ports.metrics }}
           protocol: TCP

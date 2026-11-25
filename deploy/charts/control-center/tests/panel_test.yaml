@@ -1,0 +1,55 @@
+suite: control-center panel entry
+templates:
+  - gateway/gateway.yaml
+  - gateway/httproute.yaml
+  - gateway/certificate.yaml
+  - workload.yaml
+set:
+  global.registry: registry.example.test/acme
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  panel.hostname: panel.dev.payments.example.com
+tests:
+  - it: puts the Gateway panel behind an internal NLB only
+    template: gateway/gateway.yaml
+    asserts:
+      - isKind: {of: Gateway}
+      - equal: {path: metadata.name, value: panel}
+      - equal:
+          path: spec.infrastructure.annotations["service.beta.kubernetes.io/aws-load-balancer-scheme"]
+          value: internal
+      - equal: {path: "spec.listeners[0].protocol", value: HTTPS}
+      - equal: {path: "spec.listeners[0].hostname", value: panel.dev.payments.example.com}
+      - equal: {path: "spec.listeners[0].allowedRoutes.namespaces.from", value: Same}
+  - it: routes the panel host to the control-center Service
+    template: gateway/httproute.yaml
+    asserts:
+      - isKind: {of: HTTPRoute}
+      - equal: {path: metadata.name, value: panel}
+      - equal: {path: "spec.parentRefs[0]", value: {name: panel, sectionName: https}}
+      - equal: {path: "spec.rules[0].backendRefs[0]", value: {name: control-center, port: 9000}}
+  - it: issues the listener certificate for the panel host
+    template: gateway/certificate.yaml
+    asserts:
+      - equal: {path: spec.secretName, value: panel-tls}
+      - equal: {path: spec.dnsNames, value: [panel.dev.payments.example.com]}
+  - it: points the dashboard at the API of the environment and holds no secret
+    template: workload.yaml
+    set:
+      container.env.default__endpoints__api_url: https://api.dev.payments.example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: default__endpoints__api_url, value: "https://api.dev.payments.example.com"}
+      - notExists: {path: "spec.template.spec.containers[0].envFrom"}
+  - it: renders no entry when the panel is off
+    template: gateway/gateway.yaml
+    set:
+      panel.enabled: false
+    asserts:
+      - hasDocuments: {count: 0}
+  - it: rejects a malformed host
+    template: gateway/gateway.yaml
+    set:
+      panel.hostname: "https://panel"
+    asserts:
+      - failedTemplate: {}

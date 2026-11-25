@@ -1,4 +1,20 @@
-mock_provider "aws" {}
+mock_provider "aws" {
+  mock_resource "aws_iam_role" {
+    defaults = { arn = "arn:aws:iam::111111111111:role/mock-proxy" }
+  }
+  mock_resource "aws_secretsmanager_secret" {
+    defaults = { arn = "arn:aws:secretsmanager:eu-central-1:111111111111:secret:mock-proxy-auth" }
+  }
+  mock_resource "aws_db_proxy" {
+    defaults = { name = "pay-prod-euc1-aurora-locker" }
+  }
+  mock_resource "aws_rds_global_cluster" {
+    defaults = { id = "pay-prod-euc1-aurora-locker" }
+  }
+  mock_resource "aws_db_proxy_default_target_group" {
+    defaults = { name = "default", db_proxy_name = "pay-prod-euc1-aurora-locker" }
+  }
+}
 
 variables {
   name_prefix              = "pay"
@@ -206,3 +222,102 @@ run "standby_readers_without_proxy_secret" {
   }
 }
 
+
+run "locker_app_password_login" {
+  command = apply
+
+  override_resource {
+    target = aws_rds_cluster.primary
+    values = {
+      id                 = "pay-prod-euc1-aurora-locker"
+      master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-central-1:111111111111:secret:rds-master-0001" }]
+    }
+  }
+
+  variables {
+    component          = "aurora-locker"
+    proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]
+  }
+
+  assert {
+    condition     = aws_db_proxy.this[0].require_tls && length(aws_db_proxy.this[0].auth) == 2
+    error_message = "the proxy keeps TLS and adds one login next to the master secret"
+  }
+
+  assert {
+    condition = anytrue([for a in aws_db_proxy.this[0].auth :
+    a.description == "locker_app" && a.iam_auth == "DISABLED" && a.auth_scheme == "SECRETS" && a.client_password_auth_type == "POSTGRES_SCRAM_SHA_256"])
+    error_message = "locker_app logs in with a SCRAM password and no IAM token"
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret.proxy_auth["locker_app"].kms_key_id == var.kms_key_arn && aws_secretsmanager_secret.proxy_auth["locker_app"].name == "pay-prod-euc1-aurora-locker/proxy/locker_app"
+    error_message = "the module creates an empty secret encrypted with the cluster key"
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.proxy[0].policy, "mock-proxy-auth") && strcontains(aws_iam_role_policy.proxy[0].policy, "rds-master-0001")
+    error_message = "the proxy role reads the master and the locker_app secrets"
+  }
+}
+
+run "passed_in_secret_creates_none" {
+  command = apply
+
+  override_resource {
+    target = aws_rds_cluster.primary
+    values = {
+      id                 = "pay-prod-euc1-aurora-locker"
+      master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-central-1:111111111111:secret:rds-master-0001" }]
+    }
+  }
+
+  variables {
+    proxy_auth_entries = [{ name = "locker_app", iam_auth = "REQUIRED", secret_arn = "arn:aws:secretsmanager:eu-central-1:111111111111:secret:locker-0001" }]
+  }
+
+  assert {
+    condition     = length(aws_secretsmanager_secret.proxy_auth) == 0
+    error_message = "a passed-in secret is used as is"
+  }
+
+  assert {
+    condition = anytrue([for a in aws_db_proxy.this[0].auth :
+    a.description == "locker_app" && a.iam_auth == "REQUIRED" && a.secret_arn == "arn:aws:secretsmanager:eu-central-1:111111111111:secret:locker-0001"])
+    error_message = "the passed-in secret reaches the proxy"
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.proxy[0].policy, "secret:locker-0001")
+    error_message = "the proxy role reads the passed-in secret"
+  }
+}
+
+run "recovery_without_proxy_creates_no_secret" {
+  command = plan
+
+  variables {
+    region_role               = "recovery"
+    region_name               = "us-east-1"
+    region_short              = "use1"
+    global_cluster_identifier = "pay-prod-euc1-aurora-locker"
+    recovery_regions          = {}
+    availability_zones        = ["us-east-1a", "us-east-1b", "us-east-1c"]
+    proxy_auth_entries        = [{ name = "locker_app", iam_auth = "DISABLED" }]
+  }
+
+  assert {
+    condition     = length(aws_secretsmanager_secret.proxy_auth) == 0 && length(aws_db_proxy.this) == 0
+    error_message = "no orphan secret without a proxy"
+  }
+}
+
+run "proxy_auth_iam_auth_is_validated" {
+  command = plan
+
+  variables {
+    proxy_auth_entries = [{ name = "locker_app", iam_auth = "OPTIONAL" }]
+  }
+
+  expect_failures = [var.proxy_auth_entries]
+}

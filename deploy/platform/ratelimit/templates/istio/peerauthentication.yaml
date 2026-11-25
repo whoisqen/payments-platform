@@ -1,0 +1,18 @@
+{{- if .Values.istio.peerAuthentication.enabled }}
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: ratelimit
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "platform-common.selectorLabels" (dict "root" . "component" "ratelimit") | nindent 6 }}
+  mtls:
+    mode: STRICT
+  # Prometheus scrapes the metrics port in plain text; the NetworkPolicy admits only the monitoring namespace there
+  portLevelMtls:
+    {{ .Values.ports.metrics | quote }}:
+      mode: PERMISSIVE
+{{- end }}

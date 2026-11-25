@@ -1,4 +1,22 @@
 locals {
+  locker_pod_database_cidrs = length(var.locker_pod_database_cidrs) > 0 ? var.locker_pod_database_cidrs : [var.vpc_cidr_block]
+  locker_pod_endpoint_cidrs = length(var.locker_pod_endpoint_cidrs) > 0 ? var.locker_pod_endpoint_cidrs : [var.vpc_cidr_block]
+
+  # Strict pod security group mode: every packet of a locker pod passes this group, so DNS and istiod need their own rules.
+  locker_pod_egress = merge(
+    var.locker_pod_endpoint_security_group_id != null ? {
+      "https-endpoints" = { cidr = null, sg = var.locker_pod_endpoint_security_group_id, protocol = "tcp", port = 443, description = "HTTPS to the VPC interface endpoints (KMS)" }
+      } : {
+      for c in local.locker_pod_endpoint_cidrs : "https-${c}" => { cidr = c, sg = null, protocol = "tcp", port = 443, description = "HTTPS to the VPC interface endpoints (KMS)" }
+    },
+    { for c in local.locker_pod_database_cidrs : "postgres-${c}" => { cidr = c, sg = null, protocol = "tcp", port = 5432, description = "PostgreSQL to the card-vault RDS Proxy" } },
+    {
+      "dns-udp" = { cidr = var.vpc_cidr_block, sg = null, protocol = "udp", port = 53, description = "DNS to CoreDNS" }
+      "dns-tcp" = { cidr = var.vpc_cidr_block, sg = null, protocol = "tcp", port = 53, description = "DNS to CoreDNS" }
+      "istiod"  = { cidr = var.vpc_cidr_block, sg = null, protocol = "tcp", port = 15012, description = "Mesh xDS and certificates from istiod" }
+    },
+  )
+
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
 
@@ -180,11 +198,17 @@ resource "aws_vpc_security_group_ingress_rule" "node_from_locker_pod" {
   description                  = "Locker pods to CoreDNS and cluster services"
 }
 
-resource "aws_vpc_security_group_egress_rule" "locker_pod_vpc" {
-  security_group_id = aws_security_group.locker_pod.id
-  cidr_ipv4         = var.vpc_cidr_block
-  ip_protocol       = "-1"
-  description       = "Inside the VPC"
+# Pod Identity agent traffic to 169.254.170.23 is link-local and not governed by security groups, so no rule covers it.
+resource "aws_vpc_security_group_egress_rule" "locker_pod" {
+  for_each = local.locker_pod_egress
+
+  security_group_id            = aws_security_group.locker_pod.id
+  cidr_ipv4                    = each.value.cidr
+  referenced_security_group_id = each.value.sg
+  ip_protocol                  = each.value.protocol
+  from_port                    = each.value.port
+  to_port                      = each.value.port
+  description                  = each.value.description
 }
 
 resource "aws_vpc_security_group_ingress_rule" "node_from_cluster" {

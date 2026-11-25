@@ -7,9 +7,13 @@ templates:
   - consumer/pdb.yaml
 set:
   global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: runs two producers with Recreate and the producer flow
+    documentIndex: 0
     template: producer/workload.yaml
     asserts:
       - isKind:
@@ -29,6 +33,7 @@ tests:
           path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
           value: payments
   - it: rolls the consumer without losing a pod
+    documentIndex: 0
     template: consumer/workload.yaml
     asserts:
       - equal:
@@ -48,6 +53,7 @@ tests:
             name: SCHEDULER_FLOW
             value: consumer
   - it: scales the consumer with KEDA between 3 and 12
+    documentIndex: 0
     template: consumer/autoscaling.yaml
     asserts:
       - isKind:
@@ -62,6 +68,7 @@ tests:
           path: spec.maxReplicaCount
           value: 12
   - it: protects both flows with a PodDisruptionBudget
+    documentIndex: 0
     templates:
       - producer/pdb.yaml
       - consumer/pdb.yaml
