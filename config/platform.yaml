@@ -170,3 +170,7 @@ runners:
 ai:
   # IAM role that the AI review workflow assumes by OIDC (repository variable AI_REVIEW_ROLE_ARN holds its ARN); account shared_services.
   review_role_name: pay-shared-gha-ai-review
+  # Accounts of the cardholder data environment: the admin AI agent role is denied their log groups and metrics (placeholder, set the real id)
+  cde_account_ids: ["555555555555"]
+  # Recipients of the monthly budget notifications of the Bedrock use (placeholder, set real addresses)
+  budget_subscriber_emails: ["owner@example.com"]

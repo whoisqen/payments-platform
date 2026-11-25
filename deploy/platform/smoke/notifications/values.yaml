@@ -1,0 +1,13 @@
+# Allowlist; the trigger condition and the subscription selector both use it. Never add prod or a cde-* environment
+environments: [dev, stage]
+
+# RollingSync reaches this cell only after cell-0..2 are healthy, so one cell stands for the whole environment
+dispatchCell: cell-3
+
+# Secret keys are read by the notification services as $key
+secret:
+  name: argocd-notifications-secret
+  refreshInterval: 1h
+  secretStore: aws-secrets-manager
+  # JSON keys: github-dispatch-url, github-dispatch-token, alertmanager-url
+  remoteKey: pay/shared-services/argocd/notifications

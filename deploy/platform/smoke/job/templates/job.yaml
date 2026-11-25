@@ -1,0 +1,71 @@
+{{- if include "smoke.enabled" . }}
+{{- $s := .Values.smoke }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # A fixed name: BeforeHookCreation replaces the Job of the previous sync
+  name: smoke
+  labels:
+    {{- include "smoke.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  # A failed smoke is reported by the failed sync, never retried silently
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $s.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $s.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "smoke.labels" . | nindent 8 }}
+      annotations:
+        # In the mesh so the router accepts the service account principal; native sidecars let the Job finish
+        sidecar.istio.io/inject: "true"
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $s.serviceAccountName }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: smoke
+          image: {{ include "smoke.image" . | quote }}
+          command:
+            {{- toYaml $s.command | nindent 12 }}
+          env:
+            - name: SMOKE_ROUTER_URL
+              value: {{ printf "http://%s.%s.svc:%v" $s.routerService .Release.Namespace $s.routerPort | quote }}
+            - name: SMOKE_CELL
+              value: {{ .Values.global.cell | quote }}
+            - name: SMOKE_CELL_HEADER
+              value: {{ $s.cellHeader | quote }}
+            - name: SMOKE_TIMEOUT_SECONDS
+              value: {{ $s.testTimeoutSeconds | quote }}
+            {{- range .Values.credentials.properties }}
+            - name: SMOKE_{{ . | upper }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.credentials.secretName }}
+                  key: {{ . }}
+            {{- end }}
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}

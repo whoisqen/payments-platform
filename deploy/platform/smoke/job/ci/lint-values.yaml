@@ -1,0 +1,4 @@
+global:
+  registry: registry.example.test/acme
+  environment: dev
+  cell: cell-0

@@ -41,11 +41,19 @@ jobs:
       hold: ${{ steps.decide.outputs.hold }}
       sha: ${{ steps.decide.outputs.sha }}
     steps:
+      # the default branch: the script that reads the dispatch payload comes from main, never from the payload
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: github.event_name == 'repository_dispatch'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - id: decide
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
+          # untrusted: only ever read through the environment, validated by select_revision.py
+          DISPATCH_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
           INPUT_ENV: ${{ inputs.env }}
           INPUT_CELLS: ${{ inputs.cells }}
@@ -66,7 +74,9 @@ jobs:
               fi ;;
             repository_dispatch)
               mode=copy
-              if [ "$ACTION" = smoke-green-dev ]; then env=stage source=dev; else env=prod source=stage; fi ;;
+              if [ "$ACTION" = smoke-green-dev ]; then env=stage source=dev; else env=prod source=stage; fi
+              # promote the synced revision of the smoke run, not whatever main is now
+              sha=$(python3 tools/ci/promote/select_revision.py --action "$ACTION" --payload-env DISPATCH_PAYLOAD --main origin/main) ;;
             *)
               mode=copy env=$INPUT_ENV cells=$INPUT_CELLS
               if [ "$env" = stage ]; then source=dev; else source=stage; fi ;;

@@ -1,0 +1,69 @@
+suite: smoke notifications
+templates:
+  - configmap.yaml
+  - externalsecret.yaml
+tests:
+  - it: dispatches only for dev and stage in the trigger condition
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["trigger.smoke-green"]
+          pattern: "in \\['dev', 'stage'\\]"
+      - notMatchRegex:
+          path: data["trigger.smoke-green"]
+          pattern: "prod"
+      - notMatchRegex:
+          path: data["subscriptions"]
+          pattern: "prod|cde"
+      - notMatchRegex:
+          path: data["trigger.smoke-failed"]
+          pattern: "prod"
+  - it: refuses prod and cde environments through the schema
+    template: configmap.yaml
+    set:
+      environments: [dev, prod]
+    asserts:
+      - failedTemplate:
+          errorPattern: values don't meet the specifications
+  - it: sends the green trigger only after a succeeded and healthy sync, once per revisions
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["trigger.smoke-green"]
+          pattern: "phase == 'Succeeded' and app.status.health.status == 'Healthy'"
+      - matchRegex:
+          path: data["trigger.smoke-green"]
+          pattern: "oncePer: join\\(app.status.operationState.syncResult.revisions"
+  - it: dispatches smoke-green-<env> with a minimal payload and sends nothing to GitHub on failure
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["template.smoke-green"]
+          pattern: 'event_type": "smoke-green-\{\{index .app.metadata.labels "payments-platform/environment"\}\}"'
+      - matchRegex:
+          path: data["subscriptions"]
+          pattern: "recipients: \\[webhook:github-dispatch\\]\\n  selector: payments-platform/cell=cell-3,payments-platform/environment in \\(dev,stage\\)\\n  triggers: \\[smoke-green\\]"
+      - matchRegex:
+          path: data["subscriptions"]
+          pattern: "recipients: \\[webhook:alertmanager\\]\\n  selector: payments-platform/environment in \\(dev,stage\\)\\n  triggers: \\[smoke-failed\\]"
+      - notMatchRegex:
+          path: data["template.smoke-failed"]
+          pattern: "github"
+  - it: reads the GitHub URL, token and Alertmanager URL from the secret, never from the config
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["service.webhook.github-dispatch"]
+          pattern: "Bearer \\$github-dispatch-token"
+      - matchRegex:
+          path: data["service.webhook.github-dispatch"]
+          pattern: "url: \\$github-dispatch-url"
+  - it: takes the three keys from one shared-services secret
+    template: externalsecret.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.data
+          count: 3
+      - equal:
+          path: spec.data[1].remoteRef.key
+          value: pay/shared-services/argocd/notifications
