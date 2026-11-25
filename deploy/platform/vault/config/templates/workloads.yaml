@@ -1,0 +1,38 @@
+{{- if and .Values.bootstrap.enabled .Values.bootstrap.workloads.enabled }}
+{{- $b := .Values.bootstrap }}
+{{- $w := $b.workloads }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-workloads
+  labels:
+    {{- include "vault-config.labels" . | nindent 4 }}
+data:
+  {{- range $cell := $w.cells }}
+  {{- range $svc, $s := $w.services }}
+  pay-{{ $cell.name }}-{{ $svc }}.hcl: |
+    {{- range $s.paths }}
+    path "{{ $b.kvMount }}/data/+/{{ $cell.name }}/{{ . }}/*" {
+      capabilities = ["read"]
+    }
+    {{- end }}
+  {{- end }}
+  {{- end }}
+  workloads.sh: |
+    # Per-service read policies and Kubernetes auth roles of the cells; idempotent. Runs from bootstrap.sh at init, later with a break-glass token.
+    set -eu
+    log() { printf 'vault-workloads: %s\n' "$*"; }
+    dir=$(dirname "$0")
+    {{- range $cell := $w.cells }}
+    vault auth list -format=json | jq -e 'has("{{ $cell.authMount }}/")' >/dev/null || vault auth enable -path="{{ $cell.authMount }}" kubernetes
+    {{- range $svc, $s := $w.services }}
+    vault policy write "pay-{{ $cell.name }}-{{ $svc }}" "${dir}/pay-{{ $cell.name }}-{{ $svc }}.hcl" >/dev/null
+    vault write "auth/{{ $cell.authMount }}/role/{{ $cell.name }}-{{ $svc }}" \
+      bound_service_account_names="{{ join "," $s.serviceAccounts }}" \
+      bound_service_account_namespaces="{{ $w.namespace }}" \
+      policies="pay-{{ $cell.name }}-{{ $svc }}" \
+      token_ttl="{{ $w.tokenTtl }}" token_max_ttl="{{ $w.tokenTtl }}" >/dev/null
+    {{- end }}
+    log "{{ $cell.name }}: policies and roles written on auth/{{ $cell.authMount }}"
+    {{- end }}
+{{- end }}

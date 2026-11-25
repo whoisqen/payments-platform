@@ -65,10 +65,21 @@ redis:
 
 networkPolicy:
   enabled: true
-  # Pods of the Istio ingress gateway run the Envoy that calls the service
-  edgeNamespace: istio-ingress
+  # Pods of the Gateway API proxy of Gateway payments-edge (Istio labels them with the gateway name) call the service
+  edgeNamespace: payments-edge
   edgePodLabels:
-    istio: ingressgateway
+    gateway.networking.k8s.io/gateway-name: payments-edge
+  # Namespace where Prometheus runs; it scrapes the metrics port
+  monitoringNamespace: monitoring
+
+# Mesh identity: STRICT mTLS and an AuthorizationPolicy that admits only these callers
+istio:
+  peerAuthentication:
+    enabled: true
+  authorizationPolicy:
+    enabled: true
+    # Service account Istio creates for Gateway payments-edge: <gateway>-<gatewayClassName> in the edge namespace
+    gatewayPrincipal: cluster.local/ns/payments-edge/sa/payments-edge-istio
 
 serviceMonitor:
   enabled: true

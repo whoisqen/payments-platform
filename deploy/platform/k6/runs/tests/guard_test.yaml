@@ -1,0 +1,82 @@
+suite: stage-only render guard
+templates:
+  - guard.yaml
+  - cronjobs.yaml
+  - configmap-testruns.yaml
+  - externalsecret.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: stage
+  target.baseUrl: https://api.stage.payments.example.com
+  remoteWrite.url: https://metrics.example.test/api/v1/write
+release:
+  namespace: loadgen
+tests:
+  - it: renders on stage
+    template: cronjobs.yaml
+    asserts:
+      - hasDocuments:
+          count: 7
+  - it: refuses dev
+    template: guard.yaml
+    set:
+      global.environment: dev
+    asserts:
+      - failedTemplate:
+          errorPattern: renders only for stage
+  - it: refuses prod
+    template: guard.yaml
+    set:
+      global.environment: prod
+    asserts:
+      - failedTemplate:
+          errorPattern: renders only for stage
+  - it: refuses cde-prod
+    template: guard.yaml
+    set:
+      global.environment: cde-prod
+    asserts:
+      - failedTemplate:
+          errorPattern: renders only for stage
+  - it: refuses a prod or CDE target even on stage
+    template: guard.yaml
+    set:
+      target.baseUrl: https://api.cde-prod.payments.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: looks like a prod or CDE host
+  - it: refuses unresolved placeholders when the layer requires it
+    template: guard.yaml
+    set:
+      requireResolved: true
+      remoteWrite.url: REPLACE_REMOTE_WRITE_URL
+    asserts:
+      - failedTemplate:
+          errorPattern: remoteWrite.url is not resolved
+  - it: refuses a script that is not under tests/
+    template: configmap-testruns.yaml
+    set:
+      scenarios.load.script: load/scenarios/missing.js
+    asserts:
+      - failedTemplate:
+          errorPattern: does not exist under tests/
+  - it: guards the start of every job against non-stage, freeze and prod or CDE hosts
+    template: cronjobs.yaml
+    documentSelector:
+      path: metadata.name
+      value: k6-load
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].name
+          value: guard
+      - matchRegex:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].args[0]
+          pattern: '\[ "\$TARGET_ENV" = stage \] \|\| fail'
+      - matchRegex:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].args[0]
+          pattern: '\*prod\*\|\*cde\*'
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].env
+          content:
+            name: TARGET_ENV
+            value: stage

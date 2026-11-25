@@ -1,0 +1,114 @@
+{{- range $name, $s := .Values.scenarios }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k6-{{ $name }}
+  labels:
+    {{- include "k6.labels" (dict "root" $ "component" "scheduler") | nindent 4 }}
+    payments-platform/scenario: {{ $name }}
+spec:
+  {{- if $s.onDemand }}
+  # On demand only: never fires (31 February) and stays suspended; start it with kubectl create job --from=cronjob/k6-{{ $name }}
+  schedule: "0 0 31 2 *"
+  suspend: true
+  {{- else }}
+  schedule: {{ required (printf "scenarios.%s.schedule is required unless onDemand" $name) $s.schedule | quote }}
+  suspend: false
+  {{- end }}
+  timeZone: {{ $.Values.scheduler.timeZone }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ $.Values.scheduler.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ $.Values.scheduler.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "k6.labels" (dict "root" $ "component" "scheduler") | nindent 12 }}
+            payments-platform/scenario: {{ $name }}
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          serviceAccountName: {{ $.Values.scheduler.serviceAccountName }}
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 12345
+            runAsGroup: 12345
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            # The guard refuses to start outside stage, during a freeze or against a prod or CDE host, then names the run
+            - name: guard
+              image: {{ include "k6.image" (dict "Values" $.Values "name" "k6") | quote }}
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  fail() { echo "refusing to start: $1" >&2; exit 1; }
+                  [ "$TARGET_ENV" = stage ] || fail "environment '$TARGET_ENV' is not stage"
+                  [ "$FREEZE" != true ] || fail "the k6 freeze switch is on"
+                  host=$(echo "$BASE_URL" | sed -E 's#^[a-zA-Z]+://([^/:]+).*#\1#' | tr 'A-Z' 'a-z')
+                  case "$host" in *prod*|*cde*|"") fail "BASE_URL host '$host' looks like prod or the CDE";; esac
+                  run="$SCENARIO-$(date -u +%Y%m%d-%H%M%S)"
+                  sed "s/__RUN__/$run/g" "/testruns/$SCENARIO.yaml" > /work/testrun.yaml
+                  echo "TestRun $run"
+              env:
+                - name: SCENARIO
+                  value: {{ $name }}
+                - name: TARGET_ENV
+                  value: {{ $.Values.global.environment | quote }}
+                - name: FREEZE
+                  value: {{ $.Values.target.freeze | quote }}
+                - name: BASE_URL
+                  value: {{ $.Values.target.baseUrl | quote }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: testruns
+                  mountPath: /testruns
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+          containers:
+            - name: create
+              image: {{ include "k6.image" (dict "Values" $.Values "name" "kubectl") | quote }}
+              command: ["kubectl", "create", "-f", "/work/testrun.yaml"]
+              env:
+                - name: HOME
+                  value: /work
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+          volumes:
+            - name: testruns
+              configMap:
+                name: k6-testruns
+            - name: work
+              emptyDir:
+                sizeLimit: 16Mi
+{{- end }}

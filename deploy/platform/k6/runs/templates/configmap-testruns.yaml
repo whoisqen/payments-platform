@@ -1,0 +1,48 @@
+# One TestRun manifest per scenario; the CronJob fills __RUN__ (name and testid tag) and creates it
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-testruns
+  labels:
+    {{- include "k6.labels" (dict "root" . "component" "testruns") | nindent 4 }}
+data:
+  {{- range $name, $s := .Values.scenarios }}
+  {{- if not ($.Files.Get (printf "scripts/%s" $s.script)) }}{{ fail (printf "scenarios.%s.script %s does not exist under tests/" $name $s.script) }}{{ end }}
+  {{ $name }}.yaml: |
+    apiVersion: k6.io/v1alpha1
+    kind: TestRun
+    metadata:
+      name: __RUN__
+      namespace: {{ $.Release.Namespace }}
+      labels:
+        app.kubernetes.io/part-of: payments-platform
+        payments-platform/scenario: {{ $name }}
+    spec:
+      parallelism: {{ $s.parallelism }}
+      separate: {{ $.Values.runner.separate }}
+      # The operator deletes the TestRun and its pods when the run ends; results live in VictoriaMetrics under the testid
+      cleanup: post
+      arguments: {{ include "k6.arguments" (dict "root" $ "name" $name "env" $s.env) | quote }}
+      script:
+        localFile: /scripts/{{ $s.script }}
+      initializer:
+        {{- include "k6.podSpec" (dict "root" $ "scenario" $name "image" "k6" "withScripts" true) | nindent 8 }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+      starter:
+        {{- include "k6.podSpec" (dict "root" $ "scenario" $name "image" "starter" "withScripts" false) | nindent 8 }}
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      runner:
+        {{- include "k6.podSpec" (dict "root" $ "scenario" $name "image" "k6" "withScripts" true) | nindent 8 }}
+        resources:
+          {{- toYaml ($s.resources | default $.Values.runner.resources) | nindent 10 }}
+  {{- end }}

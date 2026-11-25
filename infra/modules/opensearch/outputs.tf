@@ -3,6 +3,11 @@ output "domain_arn" {
   value       = aws_opensearch_domain.this.arn
 }
 
+output "domain_name" {
+  description = "Name of the domain."
+  value       = aws_opensearch_domain.this.domain_name
+}
+
 output "endpoint" {
   description = "VPC endpoint of the domain."
   value       = aws_opensearch_domain.this.endpoint

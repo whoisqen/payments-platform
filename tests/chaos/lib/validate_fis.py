@@ -17,6 +17,16 @@ ACTIONS = {
     "aws:rds:failover-db-cluster": (set(), ("Clusters", "aws:rds:cluster")),
     "aws:ssm:send-automation-document": ({"documentArn"}, None),
 }
+# Tags the targets may select on: the default tags of infra/live/terragrunt.hcl (section 22) and the tag Karpenter puts on its nodes.
+# There is no az or role tag; an AZ is chosen with a filter on the resource attribute below.
+TARGET_TAG_KEYS = {"environment", "cell", "component", "karpenter.sh/nodepool"}
+# resourceType -> filter paths that select by attribute (DescribeSubnets / DescribeInstances fields).
+FILTER_PATHS = {
+    "aws:ec2:subnet": {"AvailabilityZone"},
+    "aws:ec2:instance": {"Placement.AvailabilityZone", "State.Name"},
+    "aws:ec2:spot-instance": {"Placement.AvailabilityZone", "State.Name"},
+    "aws:rds:cluster": set(),
+}
 ISO_DURATION = re.compile(r"^PT(\d+H)?(\d+M)?(\d+S)?$")
 SELECTION = re.compile(r"^(ALL|RANDOM|COUNT\(\d+\)|PERCENT\(\d+\))$")
 
@@ -56,6 +66,13 @@ def _targets(targets):
             errors.append(f"target {name}: unknown keys {sorted(set(tg) - TARGET_KEYS)}")
         if "resourceType" not in tg or not ("resourceArns" in tg or "resourceTags" in tg):
             errors.append(f"target {name}: needs resourceType and resourceArns or resourceTags")
+        bad_tags = set(tg.get("resourceTags", {})) - TARGET_TAG_KEYS
+        if bad_tags:
+            errors.append(f"target {name}: resourceTags {sorted(bad_tags)} are not applied by infra")
+        allowed = FILTER_PATHS.get(tg.get("resourceType"), set())
+        bad_paths = {f.get("path") for f in tg.get("filters", [])} - allowed
+        if bad_paths:
+            errors.append(f"target {name}: filter paths {sorted(bad_paths)} not valid for {tg.get('resourceType')}")
         if not SELECTION.match(tg.get("selectionMode", "")):
             errors.append(f"target {name}: bad selectionMode")
     return errors

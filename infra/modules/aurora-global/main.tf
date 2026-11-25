@@ -29,6 +29,12 @@ locals {
   proxy_enabled    = local.working || (var.recovery_instance_count > 0 && var.proxy_secret_arn != null)
   proxy_cluster_id = local.working ? aws_rds_cluster.primary[0].id : aws_rds_cluster.secondary[var.region_name].id
   proxy_secret_arn = local.working ? aws_rds_cluster.primary[0].master_user_secret[0].secret_arn : var.proxy_secret_arn
+
+  proxy_auth_entries = { for e in var.proxy_auth_entries : e.name => e }
+  proxy_auth_secret_arns = merge(
+    { for n, e in local.proxy_auth_entries : n => e.secret_arn if e.secret_arn != null },
+    { for n, s in aws_secretsmanager_secret.proxy_auth : n => s.arn },
+  )
 }
 
 resource "aws_rds_cluster_parameter_group" "this" {
@@ -220,6 +226,18 @@ resource "aws_cloudwatch_metric_alarm" "global_lag" {
   tags = var.tags
 }
 
+# Shell only: the value is written out of band so it never lands in state; the same password sits in Vault for the pod and both rotate together.
+resource "aws_secretsmanager_secret" "proxy_auth" {
+  for_each = { for n, e in local.proxy_auth_entries : n => e if local.proxy_enabled && e.secret_arn == null }
+
+  region      = local.working ? null : var.region_name
+  name        = "${local.name}/proxy/${each.key}"
+  description = "RDS Proxy login ${each.key} of ${local.name}; JSON username and password, value set out of band"
+  kms_key_id  = var.kms_key_arn
+
+  tags = var.tags
+}
+
 resource "aws_iam_role" "proxy" {
   count = local.proxy_enabled ? 1 : 0
 
@@ -249,7 +267,7 @@ resource "aws_iam_role_policy" "proxy" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [local.proxy_secret_arn]
+        Resource = concat([local.proxy_secret_arn], values(local.proxy_auth_secret_arns))
       },
       {
         Effect   = "Allow"
@@ -277,6 +295,18 @@ resource "aws_db_proxy" "this" {
     iam_auth                  = "REQUIRED"
     client_password_auth_type = "POSTGRES_SCRAM_SHA_256"
     secret_arn                = local.proxy_secret_arn
+  }
+
+  dynamic "auth" {
+    for_each = local.proxy_auth_entries
+
+    content {
+      description               = auth.key
+      auth_scheme               = "SECRETS"
+      iam_auth                  = auth.value.iam_auth
+      client_password_auth_type = auth.value.client_password_auth_type
+      secret_arn                = local.proxy_auth_secret_arns[auth.key]
+    }
   }
 
   tags = var.tags

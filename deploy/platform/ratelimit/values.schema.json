@@ -238,6 +238,10 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "monitoringNamespace": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -366,6 +370,34 @@
     },
     "platform-common": {
       "type": "object"
+    },
+    "istio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "peerAuthentication": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "authorizationPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "gatewayPrincipal": {
+              "type": "string",
+              "pattern": "^cluster\\.local/ns/[^/]+/sa/[^/]+$"
+            }
+          }
+        }
+      }
     }
   }
 }

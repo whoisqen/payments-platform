@@ -1,0 +1,6 @@
+dependencies:
+- name: platform-common
+  repository: file://../../../charts/platform-common
+  version: 0.1.0
+digest: sha256:566dbdb9a18f54b853a4b806762f749293262cfeb531f491dc82352cbd17a9ba
+generated: "2026-11-25T16:07:11.394654091+02:00"

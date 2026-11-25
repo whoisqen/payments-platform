@@ -34,9 +34,9 @@ spec:
               - $values/deploy/platform/tempo/values.yaml
               - $values/deploy/platform/tempo/storage.yaml
             parameters:
-              # Span metrics go to vminsert of the victoria-metrics add-on, whose Service name holds the cluster name
+              # Span metrics go to vminsert of the victoria-metrics add-on (release name vm)
               - name: metricsGenerator.config.storage.remote_write[0].url
-                value: 'http://victoria-metrics-{{`{{ .name }}`}}-victoria-metrics-cluster-vminsert.victoria-metrics.svc:8480/insert/0/prometheus/api/v1/write'
+                value: 'http://vm-victoria-metrics-cluster-vminsert.victoria-metrics.svc:8480/insert/0/prometheus/api/v1/write'
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values

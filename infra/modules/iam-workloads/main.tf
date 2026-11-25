@@ -105,3 +105,58 @@ resource "aws_eks_pod_identity_association" "this" {
   role_arn        = aws_iam_role.this[each.key].arn
   tags            = var.tags
 }
+
+# Event producers get the MSK producer policy (IAM auth, write only) of the analytics cluster.
+resource "aws_iam_role_policy_attachment" "kafka_producer" {
+  for_each = var.kafka_producer_policy_arn == null ? toset([]) : toset(var.kafka_producers)
+
+  role       = aws_iam_role.this[each.key].name
+  policy_arn = var.kafka_producer_policy_arn
+}
+
+# YACE exports CloudWatch metrics to Prometheus; the CloudWatch read and tag discovery APIs have no resource-level scoping.
+resource "aws_iam_role" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  name                 = "${local.prefix}-yace"
+  permissions_boundary = var.permissions_boundary_arn
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Condition = {
+        StringEquals = { "aws:SourceAccount" = var.account_id }
+        ArnEquals    = { "aws:SourceArn" = var.cluster_arn }
+      }
+    }]
+  })
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  name = "cloudwatch-read"
+  role = aws_iam_role.yace[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "ReadMetricsAndTags"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics", "tag:GetResources"]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.yace.namespace
+  service_account = var.yace.service_account
+  role_arn        = aws_iam_role.yace[0].arn
+  tags            = var.tags
+}

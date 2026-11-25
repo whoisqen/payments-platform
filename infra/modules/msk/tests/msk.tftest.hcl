@@ -8,7 +8,7 @@ variables {
   kms_key_arn        = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0003"
   client_subnets     = ["subnet-1", "subnet-2", "subnet-3"]
   security_group_ids = ["sg-0001"]
-  log_group_name     = "/pay/prod/euc1/msk"
+  logs_kms_key_arn   = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0005"
   sink_bucket_arn    = "arn:aws:s3:::pay-prod-euc1-event-archive"
   sink_kms_key_arn   = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0004"
 
@@ -55,6 +55,64 @@ run "sink_writes_only_under_its_prefix" {
   assert {
     condition     = alltrue([for s in output.sink_bucket_policy_statements : s.Effect == "Allow"]) && output.sink_bucket_policy_statements[0].Resource[0] == "arn:aws:s3:::pay-prod-euc1-event-archive/events/*"
     error_message = "sink statements are scoped to the events prefix"
+  }
+}
+
+run "logs_go_to_an_encrypted_group_of_the_cluster" {
+  command = plan
+
+  assert {
+    condition     = aws_cloudwatch_log_group.brokers.name == "/aws/msk/pay-prod-euc1-msk" && aws_cloudwatch_log_group.brokers.kms_key_id == var.logs_kms_key_arn
+    error_message = "broker logs land in /aws/msk/<name> encrypted with the logs key"
+  }
+}
+
+run "producer_writes_but_never_reads" {
+  command = apply
+
+  override_resource {
+    target = aws_msk_configuration.this
+    values = { arn = "arn:aws:kafka:eu-central-1:111111111111:configuration/pay-prod-euc1-msk/cfg-1" }
+  }
+
+  override_resource {
+    target = aws_msk_cluster.this
+    values = {
+      arn                        = "arn:aws:kafka:eu-central-1:111111111111:cluster/pay-prod-euc1-msk/abcd-1234"
+      bootstrap_brokers_sasl_iam = "b-1.pay:9098,b-2.pay:9098,b-3.pay:9098"
+    }
+  }
+
+  assert {
+    condition = (
+      alltrue([for s in jsondecode(aws_iam_policy.producer.policy).Statement : alltrue([for a in s.Action : !contains(["kafka-cluster:ReadData", "kafka-cluster:AlterGroup", "kafka-cluster:AlterCluster", "kafka-cluster:CreateTopic", "kafka-cluster:DeleteTopic"], a)])]) &&
+      contains(flatten([for s in jsondecode(aws_iam_policy.producer.policy).Statement : s.Action]), "kafka-cluster:WriteData") &&
+      alltrue([for s in jsondecode(aws_iam_policy.producer.policy).Statement : !contains(s.Resource, "*")]) &&
+      contains(flatten([for s in jsondecode(aws_iam_policy.producer.policy).Statement : s.Resource]), "arn:aws:kafka:eu-central-1:111111111111:topic/pay-prod-euc1-msk/abcd-1234/*")
+    )
+    error_message = "the producer policy writes topics of this cluster only"
+  }
+
+  assert {
+    condition     = output.client_settings.port == 9098 && output.client_settings.security_protocol == "SASL_SSL" && output.client_settings.sasl_mechanism == "OAUTHBEARER"
+    error_message = "producers use SASL_SSL with IAM tokens on 9098"
+  }
+}
+
+run "dev_size_is_accepted" {
+  command = plan
+
+  variables {
+    env                 = "dev"
+    broker_count        = 3
+    instance_type       = "kafka.m7g.large"
+    volume_size_gb      = 100
+    enhanced_monitoring = "DEFAULT"
+  }
+
+  assert {
+    condition     = aws_msk_cluster.this.number_of_broker_nodes == 3 && aws_msk_cluster.this.enhanced_monitoring == "DEFAULT"
+    error_message = "dev runs three small brokers with default metrics"
   }
 }
 

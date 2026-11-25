@@ -20,12 +20,31 @@ storage:
   trace:
     # No keys: the AWS SDK takes the EKS Pod Identity credentials of the service account
     backend: s3
+    # Explicit so a chart bump cannot silently change the block format of the bucket
+    block:
+      version: vParquet4
+    # Parallel block reads of the queriers
+    pool:
+      max_workers: 200
+      queue_depth: 20000
 
 ingester:
   replicas: 3
+  # WAL and the blocks not yet flushed: at ~30 min per block and three copies, 20 Gi holds hours of the sampled volume
   persistence:
     enabled: true
     size: 20Gi
+    storageClass: gp3-encrypted
+  # Larger, fewer blocks: fewer S3 objects to list, compact and search; a trace is complete 10 s after its last span
+  config:
+    trace_idle_period: 10s
+    max_block_bytes: 524288000
+    max_block_duration: 30m
+    complete_block_timeout: 15m
+    flush_all_on_shutdown: true
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {memory: 4Gi}
   zoneAwareReplication:
     enabled: false
 distributor:
@@ -38,8 +57,13 @@ compactor:
   replicas: 2
   config:
     compaction:
-      # 14 days
+      # 14 days, equal to the bucket expiry
       block_retention: 336h
+      compacted_block_retention: 1h
+      compaction_window: 1h
+      # Blocks up to 100 GiB: few, large parquet files make search and trace lookup cheap
+      max_block_bytes: 107374182400
+      compaction_cycle: 30s
 
 # Span metrics and the service graph feed the trace-to-metrics links of Grafana
 metricsGenerator:

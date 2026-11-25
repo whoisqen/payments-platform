@@ -3,7 +3,11 @@
   "targets": {
     "cell-aurora": {
       "resourceType": "aws:rds:cluster",
-      "resourceTags": { "environment": "stage", "cell": "cell-1", "role": "payments" },
+      "resourceTags": {
+        "environment": "stage",
+        "cell": "cell-1",
+        "component": "aurora"
+      },
       "selectionMode": "ALL"
     }
   },
@@ -11,13 +15,31 @@
     "failover-writer": {
       "actionId": "aws:rds:failover-db-cluster",
       "description": "Promote a reader of the cell cluster to writer",
-      "targets": { "Clusters": "cell-aurora" }
+      "targets": {
+        "Clusters": "cell-aurora"
+      }
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
+    {
+      "source": "aws:cloudwatch:alarm",
+      "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop"
+    }
   ],
   "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
-  "tags": { "Name": "chaos-aurora-writer-failover", "environment": "stage", "failure-mode": "data-aurora-writer-failover" },
-  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+  "tags": {
+    "Name": "chaos-aurora-writer-failover",
+    "environment": "stage",
+    "failure-mode": "data-aurora-writer-failover"
+  },
+  "logConfiguration": {
+    "logSchemaVersion": 2,
+    "cloudWatchLogsConfiguration": {
+      "logGroupArn": "arn:aws:logs:${REGION}:${STAGE_ACCOUNT_ID}:log-group:/fis/${NAME_PREFIX}-stage-${REGION_SHORT}:*"
+    }
+  },
+  "experimentOptions": {
+    "accountTargeting": "single-account",
+    "emptyTargetResolutionMode": "fail"
+  }
 }

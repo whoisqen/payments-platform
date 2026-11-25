@@ -107,3 +107,30 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "kafka_producer_policy_arn" {
+  type        = string
+  default     = null
+  description = "producer_policy_arn of the msk module; null attaches nothing."
+}
+
+variable "kafka_producers" {
+  type        = list(string)
+  default     = ["router", "scheduler"]
+  description = "Services that publish events to MSK (the Hyperswitch Kafka store runs in router and scheduler)."
+
+  validation {
+    condition     = alltrue([for s in var.kafka_producers : contains(["router", "drainer", "scheduler"], s)])
+    error_message = "kafka_producers may list router, drainer and scheduler; the locker never publishes events."
+  }
+}
+
+variable "yace" {
+  type = object({
+    enabled         = optional(bool, true)
+    namespace       = optional(string, "monitoring")
+    service_account = optional(string, "yace")
+  })
+  default     = {}
+  description = "CloudWatch exporter role of the cluster: read-only metrics and tag discovery through Pod Identity."
+}

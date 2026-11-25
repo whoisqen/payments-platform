@@ -1,5 +1,10 @@
+locals {
+  platform     = yamldecode(file("${path.module}/../../config/platform.yaml"))
+  account_type = coalesce(var.account_type, try(local.platform.owner.github_account_type, "organization"))
+}
+
 module "organization" {
-  count         = var.account_type == "organization" ? 1 : 0
+  count         = local.account_type == "organization" ? 1 : 0
   source        = "./modules/organization"
   billing_email = var.billing_email
 }
@@ -20,8 +25,8 @@ module "rulesets" {
   required_checks    = var.required_checks
   approvals          = var.main_approvals
   tag_bypass         = var.tag_bypass
-  merge_queue        = var.account_type == "organization"
-  main_admin_bypass  = var.account_type == "user"
+  merge_queue        = local.account_type == "organization"
+  main_admin_bypass  = local.account_type == "user"
   require_signatures = var.require_signatures
 }
 
@@ -30,11 +35,11 @@ module "environments" {
   repository = module.repository.name
   branch     = var.default_branch
   teams      = var.teams
-  reviewers  = var.account_type == "organization"
+  reviewers  = local.account_type == "organization"
 }
 
 module "codeowners" {
-  count        = var.account_type == "organization" ? 1 : 0
+  count        = local.account_type == "organization" ? 1 : 0
   source       = "./modules/codeowners"
   organization = var.organization
   repository   = module.repository.name

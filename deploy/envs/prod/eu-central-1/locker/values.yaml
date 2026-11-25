@@ -15,6 +15,14 @@ locker:
   container:
     env:
       RUN_ENV: production
+  # The proxy endpoint is a placeholder until the aurora stack outputs it; the KMS alias is the locker key of this region
+  config:
+    database:
+      host: pay-prod-euc1-aurora-locker.proxy-example.eu-central-1.rds.amazonaws.com
+    secrets_management:
+      aws_kms:
+        key_id: alias/pay-prod-euc1-locker
+        region: eu-central-1
 
 locker-migrations:
   database:

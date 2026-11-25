@@ -1,0 +1,69 @@
+suite: vault workload policies
+templates:
+  - workloads.yaml
+  - bootstrap.yaml
+set:
+  snapshot.image.repository: registry.example.test/acme/vault-snapshot
+tests:
+  - it: lets the router read only its own and the shared paths of its cell
+    template: workloads.yaml
+    asserts:
+      - equal:
+          path: data["pay-cell-1-router.hcl"]
+          value: |
+            path "secret/data/+/cell-1/router/*" {
+              capabilities = ["read"]
+            }
+            path "secret/data/+/cell-1/shared/*" {
+              capabilities = ["read"]
+            }
+  - it: keeps the drainer away from the shared application keys
+    template: workloads.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["pay-cell-0-drainer.hcl"]
+          pattern: shared
+      - matchRegex:
+          path: data["pay-cell-0-drainer.hcl"]
+          pattern: 'capabilities = \["read"\]'
+  - it: binds each role to the service accounts of the payments namespace
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'auth/kubernetes-cell-2/role/cell-2-scheduler" \\\n\s+bound_service_account_names="scheduler-producer,scheduler-consumer" \\\n\s+bound_service_account_namespaces="payments"'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'auth/kubernetes/role/cell-0-router'
+  - it: never grants more than read
+    template: workloads.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["pay-spare-scheduler.hcl"]
+          pattern: (create|update|delete|list|sudo)
+  - it: runs the workload script from the bootstrap after the baseline
+    template: bootstrap.yaml
+    documentIndex: 1
+    asserts:
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: sh /workloads/workloads.sh
+  - it: mounts the workload script into the bootstrap Job
+    template: bootstrap.yaml
+    documentIndex: 2
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: workloads, configMap: {name: vault-workloads}}
+  - it: renders nothing when workloads are off
+    template: workloads.yaml
+    set:
+      bootstrap.workloads.enabled: false
+    asserts:
+      - hasDocuments: {count: 0}
+  - it: rejects a cell outside cell-0 to cell-3 and spare
+    template: workloads.yaml
+    set:
+      bootstrap.workloads.cells: [{name: cell-9, authMount: kubernetes-cell-9}]
+    asserts:
+      - failedTemplate: {}

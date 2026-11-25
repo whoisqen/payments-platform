@@ -131,3 +131,31 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "locker_pod_endpoint_cidrs" {
+  description = "CIDRs of the subnets that hold the VPC interface endpoints (KMS on 443); empty uses vpc_cidr_block. Ignored when locker_pod_endpoint_security_group_id is set."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for c in var.locker_pod_endpoint_cidrs : can(cidrhost(c, 0))])
+    error_message = "locker_pod_endpoint_cidrs must hold valid IPv4 CIDRs."
+  }
+}
+
+variable "locker_pod_database_cidrs" {
+  description = "CIDRs of the data subnets that hold the card-vault RDS Proxy (5432); empty uses vpc_cidr_block."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for c in var.locker_pod_database_cidrs : can(cidrhost(c, 0))])
+    error_message = "locker_pod_database_cidrs must hold valid IPv4 CIDRs."
+  }
+}
+
+variable "locker_pod_endpoint_security_group_id" {
+  description = "Security group of the VPC interface endpoints (vpc output endpoint_security_group_id); when set, the 443 rule targets it instead of CIDRs."
+  type        = string
+  default     = null
+}

@@ -595,6 +595,49 @@
     },
     "platform-common": {
       "type": "object"
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "hostname",
+        "gatewayClassName",
+        "certificate"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "hostname": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+        },
+        "gatewayClassName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuerKind",
+            "issuerName"
+          ],
+          "properties": {
+            "issuerKind": {
+              "enum": [
+                "ClusterIssuer",
+                "Issuer"
+              ]
+            },
+            "issuerName": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
     }
   },
   "additionalProperties": false,
@@ -608,6 +651,7 @@
     "autoscaling",
     "pdb",
     "networkPolicy",
-    "serviceAccount"
+    "serviceAccount",
+    "panel"
   ]
 }

@@ -1,1 +1,5 @@
-{{- include "platform-common.workload" (dict "root" . "cfg" .Values "name" "locker" "component" "locker") }}
+{{- $cfg := deepCopy .Values -}}
+{{- $env := merge (dict) (include "locker.configEnv" . | fromYaml) ($cfg.container.env | default dict) -}}
+{{- $_ := set $cfg.container "env" $env -}}
+{{- $_ = set $cfg.container "envFromSecrets" (append ($cfg.container.envFromSecrets | default list) (include "locker.secretName" .)) -}}
+{{- include "platform-common.workload" (dict "root" . "cfg" $cfg "name" "locker" "component" "locker") }}

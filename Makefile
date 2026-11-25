@@ -5,7 +5,7 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts observability/tests observability/slo/tests observability/lib/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 
@@ -83,10 +83,11 @@ test-terraform:
 
 test-helm:
 	@if [ -z "$(CHARTS)" ]; then echo "skip helm unittest: deploy/charts is empty"; exit 0; fi
-	@for c in $(CHARTS); do [ -d $$c/tests ] && helm unittest $$c; done
+	@for c in $(CHARTS); do [ -d $$c/tests ] && helm unittest -f 'tests/*_test.yaml' -f 'tests/*/*_test.yaml' $$c; done
 
 test-policy:
 	@if [ -d policy/opa ]; then opa test policy/opa -v; else echo "skip opa: policy/opa does not exist"; fi
+	opa test policy/tagging policy/scp/tag-policies
 	@if [ -d policy/kyverno ]; then kyverno test policy/kyverno; else echo "skip kyverno: policy/kyverno does not exist"; fi
 
 plan: ## terraform plan of every component of ENV (default dev); needs AWS credentials of the plan role
@@ -97,3 +98,34 @@ image-amd64: ## developer image for a laptop, loaded into the local docker; usag
 	@test -n "$(SERVICE)" || { echo "SERVICE is required"; exit 2; }
 	docker buildx build --platform linux/amd64 -f docker/$(SERVICE)/Dockerfile --load -t dev/$(SERVICE):local \
 		--build-arg SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct) .
+
+# Local runs of the blocking gates of .github/workflows/security.yml; outputs go to a fresh mktemp directory.
+.PHONY: security test-semgrep security-semgrep security-iac security-deps security-licenses security-workflows
+
+security: test-semgrep security-semgrep security-iac security-deps security-licenses security-workflows ## blocking DevSecOps gates of security.yml
+
+test-semgrep: ## tests of the repo Semgrep rules in policy/semgrep
+	semgrep --test --metrics=off policy/semgrep
+
+security-semgrep:
+	@out=$$(mktemp -d); \
+		semgrep scan --metrics=off $$(python3 tools/ci/security/gates.py semgrep-args policy/security/code/semgrep.toml) --sarif --output "$$out/semgrep.sarif" .; \
+		python3 tools/ci/security/gates.py sarif-gate policy/security/code/semgrep.toml "$$out/semgrep.sarif"
+
+security-iac:
+	@out=$$(mktemp -d); cp -r infra docker "$$out/"; tools/ci/security/render_charts.sh "$$out/rendered"; \
+		trivy config --config policy/security/iac/trivy-config.yaml --ignorefile policy/security/trivyignore.yaml --tf-exclude-downloaded-modules "$$out"; \
+		cd "$$out" && checkov --config-file "$(CURDIR)/policy/security/iac/checkov.yaml" -d infra -d rendered
+
+security-deps:
+	trivy fs --config policy/security/deps/trivy-vuln.yaml --ignorefile policy/security/trivyignore.yaml .
+
+security-licenses:
+	@out=$$(mktemp -d); \
+		syft scan dir:. --exclude './**/Cargo.lock' --exclude './**/target/**' --exclude './**/node_modules/**' -o "cyclonedx-json=$$out/sbom.json"; \
+		for ws in hyperswitch card-vault; do cargo metadata --format-version 1 --locked --manifest-path "vendor/$$ws/Cargo.toml" >"$$out/cargo-$$ws.json"; done; \
+		python3 tools/ci/security/license_check.py --policy policy/security/deps/licenses.toml --cyclonedx "$$out/sbom.json" \
+			--cargo-metadata "$$out/cargo-hyperswitch.json" --cargo-metadata "$$out/cargo-card-vault.json"
+
+security-workflows:
+	zizmor --config policy/security/workflows/zizmor.yml --min-severity "$$(python3 tools/ci/security/gates.py get policy/security/workflows/zizmor-gate.toml min_severity)" .github

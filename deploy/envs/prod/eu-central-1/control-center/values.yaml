@@ -1,3 +1,12 @@
 # Not layered: the digest comes from images.yaml through the ApplicationSet, the rest is here
 global:
   environment: prod
+
+container:
+  env:
+    default__endpoints__api_url: https://api.payments.example.com
+    default__features__is_live_mode: "true"
+
+panel:
+  # CloudFront serves this name; the VPC origin reaches the internal NLB of the Gateway
+  hostname: panel.payments.example.com

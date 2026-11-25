@@ -37,3 +37,8 @@ output "lag_alarm_arns" {
   description = "Global replication lag alarms keyed by region."
   value       = { for r, a in aws_cloudwatch_metric_alarm.global_lag : r => a.arn }
 }
+
+output "proxy_auth_secret_arns" {
+  description = "Secrets of the extra proxy logins keyed by name; the value is set out of band and mirrored in Vault."
+  value       = local.proxy_enabled ? local.proxy_auth_secret_arns : {}
+}

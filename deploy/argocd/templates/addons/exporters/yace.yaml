@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-yace
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # CloudWatch metrics of the managed services; every cluster exports only its own share (deploy/platform/exporters/yace/values.yaml)
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/addons: enabled
+  template:
+    metadata:
+      name: 'yace-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: yace
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: prometheus-yet-another-cloudwatch-exporter
+          targetRevision: 0.50.0
+          helm:
+            releaseName: yace
+            valueFiles:
+              - $values/deploy/platform/exporters/yace/values.yaml
+            parameters:
+              - name: platform.region
+                value: '{{`{{ index .metadata.labels "payments-platform/region" }}`}}'
+              # The cell is the last part of the cluster name (<prefix>-<env>-<region-short>-<cell>); other clusters keep the full name and match no cell
+              - name: platform.cell
+                value: '{{`{{ regexReplaceAll "^.*-(cell-[0-9]+|spare)$" .name "${1}" }}`}}'
+              # One cluster per environment and region carries this label and reads the regional and global services
+              - name: platform.shared
+                value: '{{`{{ index .metadata.labels "payments-platform/cloudwatch" }}`}}'
+              # A cluster with neither a cell nor the label has no job: no pod, no API calls
+              - name: replicaCount
+                value: '{{`{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") }}1{{ else }}0{{ end }}`}}'
+        # The NetworkPolicy of the exporter
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/exporters/yace/manifests
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

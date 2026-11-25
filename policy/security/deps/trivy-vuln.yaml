@@ -1,0 +1,13 @@
+# Blocking gate of `trivy fs` over the lockfiles: high and critical vulnerabilities that have a fixed version fail the job.
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1
+scan:
+  scanners:
+    - vuln
+  skip-dirs:
+    - "**/node_modules"
+    - "**/target"
+vulnerability:
+  ignore-unfixed: true
