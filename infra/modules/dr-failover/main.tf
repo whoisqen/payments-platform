@@ -1,6 +1,9 @@
 locals {
   name       = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
   lock_table = "${var.name_prefix}-${var.env}-${var.region_short}-dr-lock"
+  alarm_name = "${local.name}-working-region-down"
+
+  sns_kms_key_arn = var.sns_kms_key_arn != null ? var.sns_kms_key_arn : aws_kms_key.sns[0].arn
 }
 
 data "aws_region" "current" {}
@@ -29,9 +32,56 @@ resource "aws_dynamodb_table" "lock" {
   tags                        = var.tags
 }
 
+# CloudWatch alarms cannot publish to a topic encrypted with the AWS managed key alias/aws/sns: its policy cannot be changed
+# to admit cloudwatch.amazonaws.com. The topic therefore uses a customer managed key that grants CloudWatch.
+resource "aws_kms_key" "sns" {
+  count = var.sns_kms_key_arn == null ? 1 : 0
+
+  description              = "${local.name} failover trigger topic"
+  enable_key_rotation      = true
+  rotation_period_in_days  = 365
+  deletion_window_in_days  = 30
+  customer_master_key_spec = "SYMMETRIC_DEFAULT"
+  key_usage                = "ENCRYPT_DECRYPT"
+
+  # The alarm ARN is built as a string: referencing the alarm resource would form a cycle (alarm -> topic -> key).
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AccountAdministers"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${var.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "AlarmPublishes"
+        Effect    = "Allow"
+        Principal = { Service = "cloudwatch.amazonaws.com" }
+        Action    = ["kms:Decrypt", "kms:GenerateDataKey*"]
+        Resource  = "*"
+        Condition = {
+          StringEquals = { "aws:SourceAccount" = var.account_id }
+          ArnLike      = { "aws:SourceArn" = "arn:aws:cloudwatch:${data.aws_region.current.region}:${var.account_id}:alarm:${local.alarm_name}" }
+        }
+      },
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${local.name}-sns" })
+}
+
+resource "aws_kms_alias" "sns" {
+  count = var.sns_kms_key_arn == null ? 1 : 0
+
+  name          = "alias/${local.name}-sns"
+  target_key_id = aws_kms_key.sns[0].key_id
+}
+
 resource "aws_sns_topic" "failover" {
   name              = "${local.name}-trigger"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = local.sns_kms_key_arn
   tags              = var.tags
 }
 
@@ -53,7 +103,7 @@ resource "aws_sns_topic_policy" "failover" {
 
 # Route 53 publishes health check metrics in us-east-1, the standby region. Missing data does not start a failover.
 resource "aws_cloudwatch_metric_alarm" "working_region_down" {
-  alarm_name          = "${local.name}-working-region-down"
+  alarm_name          = local.alarm_name
   alarm_description   = "The Route 53 health check of ${var.source_region} failed for ${var.alarm_evaluation_periods} minutes: promote the standby data stores"
   namespace           = "AWS/Route53"
   metric_name         = "HealthCheckStatus"

@@ -12,3 +12,8 @@ output "function_name" {
   description = "Lambda function that runs scripts/dr/failover.py in warm mode."
   value       = aws_lambda_function.failover.function_name
 }
+
+output "sns_kms_key_arn" {
+  description = "Customer managed key of the failover trigger topic."
+  value       = local.sns_kms_key_arn
+}
