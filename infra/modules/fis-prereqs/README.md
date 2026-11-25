@@ -1,0 +1,10 @@
+# fis-prereqs
+
+What `fis-experiments` needs before apply, one unit per account in eu-central-1 (IAM is global).
+
+- Boundary `fis-experiment-boundary` (output `permissions_boundary_arn`) for the FIS and `chaos-automation` roles: the union of their inline policies. It covers FIS network ACLs (`managedByFIS`), ec2/rds/ssm/eks/MemoryDB/MSK reboot on environment-tagged or `<prefix>-<env>-*` resources, `chaos-*` SSM documents, PassRole and log delivery. Add any new action of fis-experiments here first.
+- Composite `<prefix>-<env>-<rs>-chaos-stop` (output `chaos_stop_alarm_arn`) is the OR of these children. The SLO burn (14.4) and `AuthorizationRateDrop` rules are Prometheus, which FIS cannot read: an Alertmanager webhook bridge (observability task) must put `Payments/Chaos StopSignal{Environment}` (1 firing, 0 otherwise) every minute. Silence counts as breaching and blocks experiments.
+- The payments edge is an NLB with no HTTP 5xx metric. `edge_target_groups` alarms on HealthyHostCount across AZs for 3 min. `aurora_cluster_ids` alarms when there is no writer for 5 min. Both outlast the fault each experiment injects. `additional_alarm_arns` adds alarms from observability.
+- `msk_cluster_name` (stage) creates `<prefix>-<env>-chaos-msk-reboot-broker`, which resolves the ARN, reboots `BrokerId` and waits for ACTIVE. With `automation_role_exists` it adds `kafka:RebootBroker` to the `chaos-automation` role.
+- Two steps: EKS rejects principals that do not exist. Apply this, then fis-experiments, then set `chaos.<env>.fis_roles_exist`. That gives the access entry (STANDARD, user `fis-experiment`, no access policy) on `eks_pod_actions.cluster_name` and the MSK role policy.
+- RBAC (deploy task): in each target namespace, add a ServiceAccount (`eks_pod_actions.service_account`) and a Role with configmaps get/create/patch/delete, pods create/list/get/delete/deletecollection, pods/ephemeralcontainers update, pods/exec create, apps/deployments get. A RoleBinding binds the Role to that ServiceAccount and to User `fis-experiment`. Check the rules against the AWS FIS EKS pod actions guide.
