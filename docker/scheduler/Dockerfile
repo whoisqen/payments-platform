@@ -55,7 +55,9 @@ COPY --from=build --chmod=0555 /out/scheduler /app/scheduler
 COPY --from=build --chmod=a=rX /src/config/deployments/ /app/config/deployments/
 COPY --from=build --chmod=a=rX /src/config/development.toml /app/config/development.toml
 USER 10001:10001
-# consumer is the default; the producer Deployment overrides it
-ENV SCHEDULER_FLOW=consumer
+# consumer is the default; the producer Deployment overrides it.
+# librdkafka (Kafka TLS to MSK) uses OpenSSL's default verify paths under /usr/lib/ssl, which distroless lacks;
+# SSL_CERT_FILE points OpenSSL at the bundle of the digest-pinned base instead
+ENV SCHEDULER_FLOW=consumer SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/app/scheduler"]
