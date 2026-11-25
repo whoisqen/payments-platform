@@ -240,3 +240,34 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "proxy_auth_entries" {
+  description = "Extra proxy logins for clients that cannot use IAM tokens; a null secret_arn makes the module create an empty KMS-encrypted secret, a passed-in secret must use kms_key_arn."
+  type = list(object({
+    name                      = string
+    secret_arn                = optional(string)
+    iam_auth                  = string
+    client_password_auth_type = optional(string, "POSTGRES_SCRAM_SHA_256")
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for e in var.proxy_auth_entries : contains(["DISABLED", "REQUIRED"], e.iam_auth)])
+    error_message = "iam_auth must be DISABLED or REQUIRED."
+  }
+
+  validation {
+    condition     = alltrue([for e in var.proxy_auth_entries : e.client_password_auth_type == "POSTGRES_SCRAM_SHA_256"])
+    error_message = "client_password_auth_type must be POSTGRES_SCRAM_SHA_256."
+  }
+
+  validation {
+    condition     = length(distinct([for e in var.proxy_auth_entries : e.name])) == length(var.proxy_auth_entries)
+    error_message = "proxy_auth_entries names must be unique."
+  }
+
+  validation {
+    condition     = alltrue([for e in var.proxy_auth_entries : can(regex("^[a-z][a-z0-9_]{0,62}$", e.name))])
+    error_message = "proxy_auth_entries names must be lower-case PostgreSQL role names."
+  }
+}

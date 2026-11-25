@@ -7,3 +7,4 @@ Aurora PostgreSQL 16 global database for one cell or for the locker.
 - Parameter groups: `rds.force_ssl`, TLS 1.3, `pg_stat_statements`, pgaudit; `rds.global_db_rpo` is never set.
 - Lag alarm above 5 s per secondary; KMS keys come from the `kms` module as inputs.
 - Unverified offline: whether a headless secondary publishes `AuroraGlobalDBReplicationLag`.
+- `proxy_auth_entries`: extra password logins (iam_auth DISABLED or REQUIRED, SCRAM) with a module-made empty KMS secret or a passed-in one; the `locker_app` value is set out of band, mirrored in Vault `secret/<env>/locker/database` and rotated together.
