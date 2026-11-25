@@ -201,6 +201,9 @@ actix-web = "4.11.0"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-bb8-diesel = "0.3.0"
 async-trait = "0.1.92"
+aws-config = { version = "1.8.14", features = ["behavior-version-latest"] }
+aws-credential-types = "1.2.14"
+aws-sigv4 = "1.4.5"
 base64 = "0.22.1"
 bb8 = "0.9.1"
 heck = "0.5.0"
@@ -242,7 +245,7 @@ openssl = "0.10.72"
 quick-xml = "0.31.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-rdkafka = "0.36.2"
+rdkafka = { version = "0.36.2", features = ["ssl"] }
 regex = "1.11.1"
 reqwest = { version = "0.13.5", features = [
     "json",

@@ -5,9 +5,9 @@ use error_stack::{report, ResultExt};
 use events::{EventsError, Message, MessagingInterface};
 use num_traits::ToPrimitive;
 use rdkafka::{
-    config::FromClientConfig,
+    config::FromClientConfigAndContext,
     message::{Header, OwnedHeaders},
-    producer::{BaseRecord, DefaultProducerContext, Producer, ThreadedProducer},
+    producer::{BaseRecord, Producer, ThreadedProducer},
 };
 use serde_json::Value;
 #[cfg(feature = "payouts")]
@@ -30,6 +30,7 @@ mod payment_intent_event;
 mod refund;
 mod refund_event;
 pub mod revenue_recovery;
+mod security;
 use diesel_models::refund::Refund;
 use hyperswitch_domain_models::payments::{payment_attempt::PaymentAttempt, PaymentIntent};
 use serde::Serialize;
@@ -167,6 +168,10 @@ pub struct KafkaSettings {
     revenue_recovery_topic: String,
     external_service_call_topic: String,
     account_updater_topic: String,
+    security_protocol: Option<security::KafkaSecurityProtocol>,
+    sasl_mechanism: Option<security::KafkaSaslMechanism>,
+    sasl_oauthbearer_provider: Option<security::KafkaOauthbearerProvider>,
+    aws_region: Option<String>,
 }
 
 /// Base rdkafka client configuration for this deployment's Kafka cluster.
@@ -183,6 +188,21 @@ pub(crate) fn base_client_config(brokers: &[String]) -> rdkafka::ClientConfig {
 }
 
 impl KafkaSettings {
+    fn security(&self) -> security::KafkaSecurity<'_> {
+        security::KafkaSecurity {
+            security_protocol: self.security_protocol,
+            sasl_mechanism: self.sasl_mechanism,
+            sasl_oauthbearer_provider: self.sasl_oauthbearer_provider,
+            aws_region: self.aws_region.as_deref(),
+        }
+    }
+
+    fn client_config(&self) -> rdkafka::ClientConfig {
+        let mut config = base_client_config(&self.brokers);
+        self.security().apply(&mut config);
+        config
+    }
+
     /// Brokers of the provisioned Kafka cluster this deployment's analytics
     /// events use. The Deja recording sink inherits these when
     /// `deja.recording.kafka.brokers` is left empty, so both producers share
@@ -288,6 +308,10 @@ impl KafkaSettings {
             ))
         })?;
 
+        self.security()
+            .validate()
+            .map_err(ApplicationError::InvalidConfigurationValueError)?;
+
         Ok(())
     }
 
@@ -332,7 +356,7 @@ pub struct KafkaProducer {
     account_updater_topic: String,
 }
 
-struct RdKafkaProducer(ThreadedProducer<DefaultProducerContext>);
+struct RdKafkaProducer(ThreadedProducer<security::KafkaClientContext>);
 
 impl std::fmt::Debug for RdKafkaProducer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -359,8 +383,11 @@ impl KafkaProducer {
     pub async fn create(conf: &KafkaSettings) -> MQResult<Self> {
         Ok(Self {
             producer: Arc::new(RdKafkaProducer(
-                ThreadedProducer::from_config(&base_client_config(&conf.brokers))
-                    .change_context(KafkaError::InitializationError)?,
+                ThreadedProducer::from_config_and_context(
+                    &conf.client_config(),
+                    conf.security().context(),
+                )
+                .change_context(KafkaError::InitializationError)?,
             )),
 
             fraud_check_analytics_topic: conf.fraud_check_analytics_topic.clone(),
@@ -793,5 +820,73 @@ impl MessagingInterface for KafkaProducer {
             .map_err(|(error, record)| report!(error).attach_printable(format!("{record:?}")))
             .change_context(KafkaError::GenericError)
             .change_context(EventsError::PublishError)
+    }
+}
+
+#[cfg(test)]
+mod security_settings_tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    fn parse(toml: &str) -> KafkaSettings {
+        config::Config::builder()
+            .add_source(config::File::from_str(toml, config::FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap()
+    }
+
+    #[test]
+    fn absent_security_settings_keep_plaintext_defaults() {
+        let settings = parse(r#"brokers = ["localhost:9092"]"#);
+        assert!(settings.security().validate().is_ok());
+        let config = settings.client_config();
+        assert_eq!(config.get("bootstrap.servers"), Some("localhost:9092"));
+        assert_eq!(config.get("security.protocol"), None);
+        assert_eq!(config.get("sasl.mechanism"), None);
+        assert_eq!(config.config_map().len(), 1);
+    }
+
+    #[test]
+    fn msk_iam_settings_map_to_sasl_ssl_oauthbearer() {
+        let settings = parse(
+            r#"
+            brokers = ["b-1.msk:9098", "b-2.msk:9098"]
+            security_protocol = "SASL_SSL"
+            sasl_mechanism = "OAUTHBEARER"
+            sasl_oauthbearer_provider = "aws_msk_iam"
+            aws_region = "eu-central-1"
+            "#,
+        );
+        assert_eq!(
+            settings.sasl_oauthbearer_provider,
+            Some(security::KafkaOauthbearerProvider::AwsMskIam)
+        );
+        assert_eq!(settings.aws_region.as_deref(), Some("eu-central-1"));
+        assert!(settings.security().validate().is_ok());
+        let config = settings.client_config();
+        assert_eq!(
+            config.get("bootstrap.servers"),
+            Some("b-1.msk:9098,b-2.msk:9098")
+        );
+        assert_eq!(config.get("security.protocol"), Some("SASL_SSL"));
+        assert_eq!(config.get("sasl.mechanism"), Some("OAUTHBEARER"));
+    }
+
+    #[test]
+    fn tls_only_settings_map_to_ssl() {
+        let settings = parse(
+            r#"
+            brokers = ["b-1.msk:9094"]
+            security_protocol = "SSL"
+            "#,
+        );
+        assert!(settings.security().validate().is_ok());
+        assert_eq!(
+            settings.client_config().get("security.protocol"),
+            Some("SSL")
+        );
     }
 }
