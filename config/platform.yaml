@@ -3,6 +3,8 @@
 owner:
   github_org: whoisqen
   github_repo: payments-platform
+  # organization or user: a repository of a personal account has no merge queue, so the ruleset requires an up-to-date branch instead
+  github_account_type: user
   contact_email: vladyslav.kozlov.it@gmail.com
   cost_center_prefix: cc
 
