@@ -1,0 +1,6 @@
+# Semgrep sources, excludes and blocking SARIF levels; registry packs are fetched at run time (no version pins).
+configs = ["policy/semgrep", "p/secrets", "p/rust", "p/python", "p/github-actions"]
+# the rule fixtures under policy/semgrep contain violations on purpose
+exclude = ["policy/semgrep", "vendor/hyperswitch-e2e", "node_modules", "target"]
+# ERROR rules map to the SARIF level error; warning and note are reported only
+block_levels = ["error"]

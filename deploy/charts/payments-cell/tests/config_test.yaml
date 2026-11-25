@@ -1,0 +1,138 @@
+suite: payments-cell hyperswitch configuration
+templates:
+  - charts/router/templates/workload.yaml
+  - charts/drainer/templates/workload.yaml
+  - charts/scheduler/templates/consumer/workload.yaml
+  - charts/scheduler/templates/producer/workload.yaml
+values:
+  - ../ci/lint-values.yaml
+set:
+  router.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  drainer.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  scheduler.image.digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  migrations.image.digest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+tests:
+  - it: gives the router every setting it needs to start
+    template: charts/router/templates/workload.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["-f", "/app/config/deployments/production.toml"]
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SERVER__HOST, value: "0.0.0.0"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MASTER_DATABASE__HOST, value: pay-dev-euc1-aurora-cell-0.proxy-example.eu-central-1.rds.amazonaws.com}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MASTER_DATABASE__PORT, value: "5432"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MASTER_DATABASE__DBNAME, value: hyperswitch}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MASTER_DATABASE__USERNAME, value: hs_app}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MASTER_DATABASE__MAX_POOL_SIZE, value: "10"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REPLICA_DATABASE__HOST, value: pay-dev-euc1-aurora-cell-0.proxy-example.eu-central-1.rds.amazonaws.com}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: PGSSLMODE, value: verify-full}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: PGSSLROOTCERT, value: /etc/ssl/certs/ca-certificates.crt}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__CLUSTER_ENABLED, value: "true"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__CLUSTER_URLS, value: "clustercfg.pay-dev-euc1-memorydb-cell-0.example.memorydb.eu-central-1.amazonaws.com:6379"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__TLS_ENABLED, value: "true"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: router}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SECRETS_MANAGEMENT__SECRETS_MANAGER, value: no_encryption}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER, value: aws_kms}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__ENCRYPTION_MANAGEMENT__AWS_KMS__KEY_ID, value: alias/pay-dev-euc1-cell-0}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__LOCKER__HOST, value: "http://locker.payments.svc.cluster.local:3001"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__LOCKER__MOCK_LOCKER, value: "false"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MULTITENANCY__TENANTS__PUBLIC__BASE_URL, value: "https://api.dev.payments.example.com"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__MULTITENANCY__GLOBAL_TENANT__SCHEMA, value: public}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__EMAIL__ACTIVE_EMAIL_CLIENT, value: NO_EMAIL_CLIENT}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__EVENTS__SOURCE, value: logs}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__DRAINER__STREAM_NAME, value: DRAINER_STREAM}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__CORS__WILDCARD_ORIGIN, value: "false"}}
+  - it: gives the drainer the same stream and partitions as the router
+    template: charts/drainer/templates/workload.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["-f", "/app/config/deployments/drainer.toml"]
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__SERVER__HOST, value: "0.0.0.0"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__DRAINER__STREAM_NAME, value: DRAINER_STREAM}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__DRAINER__NUM_PARTITIONS, value: "64"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__MASTER_DATABASE__MAX_POOL_SIZE, value: "4"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__REDIS__USERNAME, value: drainer}}
+      - notContains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__LOCKER__HOST, value: "http://locker.payments.svc.cluster.local:3001"}}
+  - it: gives both scheduler flows one stream and group
+    template: charts/scheduler/templates/producer/workload.yaml
+    documentIndex: 0
+    asserts:
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SCHEDULER__STREAM, value: SCHEDULER_STREAM}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SCHEDULER__CONSUMER_GROUP, value: SCHEDULER_GROUP}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: scheduler}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: SCHEDULER_FLOW, value: producer}}
+  - it: reads every router secret from the ClusterSecretStore vault under the cell path
+    template: charts/router/templates/workload.yaml
+    documentIndex: 1
+    asserts:
+      - isKind: {of: ExternalSecret}
+      - equal: {path: spec.secretStoreRef, value: {kind: ClusterSecretStore, name: vault}}
+      - equal: {path: spec.target.name, value: router-vault}
+      - lengthEqual: {path: spec.data, count: 12}
+      - contains:
+          path: spec.data
+          content: {secretKey: ROUTER__SECRETS__MASTER_ENC_KEY, remoteRef: {key: dev/cell-0/shared/app, property: master_enc_key}}
+      - contains:
+          path: spec.data
+          content: {secretKey: ROUTER__MASTER_DATABASE__PASSWORD, remoteRef: {key: dev/cell-0/router/database, property: password}}
+      - contains:
+          path: spec.data
+          content: {secretKey: ROUTER__JWEKEY__VAULT_PRIVATE_KEY, remoteRef: {key: dev/cell-0/shared/locker, property: vault_private_key}}
+  - it: loads the Vault secret into the router container
+    template: charts/router/templates/workload.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content: {secretRef: {name: router-vault}}
+  - it: keeps the drainer on its own Vault paths
+    template: charts/drainer/templates/workload.yaml
+    documentIndex: 1
+    asserts:
+      - equal: {path: spec.secretStoreRef.name, value: vault}
+      - equal:
+          path: spec.data
+          value:
+            - {secretKey: DRAINER__MASTER_DATABASE__PASSWORD, remoteRef: {key: dev/cell-0/drainer/database, property: password}}
+            - {secretKey: DRAINER__REDIS__PRIMARY_PASSWORD, remoteRef: {key: dev/cell-0/drainer/redis, property: password}}
+  - it: rejects a plaintext secret in a values file
+    template: charts/router/templates/workload.yaml
+    set:
+      router.container.env.ROUTER__SECRETS__JWT_SECRET: plain
+    asserts:
+      - failedTemplate:
+          errorPattern: looks like a secret
+  - it: rejects a database password as plain env of the drainer
+    template: charts/drainer/templates/workload.yaml
+    set:
+      drainer.container.env.DRAINER__MASTER_DATABASE__PASSWORD: plain
+    asserts:
+      - failedTemplate:
+          errorPattern: looks like a secret
+  - it: rejects a cell layer that still has placeholder endpoints
+    template: charts/router/templates/workload.yaml
+    set:
+      router.container.env.ROUTER__MASTER_DATABASE__HOST: writer.invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: set global.hyperswitch.database.host
+  - it: mounts the RDS CA bundle when a direct Aurora endpoint needs it
+    template: charts/drainer/templates/workload.yaml
+    documentIndex: 0
+    set:
+      global.hyperswitch.database.caBundleConfigMap: rds-ca-bundle
+    asserts:
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: PGSSLROOTCERT, value: /etc/ssl/rds/ca.pem}}
+      - contains: {path: spec.template.spec.volumes, content: {name: rds-ca, configMap: {name: rds-ca-bundle, items: [{key: ca.pem, path: ca.pem}]}}}
+  - it: switches events to Kafka with the brokers of the environment
+    template: charts/router/templates/workload.yaml
+    documentIndex: 0
+    set:
+      global.hyperswitch.events.kafka: true
+      global.hyperswitch.events.brokers: ["b-1.example.kafka.eu-central-1.amazonaws.com:9098"]
+    asserts:
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__EVENTS__SOURCE, value: kafka}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__EVENTS__KAFKA__INTENT_ANALYTICS_TOPIC, value: hyperswitch-payment-intent-events}}

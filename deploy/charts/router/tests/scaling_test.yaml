@@ -4,9 +4,13 @@ templates:
   - pdb.yaml
 set:
   global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: has a PodDisruptionBudget of 10 percent
+    documentIndex: 0
     template: pdb.yaml
     asserts:
       - isKind:
@@ -15,6 +19,7 @@ tests:
           path: spec.maxUnavailable
           value: 10%
   - it: scales the Rollout on CPU and requests per pod
+    documentIndex: 0
     template: autoscaling.yaml
     asserts:
       - isKind:

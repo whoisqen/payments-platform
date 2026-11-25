@@ -77,4 +77,7 @@ inputs = {
   proxy_subnet_ids          = dependency.vpc.outputs.subnet_ids["data"]
   availability_zones        = include.envcommon.locals.env_cfg.azs["us-east-2"]
   writer_az                 = include.envcommon.locals.env_cfg.azs["us-east-2"][0]
+
+  # The locker reads a static password once at start; the same value is in Vault secret/<env>/locker/database and both rotate together.
+  proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]
 }

@@ -162,11 +162,71 @@ run "log_retention_follows_the_input" {
   }
 }
 
-run "locker_pod_group_is_separate_from_the_node_group" {
+run "locker_pod_egress_defaults_to_the_vpc" {
   command = plan
 
   assert {
-    condition     = aws_security_group.locker_pod.name != aws_security_group.node.name && aws_vpc_security_group_egress_rule.locker_pod_vpc.cidr_ipv4 == var.vpc_cidr_block
-    error_message = "the locker pod group is its own group with VPC-only egress"
+    condition     = aws_security_group.locker_pod.name != aws_security_group.node.name
+    error_message = "the locker pod group is its own group"
   }
+
+  assert {
+    condition = (
+      length(aws_vpc_security_group_egress_rule.locker_pod) == 5 &&
+      alltrue([for r in aws_vpc_security_group_egress_rule.locker_pod : r.cidr_ipv4 == var.vpc_cidr_block && r.from_port == r.to_port]) &&
+      toset([for r in aws_vpc_security_group_egress_rule.locker_pod : "${r.ip_protocol}/${r.from_port}"]) == toset(["tcp/443", "tcp/5432", "udp/53", "tcp/53", "tcp/15012"])
+    )
+    error_message = "without inputs the locker pods reach only 443, 5432, DNS and istiod inside the VPC"
+  }
+}
+
+run "locker_pod_egress_uses_subnets_and_endpoint_group" {
+  command = plan
+
+  variables {
+    locker_pod_endpoint_cidrs             = ["10.104.0.0/19"]
+    locker_pod_database_cidrs             = ["10.104.96.0/24", "10.104.97.0/24", "10.104.98.0/24"]
+    locker_pod_endpoint_security_group_id = "sg-0endpoints"
+  }
+
+  assert {
+    condition = (
+      length(aws_vpc_security_group_egress_rule.locker_pod) == 7 &&
+      length([for r in aws_vpc_security_group_egress_rule.locker_pod : r if r.from_port == 443]) == 1 &&
+      aws_vpc_security_group_egress_rule.locker_pod["https-endpoints"].referenced_security_group_id == "sg-0endpoints" &&
+      aws_vpc_security_group_egress_rule.locker_pod["https-endpoints"].cidr_ipv4 == null
+    )
+    error_message = "the endpoint group replaces the 443 CIDR rules"
+  }
+
+  assert {
+    condition = (
+      toset([for r in aws_vpc_security_group_egress_rule.locker_pod : r.cidr_ipv4 if r.from_port == 5432]) == toset(var.locker_pod_database_cidrs) &&
+      alltrue([for r in aws_vpc_security_group_egress_rule.locker_pod : r.ip_protocol == "tcp" && r.to_port == 5432 if r.from_port == 5432])
+    )
+    error_message = "5432 goes to the data subnets only"
+  }
+}
+
+run "locker_pod_endpoint_cidrs_without_group" {
+  command = plan
+
+  variables {
+    locker_pod_endpoint_cidrs = ["10.104.0.0/19", "10.104.32.0/19", "10.104.64.0/19"]
+  }
+
+  assert {
+    condition     = length(aws_vpc_security_group_egress_rule.locker_pod) == 7 && toset([for r in aws_vpc_security_group_egress_rule.locker_pod : r.cidr_ipv4 if r.from_port == 443]) == toset(var.locker_pod_endpoint_cidrs)
+    error_message = "443 goes to each endpoint CIDR when no endpoint group is set"
+  }
+}
+
+run "locker_pod_cidrs_are_validated" {
+  command = plan
+
+  variables {
+    locker_pod_database_cidrs = ["0.0.0.0/33"]
+  }
+
+  expect_failures = [var.locker_pod_database_cidrs]
 }

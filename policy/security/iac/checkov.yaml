@@ -1,0 +1,22 @@
+# Checkov OSS has no severities without a Prisma key: only hard-fail-on blocks, Trivy carries the severity gate.
+framework:
+  - terraform
+  - kubernetes
+compact: true
+quiet: true
+download-external-modules: false
+hard-fail-on:
+  - CKV_AWS_16  # RDS storage not encrypted
+  - CKV_AWS_17  # RDS instance publicly accessible
+  - CKV_AWS_20  # S3 bucket ACL grants public read
+  - CKV_AWS_57  # S3 bucket ACL grants public write
+  - CKV_AWS_24  # security group opens 22 to 0.0.0.0/0
+  - CKV_AWS_25  # security group opens 3389 to 0.0.0.0/0
+  - CKV_AWS_7   # KMS customer key without rotation
+  - CKV_K8S_16  # privileged container
+  - CKV_K8S_17  # hostPID
+  - CKV_K8S_18  # hostIPC
+  - CKV_K8S_19  # hostNetwork
+  - CKV_K8S_20  # allowPrivilegeEscalation
+# Waivers: one check id per line, each with a trailing comment giving the reason (enforced by tools/ci/tests/security).
+skip-check: []

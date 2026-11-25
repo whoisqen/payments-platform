@@ -44,10 +44,11 @@ variable "allow_rebase_merge" {
   default = false
 }
 
-# Add "ci-gate" and "spec-gate" here once the CI workflows exist; an empty list lets PRs merge without checks.
+# ci-gate waits for every check job of ci.yml (spec-gate, security and the test stages included), so it is the one required check.
+# The advisory AI review is never required.
 variable "required_checks" {
   type    = list(string)
-  default = []
+  default = ["ci-gate"]
 }
 
 variable "main_approvals" {
@@ -119,12 +120,12 @@ variable "github_token" {
 }
 
 variable "account_type" {
-  description = "organization or user: a user account has no organization settings, teams or merge queue."
+  description = "organization or user: a user account has no organization settings, teams or merge queue. Null takes owner.github_account_type from config/platform.yaml."
   type        = string
-  default     = "organization"
+  default     = null
 
   validation {
-    condition     = contains(["organization", "user"], var.account_type)
+    condition     = var.account_type == null || contains(["organization", "user"], coalesce(var.account_type, "user"))
     error_message = "account_type must be organization or user."
   }
 }

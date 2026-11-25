@@ -97,3 +97,34 @@ image-amd64: ## developer image for a laptop, loaded into the local docker; usag
 	@test -n "$(SERVICE)" || { echo "SERVICE is required"; exit 2; }
 	docker buildx build --platform linux/amd64 -f docker/$(SERVICE)/Dockerfile --load -t dev/$(SERVICE):local \
 		--build-arg SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct) .
+
+# Local runs of the blocking gates of .github/workflows/security.yml; outputs go to a fresh mktemp directory.
+.PHONY: security test-semgrep security-semgrep security-iac security-deps security-licenses security-workflows
+
+security: test-semgrep security-semgrep security-iac security-deps security-licenses security-workflows ## blocking DevSecOps gates of security.yml
+
+test-semgrep: ## tests of the repo Semgrep rules in policy/semgrep
+	semgrep --test --metrics=off policy/semgrep
+
+security-semgrep:
+	@out=$$(mktemp -d); \
+		semgrep scan --metrics=off $$(python3 tools/ci/security/gates.py semgrep-args policy/security/code/semgrep.toml) --sarif --output "$$out/semgrep.sarif" .; \
+		python3 tools/ci/security/gates.py sarif-gate policy/security/code/semgrep.toml "$$out/semgrep.sarif"
+
+security-iac:
+	@out=$$(mktemp -d); cp -r infra docker "$$out/"; tools/ci/security/render_charts.sh "$$out/rendered"; \
+		trivy config --config policy/security/iac/trivy-config.yaml --ignorefile policy/security/trivyignore.yaml --tf-exclude-downloaded-modules "$$out"; \
+		cd "$$out" && checkov --config-file "$(CURDIR)/policy/security/iac/checkov.yaml" -d infra -d rendered
+
+security-deps:
+	trivy fs --config policy/security/deps/trivy-vuln.yaml --ignorefile policy/security/trivyignore.yaml .
+
+security-licenses:
+	@out=$$(mktemp -d); \
+		syft scan dir:. --exclude './**/Cargo.lock' --exclude './**/target/**' --exclude './**/node_modules/**' -o "cyclonedx-json=$$out/sbom.json"; \
+		for ws in hyperswitch card-vault; do cargo metadata --format-version 1 --locked --manifest-path "vendor/$$ws/Cargo.toml" >"$$out/cargo-$$ws.json"; done; \
+		python3 tools/ci/security/license_check.py --policy policy/security/deps/licenses.toml --cyclonedx "$$out/sbom.json" \
+			--cargo-metadata "$$out/cargo-hyperswitch.json" --cargo-metadata "$$out/cargo-card-vault.json"
+
+security-workflows:
+	zizmor --config policy/security/workflows/zizmor.yml --min-severity "$$(python3 tools/ci/security/gates.py get policy/security/workflows/zizmor-gate.toml min_severity)" .github

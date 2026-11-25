@@ -5,3 +5,12 @@ global:
 autoscaling:
   minReplicas: 3
   maxReplicas: 3
+
+container:
+  env:
+    default__endpoints__api_url: https://api.dev.payments.example.com
+    default__features__is_live_mode: "false"
+
+panel:
+  # CloudFront serves this name; the VPC origin reaches the internal NLB of the Gateway
+  hostname: panel.dev.payments.example.com

@@ -6,6 +6,15 @@ global:
   region: eu-central-1
   dataCidrs: ["10.120.0.0/16"]
   endpointCidrs: ["10.120.255.0/24"]
+  hyperswitch:
+    requireEndpoints: true
+    database:
+      host: pay-dev-euc1-aurora-cell-0.proxy-example.eu-central-1.rds.amazonaws.com
+    redis:
+      host: clustercfg.pay-dev-euc1-memorydb-cell-0.example.memorydb.eu-central-1.amazonaws.com
+    tenant:
+      baseUrl: https://api.dev.payments.example.com
+      controlCenterUrl: https://panel.dev.payments.example.com
 router:
   image:
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

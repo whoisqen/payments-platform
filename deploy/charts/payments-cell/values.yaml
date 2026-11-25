@@ -7,3 +7,37 @@ global:
   dataCidrs: []
   # VPC interface endpoints reached by the snapshot step of the migrations Job
   endpointCidrs: []
+  # Hyperswitch settings shared by router, drainer and scheduler; defaults live in platform-common (hyperswitch/_defaults.tpl).
+  # Secrets are not here: each chart maps them to Vault paths <kvMount>/<env>/<cell>/{router,drainer,scheduler,shared}/...
+  hyperswitch:
+    requireEndpoints: true
+    # File of vendor/hyperswitch/config/deployments baked into the images: sandbox.toml points connectors at PSP test endpoints
+    configFile: production.toml
+    logLevel: INFO
+    database:
+      # RDS Proxy endpoint of the cell (infra aurora-global output proxy_endpoint); readerHost empty means the same endpoint
+      host: ""
+      readerHost: ""
+      port: 5432
+      name: hyperswitch
+      user: hs_app
+      sslMode: verify-full
+    redis:
+      # MemoryDB cluster configuration endpoint; ACL users per service, TLS always on
+      host: ""
+      port: 6379
+      clusterEnabled: true
+      tls: true
+    kms:
+      # Empty derives alias/pay-<env>-<region short>-<cell>
+      keyAlias: ""
+    tenant:
+      # Public API host of the environment and the panel URL used in user e-mails and redirects
+      baseUrl: ""
+      controlCenterUrl: ""
+    drainer:
+      streamName: DRAINER_STREAM
+      numPartitions: 64
+    events:
+      kafka: false
+      brokers: []

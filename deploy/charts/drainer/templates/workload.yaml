@@ -1,1 +1,1 @@
-{{- include "platform-common.workload" (dict "root" . "cfg" .Values "name" "drainer" "component" "drainer") }}
+{{- include "platform-common.workload" (dict "root" . "cfg" .Values "name" "drainer" "component" "drainer" "hyperswitch" .Values.hyperswitch "secrets" .Values.secrets) }}

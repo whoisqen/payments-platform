@@ -19,6 +19,12 @@ syft = "1.28.0"
 cosign = "2.5.3"
 container-structure-test = "1.19.3"
 crane = "0.20.6"
+# scanners of .github/workflows/security.yml
+"pipx:semgrep" = "1.131.0"
+"pipx:checkov" = "3.2.450"
+"pipx:pip-audit" = "2.9.0"
+"pipx:zizmor" = "1.11.0"
+"github:EmbarkStudios/cargo-deny" = "0.18.3"
 
 [settings]
 experimental = true

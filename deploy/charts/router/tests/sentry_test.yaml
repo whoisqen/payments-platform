@@ -3,6 +3,9 @@ templates:
   - workload.yaml
 set:
   global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 tests:
   - it: reads the DSN from a secret that may be missing, so the service starts without Sentry
@@ -14,10 +17,14 @@ tests:
             secretRef:
               name: router-sentry-dsn
               optional: true
-  - it: renders no ExternalSecret while no remote key is set
+  - it: renders only the Vault ExternalSecret while no remote key is set
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
+      - equal:
+          path: metadata.name
+          value: router-vault
+        documentIndex: 1
   - it: renders the ExternalSecret of the DSN with the remote key of the environment
     set:
       container.sentryDsn.remoteKey: pay/stage/sentry/router-dsn

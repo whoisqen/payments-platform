@@ -6,6 +6,7 @@
 {{- include "platform-common.deployment" . -}}
 {{- end -}}
 {{- include "platform-common.sentryDsn" . -}}
+{{- include "platform-common.vaultSecret" . -}}
 {{- end }}
 
 {{/* The DSN of the service in Sentry, from AWS Secrets Manager; rendered only when container.sentryDsn.remoteKey is set */}}

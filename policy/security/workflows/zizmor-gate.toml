@@ -1,0 +1,2 @@
+# Lowest zizmor severity that fails the job; lower findings go to code scanning only.
+min_severity = "high"
