@@ -83,7 +83,7 @@ test-terraform:
 
 test-helm:
 	@if [ -z "$(CHARTS)" ]; then echo "skip helm unittest: deploy/charts is empty"; exit 0; fi
-	@for c in $(CHARTS); do [ -d $$c/tests ] && helm unittest $$c; done
+	@for c in $(CHARTS); do [ -d $$c/tests ] && helm unittest -f 'tests/*_test.yaml' -f 'tests/*/*_test.yaml' $$c; done
 
 test-policy:
 	@if [ -d policy/opa ]; then opa test policy/opa -v; else echo "skip opa: policy/opa does not exist"; fi

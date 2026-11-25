@@ -35,9 +35,9 @@ spec:
               # Who may log in and with which role, generated from config access.grafana_groups
               - $values/deploy/platform/grafana/access.yaml
             parameters:
-              # The Service names of the victoria-metrics and alertmanager add-ons hold the cluster name
+              # vmselect of the victoria-metrics add-on (release name vm); the alertmanager Service holds the cluster name
               - name: env.VM_URL
-                value: 'http://victoria-metrics-{{`{{ .name }}`}}-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus'
+                value: 'http://vm-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus'
               - name: env.ALERTMANAGER_URL
                 value: 'http://alertmanager-{{`{{ .name }}`}}.monitoring.svc:9093'
               - name: grafana\.ini.server.root_url
