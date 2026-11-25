@@ -1,28 +1,56 @@
 {
-  "description": "Hypothesis: with one AZ unreachable the stage cell keeps the SLOs on two AZs (confirm 5xx below 0.01%, overhead p99 below 150 ms) and RTO is 1 min. Stop: chaos-stop alarm (burn rate 14.4 or authorization rate drop above 2 pp).",
+  "description": "Hypothesis: with ${REGION}a unreachable the stage cell keeps the SLOs on two AZs (confirm 5xx below 0.01%, overhead p99 below 150 ms) and RTO is 1 min. Stop: chaos-stop alarm (burn rate 14.4 or authorization rate drop above 2 pp).",
   "targets": {
     "az-subnets": {
       "resourceType": "aws:ec2:subnet",
-      "resourceTags": { "environment": "stage", "cell": "cell-1", "az": "${REGION_SHORT}-az1" },
+      "resourceTags": {
+        "environment": "stage",
+        "component": "vpc"
+      },
+      "filters": [
+        {
+          "path": "AvailabilityZone",
+          "values": [
+            "${REGION}a"
+          ]
+        }
+      ],
       "selectionMode": "ALL"
     }
   },
   "actions": {
     "disrupt-az": {
       "actionId": "aws:network:disrupt-connectivity",
-      "description": "Block all traffic of the app and data subnets of one AZ",
-      "parameters": { "scope": "all", "duration": "PT10M" },
-      "targets": { "Subnets": "az-subnets" }
+      "description": "Block all traffic of every subnet (public, private, data) of the workload VPC in one AZ",
+      "parameters": {
+        "scope": "all",
+        "duration": "PT10M"
+      },
+      "targets": {
+        "Subnets": "az-subnets"
+      }
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
+    {
+      "source": "aws:cloudwatch:alarm",
+      "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop"
+    }
   ],
   "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
-  "tags": { "Name": "chaos-az-loss", "environment": "stage", "failure-mode": "compute-az-loss" },
+  "tags": {
+    "Name": "chaos-az-loss",
+    "environment": "stage",
+    "failure-mode": "compute-az-loss"
+  },
   "logConfiguration": {
     "logSchemaVersion": 2,
-    "cloudWatchLogsConfiguration": { "logGroupArn": "arn:aws:logs:${REGION}:${STAGE_ACCOUNT_ID}:log-group:/fis/${NAME_PREFIX}-stage-${REGION_SHORT}:*" }
+    "cloudWatchLogsConfiguration": {
+      "logGroupArn": "arn:aws:logs:${REGION}:${STAGE_ACCOUNT_ID}:log-group:/fis/${NAME_PREFIX}-stage-${REGION_SHORT}:*"
+    }
   },
-  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+  "experimentOptions": {
+    "accountTargeting": "single-account",
+    "emptyTargetResolutionMode": "fail"
+  }
 }

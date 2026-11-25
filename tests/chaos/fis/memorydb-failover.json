@@ -6,15 +6,31 @@
       "description": "Run failover-shard on one shard of the stage cell cluster",
       "parameters": {
         "documentArn": "arn:aws:ssm:${REGION}:${STAGE_ACCOUNT_ID}:document/${NAME_PREFIX}-stage-chaos-memorydb-failover-shard",
-        "documentParameters": "{\"ClusterName\":\"${NAME_PREFIX}-stage-${REGION_SHORT}-cell-1-memorydb\",\"ShardName\":\"0001\"}",
+        "documentParameters": "{\"ClusterName\":\"${NAME_PREFIX}-stage-${REGION_SHORT}-memorydb-cell-1\",\"ShardName\":\"0001\",\"AutomationAssumeRole\":\"arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-automation\"}",
         "maxDuration": "PT10M"
       }
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
+    {
+      "source": "aws:cloudwatch:alarm",
+      "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop"
+    }
   ],
   "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
-  "tags": { "Name": "chaos-memorydb-failover", "environment": "stage", "failure-mode": "data-memorydb-failover" },
-  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+  "tags": {
+    "Name": "chaos-memorydb-failover",
+    "environment": "stage",
+    "failure-mode": "data-memorydb-failover"
+  },
+  "logConfiguration": {
+    "logSchemaVersion": 2,
+    "cloudWatchLogsConfiguration": {
+      "logGroupArn": "arn:aws:logs:${REGION}:${STAGE_ACCOUNT_ID}:log-group:/fis/${NAME_PREFIX}-stage-${REGION_SHORT}:*"
+    }
+  },
+  "experimentOptions": {
+    "accountTargeting": "single-account",
+    "emptyTargetResolutionMode": "fail"
+  }
 }

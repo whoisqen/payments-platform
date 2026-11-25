@@ -1,24 +1,59 @@
 {
-  "description": "Hypothesis: losing one payments node leaves PDB and pod anti-affinity intact, Karpenter replaces it and the SLOs hold. Stop: chaos-stop alarm.",
+  "description": "Hypothesis: losing one payments node of cell-1 in ${REGION}a leaves PDB and pod anti-affinity intact, Karpenter replaces it and the SLOs hold. Stop: chaos-stop alarm.",
   "targets": {
     "payments-node": {
       "resourceType": "aws:ec2:instance",
-      "resourceTags": { "environment": "stage", "karpenter.sh/nodepool": "payments" },
-      "filters": [{ "path": "State.Name", "values": ["running"] }],
+      "resourceTags": {
+        "environment": "stage",
+        "cell": "cell-1",
+        "karpenter.sh/nodepool": "payments"
+      },
+      "filters": [
+        {
+          "path": "Placement.AvailabilityZone",
+          "values": [
+            "${REGION}a"
+          ]
+        },
+        {
+          "path": "State.Name",
+          "values": [
+            "running"
+          ]
+        }
+      ],
       "selectionMode": "COUNT(1)"
     }
   },
   "actions": {
     "terminate-node": {
       "actionId": "aws:ec2:terminate-instances",
-      "description": "Terminate one random node of the payments NodePool",
-      "targets": { "Instances": "payments-node" }
+      "description": "Terminate one random node of the payments NodePool in one AZ",
+      "targets": {
+        "Instances": "payments-node"
+      }
     }
   },
   "stopConditions": [
-    { "source": "aws:cloudwatch:alarm", "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop" }
+    {
+      "source": "aws:cloudwatch:alarm",
+      "value": "arn:aws:cloudwatch:${REGION}:${STAGE_ACCOUNT_ID}:alarm:${NAME_PREFIX}-stage-${REGION_SHORT}-chaos-stop"
+    }
   ],
   "roleArn": "arn:aws:iam::${STAGE_ACCOUNT_ID}:role/${NAME_PREFIX}-stage-${REGION_SHORT}-fis-experiment",
-  "tags": { "Name": "chaos-node-loss", "environment": "stage", "failure-mode": "compute-node-notready" },
-  "experimentOptions": { "accountTargeting": "single-account", "emptyTargetResolutionMode": "fail" }
+  "tags": {
+    "Name": "chaos-node-loss",
+    "environment": "stage",
+    "failure-mode": "compute-node-notready"
+  },
+  "logConfiguration": {
+    "logSchemaVersion": 2,
+    "cloudWatchLogsConfiguration": {
+      "logGroupArn": "arn:aws:logs:${REGION}:${STAGE_ACCOUNT_ID}:log-group:/fis/${NAME_PREFIX}-stage-${REGION_SHORT}:*"
+    }
+  },
+  "experimentOptions": {
+    "accountTargeting": "single-account",
+    "emptyTargetResolutionMode": "fail"
+  }
 }
