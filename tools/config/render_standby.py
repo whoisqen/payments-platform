@@ -29,9 +29,10 @@ def render(cfg, env):
     s = short(standby)
     cidrs = d["standby"][standby]
     host = lambda region, kind, name, suffix, tail="": f"{prefix}-{ENV}-{short(region)}-{kind}-{name}{suffix}{tail}"
-    # The cluster endpoint of the local global-database secondary: read-only until promotion, then the writer, so promotion needs no values change.
+    # The cluster endpoint of the local global-database secondary: read-only until promotion, then the writer; only the migrations Job uses it
     writer = lambda name: f"{host(standby, 'aurora', name, '')}.cluster-{d['rds_suffix']}.{standby}.rds.amazonaws.com"
-    reader = lambda name: f"{host(standby, 'aurora', name, '')}.cluster-ro-{d['rds_suffix']}.{standby}.rds.amazonaws.com"
+    # The RDS Proxy of the secondary (aurora-global output proxy_endpoint); it follows the cluster through promotion
+    proxy = lambda name: f"{host(standby, 'aurora', name, '')}.proxy-{d['rds_suffix']}.{standby}.rds.amazonaws.com"
     redis = lambda name: f"clustercfg.{prefix}-{ENV}-{s}-memorydb-{name}.{d['memorydb_suffix']}.memorydb.{standby}.amazonaws.com"
     base = ROOT / "deploy" / "envs" / ENV
     cells = sorted(p.name for p in (base / work).iterdir() if p.name.startswith("cell-") or p.name == "spare")
@@ -40,41 +41,37 @@ def render(cfg, env):
         "# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values\n"
         f"global:\n  region: {standby}\n  dataCidrs:\n{lines(cidrs['data_cidrs'], 4)}  endpointCidrs:\n{lines(cidrs['endpoint_cidrs'], 4)}")
     for c in cells:
-        w_host, r_host, r_redis = writer(c), reader(c), redis(c)
-        files[f"{standby}/{c}/values.yaml"] = f"""# Cell {c} in the standby region: local Aurora secondary and MemoryDB, ready to become the writer on promotion; endpoints are placeholders until infra/live exports them
+        r_redis = redis(c)
+        # Tenant, users (<cell>-<service>), locker host and the rest of global.hyperswitch come from envs/<env>/values.yaml, shared with the working region
+        files[f"{standby}/{c}/values.yaml"] = f"""# Cell {c} in the standby region: local Aurora secondary (through RDS Proxy) and MemoryDB, ready to become the writer on promotion; endpoints are placeholders until infra/live exports them
 global:
   cell: {c}
+  hyperswitch:
+    database:
+      # aurora-global output proxy_endpoint; the proxy has no read-only endpoint, so replica reads use it too
+      host: {proxy(c)}
+    redis:
+      host: {r_redis}
+    kms:
+      # Cell key of the kms-set stack in this region
+      keyAlias: alias/{prefix}-{ENV}-{s}-{c}
+      region: {standby}
 
+# Migrations run only where the writer is; enable after promotion
 migrations:
   enabled: false
   database:
-    host: {w_host}
-
-router:
-  container:
-    env:
-      ROUTER__MASTER_DATABASE__HOST: {w_host}
-      ROUTER__REPLICA_DATABASE__HOST: {r_host}
-      ROUTER__REDIS__HOST: {r_redis}
+    host: {writer(c)}
 
 drainer:
   container:
     env:
-      DRAINER__MASTER_DATABASE__HOST: {w_host}
-      DRAINER__REDIS__HOST: {r_redis}
       REDIS_ADDRESS: {r_redis}:6379
 
 scheduler:
-  producer:
-    container:
-      env:
-        ROUTER__MASTER_DATABASE__HOST: {w_host}
-        ROUTER__REDIS__HOST: {r_redis}
   consumer:
     container:
       env:
-        ROUTER__MASTER_DATABASE__HOST: {w_host}
-        ROUTER__REDIS__HOST: {r_redis}
         REDIS_ADDRESS: {r_redis}:6379
 """
     files[f"{standby}/locker/values.yaml"] = f"""# Locker of the standby region; its database is the local global-database secondary
