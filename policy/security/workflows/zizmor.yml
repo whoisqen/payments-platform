@@ -1,2 +1,10 @@
-# zizmor audit settings (regular persona, pedantic off); per-rule waivers go under rules.<id>.ignore with a comment giving the reason.
-rules: {}
+# zizmor audit settings (regular persona, pedantic off); each waiver is <file>:<line> with a comment giving the reason.
+rules:
+  github-env:
+    ignore:
+      # the line comes from the reviewed tools/ci/buildkit/buildkit.env after buildkit_pin_check.py validated its format
+      - action.yml:31
+  dangerous-triggers:
+    ignore:
+      # every job runs only for a successful push run of images or hotfix on main or release/*, never for a pull request
+      - promote.yml:3
