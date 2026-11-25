@@ -47,3 +47,15 @@ test('shedding phases follow capacity', () => {
   assert.deepEqual([loadPhase(2000, 2000), loadPhase(2500, 2000), loadPhase(5000, 2000)], ['within', 'over', 'heavy']);
   assert.equal(Math.max(...shedProfile(2000).stages.map((s) => s.to)), 5000);
 });
+
+test('hostOf reads the host without the URL global that k6 lacks', async () => {
+  const { hostOf, guardReasons } = await import('../lib/stage-guard.js');
+  assert.equal(hostOf('https://api.stage.pay.example.com/payments'), 'api.stage.pay.example.com');
+  assert.equal(hostOf('https://user:pw@API.Stage.Example.com:8443/x?q=1'), 'api.stage.example.com');
+  assert.equal(hostOf('http://[::1]:8080/'), '[::1]');
+  assert.equal(hostOf('not a url'), '');
+  const base = { TARGET_ENV: 'stage', FREEZE: 'false', OPEN_INCIDENTS: '0' };
+  assert.deepEqual(guardReasons({ ...base, BASE_URL: 'https://api.stage.pay.example.com' }), []);
+  assert.equal(guardReasons({ ...base, BASE_URL: 'https://api.prod.pay.example.com' }).length, 1);
+  assert.equal(guardReasons({ ...base, BASE_URL: 'https://locker.cde.example.com' }).length, 1);
+});
