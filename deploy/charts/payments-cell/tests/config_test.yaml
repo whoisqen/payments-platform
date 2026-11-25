@@ -31,7 +31,7 @@ tests:
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__CLUSTER_ENABLED, value: "true"}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__CLUSTER_URLS, value: "clustercfg.pay-dev-euc1-memorydb-cell-0.example.memorydb.eu-central-1.amazonaws.com:6379"}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__TLS_ENABLED, value: "true"}}
-      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: router}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: cell-0-router}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SECRETS_MANAGEMENT__SECRETS_MANAGER, value: no_encryption}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER, value: aws_kms}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__ENCRYPTION_MANAGEMENT__AWS_KMS__KEY_ID, value: alias/pay-dev-euc1-cell-0}}
@@ -54,7 +54,7 @@ tests:
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__DRAINER__STREAM_NAME, value: DRAINER_STREAM}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__DRAINER__NUM_PARTITIONS, value: "64"}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__MASTER_DATABASE__MAX_POOL_SIZE, value: "4"}}
-      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__REDIS__USERNAME, value: drainer}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: DRAINER__REDIS__USERNAME, value: cell-0-drainer}}
       - notContains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__LOCKER__HOST, value: "http://locker.payments.svc.cluster.local:3001"}}
   - it: gives both scheduler flows one stream and group
     template: charts/scheduler/templates/producer/workload.yaml
@@ -62,7 +62,7 @@ tests:
     asserts:
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SCHEDULER__STREAM, value: SCHEDULER_STREAM}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__SCHEDULER__CONSUMER_GROUP, value: SCHEDULER_GROUP}}
-      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: scheduler}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: ROUTER__REDIS__USERNAME, value: cell-0-scheduler}}
       - contains: {path: "spec.template.spec.containers[0].env", content: {name: SCHEDULER_FLOW, value: producer}}
   - it: reads every router secret from the ClusterSecretStore vault under the cell path
     template: charts/router/templates/workload.yaml

@@ -122,8 +122,31 @@ variable "maintenance_window" {
 }
 
 variable "users" {
-  description = "ACL users keyed by name with their access string; they authenticate with IAM, so no password exists."
+  description = "IAM-authenticated ACL users keyed by service with their access string; no password exists."
   type        = map(string)
+  default     = {}
+}
+
+variable "password_users" {
+  description = "Password-authenticated ACL users keyed by service with their access string, for clients that cannot use IAM tokens; the password lives in Vault and is set out of band."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = length(setintersection(keys(var.users), keys(var.password_users))) == 0
+    error_message = "a user is either in users (IAM) or in password_users, not both."
+  }
+}
+
+variable "user_name_prefix" {
+  description = "Prefix of every MemoryDB user name, for example cell-0-; user names are unique per account and region, so cells of one region need distinct prefixes."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = can(regex("^([a-z][a-z0-9-]*-)?$", var.user_name_prefix))
+    error_message = "user_name_prefix must be empty or lower-case letters, digits and hyphens ending with a hyphen."
+  }
 }
 
 variable "sns_topic_arn" {
