@@ -125,7 +125,8 @@ exporters:
 service:
   extensions: [health_check]
   telemetry:
-    metrics: {level: detailed, address: 0.0.0.0:8888}
+    # the chart already serves the collector metrics on 8888; collector 0.165 rejects an address key here
+    metrics: {level: detailed}
   pipelines:
     logs/detect:
       receivers: [otlp]

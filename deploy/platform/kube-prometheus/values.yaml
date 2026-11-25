@@ -5,6 +5,161 @@ grafana:
 alertmanager:
   enabled: false
 
+# observability/alerts is the one rule source: the chart rules duplicate Watchdog, lack team and runbook labels and read the histograms dropped below
+defaultRules:
+  create: false
+
+# Set by the add-on: the central endpoints and the KMS alias of the cluster account (alias/<prefix>-<env>-<region-short>-ebs-nodes)
+platform:
+  remoteWriteUrl: ""
+  alertmanagerHost: ""
+  ebsKmsKeyId: ""
+
+# Own class: the central cluster also runs this add-on and its gp3-encrypted belongs to the victoria-metrics add-on.
+# Retain like every monitoring volume: the WAL may hold samples not yet sent; a released volume is removed by hand (2 x 20 GiB per cluster)
+extraManifests:
+  - |
+    apiVersion: storage.k8s.io/v1
+    kind: StorageClass
+    metadata:
+      name: gp3-monitoring
+    provisioner: ebs.csi.aws.com
+    parameters:
+      type: gp3
+      encrypted: "true"
+      kmsKeyId: {{ .Values.platform.ebsKmsKeyId | quote }}
+      fsType: ext4
+    reclaimPolicy: Retain
+    allowVolumeExpansion: true
+    volumeBindingMode: WaitForFirstConsumer
+
+# EKS runs the control plane: these targets cannot be scraped and would stay down
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+# kube-proxy on EKS binds its metrics to 127.0.0.1
+kubeProxy:
+  enabled: false
+
+kubeApiServer:
+  serviceMonitor:
+    metricRelabelings:
+      # The request, response and etcd latency histograms are the largest series sets of a cluster and no rule or dashboard reads them
+      - sourceLabels: [__name__]
+        regex: (apiserver|etcd|workqueue|rest_client|apiextensions|aggregator|authentication|authorization|watch_cache|field_validation)_.+_bucket
+        action: drop
+
+kubelet:
+  serviceMonitor:
+    # The chart scrapes cAdvisor and the resource endpoint every 10 s; one interval for all keeps the deduplication of the central store exact
+    interval: 30s
+    cAdvisorInterval: 30s
+    resourceInterval: 30s
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: (kubelet_.+|storage_operation_.+|csi_operations_.+|volume_operation_.+|rest_client_.+|workqueue_.+|kubelet_runtime_operations_.+)_bucket
+        action: drop
+    cAdvisorMetricRelabelings:
+      # The chart defaults, repeated because a list replaces them
+      - sourceLabels: [__name__]
+        action: drop
+        regex: container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)
+      - sourceLabels: [__name__]
+        action: drop
+        regex: container_memory_mapped_file
+      - sourceLabels: [__name__]
+        action: drop
+        regex: container_(file_descriptors|tasks_state|threads_max)
+      - sourceLabels: [__name__, scope]
+        action: drop
+        regex: container_memory_failures_total;hierarchy
+      - sourceLabels: [__name__, interface]
+        action: drop
+        regex: container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*
+      # Per-device and spec series: one per container and device, read by nothing
+      - sourceLabels: [__name__]
+        action: drop
+        regex: container_(spec_.+|blkio_device_usage_total|sockets|ulimits_soft|last_seen|memory_failcnt|processes|start_time_seconds|oom_events_total)
+      # Pause containers and the cgroup slices of the node: no workload behind them
+      - sourceLabels: [__name__, container, image]
+        action: drop
+        regex: container_.+;POD;.*
+
+kube-state-metrics:
+  # Only the objects that rules and dashboards read; secrets and configmaps are left out, also so their names never leave the cluster
+  collectors:
+    - cronjobs
+    - daemonsets
+    - deployments
+    - horizontalpodautoscalers
+    - jobs
+    - namespaces
+    - nodes
+    - persistentvolumeclaims
+    - persistentvolumes
+    - poddisruptionbudgets
+    - pods
+    - replicasets
+    - resourcequotas
+    - services
+    - statefulsets
+  metricDenylist:
+    - kube_pod_tolerations
+    - kube_pod_nodeselectors
+    - kube_pod_status_scheduled_time
+    - kube_pod_container_status_last_terminated_timestamp
+    - kube_replicaset_status_observed_generation
+    - kube_.+_metadata_generation
+    - kube_.+_created
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 512Mi}
+  prometheus:
+    monitor:
+      interval: 30s
+
+prometheus-node-exporter:
+  # Every node, the tainted ones too, ahead of the workloads when a node runs short
+  priorityClassName: system-node-critical
+  tolerations:
+    - operator: Exists
+  extraArgs:
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+    # Hardware an EC2 instance does not have
+    - --no-collector.arp
+    - --no-collector.bcache
+    - --no-collector.btrfs
+    - --no-collector.fibrechannel
+    - --no-collector.infiniband
+    - --no-collector.ipvs
+    - --no-collector.mdadm
+    - --no-collector.nfs
+    - --no-collector.nfsd
+    - --no-collector.powersupplyclass
+    - --no-collector.rapl
+    - --no-collector.tapestats
+    - --no-collector.thermal_zone
+    - --no-collector.wifi
+    - --no-collector.zfs
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 96Mi}
+  prometheus:
+    monitor:
+      interval: 30s
+
+prometheusOperator:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 384Mi}
+
 prometheus:
   # One replica may be down (a node drain, an upgrade) while the other keeps scraping and evaluating rules
   podDisruptionBudget:
@@ -25,8 +180,77 @@ prometheus:
         labelSelector:
           matchLabels:
             app.kubernetes.io/name: prometheus
+    # Equal to central.dedupInterval of the add-on chart
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    # Head of about 500k series at ~4 KiB each, plus queries of the rules; no CPU limit so a WAL replay is not throttled
+    resources:
+      requests: {cpu: 500m, memory: 3Gi}
+      limits: {memory: 6Gi}
     retention: 6h
+    # 6 h of blocks (~1 GiB at 17k samples/s) plus a WAL that can hold hours of unsent samples when the central store is unreachable;
+    # the size cap keeps the volume from filling during such an outage
+    retentionSize: 16GB
+    walCompression: true
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3-monitoring
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 20Gi
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Delete
+      whenScaled: Retain
+    # The client certificate of the mutual TLS to the central stack (manifests/externalsecret.yaml)
+    secrets:
+      - prometheus-central-tls
+    remoteWrite:
+      - url: '{{ .Values.platform.remoteWriteUrl }}'
+        tlsConfig:
+          ca:
+            secret: {name: prometheus-central-tls, key: ca.crt}
+          cert:
+            secret: {name: prometheus-central-tls, key: tls.crt}
+          keySecret: {name: prometheus-central-tls, key: tls.key}
+        # Each replica sends ~17k samples/s; one shard moves ~2k samples per request at ~50 ms, so 2 shards carry the load and
+        # 30 drain a backlog after an outage at ~15x the live rate. Capacity is 5x the batch: memory per replica stays under 300k samples.
+        queueConfig:
+          capacity: 10000
+          maxSamplesPerSend: 2000
+          minShards: 2
+          maxShards: 30
+          batchSendDeadline: 5s
+          minBackoff: 100ms
+          maxBackoff: 10s
+          retryOnRateLimit: true
+        # The central store keeps no metric metadata
+        metadataConfig:
+          send: false
+        writeRelabelConfigs:
+          # Labels that the cardinality budget forbids (observability/standards): the series never leaves the cluster
+          - sourceLabels: [payment_id]
+            regex: .+
+            action: drop
+          - sourceLabels: [customer_id]
+            regex: .+
+            action: drop
+          - sourceLabels: [idempotency_key]
+            regex: .+
+            action: drop
+    # Alerts go to the Alertmanager cluster of the central stack over the same mutual TLS
+    additionalAlertManagerConfigs:
+      - scheme: https
+        tls_config:
+          ca_file: /etc/prometheus/secrets/prometheus-central-tls/ca.crt
+          cert_file: /etc/prometheus/secrets/prometheus-central-tls/tls.crt
+          key_file: /etc/prometheus/secrets/prometheus-central-tls/tls.key
+        static_configs:
+          - targets:
+              - '{{ .Values.platform.alertmanagerHost }}'
     # Every ServiceMonitor and rule of the platform charts is picked up, not only the ones with a release label
     serviceMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false

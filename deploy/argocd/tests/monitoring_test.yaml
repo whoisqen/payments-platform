@@ -1,0 +1,93 @@
+suite: monitoring add-ons collect logs, events and CloudWatch metrics and store them on encrypted volumes
+templates:
+  - addons/exporters/yace.yaml
+  - addons/otel-collector.yaml
+  - addons/central/alertmanager.yaml
+  - addons/central/tempo.yaml
+  - addons/central/grafana.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.dedupInterval: 30s
+  central.sentryUrl: https://sentry.example.test
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+tests:
+  - it: runs YACE in every cluster with add-ons from the pinned chart, under the service account of the IAM role
+    template: addons/exporters/yace.yaml
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels["payments-platform/addons"]
+          value: enabled
+      - equal:
+          path: spec.template.spec.destination.namespace
+          value: monitoring
+      - equal:
+          path: spec.template.spec.sources[0].chart
+          value: prometheus-yet-another-cloudwatch-exporter
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 0.50.0
+      - equal:
+          path: spec.template.spec.sources[0].helm.releaseName
+          value: yace
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: $values/deploy/platform/exporters/yace/values.yaml
+      - equal:
+          path: spec.template.spec.sources[1].path
+          value: deploy/platform/exporters/yace/manifests
+  - it: gives YACE the cell from the cluster name and the shared scope from the cluster label
+    template: addons/exporters/yace.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: platform.cell
+            value: '{{ regexReplaceAll "^.*-(cell-[0-9]+|spare)$" .name "${1}" }}'
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: platform.shared
+            value: '{{ index .metadata.labels "payments-platform/cloudwatch" }}'
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: replicaCount
+            value: '{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") }}1{{ else }}0{{ end }}'
+  - it: layers the container log and event overlay after the generated collector values
+    template: addons/otel-collector.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: $values/deploy/platform/otel-collector/values.yaml
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[1]
+          value: $values/deploy/platform/otel-collector/values-logs.yaml
+  - it: keeps the Alertmanager data on the encrypted retained class
+    template: addons/central/alertmanager.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: persistence.storageClass
+            value: gp3-encrypted
+  - it: addresses vminsert and vmselect by the fixed release name vm
+    template: addons/central/tempo.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].helm.parameters[0].value
+          value: http://vm-victoria-metrics-cluster-vminsert.victoria-metrics.svc:8480/insert/0/prometheus/api/v1/write
+  - it: points Grafana at vmselect of the release vm
+    template: addons/central/grafana.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: env.VM_URL
+            value: http://vm-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus

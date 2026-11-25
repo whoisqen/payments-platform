@@ -1,0 +1,187 @@
+# CloudWatch metrics of the managed AWS services for the alerts of observability/alerts (YACE). Set by the add-on:
+#   platform.region  region of the cluster
+#   platform.cell    cell of the cluster (cell-N or spare); other clusters export no cell resources
+#   platform.shared  "enabled" on the one cluster per environment and region that exports the regional and global services
+# GetMetricData is billed per metric and scrape: each resource is read by exactly one cluster, never by all of them.
+platform:
+  region: ""
+  cell: ""
+  shared: ""
+
+fullnameOverride: yace
+# The IAM role (Pod Identity association) is bound to this name in the namespace monitoring
+serviceAccount:
+  create: true
+  name: yace
+testConnection: false
+
+# Every 60 s: the CloudWatch alerts wait 2 to 5 minutes, a 300 s cycle would eat that window
+extraArgs:
+  scraping-interval: 60
+  disable-account-alias-lookup: true
+  cloudwatch-concurrency: 5
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  seccompProfile: {type: RuntimeDefault}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+resources:
+  requests: {cpu: 20m, memory: 64Mi}
+  limits: {memory: 256Mi}
+
+serviceMonitor:
+  enabled: true
+  # YACE refreshes once a minute; a faster scrape only stores the same value again
+  interval: 60s
+  timeout: 30s
+  metricRelabelings:
+    # The tags are already on every metric (exportedTagsOnMetrics)
+    - sourceLabels: [__name__]
+      regex: aws_.+_info
+      action: drop
+    # Metric names as the alerts spell them, whichever way YACE splits DBReplication and ClusterStatus.red
+    - sourceLabels: [__name__]
+      regex: aws_rds_aurora_global_db_?replication_lag_maximum
+      targetLabel: __name__
+      replacement: aws_rds_aurora_global_db_replication_lag_maximum
+    - sourceLabels: [__name__]
+      regex: aws_es_cluster_status_?red_maximum
+      targetLabel: __name__
+      replacement: aws_es_cluster_statusred_maximum
+    # Only the WebACL total (Rule="ALL"); the per-rule series would be counted twice by sum by (web_acl)
+    - sourceLabels: [__name__, dimension_Rule]
+      regex: aws_wafv2_.+;([^A].*|A|A[^L].*|AL|AL[^L].*|ALL.+)
+      action: drop
+    # CloudWatch dimensions and tags to the label names of the alerts
+    - {sourceLabels: [tag_cell], regex: (.+), targetLabel: cell}
+    - {sourceLabels: [dimension_DBInstanceIdentifier], regex: (.+), targetLabel: instance}
+    - {sourceLabels: [__name__, dimension_DBClusterIdentifier], regex: aws_rds_aurora_global_.+;(.+), targetLabel: global_cluster}
+    - {sourceLabels: [dimension_TableName], regex: (.+), targetLabel: table_name}
+    - {sourceLabels: [dimension_ReceivingRegion], regex: (.+), targetLabel: receiving_region}
+    - {sourceLabels: [dimension_DomainName], regex: (.+), targetLabel: domain_name}
+    - {sourceLabels: [dimension_Broker_ID], regex: (.+), targetLabel: broker_id}
+    - {sourceLabels: [dimension_Accelerator], regex: (.+), targetLabel: accelerator}
+    - {sourceLabels: [dimension_EndpointGroup], regex: (.+), targetLabel: endpoint_group}
+    - {sourceLabels: [dimension_NatGatewayId], regex: (.+), targetLabel: nat_gateway_id}
+    - {sourceLabels: [dimension_HealthCheckId], regex: (.+), targetLabel: health_check_id}
+    - {sourceLabels: [dimension_WebACL], regex: (.+), targetLabel: web_acl}
+    - {sourceLabels: [dimension_FirewallName], regex: (.+), targetLabel: firewall}
+    - {sourceLabels: [dimension_DistributionId], regex: (.+), targetLabel: distribution}
+    - {sourceLabels: [dimension_BackupVaultName], regex: (.+), targetLabel: backup_vault}
+    - {sourceLabels: [dimension_SourceBucket], regex: (.+), targetLabel: bucket}
+    - {sourceLabels: [dimension_DestinationBucket], regex: (.+), targetLabel: destination_bucket}
+    - {sourceLabels: [dimension_ClusterName], regex: (.+), targetLabel: cluster_name}
+    - {sourceLabels: [dimension_LoadBalancer], regex: (.+), targetLabel: load_balancer}
+    - {sourceLabels: [dimension_TargetGroup], regex: (.+), targetLabel: target_group}
+    # The ARN and the raw dimensions are carried by the mapped labels; dropping them halves the label bytes per series
+    - {regex: dimension_.+|name|account_id, action: labeldrop}
+
+# Periods: 60 s for the one-minute metrics with length 300 s, so the CloudWatch publishing delay never leaves a gap.
+# nilToZero false everywhere: the backup alerts depend on a series being absent, not zero.
+config: |-
+  apiVersion: v1alpha1
+  discovery:
+    exportedTagsOnMetrics:
+      AWS/RDS: [cell]
+      AWS/MemoryDB: [cell]
+    jobs:
+  {{- if regexMatch "^(cell-[0-9]+|spare)$" .Values.platform.cell }}
+      # Cell resources: the Aurora cluster and the MemoryDB cluster tagged with the cell of this cluster
+      - type: AWS/RDS
+        regions: [{{ .Values.platform.region }}]
+        searchTags:
+          - {key: cell, value: "^{{ .Values.platform.cell }}$"}
+        nilToZero: false
+        metrics:
+          - {name: AuroraReplicaLag, statistics: [Maximum], period: 60, length: 300}
+          - {name: CPUUtilization, statistics: [Average], period: 60, length: 300}
+      - type: AWS/MemoryDB
+        regions: [{{ .Values.platform.region }}]
+        searchTags:
+          - {key: cell, value: "^{{ .Values.platform.cell }}$"}
+        nilToZero: false
+        metrics:
+          - {name: DatabaseMemoryUsagePercentage, statistics: [Maximum], period: 60, length: 300}
+          - {name: EngineCPUUtilization, statistics: [Maximum], period: 60, length: 300}
+  {{- end }}
+  {{- if eq .Values.platform.shared "enabled" }}
+      # Aurora Global Database lag is published by the secondary clusters in the recovery regions
+      - type: AWS/RDS
+        regions: [us-east-1, us-east-2]
+        nilToZero: false
+        metrics:
+          - {name: AuroraGlobalDBReplicationLag, statistics: [Maximum], period: 60, length: 300}
+      - type: AWS/DynamoDB
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: ThrottledRequests, statistics: [Sum], period: 60, length: 300}
+          - {name: ReplicationLatency, statistics: [Maximum], period: 60, length: 300}
+      - type: AWS/Kafka
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: KafkaDataLogsDiskUsed, statistics: [Average], period: 300, length: 600}
+      - type: AWS/ES
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: ClusterStatus.red, statistics: [Maximum], period: 60, length: 300}
+          - {name: FreeStorageSpace, statistics: [Minimum], period: 60, length: 300}
+      - type: AWS/NATGateway
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: ErrorPortAllocation, statistics: [Sum], period: 60, length: 300}
+      - type: AWS/NetworkFirewall
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: DroppedPackets, statistics: [Sum], period: 60, length: 300}
+      - type: AWS/NetworkELB
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: HealthyHostCount, statistics: [Minimum], period: 60, length: 300}
+          - {name: UnHealthyHostCount, statistics: [Maximum], period: 60, length: 300}
+      - type: AWS/S3
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: ReplicationLatency, statistics: [Maximum], period: 60, length: 300}
+      # Backup publishes when a job ends: a long window keeps the last value for the hourly max_over_time of the alert
+      - type: AWS/Backup
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: NumberOfBackupJobsFailed, statistics: [Sum], period: 300, length: 3600}
+          - {name: NumberOfBackupJobsExpired, statistics: [Sum], period: 300, length: 3600}
+          - {name: NumberOfCopyJobsFailed, statistics: [Sum], period: 300, length: 3600}
+      # Global services publish in one region: CloudFront, Route 53 health checks and the CloudFront web ACLs in us-east-1,
+      # Global Accelerator in us-west-2
+      - type: AWS/CloudFront
+        regions: [us-east-1]
+        nilToZero: false
+        metrics:
+          - {name: 5xxErrorRate, statistics: [Average], period: 60, length: 300}
+      - type: AWS/WAFV2
+        regions: [us-east-1, {{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: BlockedRequests, statistics: [Sum], period: 60, length: 300}
+      - type: AWS/Route53
+        regions: [us-east-1]
+        nilToZero: false
+        metrics:
+          - {name: HealthCheckStatus, statistics: [Minimum], period: 60, length: 300}
+      - type: AWS/GlobalAccelerator
+        regions: [us-west-2]
+        nilToZero: false
+        metrics:
+          - {name: HealthyEndpointCount, statistics: [Minimum], period: 60, length: 300}
+  {{- end }}
