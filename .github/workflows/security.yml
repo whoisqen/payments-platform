@@ -115,7 +115,7 @@ jobs:
       - name: semgrep on the mise python
         run: tools/ci/security/install_pipx_tools.sh pipx:semgrep
       - name: repo rules pass their own tests
-        run: semgrep --test --metrics=off policy/semgrep
+        run: mise exec -- semgrep --test --metrics=off policy/semgrep
       - name: scan
         env:
           FULL: ${{ needs.scope.outputs.full }}
@@ -126,7 +126,7 @@ jobs:
           if [ "$FULL" != true ] && [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             args+=(--baseline-commit "$BASE_SHA")
           fi
-          semgrep scan --metrics=off --disable-version-check "${args[@]}" --sarif --output "$RUNNER_TEMP/semgrep.sarif" .
+          mise exec -- semgrep scan --metrics=off --disable-version-check "${args[@]}" --sarif --output "$RUNNER_TEMP/semgrep.sarif" .
       - name: upload to code scanning
         if: ${{ !cancelled() }}
         # reporting never fails the job (code scanning may be unavailable on the plan)
@@ -178,7 +178,7 @@ jobs:
         run: |
           status=0
           # with a console,<path> list each entry is the file of that output
-          checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov.sarif" || status=$?
+          mise exec -- checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov.sarif" || status=$?
           report="$RUNNER_TEMP/checkov.sarif"
           [ -d "$report" ] && report="$report/results_sarif.sarif"
           if [ ! -s "$report" ]; then
@@ -254,7 +254,7 @@ jobs:
             status=0
             # a hashed file is audited exactly as pinned; an unhashed one resolves its dependencies
             if grep -q -- '--hash=' "$f"; then mode=(--require-hashes --disable-pip); else mode=(); fi
-            out=$(pip-audit --progress-spinner off "${mode[@]}" -r "$f" 2>&1) || status=$?
+            out=$(mise exec -- pip-audit --progress-spinner off "${mode[@]}" -r "$f" 2>&1) || status=$?
             printf '### pip-audit %s (exit %s)\n\n<pre>\n%s\n</pre>\n' "$f" "$status" "$(tail -n 40 <<<"$out")" >>"$GITHUB_STEP_SUMMARY"
             [ "$status" -eq 0 ] || echo "::warning::pip-audit reported findings in ${f}; see the job summary"
           done
@@ -314,7 +314,7 @@ jobs:
       - name: zizmor report
         run: |
           # exit codes 10-14 only say that findings exist; the gate below decides
-          zizmor --config policy/security/workflows/zizmor.yml --format sarif .github >"$RUNNER_TEMP/zizmor.sarif" || [ $? -ge 10 ]
+          mise exec -- zizmor --config policy/security/workflows/zizmor.yml --format sarif .github >"$RUNNER_TEMP/zizmor.sarif" || [ $? -ge 10 ]
       - name: upload to code scanning
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -326,7 +326,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           min=$(python3 tools/ci/security/gates.py get policy/security/workflows/zizmor-gate.toml min_severity)
-          zizmor --config policy/security/workflows/zizmor.yml --min-severity "$min" .github
+          mise exec -- zizmor --config policy/security/workflows/zizmor.yml --min-severity "$min" .github
 
   scorecard:
     needs: [scope]

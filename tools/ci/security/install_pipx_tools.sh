@@ -40,6 +40,11 @@ for tool in "$@"; do
     echo "${tool}: installed with Python ${have}"
   fi
   bin=${tool#pipx:}
+  # Python 3.12 venvs have no setuptools, and semgrep still imports pkg_resources from it
+  if [ "$bin" = semgrep ] && ! $dry_run; then
+    vpy=$(find "$(mise where "$tool")" -maxdepth 4 -path '*/bin/python3' -print -quit)
+    "$vpy" -c 'import pkg_resources' 2>/dev/null || "$vpy" -m pip install --quiet --disable-pip-version-check 'setuptools==80.9.0'
+  fi
   if ! mise exec -- "$bin" --version >/dev/null 2>&1; then
     echo "::error::${bin} --version fails after install; see: mise exec -- ${bin} --version"
     mise exec -- "$bin" --version || true
