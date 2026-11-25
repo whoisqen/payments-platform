@@ -83,7 +83,7 @@ access:
       provisioned: false
       groups: {engineering: Viewer}
       dashboards: {folders: [l0-overview, l1-services, l2-platform]}
-      datasources: [victoriametrics]
+      datasources: [victoriametrics, tempo]
     finance:
       id: 3
       name: Finance

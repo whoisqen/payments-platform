@@ -1,0 +1,1067 @@
+{
+  "uid": "slow-requests",
+  "title": "L1 Slow requests",
+  "description": "Which requests are slow, where, and which traces show why. Slow: status > 50 ms; create > 1150 ms total (150 ms own time + 1000 ms PSP allowance); confirm > 1150 ms total (150 ms own time + 1000 ms PSP allowance); capture > 1150 ms total (150 ms own time + 1000 ms PSP allowance); refund > 1150 ms total (150 ms own time + 1000 ms PSP allowance); other routes > 300 ms or their own threshold. Groups come from the slow-request metrics; traces are kept by tail sampling for Tempo retention (14 days).",
+  "tags": [
+    "payments-platform",
+    "l1",
+    "latency",
+    "traces"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "liveNow": false,
+  "weekStart": "",
+  "fiscalYearStartMonth": 0,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 0,
+        "current": {
+          "text": "default",
+          "value": "default"
+        }
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up, env)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "prod",
+          "value": "prod"
+        },
+        "hide": 0
+      },
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\"}, region)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "eu-central-1",
+          "value": "eu-central-1"
+        },
+        "hide": 0,
+        "allValue": ".*"
+      },
+      {
+        "name": "cell",
+        "label": "Cell",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\",region=~\"$region\"}, cell)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "allValue": ".*"
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{env=~\"$env\"}, service)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "allValue": ".*"
+      },
+      {
+        "name": "psp",
+        "label": "PSP",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(psp_requests_total{env=~\"$env\",region=~\"$region\"}, psp)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 2,
+        "allValue": ".*"
+      },
+      {
+        "name": "route",
+        "label": "Route",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(slow_requests_calls_total{env=~\"$env\"}, route)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0
+      },
+      {
+        "name": "threshold",
+        "label": "Trace duration above, ms",
+        "type": "textbox",
+        "query": "0",
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "hide": 0
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "link",
+      "title": "L0 Platform overview",
+      "url": "/d/platform-overview",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "link",
+      "title": "L1 Router (RED)",
+      "url": "/d/router",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "link",
+      "title": "L1 Payments and PSP health",
+      "url": "/d/payments",
+      "icon": "dashboard",
+      "targetBlank": false,
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "type": "dashboards",
+      "title": "All dashboards",
+      "tags": [
+        "payments-platform"
+      ],
+      "asDropdown": true,
+      "keepTime": true,
+      "includeVars": true,
+      "targetBlank": false
+    },
+    {
+      "type": "link",
+      "title": "Runbooks: application",
+      "url": "https://github.com/whoisqen/payments-platform/tree/main/docs/runbooks/application",
+      "icon": "doc",
+      "targetBlank": true
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "name": "deploys",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "enable": true,
+        "iconColor": "blue",
+        "expr": "increase(argocd_app_sync_total{env=~\"$env\",phase=\"Succeeded\"}[2m]) > 0",
+        "titleFormat": "deploy {{name}}"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Overview",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "title": "slow: slow requests",
+      "description": "Requests over the threshold of their type in the time range.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "title": "slow: share of all requests",
+      "description": "Guidance (1%, 5%), not an alert.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])) / (sum (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\"}[$__range])) > 0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "decimals": 2,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "title": "slow: p95 of slow requests",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (increase(slow_requests_duration_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 3,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "title": "slow: routes with slow requests",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(sum by (route) (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])) > 0) or vector(0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "No data",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Groups",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 9
+      },
+      "title": "slow: slow requests by route, service and cell",
+      "description": "Lost time is count x mean duration of the slow requests; a row link filters the traces below. Max is the upper bound of the highest bucket with a slow request.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, route, cell) (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "100 * sum by (service, route, cell) (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])) / (sum by (service, route, cell) (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\"}[$__range])) > 0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.5, sum by (service, route, cell, le) (increase(slow_requests_duration_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.95, sum by (service, route, cell, le) (increase(slow_requests_duration_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "expr": "histogram_quantile(1, sum by (service, route, cell, le) (increase(slow_requests_duration_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range])))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "F",
+          "expr": "1000 * max by (service, route, cell) (max_over_time(timestamp(sum by (service, route, cell) (increase(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[1m])) > 0)[$__range:1m]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "refId": "G",
+          "expr": "sum by (service, route, cell) (increase(slow_requests_duration_seconds_sum{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__range]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Show the traces of this group",
+              "url": "/d/slow-requests?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-service=${__data.fields.service}&var-route=${__data.fields.route}&var-cell=${__data.fields.cell}"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Slow requests"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Share of all, %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p50"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max (bucket bound)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last seen"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lost time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Lost time",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Slow requests",
+              "Value #B": "Share of all, %",
+              "Value #C": "p50",
+              "Value #D": "p95",
+              "Value #E": "Max (bucket bound)",
+              "Value #F": "Last seen",
+              "Value #G": "Lost time"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Trend",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "title": "slow: slow requests per second by route, reqps",
+      "description": "Exemplars open a slow trace in Tempo.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (route) (rate(slow_requests_calls_total{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__rate_interval])))",
+          "legendFormat": "{{route}}",
+          "exemplar": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "title": "slow: p95 duration of slow requests by route, s",
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, histogram_quantile(0.95, sum by (route, le) (rate(slow_requests_duration_seconds_bucket{env=~\"$env\",region=~\"$region\",cell=~\"$cell\",service=~\"$service\",route=~\"$route\",slow=\"true\"}[$__rate_interval]))))",
+          "legendFormat": "{{route}}",
+          "exemplar": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "min": 0,
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Traces",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 9
+      },
+      "title": "slow: last slow traces",
+      "description": "The last 100 slow traces of the range, newest first; the trace id opens the trace in Tempo. Duration is the whole request.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{ resource.deployment.environment.name = \"$env\" && resource.cloud.region =~ \"$region\" && resource.cell =~ \"$cell\" && resource.service.name =~ \"$service\" && span.slow = true && span.http.route =~ \"$route\" && duration > ${threshold}ms } | select(span.http.method, span.http.route, span.http.status_code, span.request.type, resource.cell)",
+          "limit": 100,
+          "spss": 3,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Start time",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 9
+      },
+      "title": "slow: PSP calls inside slow requests",
+      "description": "The PSP call span of each slow trace; own time is the request duration minus this span.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{ resource.deployment.environment.name = \"$env\" && resource.cloud.region =~ \"$region\" && resource.cell =~ \"$cell\" && resource.service.name =~ \"$service\" && span.slow = true && span.http.route =~ \"$route\" && duration > ${threshold}ms } >> { name = \"call_connector_api\" }",
+          "limit": 100,
+          "spss": 3,
+          "tableType": "traces"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Start time",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}

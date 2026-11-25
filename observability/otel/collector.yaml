@@ -79,13 +79,115 @@ processors:
         statements:
           - 'delete_matching_keys(attributes, "(?i)^(payment_id|customer_id|merchant_id|idempotency_key|trace_id|card.*|pan|cvv|cvc|token|authorization)$")'
 
-  # Section 7: keep every failed or slow (>300 ms) trace and 2% of the rest.
+  # The pod cell label for Tempo and the slow-request metrics; the RBAC is in values-logs.yaml.
+  k8sattributes/cell:
+    # Same node filter as the logs overlay: a node collector watches only the pods that send to it.
+    filter:
+      node_from_env_var: OTEL_K8S_NODE_NAME
+    passthrough: false
+    pod_association:
+      - sources: [{from: connection}]
+    extract:
+      metadata: [k8s.pod.name, k8s.namespace.name]
+      labels:
+        - {tag_name: cell, key: payments-platform/cell, from: pod}
+
+  # The dashboard filters traces by environment and region.
+  resource/env:
+    attributes:
+      - {key: deployment.environment.name, value: "${env:PLATFORM_ENV}", action: upsert}
+      - {key: cloud.region, value: "${env:PLATFORM_REGION}", action: upsert}
+
+  # Thresholds from observability/slo/config/slow-requests.yaml; PSP types compare total duration with own + PSP allowance.
+  transform/slow:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - kind == SPAN_KIND_SERVER and attributes["http.route"] != nil
+        statements:
+          - set(attributes["request.type"], "other")
+          - set(attributes["request.type"], "status") where attributes["http.method"] == "GET" and (attributes["http.route"] == "/payments/{payment_id}" or attributes["http.route"] == "/refunds/{id}")
+          - set(attributes["request.type"], "create") where attributes["http.method"] == "POST" and attributes["http.route"] == "/payments"
+          - set(attributes["request.type"], "confirm") where attributes["http.method"] == "POST" and attributes["http.route"] == "/payments/{payment_id}/confirm"
+          - set(attributes["request.type"], "capture") where attributes["http.method"] == "POST" and attributes["http.route"] == "/payments/{payment_id}/capture"
+          - set(attributes["request.type"], "refund") where attributes["http.method"] == "POST" and attributes["http.route"] == "/refunds"
+          - set(attributes["slow"], true) where attributes["request.type"] == "status" and end_time_unix_nano - start_time_unix_nano > 50000000
+          - set(attributes["slow"], true) where attributes["request.type"] == "create" and end_time_unix_nano - start_time_unix_nano > 1150000000
+          - set(attributes["slow"], true) where attributes["request.type"] == "confirm" and end_time_unix_nano - start_time_unix_nano > 1150000000
+          - set(attributes["slow"], true) where attributes["request.type"] == "capture" and end_time_unix_nano - start_time_unix_nano > 1150000000
+          - set(attributes["slow"], true) where attributes["request.type"] == "refund" and end_time_unix_nano - start_time_unix_nano > 1150000000
+          - set(attributes["slow"], true) where attributes["request.type"] == "other" and end_time_unix_nano - start_time_unix_nano > 300000000
+
+  # Only the server span of a routed request feeds the slow-request metrics.
+  filter/route-spans:
+    error_mode: ignore
+    traces:
+      span:
+        - kind != SPAN_KIND_SERVER or attributes["http.route"] == nil
+
+  # Platform label names; collector.instance.id stays because node collectors would otherwise write colliding series.
+  transform/spanmetrics-labels:
+    error_mode: ignore
+    metric_statements:
+      - context: resource
+        statements:
+          - keep_keys(attributes, ["service.name"])
+      - context: datapoint
+        statements:
+          - set(attributes["service"], resource.attributes["service.name"])
+          - set(attributes["route"], attributes["http.route"])
+          - delete_key(attributes, "http.route")
+          - delete_key(attributes, "service.name")
+
+  # Section 7: keep every failed trace, every slow trace by its request type and 2% of the rest.
   tail_sampling:
     decision_wait: 10s
     num_traces: 200000
     policies:
       - {name: errors, type: status_code, status_code: {status_codes: [ERROR]}}
-      - {name: slow, type: latency, latency: {threshold_ms: 300}}
+      - name: slow-status
+        type: and
+        and:
+          and_sub_policy:
+            - {name: route, type: string_attribute, string_attribute: {key: http.route, values: ["/payments/{payment_id}", "/refunds/{id}"]}}
+            - {name: method, type: string_attribute, string_attribute: {key: http.method, values: [GET]}}
+            - {name: latency, type: latency, latency: {threshold_ms: 50}}
+      - name: slow-create
+        type: and
+        and:
+          and_sub_policy:
+            - {name: route, type: string_attribute, string_attribute: {key: http.route, values: ["/payments"]}}
+            - {name: method, type: string_attribute, string_attribute: {key: http.method, values: [POST]}}
+            - {name: latency, type: latency, latency: {threshold_ms: 1150}}
+      - name: slow-confirm
+        type: and
+        and:
+          and_sub_policy:
+            - {name: route, type: string_attribute, string_attribute: {key: http.route, values: ["/payments/{payment_id}/confirm"]}}
+            - {name: method, type: string_attribute, string_attribute: {key: http.method, values: [POST]}}
+            - {name: latency, type: latency, latency: {threshold_ms: 1150}}
+      - name: slow-capture
+        type: and
+        and:
+          and_sub_policy:
+            - {name: route, type: string_attribute, string_attribute: {key: http.route, values: ["/payments/{payment_id}/capture"]}}
+            - {name: method, type: string_attribute, string_attribute: {key: http.method, values: [POST]}}
+            - {name: latency, type: latency, latency: {threshold_ms: 1150}}
+      - name: slow-refund
+        type: and
+        and:
+          and_sub_policy:
+            - {name: route, type: string_attribute, string_attribute: {key: http.route, values: ["/refunds"]}}
+            - {name: method, type: string_attribute, string_attribute: {key: http.method, values: [POST]}}
+            - {name: latency, type: latency, latency: {threshold_ms: 1150}}
+      # Every other route is open-ended, so it is matched on the type and mark set by transform/slow.
+      - name: slow-other
+        type: ottl_condition
+        ottl_condition:
+          error_mode: ignore
+          span:
+            - attributes["request.type"] == "other" and attributes["slow"] == true
       - {name: rest, type: probabilistic, probabilistic: {sampling_percentage: 2}}
 
   batch:
@@ -93,6 +195,27 @@ processors:
     timeout: 5s
 
 connectors:
+  # One redacted and marked span stream feeds both the sampler and the slow-request metrics.
+  forward/traces: {}
+
+  # Slow-request counters and duration histogram by service, route, cell and slow; exemplars carry the trace id.
+  span_metrics/slow:
+    namespace: slow_requests
+    histogram:
+      unit: s
+      explicit:
+        buckets: [25ms, 50ms, 100ms, 150ms, 200ms, 300ms, 500ms, 750ms, 1s, 1150ms, 1500ms, 2s, 3s, 5s, 10s]
+    dimensions:
+      - {name: http.route}
+      - {name: cell}
+      - {name: slow, default: "false"}
+    exclude_dimensions: [span.name, span.kind, status.code]
+    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+    aggregation_cardinality_limit: 2000
+    exemplars: {enabled: true, max_per_data_point: 5}
+    metrics_flush_interval: 15s
+    metrics_expiration: 10m
+
   # Counts PAN patterns before redaction so a leak at the source raises PanDetectedInLogs.
   count/pan:
     logs:
@@ -138,9 +261,21 @@ service:
       exporters: [otlphttp/central-logs]
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, attributes/drop-secret-keys, transform/redact, redaction, tail_sampling, batch]
+      processors: [memory_limiter, k8sattributes/cell, resource/env, attributes/drop-secret-keys, transform/redact, redaction, transform/slow]
+      exporters: [forward/traces]
+    traces/sampling:
+      receivers: [forward/traces]
+      processors: [tail_sampling, batch]
       exporters: [otlp/central-traces]
+    traces/spanmetrics:
+      receivers: [forward/traces]
+      processors: [filter/route-spans]
+      exporters: [span_metrics/slow]
     metrics:
       receivers: [otlp, count/pan]
       processors: [memory_limiter, attributes/drop-secret-keys, transform/metric-labels, redaction, batch]
+      exporters: [prometheusremotewrite/central]
+    metrics/spanmetrics:
+      receivers: [span_metrics/slow]
+      processors: [memory_limiter, transform/spanmetrics-labels, transform/metric-labels, redaction, batch]
       exporters: [prometheusremotewrite/central]
