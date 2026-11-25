@@ -1,1 +1,1 @@
-{{- include "platform-common.workload" (dict "root" . "cfg" .Values.producer "name" "scheduler-producer" "component" "producer") }}
+{{- include "platform-common.workload" (dict "root" . "cfg" .Values.producer "name" "scheduler-producer" "component" "producer" "hyperswitch" .Values.hyperswitch "secrets" .Values.secrets) }}

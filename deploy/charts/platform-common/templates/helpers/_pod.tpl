@@ -15,6 +15,16 @@ failureThreshold: {{ .p.failureThreshold | default 3 }}
 {{- $warm := $cfg.warmup | default dict -}}
 {{- $inject := true -}}
 {{- if hasKey $istio "inject" -}}{{- $inject = $istio.inject -}}{{- end -}}
+{{- $hs := .hyperswitch | default dict -}}
+{{- $hsc := dict -}}
+{{- $env := deepCopy ($cfg.container.env | default dict) -}}
+{{- if $hs.prefix -}}
+{{- $hsc = include "platform-common.hyperswitch.config" . | fromYaml -}}
+{{- /* container.env wins over the derived settings, so any layer can override one variable */ -}}
+{{- $env = merge $env (include "platform-common.hyperswitch.env" . | fromYaml) -}}
+{{- end -}}
+{{- include "platform-common.noPlainSecrets" (dict "env" $env "name" .name) -}}
+{{- $caMap := ($hsc.database | default dict).caBundleConfigMap -}}
 metadata:
   labels:
     {{- include "platform-common.labels" . | nindent 4 }}
@@ -61,16 +71,18 @@ spec:
       command:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with $cfg.container.args }}
+      {{- if $cfg.container.args }}
       args:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $cfg.container.args | nindent 8 }}
+      {{- else if $hs.prefix }}
+      args: ["-f", {{ include "platform-common.hyperswitch.configPath" . | quote }}]
       {{- end }}
       ports:
         - name: http
           containerPort: {{ $cfg.container.port }}
           protocol: TCP
       env:
-        {{- range $k, $v := $cfg.container.env }}
+        {{- range $k, $v := $env }}
         - name: {{ $k }}
           value: {{ $v | quote }}
         {{- end }}
@@ -82,11 +94,16 @@ spec:
           value: {{ $warm.maxWaitSeconds | quote }}
         {{- end }}
       {{- $dsn := $cfg.container.sentryDsn | default dict }}
-      {{- if or $cfg.container.envFromSecrets $dsn.envName }}
+      {{- if or $cfg.container.envFromSecrets $dsn.envName .secrets }}
       envFrom:
         {{- range $cfg.container.envFromSecrets }}
         - secretRef:
             name: {{ . }}
+        {{- end }}
+        {{- if .secrets }}
+        # Every secret of the service, from Vault through the ExternalSecret of the same name
+        - secretRef:
+            name: {{ .name }}-vault
         {{- end }}
         {{- if $dsn.envName }}
         # Optional: the service starts without the Sentry DSN and reports no errors until the secret exists
@@ -116,7 +133,20 @@ spec:
       volumeMounts:
         - name: tmp
           mountPath: /tmp
+        {{- if $caMap }}
+        - name: rds-ca
+          mountPath: /etc/ssl/rds
+          readOnly: true
+        {{- end }}
   volumes:
     - name: tmp
       emptyDir: {}
+    {{- if $caMap }}
+    - name: rds-ca
+      configMap:
+        name: {{ $caMap }}
+        items:
+          - key: ca.pem
+            path: ca.pem
+    {{- end }}
 {{- end }}

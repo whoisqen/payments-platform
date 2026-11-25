@@ -11,12 +11,16 @@ set:
   global.region: eu-central-1
   global.dataCidrs: ["10.120.0.0/16"]
   global.endpointCidrs: ["10.120.255.0/24"]
+  global.hyperswitch.database.host: pay-dev-euc1-aurora-cell-1.proxy-example.eu-central-1.rds.amazonaws.com
+  global.hyperswitch.redis.host: clustercfg.pay-dev-euc1-memorydb-cell-1.example.memorydb.eu-central-1.amazonaws.com
+  global.hyperswitch.tenant.baseUrl: https://api.dev.payments.example.com
   router.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   drainer.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   scheduler.image.digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   migrations.image.digest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 tests:
   - it: labels every workload with the cell
+    documentIndex: 0
     template: charts/router/templates/workload.yaml
     asserts:
       - equal:
@@ -28,6 +32,7 @@ tests:
       - isKind:
           of: PodDisruptionBudget
   - it: orders router after drainer by sync wave
+    documentIndex: 0
     templates:
       - charts/router/templates/workload.yaml
     asserts:
@@ -35,6 +40,7 @@ tests:
           path: metadata.annotations["argocd.argoproj.io/sync-wave"]
           value: "1"
   - it: pins each component to its own digest
+    documentIndex: 0
     template: charts/drainer/templates/workload.yaml
     asserts:
       - matchRegex:

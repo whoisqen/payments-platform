@@ -608,6 +608,69 @@
     },
     "platform-common": {
       "type": "object"
+    },
+    "hyperswitch": {
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "enum": [
+            "ROUTER",
+            "DRAINER"
+          ]
+        },
+        "redisUser": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "poolSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "replicaPoolSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "configFile": {
+          "enum": [
+            "production.toml",
+            "sandbox.toml",
+            "integration_test.toml",
+            "drainer.toml"
+          ]
+        }
+      },
+      "required": [
+        "prefix",
+        "redisUser",
+        "poolSize"
+      ],
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(/[a-z0-9_-]+)+$"
+          },
+          "property": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          }
+        },
+        "required": [
+          "key",
+          "property"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false,
@@ -621,6 +684,8 @@
     "autoscaling",
     "pdb",
     "networkPolicy",
-    "serviceAccount"
+    "serviceAccount",
+    "hyperswitch",
+    "secrets"
   ]
 }

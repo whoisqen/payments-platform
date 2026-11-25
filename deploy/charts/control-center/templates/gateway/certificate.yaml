@@ -1,0 +1,24 @@
+{{- with .Values.panel }}
+{{- if .enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: panel-tls
+  labels:
+    {{- include "platform-common.labels" (dict "root" $ "name" "panel" "component" "gateway") | nindent 4 }}
+spec:
+  secretName: panel-tls
+  dnsNames:
+    - {{ .hostname | quote }}
+  duration: 2160h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    group: cert-manager.io
+    kind: {{ .certificate.issuerKind }}
+    name: {{ .certificate.issuerName }}
+{{- end }}
+{{- end }}

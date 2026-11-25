@@ -99,6 +99,7 @@ data:
     vault write "auth/${AUTH_MOUNT}/config" kubernetes_host="https://kubernetes.default.svc:443" >/dev/null
     vault write "auth/${AUTH_MOUNT}/role/${SNAPSHOT_ROLE}" bound_service_account_names="${SNAPSHOT_SA}" bound_service_account_namespaces="${NAMESPACE}" policies="${SNAPSHOT_ROLE}" ttl=15m >/dev/null
     vault write "auth/${AUTH_MOUNT}/role/${ESO_ROLE}" bound_service_account_names="${ESO_SA}" bound_service_account_namespaces="${ESO_NAMESPACE}" policies="${ESO_ROLE}" ttl=15m >/dev/null
+    if [ -f /workloads/workloads.sh ]; then sh /workloads/workloads.sh; fi
 
     vault token revoke -self >/dev/null
     log "configured; root token revoked"
@@ -187,12 +188,22 @@ spec:
             - name: script
               mountPath: /bootstrap
               readOnly: true
+            {{- if $b.workloads.enabled }}
+            - name: workloads
+              mountPath: /workloads
+              readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
       volumes:
         - name: script
           configMap:
             name: vault-bootstrap
+        {{- if $b.workloads.enabled }}
+        - name: workloads
+          configMap:
+            name: vault-workloads
+        {{- end }}
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi

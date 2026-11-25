@@ -1,0 +1,35 @@
+{{- with .Values.panel }}
+{{- if .enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: panel
+  labels:
+    {{- include "platform-common.labels" (dict "root" $ "name" "panel" "component" "gateway") | nindent 4 }}
+spec:
+  gatewayClassName: {{ .gatewayClassName }}
+  infrastructure:
+    # Reachable only from the CloudFront VPC origin; never internet-facing
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: {{ .hostname | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: panel-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+{{- end }}
+{{- end }}

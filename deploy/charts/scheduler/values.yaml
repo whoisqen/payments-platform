@@ -3,6 +3,28 @@ image:
   repository: scheduler
   pullPolicy: IfNotPresent
 
+# Router settings (the scheduler binary reads the router configuration); cell-wide values come from global.hyperswitch
+hyperswitch:
+  prefix: ROUTER
+  redisUser: scheduler
+  poolSize: 5
+  replicaPoolSize: 2
+
+# Variable -> {key, property} under <kvMount>/<env>/<cell>/ in Vault; shared/* must equal what the router reads
+secrets:
+  ROUTER__MASTER_DATABASE__PASSWORD: {key: scheduler/database, property: password}
+  ROUTER__REPLICA_DATABASE__PASSWORD: {key: scheduler/database, property: password}
+  ROUTER__ANALYTICS__SQLX__PASSWORD: {key: scheduler/database, property: password}
+  ROUTER__REDIS__PRIMARY_PASSWORD: {key: scheduler/redis, property: password}
+  ROUTER__SECRETS__MASTER_ENC_KEY: {key: shared/app, property: master_enc_key}
+  ROUTER__SECRETS__ADMIN_API_KEY: {key: shared/app, property: admin_api_key}
+  ROUTER__SECRETS__JWT_SECRET: {key: shared/app, property: jwt_secret}
+  ROUTER__API_KEYS__HASH_KEY: {key: shared/app, property: api_keys_hash_key}
+  ROUTER__USER_AUTH_METHODS__ENCRYPTION_KEY: {key: shared/app, property: user_auth_encryption_key}
+  ROUTER__JWEKEY__VAULT_ENCRYPTION_KEY: {key: shared/locker, property: vault_encryption_key}
+  ROUTER__JWEKEY__VAULT_PRIVATE_KEY: {key: shared/locker, property: vault_private_key}
+  ROUTER__JWEKEY__TUNNEL_PRIVATE_KEY: {key: shared/locker, property: tunnel_private_key}
+
 # Two producers at once are forbidden: Recreate plus the Lease and fencing inside the application
 producer:
   workload:
@@ -15,8 +37,22 @@ producer:
     port: 3000
     env:
       SCHEDULER_FLOW: producer
+      RUN_ENV: production
       # The scheduler web server binds to 127.0.0.1 by default and the kubelet probe cannot reach it
       ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+      ROUTER__SCHEDULER__SERVER__PORT: "3000"
+      ROUTER__SCHEDULER__SERVER__WORKERS: "1"
+      # Stream and group must match the consumer
+      ROUTER__SCHEDULER__STREAM: SCHEDULER_STREAM
+      ROUTER__SCHEDULER__CONSUMER_GROUP: SCHEDULER_GROUP
+      ROUTER__SCHEDULER__GRACEFUL_SHUTDOWN_INTERVAL: "60000"
+      ROUTER__SCHEDULER__LOOP_INTERVAL: "30000"
+      ROUTER__SCHEDULER__PRODUCER__BATCH_SIZE: "50"
+      # The Redis lock is the in-application fencing of the single producer; its TTL outlives one loop
+      ROUTER__SCHEDULER__PRODUCER__LOCK_KEY: producer_locking_key
+      ROUTER__SCHEDULER__PRODUCER__LOCK_TTL: "160"
+      ROUTER__SCHEDULER__PRODUCER__LOWER_FETCH_LIMIT: "900"
+      ROUTER__SCHEDULER__PRODUCER__UPPER_FETCH_LIMIT: "0"
       # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
       ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
       ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"
@@ -90,7 +126,16 @@ consumer:
     port: 3000
     env:
       SCHEDULER_FLOW: consumer
+      RUN_ENV: production
       ROUTER__SCHEDULER__SERVER__HOST: 0.0.0.0
+      ROUTER__SCHEDULER__SERVER__PORT: "3000"
+      ROUTER__SCHEDULER__SERVER__WORKERS: "1"
+      ROUTER__SCHEDULER__STREAM: SCHEDULER_STREAM
+      ROUTER__SCHEDULER__CONSUMER_GROUP: SCHEDULER_GROUP
+      ROUTER__SCHEDULER__GRACEFUL_SHUTDOWN_INTERVAL: "60000"
+      ROUTER__SCHEDULER__LOOP_INTERVAL: "3000"
+      ROUTER__SCHEDULER__CONSUMER__CONSUMER_GROUP: SCHEDULER_GROUP
+      ROUTER__SCHEDULER__CONSUMER__DISABLED: "false"
       # Traces and metrics go to the collector of the same node; it masks, samples and forwards them to the central stack
       ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "true"
       ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "true"

@@ -56,6 +56,22 @@ bootstrap:
     authRole: external-secrets
     serviceAccountName: external-secrets
     namespace: external-secrets
+  # Read-only policy and Kubernetes auth role per cell service; KV paths <kvMount>/<env>/<cell>/<path>/<name> (one Vault per environment, so env is +)
+  workloads:
+    enabled: true
+    namespace: payments
+    tokenTtl: 15m
+    # One auth mount per cell cluster; cell-0 runs Vault, so its mount is the local one
+    cells:
+      - {name: cell-0, authMount: kubernetes}
+      - {name: cell-1, authMount: kubernetes-cell-1}
+      - {name: cell-2, authMount: kubernetes-cell-2}
+      - {name: cell-3, authMount: kubernetes-cell-3}
+      - {name: spare, authMount: kubernetes-spare}
+    services:
+      router: {serviceAccounts: [router], paths: [router, shared]}
+      drainer: {serviceAccounts: [drainer], paths: [drainer]}
+      scheduler: {serviceAccounts: [scheduler-producer, scheduler-consumer], paths: [scheduler, shared]}
   autopilot:
     cleanupDeadServers: true
     deadServerLastContactThreshold: 24h

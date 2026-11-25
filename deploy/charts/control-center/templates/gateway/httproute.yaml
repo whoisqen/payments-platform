@@ -1,0 +1,24 @@
+{{- with .Values.panel }}
+{{- if .enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: panel
+  labels:
+    {{- include "platform-common.labels" (dict "root" $ "name" "panel" "component" "gateway") | nindent 4 }}
+spec:
+  parentRefs:
+    - name: panel
+      sectionName: https
+  hostnames:
+    - {{ .hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: control-center
+          port: {{ $.Values.service.port }}
+{{- end }}
+{{- end }}
