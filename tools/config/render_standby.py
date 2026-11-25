@@ -88,6 +88,14 @@ locker:
   container:
     env:
       RUN_ENV: {RUN_ENV}
+  # The proxy endpoint is a placeholder until the aurora stack outputs it; the KMS alias is the locker key of this region
+  config:
+    database:
+      host: {host(standby, 'aurora', 'locker', '')}.proxy-{d['rds_suffix']}.{standby}.rds.amazonaws.com
+    secrets_management:
+      aws_kms:
+        key_id: alias/{prefix}-{ENV}-{s}-locker
+        region: {standby}
 
 # Migrations run only where the writer is; enable after promotion
 locker-migrations:

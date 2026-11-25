@@ -25,21 +25,35 @@ tests:
       - contains:
           path: spec.template.spec.sources[0].helm.parameters
           content:
+            name: platform.remoteWriteUrl
+            value: https://metrics.example.test/insert/0/prometheus/api/v1/write
+      - notContains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
             name: prometheus.prometheusSpec.remoteWrite[0].url
             value: https://metrics.example.test/insert/0/prometheus/api/v1/write
-  - it: sends the alerts of Prometheus to the central Alertmanager over https
+  - it: sends the alerts of Prometheus to the central Alertmanager
     template: addons/kube-prometheus.yaml
     asserts:
       - contains:
           path: spec.template.spec.sources[0].helm.parameters
           content:
-            name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].static_configs[0].targets[0]
+            name: platform.alertmanagerHost
             value: alertmanager.example.test
+  - it: encrypts the Prometheus volumes with the EBS key alias of the cluster account
+    template: addons/kube-prometheus.yaml
+    asserts:
       - contains:
           path: spec.template.spec.sources[0].helm.parameters
           content:
-            name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].scheme
-            value: https
+            name: platform.ebsKmsKeyId
+            value: 'alias/acme-{{ index .metadata.labels "payments-platform/environment" }}-{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .metadata.labels "payments-platform/region") "${1}${2}${3}" }}-ebs-nodes'
+  - it: adds the client certificate of the mutual TLS as the last source
+    template: addons/kube-prometheus.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[4].path
+          value: deploy/platform/kube-prometheus/manifests
   - it: switches deduplication on in the query and storage nodes with the configured interval
     template: addons/central/victoria-metrics.yaml
     asserts:

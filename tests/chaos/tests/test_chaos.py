@@ -42,6 +42,87 @@ class FisTemplates(unittest.TestCase):
         self.assertEqual(len(errors), 3)
 
 
+def _platform_values():
+    """The four placeholders of tests/chaos/README.md, read from config/platform.yaml without PyYAML."""
+    text = (ROOT.parent.parent / "config" / "platform.yaml").read_text()
+
+    def under(section, key):
+        block = re.search(rf"^{section}:\n((?:[ #].*\n|\n)*)", text, re.M).group(1)
+        return re.search(rf"^  {key}:\s*\"?([^\"\s#]+)", block, re.M).group(1)
+
+    region = under("regions", "working")
+    short = {"eu-central-1": "euc1", "us-east-1": "use1", "us-east-2": "use2"}[region]
+    return {"NAME_PREFIX": under("naming", "prefix"), "STAGE_ACCOUNT_ID": under("accounts", "stage"), "REGION": region, "REGION_SHORT": short}
+
+
+class FisTemplateNames(unittest.TestCase):
+    """Names and selectors must match what infra/modules and infra/live create, or emptyTargetResolutionMode fail stops the run."""
+
+    VALUES = _platform_values()
+
+    def render(self, f):
+        text = f.read_text()
+        for k, v in self.VALUES.items():
+            text = text.replace("${" + k + "}", v)
+        self.assertNotIn("${", text, f"{f.name}: placeholder outside {sorted(self.VALUES)} (envsubst would blank it)")
+        return json.loads(text)
+
+    def test_names_follow_the_platform_pattern(self):
+        v = self.VALUES
+        base = f"{v['NAME_PREFIX']}-stage-{v['REGION_SHORT']}"
+        for f in sorted((ROOT / "fis").glob("*.json")):
+            with self.subTest(f=f.name):
+                t = self.render(f)
+                self.assertTrue(t["tags"]["Name"].startswith("chaos-"))
+                self.assertEqual(t["roleArn"], f"arn:aws:iam::{v['STAGE_ACCOUNT_ID']}:role/{base}-fis-experiment")
+                for s in t["stopConditions"]:
+                    self.assertEqual(s["value"], f"arn:aws:cloudwatch:{v['REGION']}:{v['STAGE_ACCOUNT_ID']}:alarm:{base}-chaos-stop")
+                log = t["logConfiguration"]["cloudWatchLogsConfiguration"]["logGroupArn"]
+                self.assertEqual(log, f"arn:aws:logs:{v['REGION']}:{v['STAGE_ACCOUNT_ID']}:log-group:/fis/{base}:*")
+                for a in t["actions"].values():
+                    for flt in (tg.get("filters", []) for tg in t.get("targets", {}).values()):
+                        for fl in flt:
+                            if "AvailabilityZone" in fl["path"]:
+                                self.assertTrue(all(re.fullmatch(rf"{v['REGION']}[a-c]", z) for z in fl["values"]), fl)
+                    if a["actionId"] != "aws:ssm:send-automation-document":
+                        continue
+                    doc = a["parameters"]["documentArn"].rsplit("/", 1)[1]
+                    self.assertRegex(doc, rf"^{v['NAME_PREFIX']}-stage-chaos-[a-z0-9-]+$")
+                    cluster = json.loads(a["parameters"]["documentParameters"])["ClusterName"]
+                    self.assertRegex(cluster, rf"^{base}-[a-z0-9-]+$")
+
+    def test_memorydb_cluster_and_automation_role(self):
+        v = self.VALUES
+        base = f"{v['NAME_PREFIX']}-stage-{v['REGION_SHORT']}"
+        params = json.loads(self.render(ROOT / "fis" / "memorydb-failover.json")["actions"]["failover-shard"]["parameters"]["documentParameters"])
+        # infra/modules/memorydb names the cluster <prefix>-<env>-<region-short>-<component>; the cell unit sets component memorydb-cell-N.
+        self.assertEqual(params["ClusterName"], f"{base}-memorydb-cell-1")
+        self.assertEqual(params["AutomationAssumeRole"], f"arn:aws:iam::{v['STAGE_ACCOUNT_ID']}:role/{base}-chaos-automation")
+
+    def test_targets_use_tags_that_infra_applies(self):
+        expected = {
+            "aurora-writer-failover.json": {"environment": "stage", "cell": "cell-1", "component": "aurora"},
+            "az-loss.json": {"environment": "stage", "component": "vpc"},
+            "node-loss.json": {"environment": "stage", "cell": "cell-1", "karpenter.sh/nodepool": "payments"},
+            "workers-spot-interruption.json": {"environment": "stage", "cell": "cell-1", "karpenter.sh/nodepool": "workers"},
+        }
+        for name, tags in expected.items():
+            with self.subTest(f=name):
+                targets = list(self.render(ROOT / "fis" / name)["targets"].values())
+                self.assertEqual(len(targets), 1)
+                self.assertEqual(targets[0]["resourceTags"], tags)
+
+    def test_validator_rejects_az_and_role_tags(self):
+        bad = json.loads((ROOT / "fis" / "aurora-writer-failover.json").read_text())
+        bad["targets"]["cell-aurora"]["resourceTags"]["role"] = "payments"
+        bad["targets"]["cell-aurora"]["filters"] = [{"path": "Placement.AvailabilityZone", "values": ["x"]}]
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "bad.json"
+            path.write_text(json.dumps(bad))
+            errors = validate_fis.validate(path)
+        self.assertEqual(len(errors), 2, errors)
+
+
 @unittest.skipIf(yaml is None, "PyYAML is not installed")
 class ChaosMeshManifests(unittest.TestCase):
     def test_manifests_carry_hypothesis_stop_and_failure_mode(self):

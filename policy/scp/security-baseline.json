@@ -18,26 +18,52 @@
       "Action": [
         "config:StopConfigurationRecorder",
         "config:DeleteConfigurationRecorder",
-        "config:DeleteDeliveryChannel",
+        "config:DeleteDeliveryChannel"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyDeletingConfigRulesExceptSecurityTerraform",
+      "Effect": "Deny",
+      "Action": [
         "config:DeleteConfigRule",
         "config:DeleteConformancePack",
         "config:DeleteOrganizationConfigRule",
         "config:DeleteOrganizationConformancePack"
       ],
-      "Resource": "*"
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::000000000003:role/pay-security-glob-tf-apply-*"
+          ]
+        }
+      }
     },
     {
       "Sid": "DenyDisablingGuardDuty",
       "Effect": "Deny",
       "Action": [
         "guardduty:DeleteDetector",
-        "guardduty:UpdateDetector",
         "guardduty:DisassociateFromAdministratorAccount",
         "guardduty:DisassociateFromMasterAccount",
         "guardduty:StopMonitoringMembers",
         "guardduty:DeletePublishingDestination"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DenyUpdatingGuardDutyDetectorExceptSecurityTerraform",
+      "Effect": "Deny",
+      "Action": "guardduty:UpdateDetector",
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::000000000003:role/pay-security-glob-tf-apply-*"
+          ]
+        }
+      }
     },
     {
       "Sid": "DenyLeavingTheOrganization",
@@ -76,7 +102,8 @@
         "ArnNotLike": {
           "aws:PrincipalArn": [
             "arn:aws:iam::111111111111:role/pay-dev-glob-tf-apply-*",
-            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*"
+            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*",
+            "arn:aws:iam::444444444444:role/pay-prod-glob-tf-apply-*"
           ]
         }
       }
@@ -105,7 +132,9 @@
         "ArnNotLike": {
           "aws:PrincipalArn": [
             "arn:aws:iam::111111111111:role/pay-dev-glob-tf-apply-*",
-            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*"
+            "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*",
+            "arn:aws:iam::444444444444:role/pay-prod-glob-tf-apply-*",
+            "arn:aws:iam::000000000002:role/pay-security-glob-tf-apply-*"
           ]
         }
       }

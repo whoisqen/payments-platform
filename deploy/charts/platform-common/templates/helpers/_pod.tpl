@@ -81,6 +81,11 @@ spec:
         - name: http
           containerPort: {{ $cfg.container.port }}
           protocol: TCP
+        {{- range $cfg.container.extraPorts }}
+        - name: {{ .name }}
+          containerPort: {{ .port }}
+          protocol: TCP
+        {{- end }}
       env:
         {{- range $k, $v := $env }}
         - name: {{ $k }}

@@ -1,1 +1,19 @@
-{{- include "platform-common.networkpolicy" (dict "root" . "cfg" .Values "name" "locker" "component" "locker") }}
+{{- $cfg := deepCopy .Values -}}
+{{- $np := $cfg.networkPolicy -}}
+{{- $endpoints := (.Values.global | default dict).endpointCidrs | default list -}}
+{{- $egress := list -}}
+{{- if $endpoints -}}
+{{- $to := list -}}
+{{- range $endpoints }}{{ $to = append $to (dict "ipBlock" (dict "cidr" .)) }}{{ end -}}
+{{- $egress = append $egress (dict "to" $to "ports" (list (dict "port" 443 "protocol" "TCP"))) -}}
+{{- end -}}
+{{- $egress = append $egress (dict "to" (list (dict "ipBlock" (dict "cidr" .Values.podIdentityAgentCidr))) "ports" (list (dict "port" 80 "protocol" "TCP"))) -}}
+{{- $ingress := list -}}
+{{- range .Values.container.extraPorts }}
+{{- if eq .name "metrics" }}
+{{- $ingress = append $ingress (dict "from" (list (dict "namespaceSelector" (dict "matchLabels" (dict "kubernetes.io/metadata.name" "monitoring")))) "ports" (list (dict "port" .port "protocol" "TCP"))) -}}
+{{- end }}
+{{- end }}
+{{- $_ := set $np "extraEgress" (concat $egress ($np.extraEgress | default list)) -}}
+{{- $_ = set $np "extraIngress" (concat $ingress ($np.extraIngress | default list)) -}}
+{{- include "platform-common.networkpolicy" (dict "root" . "cfg" $cfg "name" "locker" "component" "locker") }}

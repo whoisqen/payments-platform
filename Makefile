@@ -5,7 +5,7 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 # New linters start in report mode; LINT_STRICT=1 (CI: repository variable LINT_STRICT=true) makes their findings block.
@@ -114,11 +114,12 @@ test-helm:
 	@if [ -z "$(CHARTS)" ]; then echo "skip helm unittest: deploy/charts is empty"; exit 0; fi
 	@for c in $(CHARTS); do \
 		if [ ! -d $$c/tests ]; then continue; fi; \
-		helm dependency build $$c >/dev/null && helm unittest $$c || exit 1; \
+		helm dependency build $$c >/dev/null && helm unittest -f 'tests/*_test.yaml' -f 'tests/*/*_test.yaml' $$c || exit 1; \
 	done
 
 test-policy:
 	@if [ -d policy/opa ]; then opa test policy/opa -v; else echo "skip opa: policy/opa does not exist"; fi
+	opa test policy/tagging policy/scp/tag-policies
 	@if [ -d policy/kyverno ]; then kyverno test policy/kyverno; else echo "skip kyverno: policy/kyverno does not exist"; fi
 
 test-alerts:

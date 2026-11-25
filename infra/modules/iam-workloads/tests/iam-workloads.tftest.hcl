@@ -106,3 +106,64 @@ run "merchant_map_is_read_only" {
     error_message = "cells never write the merchant map"
   }
 }
+
+run "yace_reads_cloudwatch_only" {
+  command = plan
+
+  assert {
+    condition = (
+      aws_iam_role.yace[0].name == "pay-dev-euc1-cell-0-yace" &&
+      aws_iam_role.yace[0].permissions_boundary == var.permissions_boundary_arn &&
+      jsondecode(aws_iam_role.yace[0].assume_role_policy).Statement[0].Condition.ArnEquals["aws:SourceArn"] == var.cluster_arn
+    )
+    error_message = "the yace role is a pod identity role of this cluster with the boundary"
+  }
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_iam_role_policy.yace[0].policy).Statement :
+      s.Effect == "Allow" && alltrue([for a in s.Action : contains(["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics", "tag:GetResources"], a)])
+    ])
+    error_message = "yace may only read metrics and discover tagged resources"
+  }
+  assert {
+    condition     = aws_eks_pod_identity_association.yace[0].namespace == "monitoring" && aws_eks_pod_identity_association.yace[0].service_account == "yace"
+    error_message = "associated with monitoring/yace"
+  }
+}
+
+run "yace_can_be_turned_off" {
+  command = plan
+
+  variables {
+    yace = { enabled = false }
+  }
+
+  assert {
+    condition     = length(aws_iam_role.yace) == 0 && length(aws_eks_pod_identity_association.yace) == 0
+    error_message = "no exporter role when disabled"
+  }
+}
+
+run "only_producers_get_the_msk_policy" {
+  command = plan
+
+  variables {
+    kafka_producer_policy_arn = "arn:aws:iam::111111111111:policy/pay-dev-euc1-msk-producer"
+  }
+
+  assert {
+    condition     = toset(keys(aws_iam_role_policy_attachment.kafka_producer)) == toset(["router", "scheduler"])
+    error_message = "router and scheduler publish events, the locker does not"
+  }
+}
+
+run "locker_cannot_be_a_producer" {
+  command = plan
+
+  variables {
+    kafka_producer_policy_arn = "arn:aws:iam::111111111111:policy/pay-dev-euc1-msk-producer"
+    kafka_producers           = ["router", "locker"]
+  }
+
+  expect_failures = [var.kafka_producers]
+}

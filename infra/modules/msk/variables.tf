@@ -104,9 +104,26 @@ variable "retention_hours" {
   default     = 168
 }
 
-variable "log_group_name" {
-  description = "CloudWatch log group of the broker logs."
+variable "logs_kms_key_arn" {
+  description = "Key of the broker log group; its policy must admit logs.amazonaws.com."
   type        = string
+}
+
+variable "log_retention_days" {
+  description = "Days the broker logs stay in CloudWatch."
+  type        = number
+  default     = 30
+}
+
+variable "enhanced_monitoring" {
+  description = "CloudWatch metric level; per partition in prod and stage, DEFAULT in dev (the extra metrics are billed)."
+  type        = string
+  default     = "PER_TOPIC_PER_PARTITION"
+
+  validation {
+    condition     = contains(["DEFAULT", "PER_BROKER", "PER_TOPIC_PER_BROKER", "PER_TOPIC_PER_PARTITION"], var.enhanced_monitoring)
+    error_message = "enhanced_monitoring must be an MSK monitoring level."
+  }
 }
 
 variable "sink_bucket_arn" {

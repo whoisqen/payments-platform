@@ -1,5 +1,31 @@
 locals {
-  name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
+  name          = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
+  multi_az      = var.availability_zone_count > 1
+  log_group_arn = aws_cloudwatch_log_group.this.arn
+}
+
+resource "aws_cloudwatch_log_group" "this" {
+  name              = "/aws/opensearch/${local.name}"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = var.logs_kms_key_arn
+
+  tags = var.tags
+}
+
+# Log publishing needs a resource policy for the service; the source account condition keeps other accounts out.
+resource "aws_cloudwatch_log_resource_policy" "this" {
+  policy_name = "${local.name}-publishing"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "es.amazonaws.com" }
+      Action    = ["logs:PutLogEvents", "logs:CreateLogStream"]
+      Resource  = "${aws_cloudwatch_log_group.this.arn}:*"
+      Condition = { StringEquals = { "aws:SourceAccount" = var.account_id } }
+    }]
+  })
 }
 
 resource "aws_opensearch_domain" "this" {
@@ -9,16 +35,20 @@ resource "aws_opensearch_domain" "this" {
   cluster_config {
     instance_type            = var.data_instance_type
     instance_count           = var.data_node_count
-    zone_awareness_enabled   = true
-    dedicated_master_enabled = true
-    dedicated_master_type    = var.master_instance_type
-    dedicated_master_count   = 3
-    warm_enabled             = true
-    warm_type                = var.warm_instance_type
-    warm_count               = var.warm_node_count
+    zone_awareness_enabled   = local.multi_az
+    dedicated_master_enabled = var.dedicated_master_count > 0
+    dedicated_master_type    = var.dedicated_master_count > 0 ? var.master_instance_type : null
+    dedicated_master_count   = var.dedicated_master_count > 0 ? var.dedicated_master_count : null
+    warm_enabled             = var.warm_node_count > 0
+    warm_type                = var.warm_node_count > 0 ? var.warm_instance_type : null
+    warm_count               = var.warm_node_count > 0 ? var.warm_node_count : null
 
-    zone_awareness_config {
-      availability_zone_count = 3
+    dynamic "zone_awareness_config" {
+      for_each = local.multi_az ? [var.availability_zone_count] : []
+
+      content {
+        availability_zone_count = zone_awareness_config.value
+      }
     }
   }
 
@@ -43,7 +73,7 @@ resource "aws_opensearch_domain" "this" {
   }
 
   vpc_options {
-    subnet_ids         = var.subnet_ids
+    subnet_ids         = slice(var.subnet_ids, 0, var.availability_zone_count)
     security_group_ids = var.security_group_ids
   }
 
@@ -68,12 +98,12 @@ resource "aws_opensearch_domain" "this" {
 
   log_publishing_options {
     log_type                 = "ES_APPLICATION_LOGS"
-    cloudwatch_log_group_arn = var.log_group_arn
+    cloudwatch_log_group_arn = local.log_group_arn
   }
 
   log_publishing_options {
     log_type                 = "SEARCH_SLOW_LOGS"
-    cloudwatch_log_group_arn = var.log_group_arn
+    cloudwatch_log_group_arn = local.log_group_arn
   }
 
   lifecycle {
@@ -81,7 +111,17 @@ resource "aws_opensearch_domain" "this" {
       condition     = length(local.name) <= 28
       error_message = "OpenSearch domain names are limited to 28 characters."
     }
+    precondition {
+      condition     = var.data_node_count % var.availability_zone_count == 0
+      error_message = "data_node_count must be a multiple of availability_zone_count."
+    }
+    precondition {
+      condition     = var.warm_node_count == 0 || var.dedicated_master_count > 0
+      error_message = "UltraWarm needs dedicated master nodes."
+    }
   }
+
+  depends_on = [aws_cloudwatch_log_resource_policy.this]
 
   tags = var.tags
 }

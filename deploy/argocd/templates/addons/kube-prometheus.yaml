@@ -40,13 +40,15 @@ spec:
                 value: '{{`{{ index .metadata.labels "payments-platform/region" }}`}}'
               - name: prometheus.prometheusSpec.externalLabels.grafana_url
                 value: {{ .Values.observability.grafanaUrl | quote }}
-              # Both replicas push every sample to the central store, which keeps one of each pair; their alerts go to its Alertmanager cluster
-              - name: prometheus.prometheusSpec.remoteWrite[0].url
+              # Both replicas push every sample to the central store, which keeps one of each pair; their alerts go to its Alertmanager cluster.
+              # Scalars rendered into the lists of the values file: a list index here would replace the queue and TLS settings of the entry
+              - name: platform.remoteWriteUrl
                 value: {{ .Values.central.metricsRemoteWriteUrl | quote }}
-              - name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].scheme
-                value: https
-              - name: prometheus.prometheusSpec.additionalAlertManagerConfigs[0].static_configs[0].targets[0]
+              - name: platform.alertmanagerHost
                 value: {{ .Values.central.alertmanagerHost | quote }}
+              # The EBS key of the cluster account, by alias: alias/<prefix>-<env>-<region-short>-ebs-nodes
+              - name: platform.ebsKmsKeyId
+                value: 'alias/{{ .Values.cluster.namePrefix }}-{{`{{ index .metadata.labels "payments-platform/environment" }}`}}-{{`{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .metadata.labels "payments-platform/region") "${1}${2}${3}" }}`}}-ebs-nodes'
         # The alert rules and the SLO rules. The rules that look back further than this Prometheus keeps are not here: the long-lookback alerts
         # are evaluated twice (harmlessly empty here) and the SLO windows of 3 and 30 days are in slo/generated/central, run by vmalert
         - repoURL: {{ .Values.repo.url }}
@@ -60,6 +62,10 @@ spec:
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
+        # The client certificate Secret of the mutual TLS to the central stack
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/kube-prometheus/manifests
       syncPolicy:
         automated:
           prune: true

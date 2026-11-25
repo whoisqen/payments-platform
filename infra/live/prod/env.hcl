@@ -86,5 +86,32 @@ locals {
   standby_reader_count = local.sizing.standby.reader_count
   standby_reader_class = local.sizing.standby.reader_class
   standby_node_pool    = local.sizing.standby.node_pool_cpu_limits
-  ingress_endpoints     = local.cfg.deploy.prod.ingress_endpoints
+  ingress_endpoints    = local.cfg.deploy.prod.ingress_endpoints
+
+  # Analytics outside the CDE: MSK, OpenSearch and ClickHouse on its own cluster. config/environments may set msk, opensearch and
+  # analytics_eks (prod.yaml is the reference, so dev.yaml must lower them); until then these defaults hold, the sizes of architecture section 5.
+  analytics = {
+    msk = {
+      broker_count        = try(local.sizing.msk.broker_count, 9)
+      instance_type       = try(local.sizing.msk.instance_type, "kafka.m7g.xlarge")
+      volume_size_gb      = try(local.sizing.msk.volume_size_gb, 2000)
+      enhanced_monitoring = try(local.sizing.msk.enhanced_monitoring, "PER_TOPIC_PER_PARTITION")
+    }
+    opensearch = {
+      availability_zone_count = try(local.sizing.opensearch.availability_zone_count, 3)
+      data_node_count         = try(local.sizing.opensearch.data_node_count, 6)
+      data_instance_type      = try(local.sizing.opensearch.data_instance_type, "r7g.xlarge.search")
+      dedicated_master_count  = try(local.sizing.opensearch.dedicated_master_count, 3)
+      warm_node_count         = try(local.sizing.opensearch.warm_node_count, 2)
+      volume_size_gb          = try(local.sizing.opensearch.volume_size_gb, 1024)
+    }
+    # ClickHouse (4 shards x 2 replicas on r7g.2xlarge plus 3 Keeper nodes) runs in the stateful pool; Spot only where the cells allow it.
+    cpu_limits = try(local.sizing.analytics_eks.cpu_limits, { stateful = 96, workers = 32 })
+    spot_pools = [for p in local.karpenter_spot_pools : p if p == "stateful"]
+  }
+
+  # Argo CD of the analytics cluster reaches only its own namespaces.
+  analytics_access_entries = merge(local.access_entries, {
+    argocd = merge(local.access_entries.argocd, { namespaces = ["clickhouse", "monitoring", "karpenter", "external-secrets"] })
+  })
 }

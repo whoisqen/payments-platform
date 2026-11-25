@@ -20,9 +20,14 @@ workload:
 
 container:
   port: 3001
+  # LOCKER__* keys are rendered from config and tenants; the schema rejects them here
   env:
     RUN_ENV: production
   envFromSecrets: []
+  # card-vault serves /metrics on its own listener (config.metrics); the NetworkPolicy admits only monitoring to it
+  extraPorts:
+    - name: metrics
+      port: 9091
   # 300 RPS per pod (section 8); no sizing is given, so 1 vCPU and 1 GiB is a starting point for the load test
   resources:
     requests:
@@ -55,6 +60,9 @@ scheduling:
 service:
   enabled: true
   port: 3001
+  extraPorts:
+    - name: metrics
+      port: 9091
 
 autoscaling:
   enabled: true
@@ -70,12 +78,14 @@ pdb:
 networkPolicy:
   enabled: true
   dataPorts: [5432]
+  # Rendered rules add 443 to global.endpointCidrs (KMS, STS), 80 to the Pod Identity agent and 9091 from monitoring
   # Only router may call the locker
   extraIngress: []
   extraEgress: []
 
 serviceMonitor:
   enabled: true
+  port: metrics
   path: /metrics
 
 serviceAccount:
@@ -92,3 +102,69 @@ istio:
 securityGroupPolicy:
   securityGroupIds:
     - REPLACE_LOCKER_POD_SG_ID
+
+# Non-secret card-vault settings, rendered as LOCKER__<SECTION>__<KEY> env; server.port follows container.port
+config:
+  log:
+    console:
+      enabled: true
+      level: INFO
+      log_format: json
+  server:
+    host: 0.0.0.0
+  # Rate limit of the delete API
+  limit:
+    request_count: 1
+    duration: 60
+  cache:
+    tti: 7200
+    max_capacity: 5000
+  # RDS Proxy endpoint of the locker Aurora; the password comes from the ExternalSecret
+  database:
+    username: locker_app
+    host: REPLACE_LOCKER_DB_PROXY_HOST
+    port: 5432
+    dbname: locker
+    pool_size: 10
+    min_idle: 2
+    max_lifetime: 120
+    idle_timeout: 300
+    connection_timeout: 10
+  # Every secret value is KMS ciphertext under the locker key; only the locker role may call kms:Decrypt
+  secrets_management:
+    secrets_manager: aws_kms
+    aws_kms:
+      key_id: REPLACE_LOCKER_KMS_KEY_ALIAS
+      region: REPLACE_AWS_REGION
+  # Separate HTTP listener for /metrics; the port follows container.extraPorts "metrics"
+  metrics:
+    mode: prometheus
+    host: 0.0.0.0
+    background_metrics_collection_interval_secs: 15
+  api_client:
+    client_idle_timeout: 90
+    pool_max_idle_per_host: 10
+  # An HTTP key-manager service; none is deployed, the master keys stay KMS-wrapped in config
+  external_key_manager:
+    mode: disabled
+
+# EKS Pod Identity agent, the credential source of the AWS SDK for the KMS calls at start
+podIdentityAgentCidr: 169.254.170.23/32
+
+# PostgreSQL TLS through libpq environment; the RDS Proxy certificate chains to Amazon Root CA in the system bundle
+postgresTls:
+  mode: verify-full
+  rootCert: /etc/ssl/certs/ca-certificates.crt
+
+# Tenants of the router (x-tenant-id); master and public keys come from Vault per tenant
+tenants:
+  - id: public
+    schema: public
+    redisKeyPrefix: public
+
+# Secrets only from the Vault store, KV v2 key <environment>/<pathPrefix>/<path> under the store mount
+externalSecret:
+  name: locker-secrets
+  storeName: vault
+  pathPrefix: locker
+  refreshInterval: 1h

@@ -1,0 +1,40 @@
+# YACE: scraped from the monitoring namespace; talks only to DNS, the Pod Identity agent and the AWS APIs (CloudWatch, tagging) over HTTPS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yace
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-yet-another-cloudwatch-exporter
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 5000}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # EKS Pod Identity agent on the node
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - {protocol: TCP, port: 80}
+    # Regional AWS API endpoints (VPC endpoints or the egress firewall)
+    - ports:
+        - {protocol: TCP, port: 443}

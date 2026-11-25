@@ -15,7 +15,7 @@ spec:
       {{- include "platform-common.selectorLabels" . | nindent 6 }}
       payments-platform/role: stable
   endpoints:
-    - port: http
+    - port: {{ $sm.port | default "http" }}
       path: {{ $sm.path | default "/metrics" }}
       interval: {{ $sm.interval | default "30s" }}
 {{- end }}

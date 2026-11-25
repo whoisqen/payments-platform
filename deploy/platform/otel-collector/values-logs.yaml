@@ -1,0 +1,169 @@
+# Overlay on the generated values.yaml (same DaemonSet): container logs from the node and the Kubernetes events, shipped to the central Loki
+# through the masking processors of the tested config (attributes/drop-secret-keys, transform/redact, redaction), referenced by name.
+# Bodies stay strings: transform/redact skips map bodies, so nothing here parses JSON into the body.
+clusterRole:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: [pods, namespaces, nodes, events]
+      verbs: [get, list, watch]
+    - apiGroups: [apps]
+      resources: [replicasets, deployments, statefulsets, daemonsets]
+      verbs: [get, list, watch]
+    - apiGroups: [batch]
+      resources: [jobs, cronjobs]
+      verbs: [get, list, watch]
+    - apiGroups: [events.k8s.io]
+      resources: [events]
+      verbs: [get, list, watch]
+    # The events receiver runs on the one pod that holds the lease
+    - apiGroups: [coordination.k8s.io]
+      resources: [leases]
+      verbs: [get, list, watch, create, update, patch, delete]
+
+# The log files are root-owned 0640; root reads them as owner, with every capability dropped
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  seccompProfile: {type: RuntimeDefault}
+securityContext:
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+
+# Logs of every node, tainted ones included; the applications depend on the node-local OTLP receiver
+priorityClassName: system-node-critical
+tolerations:
+  - operator: Exists
+# memory_limiter works from this limit
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {memory: 640Mi}
+
+# The list replaces the one of values.yaml, so the TLS volume is repeated
+extraVolumes:
+  - name: tls
+    secret:
+      secretName: otel-collector-tls
+  - name: varlogpods
+    hostPath:
+      path: /var/log/pods
+  # Read offsets survive a restart: no lost and no duplicated lines
+  - name: checkpoints
+    hostPath:
+      path: /var/lib/otelcol
+      type: DirectoryOrCreate
+extraVolumeMounts:
+  - name: tls
+    mountPath: /etc/otel/tls
+    readOnly: true
+  - name: varlogpods
+    mountPath: /var/log/pods
+    readOnly: true
+  - name: checkpoints
+    mountPath: /var/lib/otelcol
+
+config:
+  extensions:
+    file_storage/checkpoints:
+      directory: /var/lib/otelcol
+      create_directory: true
+    k8s_leader_elector/events:
+      auth_type: serviceAccount
+      lease_name: otel-collector-k8s-events
+      lease_namespace: monitoring
+  receivers:
+    filelog:
+      include: [/var/log/pods/*/*/*.log]
+      # The collector's own lines would loop back through it
+      exclude: [/var/log/pods/monitoring_otel-collector*_*/opentelemetry-collector/*.log]
+      start_at: end
+      storage: file_storage/checkpoints
+      include_file_path: true
+      include_file_name: false
+      retry_on_failure:
+        enabled: true
+      operators:
+        # containerd CRI format, partial lines joined; namespace, pod, uid and container from the file path
+        - type: container
+          id: container-parser
+          format: containerd
+          max_log_size: 102400
+    k8s_events:
+      auth_type: serviceAccount
+      k8s_leader_elector: k8s_leader_elector/events
+  processors:
+    # Probe and scrape requests: most of the access-log volume, none of the signal
+    filter/probe-noise:
+      error_mode: ignore
+      logs:
+        log_record:
+          - IsMatch(body, "kube-probe/|ELB-HealthChecker/|Prometheus/[0-9]")
+          - IsMatch(body, "\"(GET|HEAD) /(healthz?|readyz?|livez?|ready|live|ping|metrics)[ ?\"]")
+          - IsMatch(body, "(GET|HEAD) /(healthz?|readyz?|livez?|ready|live|ping|metrics) HTTP/")
+    k8sattributes:
+      filter:
+        node_from_env_var: OTEL_K8S_NODE_NAME
+      passthrough: false
+      pod_association:
+        - sources:
+            - from: resource_attribute
+              name: k8s.pod.uid
+      extract:
+        metadata:
+          - k8s.deployment.name
+          - k8s.statefulset.name
+          - k8s.daemonset.name
+          - k8s.job.name
+          - k8s.node.name
+          - service.name
+    resource/platform:
+      attributes:
+        - {key: deployment.environment.name, value: "${env:PLATFORM_ENV}", action: upsert}
+        - {key: cloud.region, value: "${env:PLATFORM_REGION}", action: upsert}
+    # The file path repeats the resource labels; debug and trace lines get the short-retention marker that Loki indexes
+    transform/containers:
+      error_mode: ignore
+      log_statements:
+        - context: log
+          statements:
+            - delete_key(attributes, "log.file.path")
+            - delete_key(attributes, "log.iostream")
+            - set(attributes["log.retention"], "debug") where severity_number > 0 and severity_number < 9
+            - set(attributes["log.retention"], "debug") where IsMatch(body, "(?i)(\"level\"\\s*:\\s*\"(debug|trace)\"|\\blevel=(debug|trace)\\b|^\\S+\\s+(DEBUG|TRACE)\\s)")
+    # Moves the marker into the resource, where Loki can make it a stream label
+    groupbyattrs/retention:
+      keys: [log.retention]
+  service:
+    extensions: [health_check, file_storage/checkpoints, k8s_leader_elector/events]
+    pipelines:
+      # PAN patterns of the node logs count too (PanDetectedInLogs)
+      logs/detect:
+        receivers: [otlp, filelog]
+        processors: [memory_limiter]
+        exporters: [count/pan]
+      logs/containers:
+        receivers: [filelog]
+        processors:
+          - memory_limiter
+          - filter/probe-noise
+          - k8sattributes
+          - resource/platform
+          - attributes/drop-secret-keys
+          - transform/redact
+          - redaction
+          - transform/containers
+          - groupbyattrs/retention
+          - batch
+        exporters: [otlphttp/central-logs]
+      logs/events:
+        receivers: [k8s_events]
+        processors:
+          - memory_limiter
+          - resource/platform
+          - attributes/drop-secret-keys
+          - transform/redact
+          - redaction
+          - batch
+        exporters: [otlphttp/central-logs]

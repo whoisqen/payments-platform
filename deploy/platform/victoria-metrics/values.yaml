@@ -1,8 +1,32 @@
 # Central metrics store (runs in the central cluster, outside the CDE). Every component is replicated; the sizes are the reference
 # and are raised by the volume size of each environment layer when the volume fills up.
 # Deduplication of the two Prometheus replicas is switched on by the add-on parameter dedup.minScrapeInterval (value: central.dedup_interval).
+# Downsampling (-downsampling.period) is an Enterprise feature; this is the open-source image, so the 13 months stay at full resolution
+# and the long-range dashboards read recording rules of vmalert instead.
+
+# IOPS and throughput of the vmstorage volumes above the gp3 baseline (3000, 125 MiB/s): 13-month range queries and background merges
+# are read-heavy and sequential, so throughput is doubled (~$5 a month per volume) and IOPS raised modestly. Changeable in place.
+extraObjects:
+  - apiVersion: storage.k8s.io/v1
+    kind: VolumeAttributesClass
+    metadata:
+      name: gp3-vmstorage
+    driverName: ebs.csi.aws.com
+    parameters:
+      type: gp3
+      iops: "4000"
+      throughput: "250"
 vmselect:
   replicaCount: 3
+  extraArgs:
+    # Repeated dashboard queries are answered from the rollup cache; the newest 5 min are always recomputed
+    search.cacheTimestampOffset: 5m
+    search.maxQueryDuration: 60s
+    search.maxConcurrentRequests: 16
+    search.maxUniqueTimeseries: "1000000"
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {memory: 4Gi}
   podDisruptionBudget:
     enabled: true
     minAvailable: 2
@@ -29,6 +53,11 @@ vminsert:
   extraArgs:
     # Every sample is written to two vmstorage nodes: one node may be lost without losing data
     replicationFactor: 2
+    # Above the cardinality standard: such a series is a bug at the source, not data to store
+    maxLabelsPerTimeseries: 40
+  resources:
+    requests: {cpu: 500m, memory: 512Mi}
+    limits: {memory: 1Gi}
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -46,16 +75,26 @@ vminsert:
 
 vmstorage:
   replicaCount: 3
-  # Months (architecture section 7: 13 months, downsampled)
+  # Months (architecture section 7: 13 months)
   retentionPeriod: 13
+  extraArgs:
+    # Read-only before the volume is full, so the volume can be expanded online instead of repairing a full disk
+    storage.minFreeDiskSpaceBytes: 10GB
+  # ~1 KiB of memory per active series in the caches; 2M series per region with two copies over three nodes
+  resources:
+    requests: {cpu: "1", memory: 6Gi}
+    limits: {memory: 10Gi}
   podDisruptionBudget:
     enabled: true
     minAvailable: 2
   persistentVolume:
     enabled: true
+    # ~0.6 B per sample after compression: 2M series every 30 s for 13 months is ~1.3 TB, twice over three nodes ~0.9 TB each.
+    # Start at half and expand online when the volume passes 70% (allowVolumeExpansion): unused gp3 bytes are billed from day one
     size: 500Gi
     # Encrypted gp3, kept when a claim is deleted (manifests/storageclass.yaml)
     storageClassName: gp3-encrypted
+    volumeAttributesClassName: gp3-vmstorage
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:

@@ -10,11 +10,11 @@ variable "account_id" {
 
 variable "environment" {
   type        = string
-  description = "dev, stage or prod; also the state key prefix."
+  description = "dev, stage, prod or shared-services (the CI account); also the state key prefix."
 
   validation {
-    condition     = contains(["dev", "stage", "prod"], var.environment)
-    error_message = "environment must be dev, stage or prod."
+    condition     = contains(["dev", "stage", "prod", "shared-services"], var.environment)
+    error_message = "environment must be dev, stage, prod or shared-services."
   }
 }
 
@@ -122,5 +122,38 @@ variable "name_prefix" {
   validation {
     condition     = can(regex("^[a-z][a-z0-9]{1,10}$", var.name_prefix))
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
+  }
+}
+
+variable "plan_refs" {
+  type        = list(string)
+  default     = []
+  description = "Refs that may assume the plan role besides pull requests, for example refs/heads/main for the nightly drift check."
+
+  validation {
+    condition     = alltrue([for r in var.plan_refs : r == "refs/heads/main"])
+    error_message = "plan_refs may only hold refs/heads/main."
+  }
+}
+
+variable "ecr_read_repository_arns" {
+  type        = list(string)
+  default     = []
+  description = "Repositories the ecr-read role may read; empty creates no ecr-read role."
+
+  validation {
+    condition     = alltrue([for a in var.ecr_read_repository_arns : startswith(a, "arn:aws:ecr:") && a != "*"])
+    error_message = "ecr_read_repository_arns must be ECR repository ARNs."
+  }
+}
+
+variable "ecr_read_refs" {
+  type        = list(string)
+  default     = ["refs/heads/main"]
+  description = "Refs that may assume the ecr-read role: the schedule, repository_dispatch and dispatches of main run on refs/heads/main."
+
+  validation {
+    condition     = length(var.ecr_read_refs) > 0 && alltrue([for r in var.ecr_read_refs : can(regex("^refs/heads/(main|release/([A-Za-z0-9._-]+|[*]))$", r))])
+    error_message = "ecr_read_refs may only be refs/heads/main, refs/heads/release/<name> or refs/heads/release/*."
   }
 }

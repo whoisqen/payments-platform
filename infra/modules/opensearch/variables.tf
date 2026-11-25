@@ -98,13 +98,35 @@ variable "data_instance_type" {
 }
 
 variable "data_node_count" {
-  description = "Data nodes; a multiple of three keeps the AZs even."
+  description = "Data nodes; a multiple of availability_zone_count keeps the AZs even."
   type        = number
   default     = 6
 
   validation {
-    condition     = var.data_node_count % 3 == 0
-    error_message = "data_node_count must be a multiple of 3."
+    condition     = var.data_node_count >= 1
+    error_message = "data_node_count must be at least 1."
+  }
+}
+
+variable "availability_zone_count" {
+  description = "AZs of the data nodes: 3 in stage and prod, 1 in dev (one node, no zone awareness); the first subnets are used."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = contains([1, 2, 3], var.availability_zone_count)
+    error_message = "availability_zone_count must be 1, 2 or 3."
+  }
+}
+
+variable "dedicated_master_count" {
+  description = "Dedicated master nodes: 3, or 0 for a dev domain without them."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = contains([0, 3], var.dedicated_master_count)
+    error_message = "dedicated_master_count must be 0 or 3."
   }
 }
 
@@ -115,9 +137,14 @@ variable "warm_instance_type" {
 }
 
 variable "warm_node_count" {
-  description = "UltraWarm nodes."
+  description = "UltraWarm nodes; 0 disables the warm tier."
   type        = number
   default     = 2
+
+  validation {
+    condition     = var.warm_node_count == 0 || var.warm_node_count >= 2
+    error_message = "warm_node_count must be 0 or at least 2."
+  }
 }
 
 variable "volume_size_gb" {
@@ -136,9 +163,15 @@ variable "access_principal_arns" {
   type        = list(string)
 }
 
-variable "log_group_arn" {
-  description = "CloudWatch log group of application and slow logs."
+variable "logs_kms_key_arn" {
+  description = "Key of the application and slow log group; its policy must admit logs.amazonaws.com."
   type        = string
+}
+
+variable "log_retention_days" {
+  description = "Days the application and slow logs stay in CloudWatch."
+  type        = number
+  default     = 30
 }
 
 variable "snapshot_bucket_arn" {
