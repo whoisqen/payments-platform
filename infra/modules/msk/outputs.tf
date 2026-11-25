@@ -3,6 +3,11 @@ output "cluster_arn" {
   value       = aws_msk_cluster.this.arn
 }
 
+output "cluster_name" {
+  description = "Name of the MSK cluster."
+  value       = aws_msk_cluster.this.cluster_name
+}
+
 output "bootstrap_brokers_sasl_iam" {
   description = "IAM-authenticated TLS bootstrap string."
   value       = aws_msk_cluster.this.bootstrap_brokers_sasl_iam
@@ -31,4 +36,19 @@ output "sink_bucket_policy_statements" {
       Resource  = [var.sink_bucket_arn]
     },
   ]
+}
+
+output "producer_policy_arn" {
+  description = "Managed policy that gives a producer role IAM auth and write access to every topic of the cluster."
+  value       = aws_iam_policy.producer.arn
+}
+
+output "client_settings" {
+  description = "Producer settings: bootstrap string, port and the SASL setup of MSK IAM auth for librdkafka (OAUTHBEARER with an MSK IAM token)."
+  value = {
+    bootstrap_brokers = aws_msk_cluster.this.bootstrap_brokers_sasl_iam
+    port              = 9098
+    security_protocol = "SASL_SSL"
+    sasl_mechanism    = "OAUTHBEARER"
+  }
 }

@@ -13,9 +13,10 @@ locals {
   }
 
   # The subject pins repository and ref, so a fork, a pull request branch or another branch cannot assume an apply role.
-  # Plan reads only and runs for pull requests; apply runs from main and release branches.
+  # Plan reads only and runs for pull requests and the nightly drift check on main; apply runs from main and release branches.
   trust = { for k, subs in merge(
-    { plan = ["repo:${var.github_repository}:pull_request"] },
+    { plan = concat(["repo:${var.github_repository}:pull_request"], [for ref in var.plan_refs : "repo:${var.github_repository}:ref:${ref}"]) },
+    { ecr-read = [for ref in var.ecr_read_refs : "repo:${var.github_repository}:ref:${ref}"] },
     { for c, r in var.apply_roles : "apply-${c}" => [for ref in var.apply_refs : "repo:${var.github_repository}:ref:${ref}"] }
     ) : k => jsonencode({
       Version = "2012-10-17"
@@ -115,5 +116,40 @@ resource "aws_iam_role_policy" "apply" {
         { Sid = "ActionsWithoutResourceScoping", Effect = "Allow", Action = each.value.unscoped_actions, Resource = "*" },
       ],
     )
+  })
+}
+
+# Read-only registry role of the nightly digest check and the tag workflow (AWS_ROLE_ECR_READ); pushing stays with the ci-runners push role.
+resource "aws_iam_role" "ecr_read" {
+  count = length(var.ecr_read_repository_arns) > 0 ? 1 : 0
+
+  name                 = "${local.name_prefix}-ecr-read"
+  assume_role_policy   = local.trust["ecr-read"]
+  permissions_boundary = var.permissions_boundary_arn
+  max_session_duration = 3600
+  tags                 = merge(var.tags, { Name = "${local.name_prefix}-ecr-read" })
+}
+
+# GetAuthorizationToken has no resource-level scoping; every image action names the repositories.
+resource "aws_iam_role_policy" "ecr_read" {
+  count = length(var.ecr_read_repository_arns) > 0 ? 1 : 0
+
+  name = "ecr-read"
+  role = aws_iam_role.ecr_read[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Sid = "RegistryToken", Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
+      {
+        Sid    = "ReadImages"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
+          "ecr:DescribeImages", "ecr:DescribeRepositories", "ecr:ListImages",
+        ]
+        Resource = var.ecr_read_repository_arns
+      },
+    ]
   })
 }

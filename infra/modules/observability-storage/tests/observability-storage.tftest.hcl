@@ -124,3 +124,81 @@ run "backup_bucket_has_no_age_expiry_but_keeps_the_hygiene_rules" {
     error_message = "the name the backup job addresses"
   }
 }
+
+run "unfinished_uploads_are_aborted_after_one_day" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for k, l in aws_s3_bucket_lifecycle_configuration.this : alltrue([for r in l.rule : r.abort_incomplete_multipart_upload[0].days_after_initiation == 1 if r.id == "expire-objects"])])
+    error_message = "every bucket aborts incomplete multipart uploads after 1 day"
+  }
+}
+
+run "tiering_where_it_is_cheaper" {
+  command = plan
+
+  assert {
+    condition     = alltrue([for r in aws_s3_bucket_lifecycle_configuration.this["loki"].rule : length(r.transition) == 0])
+    error_message = "at a 30-day retention Standard-IA would cost more, so loki keeps Standard"
+  }
+  assert {
+    condition     = alltrue([for r in aws_s3_bucket_lifecycle_configuration.this["tempo"].rule : length(r.transition) == 0])
+    error_message = "tempo only expires"
+  }
+  assert {
+    condition = alltrue([for k in ["sentry", "vmbackup"] : contains(flatten([
+      for r in aws_s3_bucket_lifecycle_configuration.this[k].rule : [for t in r.transition : t.storage_class]
+    ]), "INTELLIGENT_TIERING")])
+    error_message = "sentry and vmbackup use Intelligent-Tiering"
+  }
+}
+
+run "loki_chunks_go_to_standard_ia_when_the_retention_allows" {
+  command = plan
+
+  variables {
+    buckets = {
+      loki = { retention_days = 90, namespace = "monitoring", service_account = "loki", transition = { days = 30, storage_class = "STANDARD_IA" } }
+    }
+  }
+
+  assert {
+    condition = anytrue([
+      for r in aws_s3_bucket_lifecycle_configuration.this["loki"].rule :
+      length(r.transition) == 1 && one(r.transition).days == 30 && one(r.transition).storage_class == "STANDARD_IA" && r.expiration[0].days == 90 if r.id == "expire-objects"
+    ])
+    error_message = "Standard-IA after 30 days, deleted at the retention"
+  }
+}
+
+run "standard_ia_before_30_days_is_rejected" {
+  command = plan
+
+  variables {
+    buckets = {
+      loki = { retention_days = 90, namespace = "monitoring", service_account = "loki", transition = { days = 7, storage_class = "STANDARD_IA" } }
+    }
+  }
+
+  expect_failures = [var.buckets]
+}
+
+run "yace_reads_cloudwatch_on_the_central_cluster" {
+  command = plan
+
+  assert {
+    condition     = aws_iam_role.yace[0].name == "pay-shared-services-euc1-yace-pod" && aws_iam_role.yace[0].permissions_boundary == var.permissions_boundary_arn
+    error_message = "yace role with the boundary"
+  }
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_iam_role_policy.yace[0].policy).Statement :
+      alltrue([for a in s.Action : contains(["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics", "tag:GetResources"], a)])
+    ])
+    error_message = "metric reads and tag discovery only"
+  }
+  assert {
+    condition     = aws_eks_pod_identity_association.yace[0].cluster_name == var.cluster_name && aws_eks_pod_identity_association.yace[0].service_account == "yace"
+    error_message = "monitoring/yace on the central cluster"
+  }
+}

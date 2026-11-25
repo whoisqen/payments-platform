@@ -11,7 +11,7 @@ variables {
   security_group_ids    = ["sg-0001"]
   master_user_arn       = "arn:aws:iam::111111111111:role/opensearch-admin"
   access_principal_arns = ["arn:aws:iam::111111111111:role/fluent-bit"]
-  log_group_arn         = "arn:aws:logs:eu-central-1:111111111111:log-group:/pay/prod/opensearch"
+  logs_kms_key_arn      = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0005"
   snapshot_bucket_arn   = "arn:aws:s3:::pay-prod-euc1-backup"
   snapshot_kms_key_arn  = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0004"
 
@@ -66,7 +66,51 @@ run "data_nodes_stay_even_across_azs" {
     data_node_count = 5
   }
 
-  expect_failures = [var.data_node_count]
+  expect_failures = [aws_opensearch_domain.this]
+}
+
+run "dev_is_one_node_without_masters_or_warm" {
+  command = plan
+
+  variables {
+    env                     = "dev"
+    availability_zone_count = 1
+    data_node_count         = 1
+    dedicated_master_count  = 0
+    warm_node_count         = 0
+    data_instance_type      = "m7g.medium.search"
+    volume_size_gb          = 20
+  }
+
+  assert {
+    condition = (
+      !aws_opensearch_domain.this.cluster_config[0].zone_awareness_enabled &&
+      !aws_opensearch_domain.this.cluster_config[0].dedicated_master_enabled &&
+      !aws_opensearch_domain.this.cluster_config[0].warm_enabled &&
+      aws_opensearch_domain.this.cluster_config[0].instance_count == 1 &&
+      aws_opensearch_domain.this.vpc_options[0].subnet_ids == toset(["subnet-1"])
+    )
+    error_message = "dev runs one data node in one subnet"
+  }
+}
+
+run "warm_needs_masters" {
+  command = plan
+
+  variables {
+    dedicated_master_count = 0
+  }
+
+  expect_failures = [aws_opensearch_domain.this]
+}
+
+run "logs_are_encrypted_and_publishing_is_scoped" {
+  command = plan
+
+  assert {
+    condition     = aws_cloudwatch_log_group.this.name == "/aws/opensearch/pay-prod-euc1-opensearch" && aws_cloudwatch_log_group.this.kms_key_id == var.logs_kms_key_arn
+    error_message = "logs land in an encrypted group of the domain"
+  }
 }
 
 run "tag_schema_is_enforced" {

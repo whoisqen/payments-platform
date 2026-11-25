@@ -17,6 +17,14 @@ locals {
   sink_prefixes = "${var.sink_bucket_arn}/${var.sink_prefix}/*"
 }
 
+resource "aws_cloudwatch_log_group" "brokers" {
+  name              = "/aws/msk/${local.name}"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = var.logs_kms_key_arn
+
+  tags = var.tags
+}
+
 resource "aws_msk_configuration" "this" {
   name              = local.name
   description       = "RF 3, min ISR 2, no topic auto-creation"
@@ -28,7 +36,7 @@ resource "aws_msk_cluster" "this" {
   cluster_name           = local.name
   kafka_version          = var.kafka_version
   number_of_broker_nodes = var.broker_count
-  enhanced_monitoring    = "PER_TOPIC_PER_PARTITION"
+  enhanced_monitoring    = var.enhanced_monitoring
 
   broker_node_group_info {
     instance_type   = var.instance_type
@@ -80,7 +88,7 @@ resource "aws_msk_cluster" "this" {
     broker_logs {
       cloudwatch_logs {
         enabled   = true
-        log_group = var.log_group_name
+        log_group = aws_cloudwatch_log_group.brokers.name
       }
     }
   }
@@ -143,4 +151,36 @@ resource "aws_iam_role_policy" "sink" {
       },
     ]
   })
+}
+
+# Producers (the Hyperswitch router and scheduler) attach this policy: connect, describe and write, never read or alter.
+resource "aws_iam_policy" "producer" {
+  name        = "${local.name}-producer"
+  description = "IAM auth of an event producer on ${local.name}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "Connect"
+        Effect   = "Allow"
+        Action   = ["kafka-cluster:Connect", "kafka-cluster:DescribeCluster", "kafka-cluster:WriteDataIdempotently"]
+        Resource = [local.cluster_arn]
+      },
+      {
+        Sid      = "WriteTopics"
+        Effect   = "Allow"
+        Action   = ["kafka-cluster:DescribeTopic", "kafka-cluster:WriteData"]
+        Resource = [local.topic_arn]
+      },
+      {
+        Sid      = "Bootstrap"
+        Effect   = "Allow"
+        Action   = ["kafka:GetBootstrapBrokers", "kafka:DescribeClusterV2"]
+        Resource = [local.cluster_arn]
+      },
+    ]
+  })
+
+  tags = var.tags
 }

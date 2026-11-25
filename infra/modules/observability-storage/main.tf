@@ -1,6 +1,12 @@
 locals {
   names = { for k, _ in var.buckets : k => "${var.name_prefix}-${var.environment}-${var.region_short}-${k}" }
   arns  = { for k, n in local.names : k => "arn:aws:s3:::${n}" }
+
+  # Standard-IA bills at least 30 days per object, so a transition pays off only when objects live 30 days past it.
+  transitions = { for k, b in var.buckets : k => (
+    b.transition == null ? [] :
+    b.transition.storage_class == "INTELLIGENT_TIERING" || b.retention_days == null || try(b.retention_days >= b.transition.days + 30, false) ? [b.transition] : []
+  ) }
 }
 
 resource "aws_s3_bucket" "this" {
@@ -66,7 +72,7 @@ resource "aws_s3_bucket_policy" "this" {
   depends_on = [aws_s3_bucket_public_access_block.this]
 }
 
-# Loki, Tempo and Sentry write objects and never tier them; the bucket expires them after the retention of the component.
+# Objects expire after the retention of the component; a bucket tiers them to Standard-IA or Intelligent-Tiering where that is cheaper.
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   for_each = var.buckets
 
@@ -79,6 +85,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     filter {}
 
     # A bucket of incremental backups has no age expiry: a new backup reuses files of the earlier ones, and the tool deletes the files it no longer needs
+    dynamic "transition" {
+      for_each = local.transitions[each.key]
+
+      content {
+        days          = transition.value.days
+        storage_class = transition.value.storage_class
+      }
+    }
+
     dynamic "expiration" {
       for_each = each.value.retention_days == null ? [] : [each.value.retention_days]
 
@@ -92,7 +107,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     }
 
     abort_incomplete_multipart_upload {
-      days_after_initiation = 7
+      days_after_initiation = 1
     }
   }
 
@@ -169,6 +184,53 @@ resource "aws_eks_pod_identity_association" "this" {
   namespace       = each.value.namespace
   service_account = each.value.service_account
   role_arn        = aws_iam_role.this[each.key].arn
+
+  tags = var.tags
+}
+
+# YACE of the central cluster exports CloudWatch metrics; the read and tag discovery APIs have no resource-level scoping.
+resource "aws_iam_role" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  name                 = "${var.name_prefix}-${var.environment}-${var.region_short}-yace-pod"
+  permissions_boundary = var.permissions_boundary_arn
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  name = "cloudwatch-read"
+  role = aws_iam_role.yace[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "ReadMetricsAndTags"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics", "tag:GetResources"]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "yace" {
+  count = var.yace.enabled ? 1 : 0
+
+  cluster_name    = var.cluster_name
+  namespace       = var.yace.namespace
+  service_account = var.yace.service_account
+  role_arn        = aws_iam_role.yace[0].arn
 
   tags = var.tags
 }
