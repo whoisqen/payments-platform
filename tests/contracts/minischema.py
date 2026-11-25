@@ -4,7 +4,7 @@ KNOWN = {
     "$schema", "$id", "$ref", "$defs", "definitions", "title", "description", "default", "type", "enum", "const",
     "properties", "required", "additionalProperties", "patternProperties", "items", "minItems", "maxItems",
     "uniqueItems", "minLength", "maxLength", "pattern", "minimum", "maximum", "exclusiveMinimum",
-    "exclusiveMaximum", "minProperties", "maxProperties", "if", "then", "else", "allOf", "anyOf", "oneOf", "not",
+    "exclusiveMaximum", "minProperties", "maxProperties", "propertyNames", "if", "then", "else", "allOf", "anyOf", "oneOf", "not",
 }
 TYPES = {
     "object": lambda v: isinstance(v, dict),
@@ -83,6 +83,9 @@ def errors(value, schema, root=None, path="$"):
             out.append(f"{path}: fewer than {schema['minProperties']} properties")
         if len(value) > schema.get("maxProperties", len(value)):
             out.append(f"{path}: more than {schema['maxProperties']} properties")
+        if "propertyNames" in schema:
+            for key in value:
+                out += errors(key, schema["propertyNames"], root, f"{path}[{key!r}]")
         for key, sub in value.items():
             matched = False
             if key in props:
