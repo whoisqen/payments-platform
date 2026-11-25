@@ -2,6 +2,11 @@
 {{- include "platform-common.labels" (dict "root" . "name" "migrations" "component" "migrations") -}}
 {{- end }}
 
+{{/* The Job object carries component migration, which Kyverno require-migration-snapshot matches; its pods keep component migrations for the NetworkPolicy */}}
+{{- define "migrations.jobLabels" -}}
+{{- include "platform-common.labels" (dict "root" . "name" "migrations" "component" "migration") -}}
+{{- end }}
+
 {{- define "migrations.hook" -}}
 helm.sh/hook: pre-install,pre-upgrade
 helm.sh/hook-weight: {{ .weight | quote }}

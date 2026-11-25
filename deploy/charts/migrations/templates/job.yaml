@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-migrations
   labels:
-    {{- include "migrations.labels" . | nindent 4 }}
+    {{- include "migrations.jobLabels" . | nindent 4 }}
   annotations:
     {{- include "migrations.hook" (dict "weight" .Values.job.hookWeight) | nindent 4 }}
 spec:
@@ -25,7 +25,7 @@ spec:
       {{- include "migrations.podSecurity" . | nindent 6 }}
       {{- if .Values.snapshot.enabled }}
       initContainers:
-        - name: snapshot
+        - name: pre-migration-snapshot
           image: {{ include "migrations.image" . | quote }}
           command:
             {{- toYaml .Values.snapshot.command | nindent 12 }}
