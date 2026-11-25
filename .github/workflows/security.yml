@@ -111,7 +111,9 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: python pipx:semgrep
+          install_args: python
+      - name: semgrep on the mise python
+        run: tools/ci/security/install_pipx_tools.sh pipx:semgrep
       - name: repo rules pass their own tests
         run: semgrep --test --metrics=off policy/semgrep
       - name: scan
@@ -152,7 +154,9 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: python helm trivy pipx:checkov
+          install_args: python helm trivy
+      - name: checkov on the mise python
+        run: tools/ci/security/install_pipx_tools.sh pipx:checkov
       - name: tree to scan
         run: |
           # one tree keeps one SARIF run per tool; infra/ and docker/ keep their repository paths
@@ -171,7 +175,18 @@ jobs:
         working-directory: ${{ runner.temp }}/iac
         env:
           CONFIG: ${{ github.workspace }}/policy/security/iac/checkov.yaml
-        run: checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov"
+        run: |
+          status=0
+          # with a console,<path> list each entry is the file of that output
+          checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov.sarif" || status=$?
+          report="$RUNNER_TEMP/checkov.sarif"
+          [ -d "$report" ] && report="$report/results_sarif.sarif"
+          if [ ! -s "$report" ]; then
+            echo "::error::checkov wrote no SARIF report (exit ${status}); the scan did not run, see the output above"
+            exit 1
+          fi
+          cp "$report" "$RUNNER_TEMP/checkov-report.sarif"
+          exit "$status"
       - name: upload trivy to code scanning
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -184,7 +199,7 @@ jobs:
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3.29.9
         with:
-          sarif_file: ${{ runner.temp }}/checkov/results_sarif.sarif
+          sarif_file: ${{ runner.temp }}/checkov-report.sarif
           category: checkov
 
   dependencies:
@@ -202,7 +217,9 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: python node trivy pipx:pip-audit github:EmbarkStudios/cargo-deny
+          install_args: python node trivy github:EmbarkStudios/cargo-deny
+      - name: pip-audit on the mise python
+        run: tools/ci/security/install_pipx_tools.sh pipx:pip-audit
       - name: trivy fs (high and critical with a fix block)
         run: trivy fs --config policy/security/deps/trivy-vuln.yaml --ignorefile policy/security/trivyignore.yaml .
       - name: trivy fs report
@@ -291,7 +308,9 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
-          install_args: python pipx:zizmor
+          install_args: python
+      - name: zizmor on the mise python
+        run: tools/ci/security/install_pipx_tools.sh pipx:zizmor
       - name: zizmor report
         run: |
           # exit codes 10-14 only say that findings exist; the gate below decides

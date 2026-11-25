@@ -19,8 +19,11 @@ class Policy:
 
     @classmethod
     def load(cls, path):
-        with open(path, "rb") as f:
-            conf = tomllib.load(f)
+        try:
+            with open(path, "rb") as f:
+                conf = tomllib.load(f)
+        except (OSError, ValueError) as e:
+            raise InputError(f"license policy {path} is not readable TOML: {e}") from None
         return cls(conf.get("allow", []), conf.get("deny", []) + conf.get("deny_aliases", []))
 
     def leaf(self, lic, exception=None):
@@ -112,6 +115,23 @@ def from_cargo_metadata(doc):
         yield f"{p['name']}@{p['version']}", p.get("license") or ""
 
 
+class InputError(Exception):
+    pass
+
+
+def read_json(path, what):
+    # a generator that failed leaves no file or a partial one; say which input is missing instead of a traceback
+    try:
+        doc = json.loads(Path(path).read_text())
+    except FileNotFoundError:
+        raise InputError(f"{what} output {path} does not exist: the step that writes it failed, see above") from None
+    except (OSError, ValueError) as e:
+        raise InputError(f"{what} output {path} is not readable JSON ({e.__class__.__name__}: {e})") from None
+    if not isinstance(doc, dict):
+        raise InputError(f"{what} output {path} is not a JSON object")
+    return doc
+
+
 def check(policy, packages):
     result = {ALLOW: [], REVIEW: [], DENY: [], UNKNOWN: []}
     seen = set()
@@ -142,12 +162,19 @@ def main(argv=None):
     p.add_argument("--cargo-metadata", action="append", default=[])
     p.add_argument("--summary")
     a = p.parse_args(argv)
-    policy = Policy.load(a.policy)
-    packages = []
-    for f in a.cyclonedx:
-        packages += list(from_cyclonedx(json.loads(Path(f).read_text())))
-    for f in a.cargo_metadata:
-        packages += list(from_cargo_metadata(json.loads(Path(f).read_text())))
+    try:
+        policy = Policy.load(a.policy)
+        packages = []
+        for f in a.cyclonedx:
+            packages += list(from_cyclonedx(read_json(f, "SBOM (syft)")))
+        for f in a.cargo_metadata:
+            packages += list(from_cargo_metadata(read_json(f, "cargo metadata")))
+    except InputError as e:
+        print(f"::error::{e}")
+        return 1
+    if not a.cyclonedx and not a.cargo_metadata:
+        print("::error::no input: pass --cyclonedx and/or --cargo-metadata")
+        return 1
     result = check(policy, packages)
     text = summary(result)
     print(text, end="")

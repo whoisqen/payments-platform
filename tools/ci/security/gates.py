@@ -41,11 +41,27 @@ def sarif_results(doc):
             yield res.get("ruleId", "?"), level, path, line
 
 
+def read_report(path):
+    # a scanner that crashed leaves no report; say so instead of a traceback
+    try:
+        doc = json.loads(Path(path).read_text())
+    except FileNotFoundError:
+        return None, f"{path} does not exist: the scanner produced no report, see the scan step above"
+    except (OSError, ValueError) as e:
+        return None, f"{path} is not a readable SARIF report ({e.__class__.__name__}: {e})"
+    if not isinstance(doc, dict) or not isinstance(doc.get("runs"), list):
+        return None, f"{path} is not a SARIF report (no runs list)"
+    return doc, None
+
+
 def sarif_gate(conf, files, out=sys.stdout):
     block = set(conf.get("block_levels", ["error"]))
     counts, blocking = {}, []
     for f in files:
-        doc = json.loads(Path(f).read_text())
+        doc, err = read_report(f)
+        if err:
+            print(f"::error::{err}", file=out)
+            return 1
         for rule, level, path, line in sarif_results(doc):
             counts[level] = counts.get(level, 0) + 1
             if level in block:
@@ -69,8 +85,15 @@ def main(argv=None):
     sg.add_argument("file")
     sg.add_argument("sarif", nargs="+")
     a = p.parse_args(argv)
-    conf = load(a.file)
+    try:
+        conf = load(a.file)
+    except (OSError, ValueError) as e:
+        print(f"::error::cannot read the gate config {a.file}: {e}")
+        return 1
     if a.cmd == "get":
+        if a.key not in conf:
+            print(f"::error::{a.file} has no key {a.key}")
+            return 1
         print("\n".join(get(conf, a.key)))
         return 0
     if a.cmd == "semgrep-args":

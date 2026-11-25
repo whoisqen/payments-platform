@@ -6,6 +6,9 @@ exit-code: 1
 scan:
   scanners:
     - misconfig
+  # .dockerignore files next to a Dockerfile match the dockerfile pattern but are not Dockerfiles
+  skip-files:
+    - "**/*.dockerignore"
 misconfiguration:
   scanners:
     - terraform
