@@ -5,4 +5,5 @@ Trust is pinned to the repository and the ref: pull requests for plan (read-only
 Plan reads metadata, the state of its environment and writes only `.tflock` files; no secret or object reads.
 An apply role gets its named actions on named resources, its own state prefix `<env>/<component>/`, a 1 hour session,
 the permissions boundary, and a deny on roles created without that boundary. `*`, `iam:*` and wildcard resources are rejected.
+`plan_refs` adds main to the plan trust (nightly drift); `ecr_read_repository_arns` creates `<prefix>-<env>-glob-ecr-read` (main only, read-only images). `environment` may be shared-services.
 Test: `terraform init -backend=false && terraform test`.

@@ -49,20 +49,43 @@ variable "buckets" {
     retention_days  = optional(number)
     namespace       = string
     service_account = string
+    transition = optional(object({
+      days          = number
+      storage_class = string
+    }))
   }))
-  description = "Stores by component: days until objects expire (null keeps them), and the service account that gets the one role of the bucket."
+  description = "Stores by component: days until objects expire (null keeps them), an optional tiering transition and the service account of the one role of the bucket. A Standard-IA transition applies only when objects stay 30 days past it."
   default = {
-    loki   = { retention_days = 30, namespace = "monitoring", service_account = "loki" }
-    tempo  = { retention_days = 14, namespace = "monitoring", service_account = "tempo" }
-    sentry = { retention_days = 90, namespace = "monitoring", service_account = "sentry" }
-    # Incremental backups of the metrics store (vmbackup): no age expiry, the tool removes what it no longer needs
-    vmbackup = { retention_days = null, namespace = "victoria-metrics", service_account = "vmbackup" }
+    # Chunks go to Standard-IA after 30 days; at a 30-day retention the rule stays inactive until the retention exceeds 60 days.
+    loki  = { retention_days = 30, namespace = "monitoring", service_account = "loki", transition = { days = 30, storage_class = "STANDARD_IA" } }
+    tempo = { retention_days = 14, namespace = "monitoring", service_account = "tempo" }
+    # Attachments and debug files are read unpredictably: Intelligent-Tiering moves cold ones without retrieval fees.
+    sentry = { retention_days = 90, namespace = "monitoring", service_account = "sentry", transition = { days = 0, storage_class = "INTELLIGENT_TIERING" } }
+    # Incremental backups (vmbackup) reuse old parts, so no age expiry; Intelligent-Tiering moves untouched parts to the infrequent and archive instant tiers.
+    vmbackup = { retention_days = null, namespace = "victoria-metrics", service_account = "vmbackup", transition = { days = 0, storage_class = "INTELLIGENT_TIERING" } }
   }
 
   validation {
-    condition     = alltrue([for b in values(var.buckets) : b.retention_days == null || b.retention_days >= 1])
+    condition     = alltrue([for b in values(var.buckets) : b.retention_days == null || try(b.retention_days >= 1, false)])
     error_message = "retention_days must be at least 1."
   }
+
+  validation {
+    condition = alltrue([for b in values(var.buckets) : b.transition == null || try(
+      (b.transition.storage_class == "STANDARD_IA" && b.transition.days >= 30) || (b.transition.storage_class == "INTELLIGENT_TIERING" && b.transition.days >= 0),
+    false)])
+    error_message = "transition must be STANDARD_IA after at least 30 days or INTELLIGENT_TIERING."
+  }
+}
+
+variable "yace" {
+  type = object({
+    enabled         = optional(bool, true)
+    namespace       = optional(string, "monitoring")
+    service_account = optional(string, "yace")
+  })
+  default     = {}
+  description = "CloudWatch exporter role of the central cluster: read-only metrics and tag discovery through Pod Identity."
 }
 
 variable "noncurrent_retention_days" {

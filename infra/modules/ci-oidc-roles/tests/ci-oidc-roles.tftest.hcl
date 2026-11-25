@@ -153,3 +153,60 @@ run "wildcard_resource_rejected" {
 
   expect_failures = [var.apply_roles]
 }
+
+run "nightly_drift_may_plan_from_main_only" {
+  command = plan
+
+  variables {
+    plan_refs = ["refs/heads/main"]
+  }
+
+  assert {
+    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:pull_request", "repo:example-org/payments-platform:ref:refs/heads/main"]
+    error_message = "plan from pull requests and main"
+  }
+}
+
+run "plan_from_other_branches_is_rejected" {
+  command = plan
+
+  variables {
+    plan_refs = ["refs/heads/release/*"]
+  }
+
+  expect_failures = [var.plan_refs]
+}
+
+run "ecr_read_role_reads_named_repositories_from_main" {
+  command = plan
+
+  variables {
+    environment              = "shared-services"
+    ecr_read_repository_arns = ["arn:aws:ecr:eu-central-1:444444444444:repository/payments/*"]
+  }
+
+  assert {
+    condition     = aws_iam_role.ecr_read[0].name == "pay-shared-services-glob-ecr-read" && aws_iam_role.plan.name == "pay-shared-services-glob-tf-plan"
+    error_message = "shared-services role names"
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role.ecr_read[0].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:ref:refs/heads/main"]
+    error_message = "ecr-read only from main"
+  }
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_iam_role_policy.ecr_read[0].policy).Statement :
+      alltrue([for a in s.Action : !contains(["ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:BatchDeleteImage"], a)])
+    ]) && length([for s in jsondecode(aws_iam_role_policy.ecr_read[0].policy).Statement : s if s.Resource == "*" && s.Action != ["ecr:GetAuthorizationToken"]]) == 0
+    error_message = "read only; only the token call is unscoped"
+  }
+}
+
+run "no_ecr_read_role_without_repositories" {
+  command = plan
+
+  assert {
+    condition     = length(aws_iam_role.ecr_read) == 0 && output.ecr_read_role_arn == null
+    error_message = "no repositories, no role"
+  }
+}

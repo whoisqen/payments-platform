@@ -69,6 +69,15 @@ dependency "secrets" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
+dependency "msk" {
+  config_path = "../../analytics/msk"
+
+  mock_outputs = {
+    producer_policy_arn = "arn:aws:iam::000000000000:policy/pay-mock-euc1-msk-producer"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+}
+
 inputs = {
   cell                            = "cell-2"
   cluster_name                    = dependency.eks.outputs.cluster_name
@@ -78,6 +87,7 @@ inputs = {
   locker_kms_key_arn              = dependency.kms.outputs.key_arns["locker"]
   secrets_kms_key_arn             = dependency.kms.outputs.key_arns["shared"]
   secret_arns                     = values(dependency.secrets.outputs.secret_arns)
+  kafka_producer_policy_arn       = dependency.msk.outputs.producer_policy_arn
   memorydb = {
     cluster_arn = dependency.memorydb.outputs.cluster_arn
     users       = { for u, _ in include.envcommon.locals.env_cfg.memorydb_users : u => u }
