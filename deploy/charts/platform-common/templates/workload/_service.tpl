@@ -15,5 +15,11 @@ spec:
       port: {{ .cfg.service.port }}
       targetPort: http
       protocol: TCP
+    {{- range .cfg.service.extraPorts }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .name }}
+      protocol: TCP
+    {{- end }}
 {{- end }}
 {{- end }}

@@ -153,6 +153,11 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
+          },
+          "propertyNames": {
+            "not": {
+              "pattern": "^(LOCKER__|PGSSL|PGPASSWORD)"
+            }
           }
         },
         "envFromSecrets": {
@@ -207,6 +212,31 @@
             "requests",
             "limits"
           ]
+        },
+        "extraPorts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,14}$",
+                "not": {
+                  "const": "http"
+                }
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "name",
+              "port"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false,
@@ -368,6 +398,31 @@
         "maxPendingRequests": {
           "type": "integer",
           "minimum": 1
+        },
+        "extraPorts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,14}$",
+                "not": {
+                  "const": "http"
+                }
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "name",
+              "port"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false,
@@ -537,6 +592,10 @@
         "interval": {
           "type": "string",
           "pattern": "^[0-9]+[smh]$"
+        },
+        "port": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,14}$"
         }
       },
       "additionalProperties": false,
@@ -612,6 +671,358 @@
       "required": [
         "securityGroupIds"
       ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "log": {
+          "type": "object",
+          "properties": {
+            "console": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "level": {
+                  "enum": [
+                    "TRACE",
+                    "DEBUG",
+                    "INFO",
+                    "WARN",
+                    "ERROR"
+                  ]
+                },
+                "log_format": {
+                  "enum": [
+                    "json",
+                    "default"
+                  ]
+                },
+                "filtering_directive": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "level",
+                "log_format"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "console"
+          ]
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "host"
+          ]
+        },
+        "limit": {
+          "type": "object",
+          "properties": {
+            "request_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "duration": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "buffer_size": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "request_count",
+            "duration"
+          ]
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "tti": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_capacity": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "max_capacity"
+          ]
+        },
+        "database": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "minLength": 1
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "dbname": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pool_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_idle": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_lifetime": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "idle_timeout": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "connection_timeout": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "username",
+            "host",
+            "port",
+            "dbname"
+          ]
+        },
+        "secrets_management": {
+          "type": "object",
+          "properties": {
+            "secrets_manager": {
+              "const": "aws_kms"
+            },
+            "aws_kms": {
+              "type": "object",
+              "properties": {
+                "key_id": {
+                  "type": "string",
+                  "pattern": "^(alias/[A-Za-z0-9/_-]+|REPLACE_[A-Z_]+)$"
+                },
+                "region": {
+                  "type": "string",
+                  "pattern": "^([a-z]{2}-[a-z]+-[0-9]|REPLACE_[A-Z_]+)$"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key_id",
+                "region"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "secrets_manager",
+            "aws_kms"
+          ]
+        },
+        "metrics": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "disabled",
+                "otlp",
+                "prometheus"
+              ]
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "endpoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "endpoint_timeout_secs": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "metrics_export_interval_secs": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "background_metrics_collection_interval_secs": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "api_client": {
+          "type": "object",
+          "properties": {
+            "client_idle_timeout": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "pool_max_idle_per_host": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": []
+        },
+        "external_key_manager": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "disabled",
+                "enabled",
+                "enabled_with_mtls"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https://"
+            }
+          },
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "enabled",
+                  "enabled_with_mtls"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "mode",
+              "url"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "log",
+        "server",
+        "limit",
+        "cache",
+        "database",
+        "secrets_management",
+        "metrics",
+        "api_client",
+        "external_key_manager"
+      ],
+      "description": "Non-secret settings only; secret keys (password, master_key, public_key, locker_private_key, identity, ca_cert) are rejected"
+    },
+    "postgresTls": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "const": "verify-full"
+        },
+        "rootCert": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "rootCert"
+      ]
+    },
+    "tenants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+          },
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-z_][a-z0-9_]*$"
+          },
+          "redisKeyPrefix": {
+            "type": "string",
+            "pattern": "^[^{}]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "schema",
+          "redisKeyPrefix"
+        ]
+      }
+    },
+    "externalSecret": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "storeName": {
+          "const": "vault"
+        },
+        "pathPrefix": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9/-]*[a-z0-9]$"
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "storeName",
+        "pathPrefix",
+        "refreshInterval"
+      ]
+    },
+    "podIdentityAgentCidr": {
+      "const": "169.254.170.23/32"
     }
   },
   "additionalProperties": false,
@@ -626,6 +1037,11 @@
     "pdb",
     "networkPolicy",
     "serviceAccount",
-    "securityGroupPolicy"
+    "securityGroupPolicy",
+    "config",
+    "postgresTls",
+    "tenants",
+    "externalSecret",
+    "podIdentityAgentCidr"
   ]
 }

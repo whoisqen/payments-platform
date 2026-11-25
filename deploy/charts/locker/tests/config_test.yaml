@@ -1,0 +1,172 @@
+suite: locker runtime configuration
+templates:
+  - workload.yaml
+  - externalsecret.yaml
+  - networkpolicy.yaml
+  - service.yaml
+  - servicemonitor.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.dataCidrs: ["10.120.0.0/16"]
+  global.endpointCidrs: ["10.120.255.0/24"]
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: renders every required card-vault section as LOCKER__ env
+    template: workload.yaml
+    asserts:
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__SERVER__HOST, value: "0.0.0.0"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__SERVER__PORT, value: "3001"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__LOG__CONSOLE__LEVEL, value: INFO}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__LIMIT__REQUEST_COUNT, value: "1"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__LIMIT__DURATION, value: "60"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__CACHE__MAX_CAPACITY, value: "5000"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__DATABASE__USERNAME, value: locker_app}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__DATABASE__DBNAME, value: locker}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__DATABASE__PORT, value: "5432"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__DATABASE__POOL_SIZE, value: "10"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__SECRETS_MANAGEMENT__SECRETS_MANAGER, value: aws_kms}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__METRICS__MODE, value: prometheus}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__API_CLIENT__CLIENT_IDLE_TIMEOUT, value: "90"}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__EXTERNAL_KEY_MANAGER__MODE, value: disabled}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__TENANT_SECRETS__PUBLIC__SCHEMA, value: public}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: LOCKER__TENANT_SECRETS__PUBLIC__REDIS_KEY_PREFIX, value: public}}
+  - it: verifies the database server certificate and host
+    template: workload.yaml
+    asserts:
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: PGSSLMODE, value: verify-full}}
+      - contains: {path: "spec.template.spec.containers[0].env", content: {name: PGSSLROOTCERT, value: /etc/ssl/certs/ca-certificates.crt}}
+  - it: terminates mTLS in the Istio sidecar, so the locker has no TLS section
+    template: workload.yaml
+    asserts:
+      - notMatchRegex: {path: "spec.template.spec.containers[0].env[*].name", pattern: "^LOCKER__TLS__"}
+  - it: keeps every secret out of the pod spec and reads them from the ExternalSecret
+    template: workload.yaml
+    asserts:
+      - notMatchRegex: {path: "spec.template.spec.containers[0].env[*].name", pattern: "PASSWORD|MASTER_KEY|PUBLIC_KEY|PRIVATE_KEY|IDENTITY|CA_CERT"}
+      - contains: {path: "spec.template.spec.containers[0].envFrom", content: {secretRef: {name: locker-secrets}}}
+  - it: rejects a LOCKER__ key in container.env, so no plaintext secret can bypass Vault
+    template: workload.yaml
+    set:
+      container.env.LOCKER__DATABASE__PASSWORD: plaintext
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a password in the database values
+    template: workload.yaml
+    set:
+      config.database.password: plaintext
+    asserts:
+      - failedTemplate: {}
+  - it: rejects any store other than vault
+    template: externalsecret.yaml
+    set:
+      externalSecret.storeName: aws-secrets-manager
+    asserts:
+      - failedTemplate: {}
+  - it: takes every secret from the Vault store under <env>/locker
+    template: externalsecret.yaml
+    asserts:
+      - isKind: {of: ExternalSecret}
+      - equal: {path: spec.secretStoreRef, value: {kind: ClusterSecretStore, name: vault}}
+      - equal: {path: spec.target.name, value: locker-secrets}
+      - lengthEqual: {path: spec.data, count: 4}
+      - equal:
+          path: spec.data
+          value:
+            - {secretKey: LOCKER__DATABASE__PASSWORD, remoteRef: {key: dev/locker/database, property: password}}
+            - {secretKey: LOCKER__SECRETS__LOCKER_PRIVATE_KEY, remoteRef: {key: dev/locker/jwe, property: locker-private-key}}
+            - {secretKey: LOCKER__TENANT_SECRETS__PUBLIC__MASTER_KEY, remoteRef: {key: dev/locker/tenants/public, property: master-key}}
+            - {secretKey: LOCKER__TENANT_SECRETS__PUBLIC__PUBLIC_KEY, remoteRef: {key: dev/locker/tenants/public, property: public-key}}
+      - notExists: {path: spec.dataFrom}
+  - it: adds the client identity and CA only for an external key manager over mTLS
+    template: externalsecret.yaml
+    set:
+      config.external_key_manager: {mode: enabled_with_mtls, url: "https://keymanager.example.test"}
+    asserts:
+      - contains:
+          path: spec.data
+          content: {secretKey: LOCKER__API_CLIENT__IDENTITY, remoteRef: {key: dev/locker/external-key-manager, property: client-identity}}
+      - contains:
+          path: spec.data
+          content: {secretKey: LOCKER__EXTERNAL_KEY_MANAGER__CA_CERT, remoteRef: {key: dev/locker/external-key-manager, property: ca-cert}}
+  - it: fails without an environment for the Vault paths
+    template: externalsecret.yaml
+    set:
+      global.environment: ""
+    asserts:
+      - failedTemplate: {errorMessage: "global.environment is required for the Vault paths of the locker"}
+  - it: keeps the CDE NetworkPolicy to the base rules plus KMS and STS endpoints, Pod Identity and metrics
+    template: networkpolicy.yaml
+    asserts:
+      - equal: {path: spec.policyTypes, value: [Ingress, Egress]}
+      - equal:
+          path: spec.ingress
+          value:
+            - from:
+                - podSelector: {}
+                - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: istio-system}}
+                - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+              ports:
+                - {port: http, protocol: TCP}
+            - from:
+                - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+              ports:
+                - {port: 9091, protocol: TCP}
+      - equal:
+          path: spec.egress
+          value:
+            - to:
+                - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+                  podSelector: {matchLabels: {k8s-app: kube-dns}}
+              ports:
+                - {port: 53, protocol: UDP}
+                - {port: 53, protocol: TCP}
+            - to:
+                - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: istio-system}}
+              ports:
+                - {port: 15012, protocol: TCP}
+                - {port: 443, protocol: TCP}
+            - to:
+                - podSelector: {}
+            - to:
+                - ipBlock: {cidr: 10.120.0.0/16}
+              ports:
+                - {port: 5432, protocol: TCP}
+            - to:
+                - ipBlock: {cidr: 10.120.255.0/24}
+              ports:
+                - {port: 443, protocol: TCP}
+            - to:
+                - ipBlock: {cidr: 169.254.170.23/32}
+              ports:
+                - {port: 80, protocol: TCP}
+  - it: serves metrics on the named port 9091 that the ServiceMonitor scrapes
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content: {name: metrics, containerPort: 9091, protocol: TCP}
+        template: workload.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: LOCKER__METRICS__PORT, value: "9091"}
+        template: workload.yaml
+      - contains:
+          path: spec.ports
+          content: {name: metrics, port: 9091, targetPort: metrics, protocol: TCP}
+        template: service.yaml
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+        template: servicemonitor.yaml
+  - it: fails when prometheus metrics have no metrics port
+    template: workload.yaml
+    set:
+      container.extraPorts: []
+    asserts:
+      - failedTemplate: {errorMessage: "container.extraPorts needs a port named metrics for config.metrics.mode prometheus"}
+  - it: rejects any Pod Identity address other than the EKS agent
+    template: networkpolicy.yaml
+    set:
+      podIdentityAgentCidr: 0.0.0.0/0
+    asserts:
+      - failedTemplate: {}
