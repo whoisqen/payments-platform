@@ -4,6 +4,6 @@ include "root" {
 }
 
 include "envcommon" {
-  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/security/org-config.hcl"
+  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/security/org/org-config.hcl"
   expose = true
 }

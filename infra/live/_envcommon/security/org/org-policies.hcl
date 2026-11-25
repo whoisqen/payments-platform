@@ -1,5 +1,5 @@
 locals {
-  base = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/security/baseline.hcl").locals
+  base = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/security/org/baseline.hcl").locals
 
   # security-baseline stays off the Security OU: it denies guardduty:UpdateDetector and conformance pack deletes that the audit stacks need.
   default_targets = {

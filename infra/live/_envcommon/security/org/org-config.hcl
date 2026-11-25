@@ -1,5 +1,5 @@
 locals {
-  base    = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/security/baseline.hcl").locals
+  base    = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/security/org/baseline.hcl").locals
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
 }
 
