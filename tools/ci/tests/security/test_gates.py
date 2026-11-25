@@ -3,6 +3,7 @@ import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "security"))
@@ -49,6 +50,30 @@ class SarifGateTest(unittest.TestCase):
 
     def test_empty_report_passes(self):
         self.assertEqual(self.gate({"runs": []})[0], 0)
+
+    def test_missing_report_fails_with_a_message(self):
+        out = io.StringIO()
+        code = gates.sarif_gate({"block_levels": ["error"]}, [self.dir / "absent.sarif"], out=out)
+        self.assertEqual(code, 1)
+        self.assertIn("produced no report", out.getvalue())
+
+    def test_broken_report_fails_with_a_message(self):
+        for text in ("{not json", "[]", '{"version": "2.1.0"}'):
+            f = self.dir / "bad.sarif"
+            f.write_text(text)
+            out = io.StringIO()
+            self.assertEqual(gates.sarif_gate({}, [f], out=out), 1, text)
+            self.assertIn("::error::", out.getvalue())
+
+    def test_main_reports_a_missing_config_and_key(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(gates.main(["get", str(self.dir / "none.toml"), "x"]), 1)
+            conf = self.dir / "c.toml"
+            conf.write_text('min_severity = "high"\n')
+            self.assertEqual(gates.main(["get", str(conf), "other"]), 1)
+        self.assertIn("cannot read the gate config", out.getvalue())
+        self.assertIn("has no key other", out.getvalue())
 
 
 class ConfigTest(unittest.TestCase):

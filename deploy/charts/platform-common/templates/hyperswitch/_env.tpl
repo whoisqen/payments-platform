@@ -43,7 +43,8 @@
 {{- $_ := set $e (printf "%s__REDIS__CLUSTER_URLS" $p) (printf "%s:%v" $redis $c.redis.port) -}}
 {{- end -}}
 {{- $_ := set $e (printf "%s__REDIS__TLS_ENABLED" $p) $c.redis.tls -}}
-{{- $_ := set $e (printf "%s__REDIS__USERNAME" $p) $hs.redisUser -}}
+{{- /* MemoryDB user names are unique per account and region, so each cell has its own: <cell>-<service> */ -}}
+{{- $_ := set $e (printf "%s__REDIS__USERNAME" $p) (printf "%s-%s" ($g.cell | default "cell-0") $hs.redisUser) -}}
 {{- /* Secrets arrive decrypted from Vault, so the secrets manager is off; KMS still encrypts data keys */ -}}
 {{- $_ := set $e (printf "%s__SECRETS_MANAGEMENT__SECRETS_MANAGER" $p) "no_encryption" -}}
 {{- $_ := set $e (printf "%s__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER" $p) "aws_kms" -}}

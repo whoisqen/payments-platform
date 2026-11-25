@@ -261,6 +261,34 @@ run "locker_app_password_login" {
   }
 }
 
+run "cell_hs_app_password_login" {
+  command = apply
+
+  override_resource {
+    target = aws_rds_cluster.primary
+    values = {
+      id                 = "pay-prod-euc1-aurora-cell-0"
+      master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-central-1:111111111111:secret:rds-master-0001" }]
+    }
+  }
+
+  variables {
+    component          = "aurora-cell-0"
+    proxy_auth_entries = [{ name = "hs_app", iam_auth = "DISABLED" }]
+  }
+
+  assert {
+    condition = anytrue([for a in aws_db_proxy.this[0].auth :
+    a.description == "hs_app" && a.iam_auth == "DISABLED" && a.auth_scheme == "SECRETS" && a.client_password_auth_type == "POSTGRES_SCRAM_SHA_256"])
+    error_message = "router, drainer and scheduler share the hs_app SCRAM login without an IAM token"
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret.proxy_auth["hs_app"].name == "pay-prod-euc1-aurora-cell-0/proxy/hs_app" && aws_secretsmanager_secret.proxy_auth["hs_app"].kms_key_id == var.kms_key_arn
+    error_message = "the hs_app secret shell is per cell and uses the cell key"
+  }
+}
+
 run "passed_in_secret_creates_none" {
   command = apply
 

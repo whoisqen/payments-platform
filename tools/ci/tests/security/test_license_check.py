@@ -84,6 +84,16 @@ class MainTest(unittest.TestCase):
         self.assertIn("::error::bad@1", out)
         self.assertIn("denied 1", summary)
 
+    def test_missing_or_broken_input_fails_with_a_message(self):
+        broken = self.dir / "broken.json"
+        broken.write_text("{")
+        for args in (["--cyclonedx", str(self.dir / "absent.json")], ["--cargo-metadata", str(broken)], []):
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = lc.main(["--policy", str(self.dir / "policy.toml")] + args)
+            self.assertEqual(code, 1, args)
+            self.assertIn("::error::", out.getvalue())
+
     def test_review_and_unknown_do_not_fail(self):
         code, _, summary = self.run_main([("ok", "MIT"), ("weak", "LGPL-2.1-only"), ("none", None)])
         self.assertEqual(code, 0)
