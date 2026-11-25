@@ -1,0 +1,2 @@
+# zizmor audit settings (regular persona, pedantic off); per-rule waivers go under rules.<id>.ignore with a comment giving the reason.
+rules: {}

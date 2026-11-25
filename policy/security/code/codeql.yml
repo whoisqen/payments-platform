@@ -1,0 +1,7 @@
+name: payments-platform codeql
+queries:
+  - uses: security-extended
+paths-ignore:
+  - vendor/hyperswitch-e2e
+  - "**/node_modules"
+  - "**/target"
