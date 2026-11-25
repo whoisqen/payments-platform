@@ -103,10 +103,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      # the revision select_revision.py proved to be on main
+      # the test code of the default branch, never a ref named by the event: this job holds stage credentials
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
       - name: API scenarios against stage
         env:
@@ -126,9 +125,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      # the test code of the default branch, never a ref named by the event: this job holds stage credentials
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
       - name: latest k6 TestRun of stage within the limits
         env:
