@@ -55,5 +55,8 @@ COPY --from=build --chmod=0555 /out/router /app/router
 COPY --from=build --chmod=a=rX /src/config/deployments/ /app/config/deployments/
 COPY --from=build --chmod=a=rX /src/config/development.toml /app/config/development.toml
 USER 10001:10001
+# librdkafka (Kafka TLS to MSK) uses OpenSSL's default verify paths under /usr/lib/ssl, which distroless lacks;
+# point OpenSSL at the bundle of the digest-pinned base instead
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/app/router"]
