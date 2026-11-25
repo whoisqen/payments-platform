@@ -1,6 +1,7 @@
 suite: payments-locker
 templates:
   - charts/locker/templates/workload.yaml
+  - charts/locker/templates/externalsecret.yaml
   - charts/locker-migrations/templates/job.yaml
 set:
   global.registry: registry.example.test/acme
@@ -28,3 +29,27 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: "@sha256:b{64}$"
+  - it: takes the locker secrets from Vault under the environment of the layer
+    template: charts/locker/templates/externalsecret.yaml
+    asserts:
+      - equal:
+          path: spec.secretStoreRef.name
+          value: vault
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: dev/locker/database
+  - it: points the locker at the KMS alias of the environment layer
+    template: charts/locker/templates/workload.yaml
+    values:
+      - ../../../envs/dev/eu-central-1/locker/values.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOCKER__SECRETS_MANAGEMENT__AWS_KMS__KEY_ID
+            value: alias/pay-dev-euc1-locker
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOCKER__DATABASE__HOST
+            value: pay-dev-euc1-aurora-locker.proxy-example.eu-central-1.rds.amazonaws.com
