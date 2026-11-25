@@ -1,5 +1,11 @@
 locals {
   name = "${var.name_prefix}-${var.env}-${var.region_short}-${var.component}"
+
+  # Keyed by service; the MemoryDB name carries user_name_prefix because user names are unique per account and region.
+  users = merge(
+    { for k, v in var.users : k => { access_string = v, type = "iam" } },
+    { for k, v in var.password_users : k => { access_string = v, type = "password" } },
+  )
 }
 
 resource "aws_memorydb_subnet_group" "this" {
@@ -24,14 +30,28 @@ resource "aws_memorydb_parameter_group" "this" {
   tags = var.tags
 }
 
-resource "aws_memorydb_user" "this" {
-  for_each = var.users
+# Throwaway first password only: MemoryDB has no write-only password argument, so the real one is set out of band
+# (README, rotation) and Terraform ignores it; this value is never written to Vault.
+resource "random_password" "bootstrap" {
+  for_each = var.password_users
 
-  user_name     = each.key
-  access_string = each.value
+  length  = 64
+  special = false
+}
+
+resource "aws_memorydb_user" "this" {
+  for_each = local.users
+
+  user_name     = "${var.user_name_prefix}${each.key}"
+  access_string = each.value.access_string
 
   authentication_mode {
-    type = "iam"
+    type      = each.value.type
+    passwords = each.value.type == "password" ? [random_password.bootstrap[each.key].result] : null
+  }
+
+  lifecycle {
+    ignore_changes = [authentication_mode[0].passwords]
   }
 
   tags = var.tags
