@@ -51,6 +51,13 @@ flowchart LR
 
 ## Pages
 
+Domain (start here if card payments are new to you):
+
+- [Payments in 10 minutes](domain/README.md)
+- [Payment lifecycle](domain/payment-lifecycle.md)
+- [Cards and compliance](domain/cards-and-compliance.md)
+- [Platform concepts](domain/platform-concepts.md)
+
 Foundation:
 
 - [AWS accounts and network](foundation/aws-accounts-network.md)

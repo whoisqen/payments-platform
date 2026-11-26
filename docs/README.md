@@ -6,10 +6,11 @@ The payments platform is a multi-tenant payment orchestrator on Hyperswitch, run
 
 **Newcomer** (one hour):
 
-1. [Architecture overview](architecture/README.md): the request path from merchant to PSP, cells, locker, edge, data, regions.
-2. [Glossary](glossary.md): the words used everywhere else.
-3. [Services, configuration and secrets](architecture/runtime/services-secrets.md).
-4. [Disaster recovery](dr/README.md): what happens when a region fails.
+1. [Payments in 10 minutes](architecture/domain/README.md): the subject area for readers new to card payments: who takes part in a payment, its lifecycle, card data and PCI DSS, and the platform's own concepts.
+2. [Architecture overview](architecture/README.md): the request path from merchant to PSP, cells, locker, edge, data, regions.
+3. [Glossary](glossary.md): the words used everywhere else.
+4. [Services, configuration and secrets](architecture/runtime/services-secrets.md).
+5. [Disaster recovery](dr/README.md): what happens when a region fails.
 
 **Engineer** (changing code or infrastructure):
 
@@ -40,7 +41,7 @@ The payments platform is a multi-tenant payment orchestrator on Hyperswitch, run
 
 | Directory | Contents |
 |---|---|
-| `architecture/` | Overview and one page per subsystem; `cost/` for cost and FinOps |
+| `architecture/` | Overview and one page per subsystem; `domain/` for the payments primer; `cost/` for cost and FinOps |
 | `security/` | Controls and threat model |
 | `dr/` | Warm standby, failover, drills |
 | `runbooks/` | One runbook per alert or operation |
