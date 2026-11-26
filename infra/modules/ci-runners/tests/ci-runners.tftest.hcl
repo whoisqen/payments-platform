@@ -11,9 +11,27 @@ mock_provider "aws" {
   mock_resource "aws_cloudwatch_event_rule" {
     defaults = { arn = "arn:aws:events:eu-central-1:123456789012:rule/mock" }
   }
+  mock_resource "aws_sqs_queue" {
+    defaults = { arn = "arn:aws:sqs:eu-central-1:123456789012:mock" }
+  }
   mock_resource "aws_cloudwatch_log_group" {
     defaults = { arn = "arn:aws:logs:eu-central-1:123456789012:log-group:mock" }
   }
+}
+
+override_resource {
+  target = aws_kms_key.secrets
+  values = { arn = "arn:aws:kms:eu-central-1:123456789012:key/secrets" }
+}
+
+override_resource {
+  target = aws_kms_key.cache
+  values = { arn = "arn:aws:kms:eu-central-1:123456789012:key/cache" }
+}
+
+override_resource {
+  target = aws_kms_key.jit_logs
+  values = { arn = "arn:aws:kms:eu-central-1:123456789012:key/jit-logs" }
 }
 
 variables {

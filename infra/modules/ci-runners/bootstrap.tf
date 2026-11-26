@@ -20,7 +20,48 @@ resource "aws_cloudwatch_log_group" "jit_config" {
 
   name              = "/aws/lambda/${local.jit_name}"
   retention_in_days = 365
+  kms_key_id        = aws_kms_key.jit_logs[0].arn
   tags              = var.tags
+}
+
+# Logs of the bootstrap function name pools and instances; they stay encrypted with a key only this log group can use.
+resource "aws_kms_key" "jit_logs" {
+  count = length(local.untrusted_pools) > 0 ? 1 : 0
+
+  description             = "Logs of the CI runner bootstrap function"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+  tags                    = var.tags
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AccountAdministers"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${var.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "LogGroupEncrypts"
+        Effect    = "Allow"
+        Principal = { Service = "logs.${var.region}.amazonaws.com" }
+        Action    = ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"]
+        Resource  = "*"
+        Condition = { ArnEquals = { "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.region}:${var.account_id}:log-group:/aws/lambda/${local.jit_name}" } }
+      },
+    ]
+  })
+}
+
+# Lifecycle events the function failed to handle wait here for an operator instead of being lost; the instance itself is abandoned by the hook.
+resource "aws_sqs_queue" "jit_config_dlq" {
+  count = length(local.untrusted_pools) > 0 ? 1 : 0
+
+  name                      = "${local.jit_name}-dlq"
+  message_retention_seconds = 1209600
+  sqs_managed_sse_enabled   = true
+  tags                      = var.tags
 }
 
 resource "aws_iam_role" "jit_config" {
@@ -55,12 +96,16 @@ resource "aws_iam_role_policy" "jit_config" {
       { Effect = "Allow", Action = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"], Resource = [aws_kms_key.secrets.arn] },
       { Effect = "Allow", Action = ["autoscaling:CompleteLifecycleAction"], Resource = [for n in local.untrusted_pools : local.asg_arn[n]] },
       { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = ["${aws_cloudwatch_log_group.jit_config[0].arn}:*"] },
+      { Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [aws_sqs_queue.jit_config_dlq[0].arn] },
+      { Effect = "Allow", Action = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"], Resource = ["*"] },
     ]
   })
 }
 
 # Runs outside the VPC: it needs only api.github.com and AWS APIs, and nothing in a pull request can reach it.
 resource "aws_lambda_function" "jit_config" {
+  # checkov:skip=CKV_AWS_117:outside the VPC on purpose, so no runner subnet can reach it; it calls only api.github.com and AWS APIs
+  # checkov:skip=CKV_AWS_272:the package is built in the same plan from reviewed source in this module, not uploaded by a third party
   count = length(local.untrusted_pools) > 0 ? 1 : 0
 
   function_name                  = local.jit_name
@@ -73,6 +118,15 @@ resource "aws_lambda_function" "jit_config" {
   timeout                        = 60
   memory_size                    = 256
   reserved_concurrent_executions = 10
+  kms_key_arn                    = aws_kms_key.secrets.arn
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  dead_letter_config {
+    target_arn = aws_sqs_queue.jit_config_dlq[0].arn
+  }
 
   environment {
     variables = {
