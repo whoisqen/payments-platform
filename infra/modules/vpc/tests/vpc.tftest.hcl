@@ -103,3 +103,81 @@ run "recovery_region_without_public_tier" {
     error_message = "recovery region short name"
   }
 }
+
+run "untrusted_tier_is_off_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_route_table.untrusted) == 0 && length([for k, v in aws_subnet.this : k if startswith(k, "untrusted")]) == 0
+    error_message = "no untrusted tier unless its CIDRs are given"
+  }
+}
+
+run "untrusted_tier_leaves_only_through_the_firewall" {
+  command = plan
+
+  variables {
+    enable_egress_route       = true
+    egress_transit_gateway_id = "tgw-0123456789abcdef0"
+    subnet_cidrs = {
+      public    = ["10.100.0.0/24", "10.100.1.0/24", "10.100.2.0/24"]
+      private   = ["10.100.32.0/19", "10.100.64.0/19", "10.100.96.0/19"]
+      data      = ["10.100.10.0/24", "10.100.11.0/24", "10.100.12.0/24"]
+      untrusted = ["10.100.20.0/22", "10.100.24.0/22", "10.100.28.0/22"]
+    }
+  }
+
+  assert {
+    condition     = length(aws_subnet.this) == 12 && length(aws_route_table.untrusted) == 3 && length(aws_route_table_association.untrusted) == 3
+    error_message = "one untrusted subnet and route table per AZ"
+  }
+  assert {
+    condition     = alltrue([for r in aws_route.untrusted_egress : r.transit_gateway_id == "tgw-0123456789abcdef0" && r.destination_cidr_block == "0.0.0.0/0"]) && length(aws_route.untrusted_egress) == 3
+    error_message = "the only default route of the untrusted tier is the transit gateway to the firewall"
+  }
+  assert {
+    condition     = tolist(output.untrusted_cidr_blocks) == tolist(["10.100.20.0/22", "10.100.24.0/22", "10.100.28.0/22"])
+    error_message = "the firewall needs the untrusted CIDRs"
+  }
+}
+
+run "untrusted_tier_needs_three_cidrs" {
+  command = plan
+
+  variables {
+    subnet_cidrs = {
+      private   = ["10.100.32.0/19", "10.100.64.0/19", "10.100.96.0/19"]
+      data      = ["10.100.10.0/24", "10.100.11.0/24", "10.100.12.0/24"]
+      untrusted = ["10.100.20.0/22"]
+    }
+  }
+
+  expect_failures = [var.subnet_cidrs]
+}
+
+run "egress_vpc_has_a_public_route_table_per_az" {
+  command = plan
+
+  variables {
+    enable_internet_gateway   = true
+    public_route_table_per_az = true
+  }
+
+  assert {
+    condition     = length(aws_route_table.public) == 0 && length(aws_route_table.public_az) == 3 && length(aws_route.public_internet_az) == 3 && length(aws_route.public_internet) == 0
+    error_message = "three public route tables, each with the internet route"
+  }
+}
+
+run "one_public_route_table_by_default" {
+  command = plan
+
+  variables {
+    enable_internet_gateway = true
+  }
+
+  assert {
+    condition     = length(aws_route_table.public) == 1 && length(aws_route_table.public_az) == 0 && length(aws_route.public_internet) == 1
+    error_message = "the shared public route table stays the default"
+  }
+}

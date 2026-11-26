@@ -2,9 +2,17 @@ locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
   az_index     = { for i, id in var.nat_subnet_ids : tostring(i) => id }
+
+  # Pass-only rules (no generated drop), so the CI allowlist after them still decides every other domain of these sources.
+  ci_trusted_rules = join("\n", [for i, d in var.ci_trusted_domains : startswith(d, ".") ?
+    "pass tls $HOME_NET any -> $EXTERNAL_NET 443 (tls.sni; dotprefix; content:\"${d}\"; nocase; endswith; flow:to_server,established; msg:\"ci trusted ${d}\"; sid:${920001 + i}; rev:1;)" :
+    "pass tls $HOME_NET any -> $EXTERNAL_NET 443 (tls.sni; content:\"${d}\"; nocase; startswith; endswith; flow:to_server,established; msg:\"ci trusted ${d}\"; sid:${920001 + i}; rev:1;)"
+  ])
 }
 
 resource "aws_networkfirewall_rule_group" "psp_allowlist" {
+  count = length(var.psp_domains) > 0 ? 1 : 0
+
   name        = "${local.name}-psp-allowlist"
   description = "Egress allowlist of PSP domains (SNI and HTTP host)"
   type        = "STATEFUL"
@@ -53,6 +61,78 @@ resource "aws_networkfirewall_rule_group" "psp_fence" {
   }
 }
 
+# AWS APIs without an interface endpoint that only the trusted runner pools reach (Terraform plan of other accounts, image builds).
+resource "aws_networkfirewall_rule_group" "ci_trusted" {
+  count = length(var.ci_trusted_source_cidrs) > 0 ? 1 : 0
+
+  name        = "${local.name}-ci-trusted"
+  description = "Extra AWS domains of the trusted CI runner subnets (TLS SNI, pass only)"
+  type        = "STATEFUL"
+  capacity    = 100
+
+  rule_group {
+    rule_variables {
+      ip_sets {
+        key = "HOME_NET"
+        ip_set {
+          definition = var.ci_trusted_source_cidrs
+        }
+      }
+    }
+
+    rules_source {
+      rules_string = local.ci_trusted_rules
+    }
+
+    stateful_rule_options {
+      rule_order = "STRICT_ORDER"
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.name}-ci-trusted" })
+}
+
+# Allowlist of the CI runners: HOME_NET is the CI runner VPC only, so these domains open nothing for any other source.
+resource "aws_networkfirewall_rule_group" "ci_allowlist" {
+  count = length(var.ci_source_cidrs) > 0 ? 1 : 0
+
+  name        = "${local.name}-ci-allowlist"
+  description = "Egress allowlist of the untrusted CI runner subnets (SNI and HTTP host)"
+  type        = "STATEFUL"
+  capacity    = var.ci_rule_group_capacity
+
+  rule_group {
+    rule_variables {
+      ip_sets {
+        key = "HOME_NET"
+        ip_set {
+          definition = var.ci_source_cidrs
+        }
+      }
+    }
+
+    rules_source {
+      rules_source_list {
+        generated_rules_type = "ALLOWLIST"
+        target_types         = ["HTTP_HOST", "TLS_SNI"]
+        targets              = var.ci_domains
+      }
+    }
+
+    stateful_rule_options {
+      rule_order = "STRICT_ORDER"
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.name}-ci-allowlist" })
+}
+
+# An egress VPC without PSP traffic (shared-services) has no PSP allowlist.
+moved {
+  from = aws_networkfirewall_rule_group.psp_allowlist
+  to   = aws_networkfirewall_rule_group.psp_allowlist[0]
+}
+
 resource "aws_networkfirewall_firewall_policy" "this" {
   name = local.name
 
@@ -70,9 +150,28 @@ resource "aws_networkfirewall_firewall_policy" "this" {
       resource_arn = aws_networkfirewall_rule_group.psp_fence.arn
     }
 
-    stateful_rule_group_reference {
-      priority     = 2
-      resource_arn = aws_networkfirewall_rule_group.psp_allowlist.arn
+    dynamic "stateful_rule_group_reference" {
+      for_each = aws_networkfirewall_rule_group.psp_allowlist
+      content {
+        priority     = 2
+        resource_arn = stateful_rule_group_reference.value.arn
+      }
+    }
+
+    dynamic "stateful_rule_group_reference" {
+      for_each = aws_networkfirewall_rule_group.ci_trusted
+      content {
+        priority     = 3
+        resource_arn = stateful_rule_group_reference.value.arn
+      }
+    }
+
+    dynamic "stateful_rule_group_reference" {
+      for_each = aws_networkfirewall_rule_group.ci_allowlist
+      content {
+        priority     = 4
+        resource_arn = stateful_rule_group_reference.value.arn
+      }
     }
   }
 

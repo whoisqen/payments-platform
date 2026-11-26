@@ -51,12 +51,72 @@ variable "nat_subnet_ids" {
 
 variable "psp_domains" {
   type        = list(string)
-  description = "PSP domains from infra/network/psp-allowlist.yaml; a leading dot also matches subdomains."
+  description = "PSP domains from infra/network/psp-allowlist.yaml; a leading dot also matches subdomains. Empty (no PSP rule group) only for an egress VPC that serves CI runners."
 
   validation {
-    condition     = length(var.psp_domains) > 0 && alltrue([for d in var.psp_domains : can(regex("^\\.?[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", d))])
-    error_message = "psp_domains must be a non-empty list of lower-case domain names."
+    condition     = (length(var.psp_domains) > 0 || length(var.ci_source_cidrs) > 0) && alltrue([for d in var.psp_domains : can(regex("^\\.?[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", d))])
+    error_message = "psp_domains must be lower-case domain names, and may be empty only when ci_source_cidrs is set."
   }
+}
+
+variable "ci_source_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "CIDRs of the CI runners, trusted and untrusted (the shared-services VPC); empty creates no CI allowlist."
+
+  validation {
+    condition     = alltrue([for c in var.ci_source_cidrs : can(cidrhost(c, 0)) && c != "0.0.0.0/0"])
+    error_message = "ci_source_cidrs must be CIDRs of the runner subnets, never 0.0.0.0/0."
+  }
+}
+
+variable "ci_domains" {
+  type = list(string)
+  default = [
+    "github.com", "api.github.com", "codeload.github.com", ".actions.githubusercontent.com", "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com", "ghcr.io", "pkg-containers.githubusercontent.com", ".blob.core.windows.net",
+    "autoscaling.eu-central-1.amazonaws.com", "pypi.org", "files.pythonhosted.org", "registry.npmjs.org", "crates.io",
+    "static.crates.io", "index.crates.io", "mise.jdx.dev", "mise-versions.jdx.dev",
+  ]
+  description = "Domains the untrusted CI runners may reach: GitHub (Actions, releases, ghcr), Actions storage, the Auto Scaling API and the package registries of the jobs; a leading dot also matches subdomains."
+
+  validation {
+    condition     = length(var.ci_domains) > 0 && alltrue([for d in var.ci_domains : can(regex("^\\.?[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", d))])
+    error_message = "ci_domains must be a non-empty list of lower-case domain names."
+  }
+}
+
+variable "ci_trusted_source_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "CIDRs of the trusted CI runner pools (vpc output private_cidr_blocks); they may also reach ci_trusted_domains. Empty creates no rule group."
+
+  validation {
+    condition     = alltrue([for c in var.ci_trusted_source_cidrs : can(cidrhost(c, 0)) && c != "0.0.0.0/0"])
+    error_message = "ci_trusted_source_cidrs must be CIDRs of the runner subnets, never 0.0.0.0/0."
+  }
+}
+
+variable "ci_trusted_domains" {
+  type = list(string)
+  default = [
+    "sts.amazonaws.com", "iam.amazonaws.com", "route53.amazonaws.com", "globalaccelerator.amazonaws.com", "tagging.eu-central-1.amazonaws.com",
+    "ec2.eu-central-1.amazonaws.com", "elasticloadbalancing.eu-central-1.amazonaws.com", "acm.eu-central-1.amazonaws.com",
+    "network-firewall.eu-central-1.amazonaws.com", "ram.eu-central-1.amazonaws.com", "rds.eu-central-1.amazonaws.com",
+    "elasticache.eu-central-1.amazonaws.com", "memory-db.eu-central-1.amazonaws.com", "dynamodb.eu-central-1.amazonaws.com",
+  ]
+  description = "AWS API domains without an interface endpoint in the CI VPC that the trusted pools need (the read-only Terraform plan of the environment accounts); a leading dot also matches subdomains."
+
+  validation {
+    condition     = length(var.ci_trusted_domains) <= 90 && alltrue([for d in var.ci_trusted_domains : can(regex("^\\.?[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", d))])
+    error_message = "ci_trusted_domains must be at most 90 lower-case domain names."
+  }
+}
+
+variable "ci_rule_group_capacity" {
+  type        = number
+  default     = 200
+  description = "Capacity of the CI allowlist rule group; it cannot be changed in place."
 }
 
 variable "rule_group_capacity" {

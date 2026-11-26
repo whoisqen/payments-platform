@@ -2,9 +2,21 @@ data "aws_ssm_parameter" "ami" {
   name = var.ami_ssm_parameter
 }
 
+locals {
+  # Every IPv4 range except 10/8, 172.16/12, 192.168/16 and 100.64/10. A security group cannot name domains and GitHub and its storage have no stable
+  # ranges, so the domain allowlist is the Network Firewall on the only route of the untrusted tier; this rule keeps out every private address.
+  public_ipv4_cidrs = [
+    "0.0.0.0/5", "8.0.0.0/7", "11.0.0.0/8", "12.0.0.0/6", "16.0.0.0/4", "32.0.0.0/3", "64.0.0.0/3", "96.0.0.0/6", "100.0.0.0/10",
+    "100.128.0.0/9", "101.0.0.0/8", "102.0.0.0/7", "104.0.0.0/5", "112.0.0.0/4", "128.0.0.0/3", "160.0.0.0/5", "168.0.0.0/6", "172.0.0.0/12",
+    "172.32.0.0/11", "172.64.0.0/10", "172.128.0.0/9", "173.0.0.0/8", "174.0.0.0/7", "176.0.0.0/4", "192.0.0.0/9", "192.128.0.0/11",
+    "192.160.0.0/13", "192.169.0.0/16", "192.170.0.0/15", "192.172.0.0/14", "192.176.0.0/12", "192.192.0.0/10", "193.0.0.0/8", "194.0.0.0/7",
+    "196.0.0.0/6", "200.0.0.0/5", "208.0.0.0/4", "224.0.0.0/3",
+  ]
+}
+
 # Runners only call out over HTTPS (GitHub, AWS APIs, registries); nothing may connect in, and Session Manager replaces SSH.
 resource "aws_security_group" "pool" {
-  for_each = local.pool_names
+  for_each = var.pools
 
   name        = local.asg_name[each.key]
   description = "CI runners of the ${each.key} pool: outbound HTTPS only"
@@ -12,11 +24,22 @@ resource "aws_security_group" "pool" {
   tags        = merge(var.tags, { Name = local.asg_name[each.key] })
 
   egress {
-    description = "HTTPS"
+    description = each.value.untrusted ? "HTTPS to public addresses, filtered by the Network Firewall CI allowlist" : "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = each.value.untrusted ? local.public_ipv4_cidrs : ["0.0.0.0/0"]
+  }
+
+  dynamic "egress" {
+    for_each = each.value.untrusted ? [var.endpoint_security_group_id] : []
+    content {
+      description     = "HTTPS to the interface endpoints"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      security_groups = [egress.value]
+    }
   }
 }
 
@@ -28,11 +51,14 @@ resource "aws_launch_template" "pool" {
   instance_type = each.value.instance_types[0]
   tags          = var.tags
 
+  # An untrusted instance powers off after its one job and is replaced, so nothing a pull request left behind meets the next one.
+  instance_initiated_shutdown_behavior = each.value.untrusted ? "terminate" : null
+
   iam_instance_profile {
     name = aws_iam_instance_profile.runner[each.key].name
   }
 
-  # Containers sit one hop behind the instance and cannot reach the credentials of its role.
+  # IMDSv2 with one hop: a container behind the docker bridge cannot get a token and so cannot reach the role credentials.
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -67,14 +93,15 @@ resource "aws_launch_template" "pool" {
   }
 
   user_data = base64encode(templatefile("${path.module}/templates/user-data.sh.tftpl", {
-    region            = var.region
-    secret_id         = aws_secretsmanager_secret.github_app[each.key].name
-    asg_name          = local.asg_name[each.key]
-    github_repository = var.github_repository
-    runner_version    = var.runner_version
-    runner_sha256     = var.runner_sha256
-    labels            = join(",", concat(["self-hosted", "linux", "arm64", each.key], each.value.labels))
-    block_metadata    = each.value.untrusted
+    region               = var.region
+    secret_id            = aws_secretsmanager_secret.github_app[each.key].name
+    asg_name             = local.asg_name[each.key]
+    github_repository    = var.github_repository
+    runner_version       = var.runner_version
+    runner_sha256        = var.runner_sha256
+    labels               = join(",", local.runner_labels[each.key])
+    untrusted            = each.value.untrusted
+    jit_parameter_prefix = local.jit_parameter_prefix[each.key]
   }))
 }
 
@@ -85,7 +112,7 @@ resource "aws_autoscaling_group" "pool" {
   name                    = local.asg_name[each.key]
   min_size                = each.value.min_size
   max_size                = each.value.max_size
-  vpc_zone_identifier     = each.value.untrusted && var.untrusted_subnet_ids != null ? var.untrusted_subnet_ids : var.subnet_ids
+  vpc_zone_identifier     = each.value.untrusted ? var.untrusted_subnet_ids : var.subnet_ids
   capacity_rebalance      = true
   health_check_type       = "EC2"
   default_instance_warmup = 120
@@ -132,6 +159,17 @@ resource "aws_autoscaling_group" "pool" {
   lifecycle {
     ignore_changes = [desired_capacity]
   }
+}
+
+# An untrusted instance waits until the bootstrap function stored its JIT runner config; no config, no instance. A separate resource so it also attaches to an existing group.
+resource "aws_autoscaling_lifecycle_hook" "jit_config" {
+  for_each = local.untrusted_pools
+
+  name                   = "jit-config"
+  autoscaling_group_name = aws_autoscaling_group.pool[each.key].name
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
+  default_result         = "ABANDON"
+  heartbeat_timeout      = 300
 }
 
 # A busy instance (one job at a time) averages high CPU, an idle one almost none; the group follows the average and busy instances are protected from scale-in.

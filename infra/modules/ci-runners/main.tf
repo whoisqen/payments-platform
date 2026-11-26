@@ -13,6 +13,11 @@ locals {
   push_role_name   = "${var.name_prefix}-ci-ecr-push"
   github_subjects  = [for r in var.github_push_refs : "repo:${var.github_repository}:ref:${r}"]
 
+  untrusted_pools          = toset([for n, p in var.pools : n if p.untrusted])
+  runner_labels            = { for n, p in var.pools : n => concat(["self-hosted", "linux", "arm64", n], p.labels) }
+  jit_parameter_prefix     = { for n in local.pool_names : n => "/${var.name_prefix}/ci/jit/${n}" }
+  jit_parameter_arn_prefix = { for n in local.pool_names : n => "arn:aws:ssm:${var.region}:${var.account_id}:parameter${local.jit_parameter_prefix[n]}" }
+
   # Only the roles of the cache writers and the push role may write cache objects; management actions stay open for Terraform.
   cache_read_statements = [
     { Effect = "Allow", Action = ["s3:GetObject", "s3:ListBucket"], Resource = [local.bucket_arn, "${local.bucket_arn}/*"] },
@@ -41,19 +46,28 @@ locals {
     ], Resource = var.ecr_repository_arns },
   ]
 
-  # What a job may do is the property of its pool: cache write, image pull, plan roles. Every instance reads its own GitHub App key to register
-  # and protects itself from scale-in while a job runs; untrusted pools get an explicit deny of roles and the registry.
+  # What a job may do is the property of its pool: cache write, image pull, plan roles. A trusted instance reads its own GitHub App key to register;
+  # an untrusted instance never sees a key, it reads the one-time JIT runner config the bootstrap function stored for it and deletes it.
   pool_policies = { for n, p in var.pools : n => concat(
     local.cache_read_statements,
     p.cache_write ? local.cache_write_statements : [],
     p.ecr_pull ? local.ecr_pull_statements : [],
     p.assume_plan ? [{ Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.plan_role_arns }] : [],
-    [
+    [for st in [
+      { Effect = "Allow", Action = ["ssm:GetParameter", "ssm:DeleteParameter"], Resource = ["${local.jit_parameter_arn_prefix[n]}/*"] },
+      {
+        Effect    = "Allow"
+        Action    = ["kms:Decrypt"]
+        Resource  = [aws_kms_key.secrets.arn]
+        Condition = { StringLike = { "kms:EncryptionContext:PARAMETER_ARN" = "${local.jit_parameter_arn_prefix[n]}/*" } }
+      },
+    ] : st if p.untrusted],
+    p.untrusted ? [] : [
       { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_secretsmanager_secret.github_app[n].arn] },
       { Effect = "Allow", Action = ["kms:Decrypt"], Resource = [aws_kms_key.secrets.arn] },
-      { Effect = "Allow", Action = ["autoscaling:SetInstanceProtection"], Resource = [local.asg_arn[n]] },
     ],
-    p.untrusted ? [{ Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*"], Resource = ["*"] }] : [],
+    [{ Effect = "Allow", Action = ["autoscaling:SetInstanceProtection"], Resource = [local.asg_arn[n]] }],
+    p.untrusted ? [{ Effect = "Deny", Action = ["sts:AssumeRole", "ecr:*", "secretsmanager:*"], Resource = ["*"] }] : [],
   ) }
 
   ec2_trust = jsonencode({
@@ -171,11 +185,11 @@ resource "aws_s3_bucket_policy" "cache" {
   })
 }
 
-# The value is JSON {"app_id": ..., "installation_id": ..., "private_key": ...} set outside Terraform; the app needs only the runner administration permission.
+# The value is JSON {"app_id": ..., "installation_id": ..., "private_key": ...} set outside Terraform; the app needs only the administration permission of the repository.
 resource "aws_secretsmanager_secret" "github_app" {
   for_each                = local.pool_names
   name                    = "${var.name_prefix}/ci/github-app/${each.key}"
-  description             = "GitHub App credentials that the instances of the ${each.key} pool register their runner with; the value is set outside Terraform"
+  description             = "GitHub App credentials that register the runners of the ${each.key} pool; the value is set outside Terraform"
   kms_key_id              = aws_kms_key.secrets.arn
   recovery_window_in_days = var.secret_recovery_window_days
   tags                    = var.tags

@@ -58,8 +58,8 @@ Everything that does not block goes to code scanning and the job summary. Every 
 ### Pipeline hygiene
 
 - Every workflow starts with `permissions: {}` and grants per job; actions are pinned by commit SHA.
-- Pull request jobs run on the `ci-pr` runner pool and request no cloud credentials. Builds, image pushes and plans run on trusted pools and assume narrow roles through GitHub OIDC. See the [threat model](../../security/threat-model.md#ci-pull-request-perimeter).
-- Terraform roles: a read-only plan role per account, and one apply role per component that trusts only `main` and `release/*`, with a one-hour session and a permissions boundary.
+- Pull request jobs run on the `ci-pr` runner pool and request no cloud credentials. A `ci-pr` instance has no Docker, never holds a GitHub App key, runs one job and is terminated, and reaches only allowlisted domains. Builds, image pushes and plans run on trusted pools and assume narrow roles through GitHub OIDC. See the [threat model](../../security/threat-model.md#ci-pull-request-perimeter).
+- Terraform roles: a read-only plan role per account that trusts only `main` (nightly drift check), and one apply role per component that trusts only `main` and `release/*`, with a one-hour session and a permissions boundary.
 - Commits follow Conventional Commits; `spec-gate` requires a spec reference or a named exemption.
 
 ## Where in the repo

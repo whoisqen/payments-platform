@@ -13,9 +13,9 @@ locals {
   }
 
   # The subject pins repository and ref, so a fork, a pull request branch or another branch cannot assume an apply role.
-  # Plan reads only and runs for pull requests and the nightly drift check on main; apply runs from main and release branches.
+  # Plan reads state, so only main (the nightly drift check) may assume it; pull requests run terraform test with mock providers.
   trust = { for k, subs in merge(
-    { plan = concat(["repo:${var.github_repository}:pull_request"], [for ref in var.plan_refs : "repo:${var.github_repository}:ref:${ref}"]) },
+    { plan = [for ref in var.plan_refs : "repo:${var.github_repository}:ref:${ref}"] },
     { ecr-read = [for ref in var.ecr_read_refs : "repo:${var.github_repository}:ref:${ref}"] },
     { for c, r in var.apply_roles : "apply-${c}" => [for ref in var.apply_refs : "repo:${var.github_repository}:ref:${ref}"] }
     ) : k => jsonencode({

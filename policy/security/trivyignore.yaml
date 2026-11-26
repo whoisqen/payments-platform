@@ -15,6 +15,12 @@ misconfigurations:
     statement: the access-log bucket receives S3 server access logs, and S3 does not support SSE-KMS on a server access logging destination; it uses SSE-S3 (AES256), as AWS and the rule text require. The log buckets themselves use the KMS key.
   - id: AWS-0104
     paths:
+      - infra/modules/ci-runners/pools.tf
+    statement: CI runner egress is tcp/443 only; untrusted pools exclude every private range and leave only through the transit gateway, where the Network Firewall CI allowlist filters by domain (security groups cannot match domains).
+    # accepted risk, not a false positive: review again when it expires
+    expired_at: 2027-05-25
+  - id: AWS-0104
+    paths:
       - infra/modules/eks/main.tf
     statement: node egress to 0.0.0.0/0 is tcp/443 only and leaves through the transit gateway, where Network Firewall allows PSP domains only.
     # accepted risk, not a false positive: review again when it expires

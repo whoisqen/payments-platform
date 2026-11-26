@@ -7,7 +7,7 @@ terraform {
   source = "${get_repo_root()}/infra/modules//ci-oidc-roles"
 }
 
-# Plan from pull requests and the nightly drift check on main (vars.AWS_ROLE_TF_PLAN); apply roles are added per component when the apply workflow exists.
+# Plan only from the nightly drift check on main (vars.AWS_ROLE_TF_PLAN); pull requests get no state access; apply roles are added per component when the apply workflow exists.
 inputs = {
   github_repository        = "${local.cfg.owner.github_org}/${local.cfg.owner.github_repo}"
   permissions_boundary_arn = local.env_cfg.permissions_boundary_arn

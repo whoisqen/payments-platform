@@ -4,6 +4,7 @@ modules:
   kms: {purpose: CMK, multi-Region primary or replica, out: [key_arn, key_id, alias_name]}
   vpc: {purpose: 3-AZ VPC with tiers and endpoints, out: [vpc_id, subnet_ids, private_route_table_ids, data_route_table_ids, endpoint_security_group_id]}
   network-firewall: {purpose: egress allowlist, NAT, static EIPs for PSP allowlists, out: [firewall_arn, egress_public_ips, nat_gateway_ids]}
+  egress-routing: {purpose: routes inside the egress VPC per AZ (transit gateway to firewall endpoint, firewall to NAT, symmetric return path), out: []}
   transit-gateway: {purpose: TGW, route tables, RAM, out: [transit_gateway_id, route_table_ids, attachment_ids]}
   ecr: {purpose: repositories, replication to recovery regions, out: [repository_urls, repository_arns]}
   global-accelerator: {purpose: static anycast IPs, endpoint groups (recovery weight 0), out: [static_ips, endpoint_group_arns]}

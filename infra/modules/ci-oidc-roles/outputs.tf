@@ -5,7 +5,7 @@ output "oidc_provider_arn" {
 
 output "plan_role_arn" {
   value       = aws_iam_role.plan.arn
-  description = "Role for plan on pull requests."
+  description = "Read-only plan role of the nightly drift check on main."
 }
 
 output "apply_role_arns" {

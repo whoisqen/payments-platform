@@ -54,6 +54,8 @@ flowchart LR
 - Every VPC has public, private and data tiers in three AZs, a locked default security group and no internet gateway unless a stack asks for one. AWS API calls stay inside through endpoints. Flow logs go to the log archive in Parquet.
 - CIDRs come from `config/platform.yaml` (`network`): one `/16` per environment and region, one `/20` per egress VPC.
 - Outbound traffic goes through the transit gateway to the egress VPC. Network Firewall drops everything that is not a PSP domain in `dns.psp_domains`. The static Elastic IPs are registered with every PSP and are protected from deletion.
+- Shared-services carries no PSP traffic. Its firewall passes only the CI allowlist (GitHub, Actions storage, package registries) for the runner VPC, plus a short list of AWS API domains for the trusted runner subnets. Pull request runners (`ci-pr`) sit in a separate untrusted tier whose only routes out are the transit gateway and the S3 gateway endpoint. See the [threat model](../../security/threat-model.md#ci-pull-request-perimeter).
+- In the egress VPC each AZ routes transit gateway traffic through its own firewall endpoint to its own NAT gateway and back, so stateful inspection sees both directions.
 - Transit gateway route tables are explicit: no default association or propagation, and static blackhole routes cut paths that must not exist (for example CDE to platform).
 - Each region with workloads has its own egress path, so PSP traffic never crosses regions.
 - Data stores admit connections only from the node security groups of the listed clusters; Aurora admits only its RDS Proxy. In a recovery region the client lists are empty until the switch.
@@ -65,6 +67,6 @@ flowchart LR
 |---|---|
 | `infra/aft-account-requests/` | Account requests per OU |
 | `infra/modules/org-policies`, `org-config`, `org-trail`, `org-security-services`, `log-archive`, `identity-center` | Organization controls |
-| `infra/modules/vpc`, `transit-gateway`, `network-firewall`, `data-access` | Network |
-| `infra/live/<env>/<region>/vpc`, `tgw`, `egress-vpc`, `firewall` | Network stacks per environment and region |
+| `infra/modules/vpc`, `transit-gateway`, `network-firewall`, `egress-routing`, `data-access` | Network |
+| `infra/live/<env>/<region>/vpc`, `tgw`, `egress-vpc`, `firewall`, `egress-routing` | Network stacks per environment and region |
 | `policy/scp/`, `policy/tagging/` | SCPs, tag and backup policies, tag schema |

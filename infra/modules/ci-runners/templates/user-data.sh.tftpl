@@ -3,11 +3,20 @@
 set -euo pipefail
 exec > >(tee /var/log/runner-bootstrap.log) 2>&1
 
+%{ if untrusted ~}
+# No docker on an untrusted pool: the docker group is root on the host, and builds run on the BuildKit pods.
+dnf install -y git jq tar gzip libicu iptables-nft
+useradd --create-home --shell /bin/bash runner
+
+# Pull request code runs as the runner user and must not read the credentials of the instance role; the rule exists before any job can start.
+iptables -I OUTPUT -m owner --uid-owner runner -d 169.254.169.254 -j REJECT
+%{ else ~}
 dnf install -y docker git jq tar gzip libicu iptables-nft
 systemctl enable --now docker
 
 useradd --create-home --shell /bin/bash runner
 usermod -aG docker runner
+%{ endif ~}
 
 # Local NVMe, when the instance type has one, holds the work directory and the docker data: builds never wait for EBS.
 store=$(ls /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_* 2>/dev/null | head -1 || true)
@@ -24,28 +33,6 @@ echo "${runner_sha256}  runner.tgz" | sha256sum -c -
 tar xzf runner.tgz
 rm runner.tgz
 chown -R runner:runner /opt/runner
-
-# Registration token of the repository through the GitHub App of this pool; the credentials are read once and not kept.
-secret=$(aws secretsmanager get-secret-value --region "${region}" --secret-id "${secret_id}" --query SecretString --output text)
-app_id=$(jq -r .app_id <<<"$secret")
-installation_id=$(jq -r .installation_id <<<"$secret")
-key=$(jq -r .private_key <<<"$secret")
-b64() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
-now=$(date +%s)
-header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64)
-payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "$app_id" | b64)
-signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign <(printf '%s' "$key") | b64)
-installation_token=$(curl -fsS -X POST -H "Authorization: Bearer $header.$payload.$signature" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/app/installations/$installation_id/access_tokens" | jq -r .token)
-registration_token=$(curl -fsS -X POST -H "Authorization: Bearer $installation_token" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${github_repository}/actions/runners/registration-token" | jq -r .token)
-unset secret app_id installation_id key header payload signature installation_token
-
-sudo -u runner ./config.sh --unattended --replace --url "https://github.com/${github_repository}" --token "$registration_token" \
-  --name "$(hostname)" --labels "${labels}" --work /home/runner/_work
-unset registration_token
-./svc.sh install runner
-./svc.sh start
 
 # An instance that runs a job must not be removed by a scale-in: a root service sets the protection while the job process exists.
 cat >/usr/local/bin/protect-while-busy <<'PROTECT'
@@ -77,8 +64,63 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable --now protect-while-busy
-%{ if block_metadata ~}
+%{ if untrusted ~}
 
-# Pull request code runs as the runner user and must not read the credentials of the instance role (containers are stopped by the hop limit of 1).
-iptables -I OUTPUT -m owner --uid-owner runner -d 169.254.169.254 -j REJECT
+# One job per instance: the bootstrap function stored a one-time JIT config for this instance; it is read once, deleted, then the instance powers off and is terminated.
+cat >/usr/local/bin/run-one-job <<'ONCE'
+#!/bin/bash
+set -uo pipefail
+token=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+id=$(curl -fsS -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)
+name="${jit_parameter_prefix}/$id"
+jit=""
+for _ in $(seq 1 60); do
+  jit=$(aws ssm get-parameter --region "${region}" --with-decryption --name "$name" --query Parameter.Value --output text 2>/dev/null) && break
+  jit=""
+  sleep 5
+done
+if [ -n "$jit" ]; then
+  aws ssm delete-parameter --region "${region}" --name "$name" || true
+  cd /opt/runner && runuser -u runner -- ./run.sh --jitconfig "$jit"
+fi
+systemctl poweroff
+ONCE
+chmod 700 /usr/local/bin/run-one-job
+cat >/etc/systemd/system/run-one-job.service <<'UNIT'
+[Unit]
+Description=Run one GitHub Actions job with a JIT config, then power off
+After=network-online.target protect-while-busy.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/run-one-job
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now --no-block run-one-job
+%{ else ~}
+
+# Registration token of the repository through the GitHub App of this pool; the credentials are read once and not kept.
+secret=$(aws secretsmanager get-secret-value --region "${region}" --secret-id "${secret_id}" --query SecretString --output text)
+app_id=$(jq -r .app_id <<<"$secret")
+installation_id=$(jq -r .installation_id <<<"$secret")
+key=$(jq -r .private_key <<<"$secret")
+b64() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+now=$(date +%s)
+header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64)
+payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "$app_id" | b64)
+signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign <(printf '%s' "$key") | b64)
+installation_token=$(curl -fsS -X POST -H "Authorization: Bearer $header.$payload.$signature" -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$installation_id/access_tokens" | jq -r .token)
+registration_token=$(curl -fsS -X POST -H "Authorization: Bearer $installation_token" -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${github_repository}/actions/runners/registration-token" | jq -r .token)
+unset secret app_id installation_id key header payload signature installation_token
+
+sudo -u runner ./config.sh --unattended --replace --url "https://github.com/${github_repository}" --token "$registration_token" \
+  --name "$(hostname)" --labels "${labels}" --work /home/runner/_work
+unset registration_token
+./svc.sh install runner
+./svc.sh start
 %{ endif ~}
