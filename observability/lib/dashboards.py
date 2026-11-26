@@ -1,12 +1,15 @@
 """Dashboard definitions by level (section 15 hierarchy); thresholds come from thresholds.py."""
+from pathlib import Path
+
 import thresholds as T
-from panels import F, FC, Dashboard, drill, steps
+import yaml
+from panels import DS, F, FC, Dashboard, drill, steps
 
 TITLES = {
     "platform-overview": "L0 Platform overview", "slo-overview": "L0 SLO overview", "payments": "L1 Payments and PSP health", "router": "L1 Router (RED)",
     "locker": "L1 Locker (RED, CDE)", "drainer": "L1 Drainer (write-behind)", "scheduler": "L1 Scheduler (sync and webhooks)", "cells": "L2 Cells",
     "kubernetes": "L2 Kubernetes (USE)", "data-stores": "L3 Data stores", "backup": "L3 Backup and restore", "dr-switch": "L3 DR switch readiness",
-    "edge": "L3 Edge and security", "cost": "FinOps: unit cost and spend",
+    "edge": "L3 Edge and security", "cost": "FinOps: unit cost and spend", "slow-requests": "L1 Slow requests",
 }
 # cAdvisor also exports a pod-level series with an empty container; counting it doubles the use.
 CADVISOR_CONTAINERS = 'container!="",container!="POD"'
@@ -93,6 +96,80 @@ def stream_ts(d):
          thr=steps(T.REDIS_STREAM_LEN / 2, T.REDIS_STREAM_LEN))
 
 
+SLOW_CFG = yaml.safe_load((Path(__file__).resolve().parents[1] / "slo" / "config" / "slow-requests.yaml").read_text(encoding="utf-8"))
+SLOW_SEL = FC + ',service=~"$service",route=~"$route"'
+SLOW_ONLY = SLOW_SEL + ',slow="true"'
+SLOW_BY = "service, route, cell"
+SLOW_SHARE_THR = steps(1, 5)
+
+
+def slow_rule():
+    allowance = SLOW_CFG["psp_allowance_ms"]
+    parts = []
+    for name, spec in SLOW_CFG["types"].items():
+        if spec["measure"] == "own":
+            parts.append(f"{name} > {spec['threshold_ms'] + allowance} ms total ({spec['threshold_ms']} ms own time + {allowance} ms PSP allowance)")
+        else:
+            parts.append(f"{name} > {spec['threshold_ms']} ms")
+    parts.append(f"other routes > {SLOW_CFG['other']['threshold_ms']} ms or their own threshold")
+    return "; ".join(parts)
+
+
+# Tables and stats count over the whole range; time series use rate over the rate interval.
+def slow_count(by="", sel=SLOW_ONLY, window="$__range", fn="increase"):
+    b = f" by ({by})" if by else ""
+    return f"sum{b} ({fn}(slow_requests_calls_total{{{sel}}}[{window}]))"
+
+
+def slow_quantile(q, by="", window="$__range", fn="increase"):
+    labels = f"{by}, le" if by else "le"
+    return f"histogram_quantile({q}, sum by ({labels}) ({fn}(slow_requests_duration_seconds_bucket{{{SLOW_ONLY}}}[{window}])))"
+
+
+def slow_requests():
+    variables = [
+        {"name": "route", "label": "Route", "type": "query", "datasource": DS, "query": 'label_values(slow_requests_calls_total{env=~"$env"}, route)', "refresh": 2, "sort": 1,
+         "multi": True, "includeAll": True, "allValue": ".*", "current": {"text": "All", "value": "$__all"}},
+        {"name": "threshold", "label": "Trace duration above, ms", "type": "textbox", "query": "0", "current": {"text": "0", "value": "0"}},
+    ]
+    d = Dashboard("slow-requests", TITLES["slow-requests"], "l1", ["latency", "traces"], links=nav("platform-overview", "router", "payments"), runbooks=["application"],
+                  extra_vars=variables, description=f"Which requests are slow, where, and which traces show why. Slow: {slow_rule()}. "
+                  "Groups come from the slow-request metrics; traces are kept by tail sampling for Tempo retention (14 days).")
+    d.row("Overview")
+    d.stat("slow: slow requests", slow_count(), "short", thr=steps(info=True), desc="Requests over the threshold of their type in the time range.")
+    d.stat("slow: share of all requests", "100 * " + ratio(slow_count(), slow_count(sel=SLOW_SEL)), "percent", hi=100, thr=SLOW_SHARE_THR, decimals=2,
+           desc="Guidance (1%, 5%), not an alert.")
+    d.stat("slow: p95 of slow requests", slow_quantile(0.95), "s", decimals=3, thr=steps(info=True))
+    d.stat("slow: routes with slow requests", f"count({slow_count('route')} > 0) or vector(0)", "short", thr=steps(info=True))
+    d.row("Groups")
+    lost = f"sum by ({SLOW_BY}) (increase(slow_requests_duration_seconds_sum{{{SLOW_ONLY}}}[$__range]))"
+    last = f"1000 * max by ({SLOW_BY}) (max_over_time(timestamp({slow_count(SLOW_BY, window='1m')} > 0)[$__range:1m]))"
+    link = {"title": "Show the traces of this group",
+            "url": "/d/slow-requests?${__url_time_range}&${env:queryparam}&${region:queryparam}&var-service=${__data.fields.service}&var-route=${__data.fields.route}&var-cell=${__data.fields.cell}"}
+    d.merged_table("slow: slow requests by route, service and cell", [
+        ("Slow requests", slow_count(SLOW_BY), "short"),
+        ("Share of all, %", "100 * " + ratio(slow_count(SLOW_BY), slow_count(SLOW_BY, sel=SLOW_SEL)), "percent"),
+        ("p50", slow_quantile(0.5, SLOW_BY), "s"),
+        ("p95", slow_quantile(0.95, SLOW_BY), "s"),
+        ("Max (bucket bound)", slow_quantile(1, SLOW_BY), "s"),
+        ("Last seen", last, "dateTimeAsIso"),
+        ("Lost time", lost, "s"),
+    ], sort_by="Lost time", link=link, desc="Lost time is count x mean duration of the slow requests; a row link filters the traces below. "
+                                            "Max is the upper bound of the highest bucket with a slow request.")
+    d.row("Trend")
+    d.ts("slow: slow requests per second by route, reqps", [(top(slow_count("route", window="5m", fn="rate")), "{{route}}")], "reqps", exemplar=True,
+         desc="Exemplars open a slow trace in Tempo.")
+    d.ts("slow: p95 duration of slow requests by route, s", [(top(slow_quantile(0.95, "route", window="5m", fn="rate")), "{{route}}")], "s", exemplar=True, decimals=3)
+    d.row("Traces")
+    match = ('resource.deployment.environment.name = "$env" && resource.cloud.region =~ "$region" && resource.cell =~ "$cell" && resource.service.name =~ "$service" '
+             '&& span.slow = true && span.http.route =~ "$route" && duration > ${threshold}ms')
+    d.traces_table("slow: last slow traces", "{ " + match + " } | select(span.http.method, span.http.route, span.http.status_code, span.request.type, resource.cell)",
+                   desc="The last 100 slow traces of the range, newest first; the trace id opens the trace in Tempo. Duration is the whole request.")
+    d.traces_table("slow: PSP calls inside slow requests", "{ " + match + ' } >> { name = "call_connector_api" }',
+                   desc="The PSP call span of each slow trace; own time is the request duration minus this span.")
+    return d
+
+
 DRAIN_THR = steps(T.DRAIN_LAG_S / 2, T.DRAIN_LAG_S)
 STALE_DESC = "Payments in an unknown state for more than 15 minutes; the scheduler syncs them with the PSP."
 
@@ -139,7 +216,7 @@ def build_all():
     d.ts("SLO: burn rate over 3 days, x budget", [(f'slo:sli_error:ratio_rate3d{{{F}}} {burn}', legend)], "none", thr=steps(1), desc="Above 1 with the 6-hour window opens a ticket.")
     out.append(("l0-overview", d))
 
-    d = Dashboard("payments", TITLES["payments"], "l1", ["psp", "payments"], links=nav("platform-overview", "slo-overview", "cells"), runbooks=["application"],
+    d = Dashboard("payments", TITLES["payments"], "l1", ["psp", "payments"], links=nav("platform-overview", "slo-overview", "cells", "slow-requests"), runbooks=["application"],
                   description="Which PSP degrades?")
     psp = ',psp=~"$psp"'
     d.row("Overview")
@@ -164,7 +241,7 @@ def build_all():
          desc="An authorization rate 5 points below the week-ago line raises AuthorizationRateDrop.")
     out.append(("l1-services", d))
 
-    d = Dashboard("router", TITLES["router"], "l1", ["red", "router"], service="router", links=nav("platform-overview", "payments", "cells"), runbooks=["application"],
+    d = Dashboard("router", TITLES["router"], "l1", ["red", "router"], service="router", links=nav("platform-overview", "payments", "cells", "slow-requests"), runbooks=["application"],
                   description="Rate, errors and duration of the payment API.")
     red(d, "router", steps(T.ROUTER_5XX_RATIO * 100))
     d.row("Dependencies")
@@ -172,6 +249,8 @@ def build_all():
     d.ts("router: p99 platform overhead by cell, s", [(f'histogram_quantile(0.99, sum by (cell, le) (rate(platform_overhead_seconds_bucket{{{FC},service=~"$service"}}[5m])))', "{{cell}}")],
          "s", thr=OVERHEAD_THR, exemplar=True, decimals=3, desc="Platform time on top of the PSP time; the SLO is 150 ms at p99.")
     out.append(("l1-services", d))
+
+    out.append(("l1-services", slow_requests()))
 
     d = Dashboard("locker", TITLES["locker"], "l1", ["red", "locker", "cde"], service="locker", links=nav("platform-overview", "payments", "cells"), runbooks=["application"],
                   description="Locker is a CDE component: no card data in any panel.")

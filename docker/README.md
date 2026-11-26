@@ -2,6 +2,8 @@
 
 One Dockerfile per service (`docker/<service>/Dockerfile`), `budgets.yaml` with image size budgets, container-structure-test.
 
+Kafka TLS (router, scheduler): `rdkafka` is built with the `ssl` feature and links the system libssl and libcrypto, which `collect-libs.sh` copies from the snapshot-pinned build stage. librdkafka verifies the MSK certificates through OpenSSL's default paths under `/usr/lib/ssl`, which distroless does not have, so the runtime stage sets `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` (the bundle of the digest-pinned base). The drainer does not link rdkafka.
+
 ## Rootless builds
 
 Images are built by BuildKit running rootless in pods of a build cluster; no runner has a Docker daemon, `docker.sock`, a privileged container or a hostPath. The runner holds only the buildx client.
@@ -35,7 +37,7 @@ In the build cluster (`deploy/platform/ci-build/`, not written by this change):
 
 Every Dockerfile runs as root only inside the build user namespace and has no step that needs real root:
 
-- `router`, `drainer`, `scheduler`, `locker` (`tools`, `build` stages): `apt-get install` (also needs the `_apt` sandbox user, covered by the uid range; set `APT::Sandbox::User "root"` if a node refuses), `cargo install`, `cargo build`, a `--mount=type=secret` at `/root/.aws/credentials` and `--mount=type=cache` mounts. `collect-libs.sh` uses `ldd`, `cp`, `mkdir` only.
+- `router`, `drainer`, `scheduler`, `locker` (`tools`, `build` stages): `apt-get install` (also needs the `_apt` sandbox user, covered by the uid range; set `APT::Sandbox::User "root"` if a node refuses), `cargo install`, `cargo build`, a `--mount=type=secret` at `/root/.aws/credentials` and `--mount=type=cache` mounts. `collect-libs.sh` uses `ldd`, `grep`, `awk`, `cp`, `mkdir` only.
 - `vault-snapshot` (`fetch` stage): `apt-get install`, `curl` with a pinned sha256, `unzip`, the AWS CLI installer into `/out`.
 - `control-center`: `USER root` then `chown -R 10001:10001 /usr/src/app`; this needs the uid 10001 inside the user namespace map (it is within the 65536 range) and `CAP_CHOWN` of the namespace, which rootless BuildKit has. It is the only step that changes ownership; if a builder refuses it, use `COPY --chown=10001:10001` from the upstream stage instead.
 - No Dockerfile uses `--security=insecure`, `mknod`, `mount`, `sysctl`, `setcap` or `chroot`. The final stages are distroless with `USER 10001:10001`.

@@ -1,10 +1,14 @@
 """Panel and dashboard builders that enforce the dashboard standard checked by observability/lib/tests."""
+import re
 from pathlib import Path
 
 import yaml
 
 COLORS = {"ok": "green", "warn": "yellow", "crit": "red", "info": "blue"}
 DS = {"type": "prometheus", "uid": "${datasource}"}
+# The Tempo uid is fixed in deploy/platform/grafana/values.yaml.
+TEMPO = {"type": "tempo", "uid": "tempo"}
+TRACE_LIMIT = 100
 F = 'env=~"$env",region=~"$region"'
 FC = F + ',cell=~"$cell"'
 RATE = "$__rate_interval"
@@ -52,17 +56,18 @@ def drill(uid, title, var=None):
 
 
 class Dashboard:
-    def __init__(self, uid, title, level, tags, service=None, links=(), description="", runbooks=(), time=None):
+    def __init__(self, uid, title, level, tags, service=None, links=(), description="", runbooks=(), time=None, extra_vars=()):
         self.uid, self.title, self.level, self.tags = uid, title, level, tags
         self.service, self.links, self.description, self.runbooks = service, list(links), description, list(runbooks)
+        self.extra_vars = list(extra_vars)
         self.time = time or LEVEL_TIME[level]
         self.items = []
 
     def row(self, title):
         self.items.append({"type": "row", "title": title, "collapsed": False, "panels": []})
 
-    def _add(self, kind, w, body):
-        self.items.append({"type": kind, "datasource": DS, "_w": w, **body})
+    def _add(self, kind, w, body, ds=DS):
+        self.items.append({"type": kind, "datasource": ds, "_w": w, **body})
 
     @staticmethod
     def _defaults(unit, lo, hi, thr, decimals, link=None):
@@ -143,6 +148,26 @@ class Dashboard:
                                "options": {"showHeader": True, "sortBy": [{"displayName": value_name, "desc": True}]},
                                "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": True}, "renameByName": {"Value": value_name}}}]})
 
+    # One row per label set: each (name, expr, unit) column is an instant query joined on the shared labels.
+    def merged_table(self, title, columns, sort_by, w=24, desc="", link=None):
+        t = self._targets([expr for _, expr, _ in columns], instant=True)
+        for target in t:
+            target["format"] = "table"
+        d = self._defaults("short", None, None, None, None, link)
+        rename = {f"Value #{target['refId']}": name for target, (name, _, _) in zip(t, columns)}
+        overrides = [{"matcher": {"id": "byName", "options": name}, "properties": [{"id": "unit", "value": unit}]} for name, _, unit in columns]
+        self._add("table", w, {"title": title, "description": desc, "targets": t, "fieldConfig": {"defaults": d, "overrides": overrides},
+                               "options": {"showHeader": True, "sortBy": [{"displayName": sort_by, "desc": True}], "footer": {"show": False}},
+                               "transformations": [{"id": "merge", "options": {}},
+                                                   {"id": "organize", "options": {"excludeByName": {"Time": True}, "renameByName": rename}}]})
+
+    # The trace id column of Tempo search results opens the trace view, so no link is set here.
+    def traces_table(self, title, query, w=24, desc=""):
+        target = {"refId": "A", "datasource": TEMPO, "queryType": "traceql", "query": query, "limit": TRACE_LIMIT, "spss": 3, "tableType": "traces"}
+        d = self._defaults("ms", None, None, None, None)
+        self._add("table", w, {"title": title, "description": desc, "targets": [target], "fieldConfig": {"defaults": d, "overrides": []},
+                               "options": {"showHeader": True, "sortBy": [{"displayName": "Start time", "desc": True}], "footer": {"show": False}}}, ds=TEMPO)
+
     def _layout(self):
         sections, cur = [], None
         for item in self.items:
@@ -219,11 +244,11 @@ class Dashboard:
             query("cell", "Cell", 'up{env=~"$env",region=~"$region"}, cell', "All"),
             service,
             query("psp", "PSP", 'psp_requests_total{env=~"$env",region=~"$region"}, psp', "All"),
-        ]
+        ] + [{**v, "hide": 0 if re.search(rf"\$\{{?{v['name']}\b", used) else 2} for v in self.extra_vars]
 
     def build(self):
         panels = self._layout()
-        used = " ".join(t["expr"] for p in panels for t in p.get("targets", []))
+        used = " ".join(t.get("expr") or t.get("query", "") for p in panels for t in p.get("targets", []))
         links = [{"type": "link", "title": t, "url": f"/d/{u}", "icon": "dashboard", "targetBlank": False, "keepTime": True, "includeVars": True} for u, t in self.links]
         links.append({"type": "dashboards", "title": "All dashboards", "tags": ["payments-platform"], "asDropdown": True, "keepTime": True, "includeVars": True, "targetBlank": False})
         links += [{"type": "link", "title": f"Runbooks: {area}", "url": f"{RUNBOOK_BASE}/{area}", "icon": "doc", "targetBlank": True} for area in self.runbooks]

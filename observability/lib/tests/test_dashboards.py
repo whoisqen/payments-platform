@@ -32,10 +32,19 @@ def panels(doc):
     return [p for p in doc["panels"] if p["type"] != "row"]
 
 
+# PromQL checks apply to the metric panels; Tempo panels have their own test.
+def targets(p):
+    return p["targets"] if p["datasource"]["type"] == "prometheus" else []
+
+
+def tempo_panels(doc):
+    return [p for p in panels(doc) if p["datasource"]["type"] == "tempo"]
+
+
 class DashboardStandardTest(unittest.TestCase):
     def test_all_levels_present(self):
         uids = {d["uid"] for d in DOCS.values()}
-        wanted = {"platform-overview", "slo-overview", "payments", "router", "locker", "drainer", "scheduler", "cells", "data-stores", "backup", "dr-switch", "cost", "kubernetes", "edge"}
+        wanted = {"platform-overview", "slo-overview", "payments", "router", "locker", "drainer", "scheduler", "cells", "data-stores", "backup", "dr-switch", "cost", "kubernetes", "edge", "slow-requests"}
         self.assertEqual(wanted, uids)
 
     def test_committed_json_matches_generator(self):
@@ -47,7 +56,7 @@ class DashboardStandardTest(unittest.TestCase):
                 with self.subTest(dashboard=path.name, panel=p.get("title")):
                     self.assertTrue(p["title"])
                     self.assertTrue(p["fieldConfig"]["defaults"].get("unit"))
-                    self.assertEqual(p["datasource"]["uid"], "${datasource}")
+                    self.assertEqual(p["datasource"]["uid"], "tempo" if p["datasource"]["type"] == "tempo" else "${datasource}")
 
     def test_percent_panels_are_bounded(self):
         for path, doc in DOCS.items():
@@ -86,7 +95,7 @@ class DashboardStandardTest(unittest.TestCase):
     def test_queries_use_variables_and_legends(self):
         for path, doc in DOCS.items():
             for p in panels(doc):
-                for t in p["targets"]:
+                for t in targets(p):
                     with self.subTest(dashboard=path.name, panel=p["title"]):
                         self.assertIn("$env", t["expr"])
                         if p["type"] in ("timeseries", "bargauge"):
@@ -95,7 +104,7 @@ class DashboardStandardTest(unittest.TestCase):
     def test_rate_only_on_counters(self):
         for path, doc in DOCS.items():
             for p in panels(doc):
-                for t in p["targets"]:
+                for t in targets(p):
                     for fn, metric in re.findall(r"\b(rate|increase)\(\s*([A-Za-z_:][A-Za-z0-9_:]*)", t["expr"]):
                         with self.subTest(dashboard=path.name, panel=p["title"], metric=metric):
                             if metric not in COUNTER_WITHOUT_SUFFIX:
@@ -104,14 +113,14 @@ class DashboardStandardTest(unittest.TestCase):
     def test_latency_panels_use_quantiles_not_averages(self):
         for path, doc in DOCS.items():
             for p in panels(doc):
-                for t in p["targets"]:
+                for t in targets(p):
                     if "duration" in t["expr"] or "latency" in t["expr"]:
                         self.assertNotRegex(t["expr"], r"\bavg(_over_time)?\(", f"{path.name}: {p['title']}")
 
     def test_standard_variables_and_defaults(self):
         for path, doc in DOCS.items():
             names = [v["name"] for v in doc["templating"]["list"]]
-            self.assertEqual(names, ["datasource", "env", "region", "cell", "service", "psp"], path.name)
+            self.assertEqual(names[:6], ["datasource", "env", "region", "cell", "service", "psp"], path.name)
             by = {v["name"]: v for v in doc["templating"]["list"]}
             self.assertEqual(by["env"]["current"]["text"], "prod")
             self.assertEqual(by["region"]["current"]["text"], "eu-central-1")
@@ -119,7 +128,7 @@ class DashboardStandardTest(unittest.TestCase):
 
     def test_no_high_cardinality_labels(self):
         for path, doc in DOCS.items():
-            text = json.dumps([t["expr"] + t["legendFormat"] for p in panels(doc) for t in p["targets"]])
+            text = json.dumps([t["expr"] + t["legendFormat"] for p in panels(doc) for t in targets(p)])
             for word in FORBIDDEN:
                 self.assertNotRegex(text, rf"\b{word}\b", f"{path.name} mentions {word}")
 
@@ -144,7 +153,7 @@ class DashboardStandardTest(unittest.TestCase):
         _, recorded = cov.load_rules([OBS / "alerts", OBS / "slo" / "generated"])
         for path, doc in DOCS.items():
             for p in panels(doc):
-                for t in p["targets"]:
+                for t in targets(p):
                     for m in cov.extract_metrics(t["expr"]):
                         with self.subTest(dashboard=path.name, metric=m):
                             self.assertTrue(m in catalog or m in recorded or m == "ALERTS", m)
@@ -214,14 +223,14 @@ class DashboardStandardTest(unittest.TestCase):
                     self.assertEqual(p["options"]["tooltip"]["sort"], "desc")
                     self.assertIn(p["options"]["legend"]["displayMode"], ("table", "list"))
                     self.assertIn(p["options"]["legend"]["placement"], ("bottom", "right"))
-                    for t in p["targets"]:
+                    for t in targets(p):
                         self.assertNotIn("{{", t["expr"])
                         self.assertNotRegex(t["legendFormat"], r"[({]\s*[a-z_]+\{|rate\(", "legend must name the series, not repeat the query")
 
     def test_range_queries_use_rate_interval(self):
         for path, doc in DOCS.items():
             for p in panels(doc):
-                for t in p["targets"]:
+                for t in targets(p):
                     if not t.get("instant"):
                         self.assertNotIn("[5m]", t["expr"], f"{path.name}: {p['title']}")
 
@@ -230,7 +239,7 @@ class DashboardStandardTest(unittest.TestCase):
             for p in panels(doc):
                 if p["type"] != "timeseries":
                     continue
-                for t in p["targets"]:
+                for t in targets(p):
                     if WIDE_LABELS.search(t["expr"]) and "store" not in t["legendFormat"]:
                         self.assertRegex(t["expr"], r"^(topk|bottomk)\(8,", f"{path.name}: {p['title']}")
 
@@ -239,13 +248,13 @@ class DashboardStandardTest(unittest.TestCase):
             for p in panels(doc):
                 if p["fieldConfig"]["defaults"]["unit"] != "percent":
                     continue
-                for t in p["targets"]:
+                for t in targets(p):
                     if re.search(r"\) / [a-z(]", t["expr"]) and "_bytes" not in t["expr"] and "Disk" not in t["expr"]:
                         self.assertIn("> 0)", t["expr"], f"{path.name}: {p['title']}")
 
     def test_variables_readable_and_hidden_when_unused(self):
         for path, doc in DOCS.items():
-            used = " ".join(t["expr"] for p in panels(doc) for t in p["targets"])
+            used = " ".join(t.get("expr") or t["query"] for p in panels(doc) for t in p["targets"])
             by = {v["name"]: v for v in doc["templating"]["list"]}
             self.assertFalse(by["env"]["multi"] or by["env"]["includeAll"], "one environment at a time")
             for v in by.values():
@@ -254,7 +263,7 @@ class DashboardStandardTest(unittest.TestCase):
                     if v["type"] == "query":
                         self.assertEqual(v["sort"], 1)
                     if v.get("hide", 0) == 0 and v["name"] not in ("datasource", "env", "region"):
-                        self.assertIn(f"${v['name']}", used)
+                        self.assertRegex(used, rf"\$\{{?{v['name']}\b")
 
     def test_time_and_refresh_by_level(self):
         for path, doc in DOCS.items():
@@ -294,6 +303,60 @@ class DashboardStandardTest(unittest.TestCase):
             hits = [c for v, c in drawn if any(math.isclose(v, x) for x in (value, value * 100))]
             with self.subTest(alert=alert):
                 self.assertIn(want[rules[alert]], hits)
+
+
+class SlowRequestsDashboardTest(unittest.TestCase):
+    DOC = json.loads((OBS / "dashboards" / "l1-services" / "slow-requests.json").read_text())
+
+    def emitted_labels(self):
+        cfg = yaml.safe_load((OBS / "otel" / "collector.yaml").read_text())
+        dims = [d["name"] for d in cfg["connectors"]["span_metrics/slow"]["dimensions"]]
+        stmts = [s for g in cfg["processors"]["transform/spanmetrics-labels"]["metric_statements"] for s in g["statements"]]
+        renamed = dict(re.findall(r'set\(attributes\["([a-z_.]+)"\], (?:resource\.)?attributes\["([a-z_.]+)"\]\)', "\n".join(stmts)))
+        out = {new for new, old in renamed.items()} | {d for d in dims if d not in renamed.values()}
+        return out | set(cfg["exporters"]["prometheusremotewrite/central"]["external_labels"]) | {"le"}
+
+    def test_queries_use_only_labels_the_collector_emits(self):
+        allowed = self.emitted_labels()
+        self.assertEqual(allowed, {"service", "route", "cell", "slow", "env", "region", "le"})
+        for p in panels(self.DOC):
+            for t in targets(p):
+                used = set(re.findall(r"([a-z_]+)=~?\"", t["expr"])) | {l.strip() for by in re.findall(r"by \(([^)]*)\)", t["expr"]) for l in by.split(",")}
+                with self.subTest(panel=p["title"], ref=t["refId"]):
+                    self.assertLessEqual(used, allowed)
+                    for m in cov.extract_metrics(t["expr"]):
+                        self.assertTrue(m.startswith("slow_requests_"), m)
+
+    def test_trace_tables_are_bounded_and_filtered(self):
+        tables = tempo_panels(self.DOC)
+        self.assertEqual(len(tables), 2)
+        for p in tables:
+            (t,) = p["targets"]
+            with self.subTest(panel=p["title"]):
+                self.assertEqual(p["datasource"], {"type": "tempo", "uid": "tempo"})
+                self.assertEqual((t["queryType"], t["limit"]), ("traceql", 100))
+                for part in ("span.slow = true", '"$env"', '"$route"', '"$cell"', '"$service"', "${threshold}ms"):
+                    self.assertIn(part, t["query"])
+
+    def test_group_rows_filter_the_trace_tables(self):
+        (table,) = [p for p in panels(self.DOC) if p["type"] == "table" and p["datasource"]["type"] == "prometheus"]
+        url = table["fieldConfig"]["defaults"]["links"][0]["url"]
+        for var in ("service", "route", "cell"):
+            self.assertIn(f"var-{var}=${{__data.fields.{var}}}", url)
+        self.assertEqual(table["options"]["sortBy"][0]["displayName"], "Lost time")
+        names = list(table["transformations"][1]["options"]["renameByName"].values())
+        self.assertEqual(names, ["Slow requests", "Share of all, %", "p50", "p95", "Max (bucket bound)", "Last seen", "Lost time"])
+
+    def test_the_l1_services_dashboards_link_here(self):
+        for uid in ("router", "payments"):
+            doc = json.loads((OBS / "dashboards" / "l1-services" / f"{uid}.json").read_text())
+            self.assertIn("/d/slow-requests", [link.get("url") for link in doc["links"]], uid)
+
+    def test_thresholds_in_the_description_follow_the_yaml(self):
+        cfg = yaml.safe_load((OBS / "slo" / "config" / "slow-requests.yaml").read_text())
+        for name, spec in cfg["types"].items():
+            total = spec["threshold_ms"] + (cfg["psp_allowance_ms"] if spec["measure"] == "own" else 0)
+            self.assertIn(f"{name} > {total} ms", self.DOC["description"])
 
 
 if __name__ == "__main__":

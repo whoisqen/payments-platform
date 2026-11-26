@@ -19,6 +19,13 @@ mock_provider "aws" {
     defaults = { arn = "arn:aws:cloudwatch:us-east-1:111111111111:alarm:pay-stage-use1-dr-failover-working-region-down" }
   }
 
+  mock_resource "aws_kms_key" {
+    defaults = {
+      arn    = "arn:aws:kms:us-east-1:111111111111:key/22222222-3333-4444-5555-666666666666"
+      key_id = "22222222-3333-4444-5555-666666666666"
+    }
+  }
+
   mock_resource "aws_dynamodb_table" {
     defaults = { arn = "arn:aws:dynamodb:us-east-1:111111111111:table/pay-stage-use1-dr-lock" }
   }
@@ -79,6 +86,62 @@ run "lock_table_is_encrypted_and_protected" {
     condition     = aws_dynamodb_table.lock.name == "pay-stage-use1-dr-lock" && aws_dynamodb_table.lock.deletion_protection_enabled && aws_dynamodb_table.lock.hash_key == "pk"
     error_message = "lock table name, key and deletion protection"
   }
+}
+
+run "trigger_topic_uses_a_key_cloudwatch_can_use" {
+  command = apply
+
+  assert {
+    condition     = aws_sns_topic.failover.kms_master_key_id != "alias/aws/sns" && aws_sns_topic.failover.kms_master_key_id == aws_kms_key.sns[0].arn
+    error_message = "the trigger topic must use the module's customer managed key, never alias/aws/sns"
+  }
+
+  assert {
+    condition     = aws_kms_key.sns[0].enable_key_rotation && aws_kms_alias.sns[0].name == "alias/pay-stage-use1-dr-failover-sns"
+    error_message = "the topic key rotates and has the <name>-sns alias"
+  }
+
+  assert {
+    condition = length([
+      for st in jsondecode(aws_kms_key.sns[0].policy).Statement : st
+      if try(st.Principal.Service, "") == "cloudwatch.amazonaws.com" &&
+      st.Effect == "Allow" &&
+      contains(st.Action, "kms:Decrypt") && contains(st.Action, "kms:GenerateDataKey*") &&
+      try(st.Condition.StringEquals["aws:SourceAccount"], "") == var.account_id
+    ]) == 1
+    error_message = "the key policy grants CloudWatch Decrypt and GenerateDataKey* limited to the source account"
+  }
+
+  assert {
+    condition = length([
+      for st in jsondecode(aws_kms_key.sns[0].policy).Statement : st
+      if try(st.Principal.AWS, "") == "arn:aws:iam::111111111111:root" && st.Action == "kms:*"
+    ]) == 1
+    error_message = "the account root administers the key"
+  }
+}
+
+run "existing_topic_key_is_used" {
+  command = apply
+
+  variables {
+    sns_kms_key_arn = "arn:aws:kms:us-east-1:111111111111:key/77777777-8888-9999-aaaa-bbbbbbbbbbbb"
+  }
+
+  assert {
+    condition     = length(aws_kms_key.sns) == 0 && length(aws_kms_alias.sns) == 0 && aws_sns_topic.failover.kms_master_key_id == var.sns_kms_key_arn
+    error_message = "a supplied key replaces the module key"
+  }
+}
+
+run "aws_managed_topic_key_rejected" {
+  command = plan
+
+  variables {
+    sns_kms_key_arn = "alias/aws/sns"
+  }
+
+  expect_failures = [var.sns_kms_key_arn]
 }
 
 run "short_alarm_window_rejected" {

@@ -116,3 +116,14 @@ variable "component" {
   type        = string
   default     = "dr-failover"
 }
+
+variable "sns_kms_key_arn" {
+  description = "Existing customer managed key for the trigger topic; its policy must allow cloudwatch.amazonaws.com kms:Decrypt and kms:GenerateDataKey*. Null (default) creates a key in the module."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.sns_kms_key_arn == null || can(regex("^arn:aws[a-z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/[a-zA-Z0-9-]+$", var.sns_kms_key_arn))
+    error_message = "sns_kms_key_arn must be a KMS key ARN (not an alias, never alias/aws/sns)."
+  }
+}
