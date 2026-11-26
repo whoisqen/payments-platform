@@ -12,7 +12,9 @@ terraform {
 inputs = {
   component               = "vpc-egress"
   enable_internet_gateway = true
-  flow_logs_bucket_arn    = local.env_cfg.flow_logs_bucket_arn
+  # NAT return traffic must reach the firewall endpoint of its own AZ (egress-routing).
+  public_route_table_per_az = true
+  flow_logs_bucket_arn      = local.env_cfg.flow_logs_bucket_arn
   # The egress VPC holds no workloads, so it needs no endpoints.
   gateway_endpoint_services   = []
   interface_endpoint_services = []

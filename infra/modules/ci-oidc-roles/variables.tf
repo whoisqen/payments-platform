@@ -127,12 +127,12 @@ variable "name_prefix" {
 
 variable "plan_refs" {
   type        = list(string)
-  default     = []
-  description = "Refs that may assume the plan role besides pull requests, for example refs/heads/main for the nightly drift check."
+  default     = ["refs/heads/main"]
+  description = "Refs that may assume the plan role: refs/heads/main for the nightly drift check; pull requests never get state access."
 
   validation {
-    condition     = alltrue([for r in var.plan_refs : r == "refs/heads/main"])
-    error_message = "plan_refs may only hold refs/heads/main."
+    condition     = length(var.plan_refs) > 0 && alltrue([for r in var.plan_refs : r == "refs/heads/main"])
+    error_message = "plan_refs must hold refs/heads/main and nothing else."
   }
 }
 

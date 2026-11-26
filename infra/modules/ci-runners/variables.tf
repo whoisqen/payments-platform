@@ -45,8 +45,34 @@ variable "subnet_ids" {
 
 variable "untrusted_subnet_ids" {
   type        = list(string)
+  default     = []
+  description = "Subnets of the untrusted pools, separate from subnet_ids, whose only egress is the Network Firewall allowlist; required when a pool is untrusted."
+
+  validation {
+    condition     = !anytrue([for p in values(var.pools) : p.untrusted]) || length(var.untrusted_subnet_ids) > 0
+    error_message = "an untrusted pool needs untrusted_subnet_ids; it never shares the subnets of the trusted pools."
+  }
+  validation {
+    condition     = length(setintersection(var.untrusted_subnet_ids, var.subnet_ids)) == 0
+    error_message = "untrusted_subnet_ids may not include any of subnet_ids."
+  }
+}
+
+variable "endpoint_security_group_id" {
+  type        = string
   default     = null
-  description = "Subnets of the untrusted pool; give it subnets without routes to other networks so that pull request code cannot reach them. null uses subnet_ids."
+  description = "Security group of the VPC interface endpoints; the only private destination an untrusted pool may reach. Required when a pool is untrusted."
+
+  validation {
+    condition     = !anytrue([for p in values(var.pools) : p.untrusted]) || var.endpoint_security_group_id != null
+    error_message = "an untrusted pool needs endpoint_security_group_id."
+  }
+}
+
+variable "runner_group_id" {
+  type        = number
+  default     = 1
+  description = "Runner group of the JIT runners of the untrusted pools; 1 is the default group of the repository."
 }
 
 variable "ebs_kms_key_arn" {

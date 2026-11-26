@@ -22,3 +22,8 @@ output "psp_fence_rule_group_name" {
   description = "Rule group that the failover script edits to fence the region."
   value       = aws_networkfirewall_rule_group.psp_fence.name
 }
+
+output "ci_allowlist_rule_group_arn" {
+  value       = one(aws_networkfirewall_rule_group.ci_allowlist[*].arn)
+  description = "CI allowlist rule group; null without ci_source_cidrs."
+}

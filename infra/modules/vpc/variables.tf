@@ -46,15 +46,16 @@ variable "azs" {
 
 variable "subnet_cidrs" {
   type = object({
-    public  = optional(list(string), [])
-    private = list(string)
-    data    = list(string)
+    public    = optional(list(string), [])
+    private   = list(string)
+    data      = list(string)
+    untrusted = optional(list(string), [])
   })
-  description = "CIDRs per tier, one per AZ; the public tier is empty or three entries (NLB ingress subnets in the CDE)."
+  description = "CIDRs per tier, one per AZ; public is empty or three entries (NLB ingress subnets in the CDE), untrusted is empty or three entries (pull request runners)."
 
   validation {
-    condition     = length(var.subnet_cidrs.private) == 3 && length(var.subnet_cidrs.data) == 3 && contains([0, 3], length(var.subnet_cidrs.public))
-    error_message = "private and data need three CIDRs; public needs zero or three."
+    condition     = length(var.subnet_cidrs.private) == 3 && length(var.subnet_cidrs.data) == 3 && contains([0, 3], length(var.subnet_cidrs.public)) && contains([0, 3], length(var.subnet_cidrs.untrusted))
+    error_message = "private and data need three CIDRs; public and untrusted need zero or three."
   }
 }
 
@@ -62,6 +63,12 @@ variable "enable_internet_gateway" {
   type        = bool
   default     = false
   description = "Attach an internet gateway to the public tier; must stay false in the CDE (SCP denies it)."
+}
+
+variable "public_route_table_per_az" {
+  type        = bool
+  default     = false
+  description = "One public route table per AZ instead of one shared table; the egress VPC needs it so that NAT return traffic goes back through the firewall endpoint of its AZ."
 }
 
 variable "enable_egress_route" {

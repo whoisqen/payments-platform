@@ -1,21 +1,38 @@
-mock_provider "aws" {}
+mock_provider "aws" {
+  mock_resource "aws_iam_role" {
+    defaults = { arn = "arn:aws:iam::123456789012:role/mock" }
+  }
+  mock_resource "aws_secretsmanager_secret" {
+    defaults = { arn = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:mock" }
+  }
+  mock_resource "aws_lambda_function" {
+    defaults = { arn = "arn:aws:lambda:eu-central-1:123456789012:function:mock" }
+  }
+  mock_resource "aws_cloudwatch_event_rule" {
+    defaults = { arn = "arn:aws:events:eu-central-1:123456789012:rule/mock" }
+  }
+  mock_resource "aws_cloudwatch_log_group" {
+    defaults = { arn = "arn:aws:logs:eu-central-1:123456789012:log-group:mock" }
+  }
+}
 
 variables {
-  name_prefix              = "acme"
-  account_id               = "123456789012"
-  region                   = "eu-central-1"
-  permissions_boundary_arn = "arn:aws:iam::123456789012:policy/boundary"
-  vpc_id                   = "vpc-00000001"
-  subnet_ids               = ["subnet-a", "subnet-b", "subnet-c"]
-  untrusted_subnet_ids     = ["subnet-x", "subnet-y"]
-  ebs_kms_key_arn          = "arn:aws:kms:eu-central-1:123456789012:key/mrk-ebs"
-  runner_version           = "2.329.0"
-  runner_sha256            = "abababababababababababababababababababababababababababababababab"
-  github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
-  github_repository        = "acme/platform"
-  ecr_repository_arns      = ["arn:aws:ecr:eu-central-1:123456789012:repository/payments/*"]
-  plan_role_arns           = ["arn:aws:iam::333333333333:role/acme-stage-tf-plan"]
-  tags                     = { team = "platform" }
+  name_prefix                = "acme"
+  account_id                 = "123456789012"
+  region                     = "eu-central-1"
+  permissions_boundary_arn   = "arn:aws:iam::123456789012:policy/boundary"
+  vpc_id                     = "vpc-00000001"
+  subnet_ids                 = ["subnet-a", "subnet-b", "subnet-c"]
+  untrusted_subnet_ids       = ["subnet-x", "subnet-y"]
+  endpoint_security_group_id = "sg-endpoints"
+  ebs_kms_key_arn            = "arn:aws:kms:eu-central-1:123456789012:key/mrk-ebs"
+  runner_version             = "2.329.0"
+  runner_sha256              = "abababababababababababababababababababababababababababababababab"
+  github_oidc_provider_arn   = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+  github_repository          = "acme/platform"
+  ecr_repository_arns        = ["arn:aws:ecr:eu-central-1:123456789012:repository/payments/*"]
+  plan_role_arns             = ["arn:aws:iam::333333333333:role/acme-stage-tf-plan"]
+  tags                       = { team = "platform" }
   pools = {
     ci-build = { instance_types = ["c7gd.4xlarge", "c6gd.4xlarge"], min_size = 0, warm_size = 1, max_size = 8, root_volume_gb = 30, on_demand_base = 0, target_cpu = 50, labels = ["build"], cache_write = true, ecr_pull = true, assume_plan = false, untrusted = false }
     ci-test  = { instance_types = ["m7g.2xlarge"], min_size = 0, warm_size = 1, max_size = 16, root_volume_gb = 40, on_demand_base = 0, target_cpu = 50, labels = [], cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
@@ -66,8 +83,120 @@ run "launch_template_hardens_the_instance" {
     error_message = "encrypted volumes and no public address"
   }
   assert {
-    condition     = alltrue([for s in aws_security_group.pool : length(s.egress) == 1 && one(s.egress).from_port == 443])
+    condition     = alltrue([for s in aws_security_group.pool : alltrue([for e in s.egress : e.from_port == 443 && e.to_port == 443 && e.protocol == "tcp"])])
     error_message = "outbound HTTPS only"
+  }
+  assert {
+    condition     = aws_launch_template.pool["ci-pr"].metadata_options[0].http_tokens == "required" && aws_launch_template.pool["ci-pr"].metadata_options[0].http_put_response_hop_limit == 1
+    error_message = "the untrusted pool requires IMDSv2 with one hop"
+  }
+}
+
+run "untrusted_pool_has_no_docker" {
+  command = plan
+
+  assert {
+    condition     = !can(regex("docker", replace(base64decode(aws_launch_template.pool["ci-pr"].user_data), "/(?m)^#.*$/", "")))
+    error_message = "the untrusted pool installs no docker and the runner user is in no docker group"
+  }
+  assert {
+    condition     = can(regex("usermod -aG docker runner", base64decode(aws_launch_template.pool["ci-build"].user_data)))
+    error_message = "trusted pools keep docker"
+  }
+  assert {
+    condition     = length(split("iptables -I OUTPUT", base64decode(aws_launch_template.pool["ci-pr"].user_data))[0]) < length(split("run.sh", base64decode(aws_launch_template.pool["ci-pr"].user_data))[0])
+    error_message = "the metadata block exists before the runner can start a job"
+  }
+}
+
+run "untrusted_egress_reaches_no_private_address" {
+  command = plan
+
+  assert {
+    condition = alltrue(flatten([for e in aws_security_group.pool["ci-pr"].egress : [
+      for c in coalesce(e.cidr_blocks, []) : !contains(["0.0.0.0/0", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"], c) && !startswith(c, "10.") && !startswith(c, "192.168.")
+    ]]))
+    error_message = "the untrusted pool may not reach any address or any private range"
+  }
+  assert {
+    condition     = length([for e in aws_security_group.pool["ci-pr"].egress : e if contains(coalesce(e.security_groups, []), "sg-endpoints")]) == 1
+    error_message = "the interface endpoints are the only private destination"
+  }
+  assert {
+    condition     = length([for e in aws_security_group.pool["ci-build"].egress : e if contains(coalesce(e.cidr_blocks, []), "0.0.0.0/0")]) == 1
+    error_message = "trusted pools keep outbound HTTPS"
+  }
+}
+
+run "untrusted_pool_needs_its_own_subnets" {
+  command = plan
+
+  variables {
+    untrusted_subnet_ids = []
+  }
+
+  expect_failures = [var.untrusted_subnet_ids]
+}
+
+run "untrusted_subnets_may_not_overlap_trusted_ones" {
+  command = plan
+
+  variables {
+    untrusted_subnet_ids = ["subnet-x", "subnet-a"]
+  }
+
+  expect_failures = [var.untrusted_subnet_ids]
+}
+
+run "untrusted_pool_needs_the_endpoint_group" {
+  command = plan
+
+  variables {
+    endpoint_security_group_id = null
+  }
+
+  expect_failures = [var.endpoint_security_group_id]
+}
+
+run "trusted_pools_alone_need_no_untrusted_inputs" {
+  command = plan
+
+  variables {
+    untrusted_subnet_ids       = []
+    endpoint_security_group_id = null
+    pools = {
+      ci-test = { instance_types = ["m7g.2xlarge"], min_size = 0, warm_size = 1, max_size = 4, root_volume_gb = 40, on_demand_base = 0, target_cpu = 50, labels = [], cache_write = false, ecr_pull = true, assume_plan = false, untrusted = false }
+    }
+  }
+
+  assert {
+    condition     = length(aws_lambda_function.jit_config) == 0 && length(aws_secretsmanager_secret_policy.untrusted) == 0
+    error_message = "no bootstrap function without an untrusted pool"
+  }
+}
+
+run "untrusted_pool_registers_one_job_through_the_bootstrap" {
+  command = apply
+
+  assert {
+    condition     = keys(aws_autoscaling_lifecycle_hook.jit_config) == ["ci-pr"] && aws_autoscaling_lifecycle_hook.jit_config["ci-pr"].lifecycle_transition == "autoscaling:EC2_INSTANCE_LAUNCHING" && aws_autoscaling_lifecycle_hook.jit_config["ci-pr"].default_result == "ABANDON"
+    error_message = "an untrusted instance waits for its JIT config and is abandoned without one"
+  }
+  assert {
+    condition     = can(regex("--jitconfig", base64decode(aws_launch_template.pool["ci-pr"].user_data))) && !can(regex("secretsmanager|config.sh|svc.sh", base64decode(aws_launch_template.pool["ci-pr"].user_data)))
+    error_message = "the untrusted instance runs one job from a JIT config and never reads the App key"
+  }
+  assert {
+    condition     = can(regex("/acme/ci/jit/ci-pr", base64decode(aws_launch_template.pool["ci-pr"].user_data))) && aws_launch_template.pool["ci-pr"].instance_initiated_shutdown_behavior == "terminate" && aws_launch_template.pool["ci-build"].instance_initiated_shutdown_behavior == null
+    error_message = "the instance reads its own parameter and is terminated when it powers off"
+  }
+  assert {
+    condition     = jsondecode(aws_lambda_function.jit_config[0].environment[0].variables.POOLS)["acme-ci-ci-pr"].labels == ["self-hosted", "linux", "arm64", "ci-pr"] && length(keys(jsondecode(aws_lambda_function.jit_config[0].environment[0].variables.POOLS))) == 1
+    error_message = "the function serves only the untrusted pool and fixes its labels"
+  }
+  assert {
+    condition     = jsondecode(aws_cloudwatch_event_rule.jit_config[0].event_pattern).detail.AutoScalingGroupName == ["acme-ci-ci-pr"]
+    error_message = "only launches of the untrusted group trigger the function"
   }
 }
 
@@ -128,6 +257,30 @@ run "roles_decide_what_a_pool_may_do" {
   assert {
     condition     = can(regex("ec2.amazonaws.com", aws_iam_role.runner["ci-pr"].assume_role_policy))
     error_message = "instances assume the role through the EC2 service"
+  }
+  assert {
+    condition = !anytrue([for st in jsondecode(aws_iam_role_policy.runner["ci-pr"].policy).Statement : st.Effect == "Allow" && anytrue([for a in st.Action : startswith(a, "secretsmanager:")])]) && anytrue([
+      for st in jsondecode(aws_iam_role_policy.runner["ci-pr"].policy).Statement : st.Effect == "Deny" && contains(st.Action, "secretsmanager:*")
+    ])
+    error_message = "the untrusted instance role cannot read any GitHub App key"
+  }
+  assert {
+    condition     = can(regex("secretsmanager:GetSecretValue", aws_iam_role_policy.runner["ci-build"].policy))
+    error_message = "trusted pools still register with their own key"
+  }
+  assert {
+    condition = alltrue([for st in jsondecode(aws_iam_role_policy.runner["ci-pr"].policy).Statement : st.Resource == [aws_kms_key.secrets.arn] ? try(st.Condition.StringLike, {})["kms:EncryptionContext:PARAMETER_ARN"] == "arn:aws:ssm:eu-central-1:123456789012:parameter/acme/ci/jit/ci-pr/*" : true]) && anytrue([
+      for st in jsondecode(aws_iam_role_policy.runner["ci-pr"].policy).Statement : st.Resource == ["arn:aws:ssm:eu-central-1:123456789012:parameter/acme/ci/jit/ci-pr/*"]
+    ])
+    error_message = "the untrusted instance reads and decrypts only the JIT parameters of its pool"
+  }
+  assert {
+    condition     = alltrue([for st in jsondecode(aws_iam_role_policy.jit_config[0].policy).Statement : !contains(st.Action, "secretsmanager:GetSecretValue") || st.Resource == [aws_secretsmanager_secret.github_app["ci-pr"].arn]])
+    error_message = "the bootstrap function reads only the key of the untrusted pool"
+  }
+  assert {
+    condition     = jsondecode(aws_secretsmanager_secret_policy.untrusted["ci-pr"].policy).Statement[0].Condition.ArnNotEquals["aws:PrincipalArn"] == "arn:aws:iam::123456789012:role/acme-ci-jit-config" && length(aws_secretsmanager_secret_policy.untrusted) == 1
+    error_message = "only the bootstrap function may read the key of the untrusted pool"
   }
 }
 

@@ -48,8 +48,8 @@ run "trust_is_pinned_to_repository_and_context" {
   command = plan
 
   assert {
-    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:pull_request"]
-    error_message = "plan only from pull requests of this repository"
+    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:ref:refs/heads/main"]
+    error_message = "plan only from main of this repository"
   }
   assert {
     condition     = jsondecode(aws_iam_role.apply["network"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:ref:refs/heads/main", "repo:example-org/payments-platform:ref:refs/heads/release/*"]
@@ -154,17 +154,41 @@ run "wildcard_resource_rejected" {
   expect_failures = [var.apply_roles]
 }
 
-run "nightly_drift_may_plan_from_main_only" {
+run "no_role_trusts_pull_requests" {
   command = plan
 
   variables {
-    plan_refs = ["refs/heads/main"]
+    ecr_read_repository_arns = ["arn:aws:ecr:eu-central-1:444444444444:repository/payments/*"]
   }
 
   assert {
-    condition     = jsondecode(aws_iam_role.plan.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == ["repo:example-org/payments-platform:pull_request", "repo:example-org/payments-platform:ref:refs/heads/main"]
-    error_message = "plan from pull requests and main"
+    condition = alltrue(flatten([
+      for r in concat([aws_iam_role.plan], values(aws_iam_role.apply), aws_iam_role.ecr_read) : [
+        for s in jsondecode(r.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] : !strcontains(s, "pull_request")
+      ]
+    ]))
+    error_message = "a pull request may not read state or assume any role"
   }
+}
+
+run "plan_without_refs_is_rejected" {
+  command = plan
+
+  variables {
+    plan_refs = []
+  }
+
+  expect_failures = [var.plan_refs]
+}
+
+run "plan_from_a_pull_request_subject_is_rejected" {
+  command = plan
+
+  variables {
+    plan_refs = ["pull_request"]
+  }
+
+  expect_failures = [var.plan_refs]
 }
 
 run "plan_from_other_branches_is_rejected" {

@@ -1,7 +1,7 @@
 locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
-  tiers        = ["public", "private", "data"]
+  tiers        = ["public", "private", "data", "untrusted"]
 
   subnets = merge([
     for t in local.tiers : {
@@ -9,8 +9,9 @@ locals {
     }
   ]...)
 
-  has_public = length(var.subnet_cidrs.public) > 0
-  az_index   = { for i, az in var.azs : tostring(i) => az }
+  has_public    = length(var.subnet_cidrs.public) > 0
+  has_untrusted = length(var.subnet_cidrs.untrusted) > 0
+  az_index      = { for i, az in var.azs : tostring(i) => az }
 }
 
 resource "aws_vpc" "this" {
@@ -44,14 +45,30 @@ resource "aws_internet_gateway" "this" {
 }
 
 resource "aws_route_table" "public" {
-  count = local.has_public ? 1 : 0
+  count = local.has_public && !var.public_route_table_per_az ? 1 : 0
 
   vpc_id = aws_vpc.this.id
   tags   = merge(var.tags, { Name = "${local.name}-public" })
 }
 
+# One public route table per AZ where a stateful appliance sits in front of the NAT gateways (egress VPC): return traffic must use the endpoint of its own AZ.
+resource "aws_route_table" "public_az" {
+  for_each = local.has_public && var.public_route_table_per_az ? local.az_index : {}
+
+  vpc_id = aws_vpc.this.id
+  tags   = merge(var.tags, { Name = "${local.name}-public-${each.key}" })
+}
+
+resource "aws_route" "public_internet_az" {
+  for_each = length(aws_internet_gateway.this) > 0 ? aws_route_table.public_az : {}
+
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.this[0].id
+}
+
 resource "aws_route" "public_internet" {
-  count = length(aws_internet_gateway.this)
+  count = var.public_route_table_per_az ? 0 : length(aws_internet_gateway.this)
 
   route_table_id         = aws_route_table.public[0].id
   destination_cidr_block = "0.0.0.0/0"
@@ -81,11 +98,34 @@ resource "aws_route_table" "data" {
   tags   = merge(var.tags, { Name = "${local.name}-data-${each.key}" })
 }
 
+# Untrusted tier (pull request runners): its only route out is the transit gateway to the Network Firewall, which applies the CI allowlist to these CIDRs.
+resource "aws_route_table" "untrusted" {
+  for_each = local.has_untrusted ? local.az_index : {}
+
+  vpc_id = aws_vpc.this.id
+  tags   = merge(var.tags, { Name = "${local.name}-untrusted-${each.key}" })
+}
+
+resource "aws_route" "untrusted_egress" {
+  for_each = local.has_untrusted && var.enable_egress_route ? local.az_index : {}
+
+  route_table_id         = aws_route_table.untrusted[each.key].id
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = var.egress_transit_gateway_id
+}
+
+resource "aws_route_table_association" "untrusted" {
+  for_each = { for k, v in local.subnets : k => v if v.tier == "untrusted" }
+
+  subnet_id      = aws_subnet.this[each.key].id
+  route_table_id = aws_route_table.untrusted[element(split("-", each.key), 1)].id
+}
+
 resource "aws_route_table_association" "public" {
   for_each = local.has_public ? { for k, v in local.subnets : k => v if v.tier == "public" } : {}
 
   subnet_id      = aws_subnet.this[each.key].id
-  route_table_id = aws_route_table.public[0].id
+  route_table_id = var.public_route_table_per_az ? aws_route_table.public_az[element(split("-", each.key), 1)].id : aws_route_table.public[0].id
 }
 
 resource "aws_route_table_association" "private" {
@@ -108,8 +148,12 @@ resource "aws_vpc_endpoint" "gateway" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${var.region}.${each.key}"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = concat([for rt in aws_route_table.private : rt.id], [for rt in aws_route_table.data : rt.id])
-  tags              = merge(var.tags, { Name = "${local.name}-${each.key}" })
+  # The untrusted tier gets S3 only (build cache reads), so that traffic never leaves through the firewall.
+  route_table_ids = concat(
+    [for rt in aws_route_table.private : rt.id], [for rt in aws_route_table.data : rt.id],
+    each.key == "s3" ? [for rt in aws_route_table.untrusted : rt.id] : [],
+  )
+  tags = merge(var.tags, { Name = "${local.name}-${each.key}" })
 }
 
 resource "aws_security_group" "endpoints" {

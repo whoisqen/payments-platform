@@ -33,6 +33,9 @@ locals {
   # Set after the first apply of tgw: the vpc stack needs the attachment before it may route through it (two-step by design).
   transit_gateway_id = null
 
+  # No PSP traffic leaves shared-services: its firewall passes only the CI allowlist of the untrusted runner tier.
+  psp_domains = []
+
   kms_keys = {
     "ebs-nodes" = { user_role_arns = [local.autoscaling_slr_arn] }
     "shared"    = {}

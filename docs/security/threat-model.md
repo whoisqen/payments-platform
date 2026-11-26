@@ -45,71 +45,87 @@ This section covers the runner pools, the GitHub OIDC roles and what code from a
 
 ### Runner pools
 
-Runners are EC2 Auto Scaling groups of arm64 Spot instances in the shared-services account, one group per kind of job. There is no Kubernetes runner namespace. Instances are long-lived: one job at a time, replaced by Spot or a new image.
+Runners are EC2 Auto Scaling groups of arm64 Spot instances in the shared-services account, one group per kind of job. There is no Kubernetes runner namespace. The trusted pools are persistent: an instance runs one job at a time and is replaced by Spot or a new image. Every `ci-pr` instance runs exactly one job and is then terminated.
 
 | Pool | Used by | Instance role may | Network |
 |---|---|---|---|
-| `ci-build` | image builds on `main` | read and write the build cache, pull from ECR | own security group, outbound 443 only |
-| `ci-test` | heavy tests | read the cache, pull from ECR | same |
-| `ci-light` | small jobs, plans | read the cache, assume the stage plan role | same |
-| `ci-pr` | every pull request job | read the cache; read its own GitHub App secret; set scale-in protection on its own group; explicit deny on `sts:AssumeRole` and `ecr:*` | own security group, outbound 443 only, no inbound |
+| `ci-build` | image builds on `main` | read and write the build cache, pull from ECR, read its own GitHub App secret | private tier; security group outbound 443 only; Network Firewall CI allowlist plus the AWS API allowlist |
+| `ci-test` | heavy tests | read the cache, pull from ECR, read its own GitHub App secret | same |
+| `ci-light` | small jobs, plans | read the cache, assume the stage plan role, read its own GitHub App secret | same |
+| `ci-pr` | every pull request job | read the cache; read and delete the one-time runner configs of its own pool; set scale-in protection on its own group; explicit deny on `sts:AssumeRole`, `ecr:*` and `secretsmanager:*` | untrusted tier; security group outbound 443 to public addresses and the VPC interface endpoints only, no inbound; Network Firewall CI allowlist only |
 
-Every instance: IMDSv2 with hop limit 1, encrypted root volume, no public IP, no SSH (Session Manager only). On `ci-pr` an iptables rule blocks the `runner` user from the metadata service. The cache bucket policy denies writes to every role except the cache writers, so a pull request cannot poison the cache.
+Every instance: IMDSv2 with hop limit 1, encrypted root volume, no public IP, no SSH (Session Manager only). The cache bucket policy denies writes to every role except the cache writers, so a pull request cannot poison the cache.
+
+A `ci-pr` instance differs from the trusted pools in four ways:
+
+- No Docker. The boot script installs no Docker daemon and the `runner` user is in no `docker` group, so a job that needs Docker (service containers, image builds) cannot run on `ci-pr`; such pull-request jobs (component tests, the migration round trip) run on GitHub-hosted runners, a fresh VM per job with no AWS access.
+- An iptables rule blocks the `runner` user from the metadata service. It is set in the boot script before the runner service starts, so no job runs without it.
+- No GitHub App key. A launch lifecycle hook calls the `<prefix>-ci-jit-config` Lambda. That function is the only principal the secret resource policy lets read the pool's App key. It asks GitHub for a just-in-time runner config with labels fixed by Terraform and stores it as a one-time SecureString `/<prefix>/ci/jit/ci-pr/<instance-id>`. The instance reads the parameter, deletes it, runs one job and powers off, and the group terminates it. If no config is stored, the hook abandons the launch and the instance is terminated.
+- Own subnets. The untrusted tier has its own route tables: the only routes out are the transit gateway to the egress VPC, where the Network Firewall applies the CI domain allowlist, and the S3 gateway endpoint for cache reads. The trusted pools leave the VPC through the same firewall and also pass a short allowlist of AWS API domains that have no interface endpoint.
 
 ### GitHub OIDC roles
 
 | Role | Trusted subject | Grants |
 |---|---|---|
-| `pay-<env>-glob-tf-plan` (each account) | `repo:<org>/<repo>:pull_request` and `refs/heads/main` | read-only describe calls, read the Terraform state of its environment, write lock files only; explicit deny on secret values |
+| `pay-<env>-glob-tf-plan` (each account) | `refs/heads/main` only (nightly drift check) | read-only describe calls, read the Terraform state of its environment, write lock files only; explicit deny on secret values |
 | `pay-<env>-glob-tf-apply-<component>` | `main` and `release/*` only | named actions on named resources, own state prefix |
 | ECR push (`pay-ci-ecr-push`) | `main` and `release/*` only | push to the platform repositories |
 | ECR read | `main` only | read images |
 | AI review | `repo:<org>/<repo>:environment:ai-review` | invoke one EU inference profile with the guardrail |
 
-The jobs in `ci.yml` and `security.yml` request no `id-token`; a pull request run gets no cloud credentials from the workflow as written.
+None of the plan, apply and ECR roles trusts the `pull_request` subject; a test of the `ci-oidc-roles` module enforces it. Pull requests check Terraform with `terraform test` and mock providers. The jobs in `ci.yml` and `security.yml` request no `id-token`.
 
 ### What a malicious pull request can and cannot reach
 
 ```mermaid
 flowchart TB
-  PRCODE["Pull request code on ci-pr"] -->|"can"| NET443["Any address on 443: GitHub, registries, VPC endpoints"]
+  PRCODE["Pull request code on ci-pr"] -->|"can"| ALLOW["Allowlisted domains on 443: GitHub, Actions storage, package registries"]
   PRCODE -->|"can"| CACHE["Read the build cache"]
-  PRCODE -->|"can, through docker as root"| IMDS["Instance role of ci-pr"]
-  IMDS --> APPKEY["GitHub App key of the ci-pr pool"]
-  PRCODE -.->|"cannot"| CDE["CDE VPCs, data stores, EKS APIs without IAM rights"]
-  PRCODE -.->|"cannot"| PUSH["ECR push, apply roles, other pools' roles"]
+  PRCODE -.->|"cannot"| IMDS["Instance role of ci-pr: iptables block, no docker"]
+  PRCODE -.->|"cannot"| APPKEY["GitHub App keys: read only by the jit-config Lambda"]
+  PRCODE -.->|"cannot"| NET["Other domains, private addresses, CDE VPCs, data stores"]
+  PRCODE -.->|"cannot"| ROLES["Plan, apply, push roles; other pools' roles"]
   PRCODE -.->|"cannot"| CACHEW["Write the build cache"]
+  PRCODE -.->|"cannot"| NEXT["Later jobs: the instance is terminated after one job"]
+  LABEL["Pull request job on a trusted pool"] -->|"can"| TRUSTED["Docker, that pool's role and App key"]
 ```
+
+The last line is the open path: it applies to any pull request job that runs on a trusted pool (see "Run on a trusted pool" below).
 
 Threat actors: a fork pull request from an outside contributor; a same-repository pull request from a collaborator or a stolen collaborator token; malicious dependency code that runs during a build or test.
 
 | Threat | Actor | Mitigation | Owner | Residual risk |
 |---|---|---|---|---|
-| Steal the instance role credentials | any | iptables block for the `runner` user, hop limit 1, explicit deny of `sts:AssumeRole` and `ecr:*` on the role | Platform team | The `runner` user is in the `docker` group. A root container with host networking is not the `runner` user and not an extra hop, so it can likely reach the metadata service and get the `ci-pr` role. That role then reads the cache and the pool's GitHub App secret. |
-| Abuse the GitHub App key | any, after the step above | One app per pool; the key is read once at boot and not kept on disk | Repository owner | Registering a repository runner needs the repository Administration permission, which covers more than runners. With the key an attacker could register a rogue runner with trusted labels (`ci-build`, `ci-light`) and pick up `main` jobs that request OIDC tokens for the push or plan roles. |
-| Persist on a runner | any | Instances are replaced by Spot and image changes | Platform team | Runners are not ephemeral: code left behind can observe later pull request jobs on the same instance. |
-| Move sideways in the network | any | Security group allows outbound 443 only; data stores admit only their cluster nodes; EKS endpoints are private and need IAM; admin tools need Okta | Platform team | `ci-pr` shares the private subnets of the trusted pools (`untrusted_subnet_ids` is not set), and shared-services has no Network Firewall of its own, so outbound 443 is open to any address. |
-| Read Terraform state | same-repository PR | Plan role is read-only and denied secret values; apply roles trust only `main` and `release/*` | Platform team | A same-repository PR can edit its own workflow to request `id-token: write` and assume the plan role of any account. State of some stacks holds secret values (for example Okta client secrets and generated passwords in shared-services). |
-| Run on a trusted pool | same-repository PR | `runs-on` labels in the workflows | Repository owner | A PR can change `runs-on` to a trusted pool label and use that pool's role, for example cache write. |
-| Steal repository secrets | fork PR | GitHub withholds secrets and `id-token` from fork pull requests; AI review skips forks before asking for credentials | Repository owner | Workflows of outside contributors run without approval unless the repository setting requires it. |
-| Abuse runner capacity (mining, exhausting CI) | any | `max_size` per pool (20 instances for `ci-pr`), Spot only, one job per instance, job timeouts in the workflows; Bedrock spend has its own budget | Platform team | Within `max_size` a pull request can keep `ci-pr` busy and delay other pull requests; there is no budget alarm on runner spend |
-| Tamper with the AI review | same-repository PR | Review code runs from the base commit; head is read as data | Repository owner | The workflow file comes from the PR (`pull_request` trigger), so it can be edited. |
+| Steal the instance role credentials | any | No Docker and no `docker` group on `ci-pr`; iptables block for the `runner` user set before the runner starts; hop limit 1; explicit deny of `sts:AssumeRole`, `ecr:*` and `secretsmanager:*` on the role | Platform team | Only a process that escalates to root on the instance reaches the role. The role can then read the cache and read or delete the pending one-time runner configs of the whole `ci-pr` pool (the parameter path is per pool, not per instance). With another instance's config an attacker can take that runner's place or stop it from registering, and so see or block other pull request jobs. The labels are fixed, so such a runner only receives `ci-pr` jobs |
+| Abuse the GitHub App key | any | `ci-pr` instances never hold a key: only the jit-config Lambda reads it (secret resource policy denies every other principal); the Lambda runs outside the VPC; the installation token is limited to one repository and the Administration permission; labels and repository come from Terraform, not from the instance | Repository owner | Anyone who can change the Lambda, its role or the secret policy (an apply in shared-services or an administrator) can read the key. The trusted pools still read their own keys at boot; see "Run on a trusted pool" |
+| Persist on a runner | any | `ci-pr` runs one job per instance with a just-in-time config, then powers off and is terminated; nothing carries over to the next job | Platform team | The trusted pools are persistent; code that reaches them through a trusted label can observe later jobs on the same instance |
+| Move sideways in the network | any | Untrusted subnets whose only routes out are the transit gateway and the S3 gateway endpoint; security group allows 443 to public addresses and the interface endpoints only; data stores admit only their cluster nodes; EKS endpoints are private and need IAM; admin tools need Okta | Platform team | The VPC-local route cannot be removed, so the security group is what keeps `ci-pr` off private addresses in the VPC |
+| Exfiltrate code or data | any | Network Firewall CI allowlist: GitHub, Actions storage, the Auto Scaling API and the package registries of the jobs; every other domain is dropped | Platform team | Data can still leave through an allowed domain: any repository on `github.com`, any Azure storage account under `.blob.core.windows.net`, a package registry. The firewall matches the TLS SNI and HTTP Host the client sends and does not decrypt TLS. DNS queries to the VPC resolver are not filtered |
+| Read Terraform state | same-repository PR | No OIDC role trusts `pull_request`; the plan role trusts `main` only and is denied secret values; apply roles trust only `main` and `release/*`; pull requests use `terraform test` with mock providers | Platform team | A pull request cannot get state credentials. Code merged to `main` runs the nightly plan with read access to state |
+| Run on a trusted pool | same-repository PR | `runs-on` labels in the workflows; the trusted pools use the GitHub App of their own pool | Repository owner | A pull request job reaches a trusted pool when its workflow sends it there or when the pull request edits `runs-on` to a trusted label. On a trusted pool the metadata service is not blocked for the `runner` user, so the job gets that pool's role (for example cache write on `ci-build`) and can read the pool's GitHub App secret; it also has Docker and the `docker` group, and the instance is persistent. Pull request jobs that need Docker therefore need their own isolation rather than a trusted pool |
+| Steal repository secrets | fork PR | GitHub withholds secrets and `id-token` from fork pull requests; AI review skips forks before asking for credentials | Repository owner | Workflows of outside contributors run without approval unless the repository setting requires it |
+| Abuse runner capacity (mining, exhausting CI) | any | `max_size` per pool (20 instances for `ci-pr`), Spot only, one job per instance, job timeouts in the workflows; the jit-config Lambda has a reserved concurrency of 10; Bedrock spend has its own budget | Platform team | Within `max_size` a pull request can keep `ci-pr` busy and delay other pull requests; there is no budget alarm on runner spend |
+| Tamper with the AI review | same-repository PR | Review code runs from the base commit; head is read as data | Repository owner | The workflow file comes from the PR (`pull_request` trigger), so it can be edited |
 
 ### Recommended fixes
 
-| Fix | Closes | Owner |
-|---|---|---|
-| Run `ci-pr` jobs without the docker group (rootless Docker or a dedicated build VM per job) and register runners with `--ephemeral` | instance role theft, persistence | Platform team |
-| Keep the GitHub App keys out of the `ci-pr` role: a registration service in a trusted account hands out one-time registration tokens | rogue runner registration | Platform team |
-| Give `ci-pr` its own subnets without routes to other networks (`untrusted_subnet_ids`) and an egress allowlist for GitHub and package registries | lateral movement | Platform team |
-| Restrict the plan role trust to `main` (drop the `pull_request` subject) or run PR plans through a separate role without state access to secret-holding stacks | state read | Platform team |
-| Require approval for workflows from outside contributors and protect self-hosted labels with runner groups where the account type allows | fork abuse, label hijack | Repository owner |
+| Fix | Closes | Owner | Status |
+|---|---|---|---|
+| Run `ci-pr` jobs without Docker and the `docker` group, one job per instance | instance role theft, persistence | Platform team | Done |
+| Keep the GitHub App keys out of the `ci-pr` role: a bootstrap function behind a secret resource policy hands each instance a one-time just-in-time config | rogue runner registration | Platform team | Done |
+| Give `ci-pr` its own subnets routed only through the Network Firewall CI allowlist | lateral movement, exfiltration to arbitrary hosts | Platform team | Done |
+| Restrict the plan role trust to `main` | state read | Platform team | Done |
+| Require approval for workflows from outside contributors, keep every pull request job on `ci-pr`, and restrict trusted labels to `main` with runner groups where the account type allows | fork abuse, label hijack | Repository owner | Open |
+| Scope the one-time config path per instance, for example with an instance-ID condition on the parameter, so a root process on one instance cannot read another's config | JIT config theft | Platform team | Open |
+| Add DNS Firewall on the CI VPC with the same domain allowlist | DNS exfiltration | Platform team | Open |
 
 ## Where in the repo
 
 | Path | What |
 |---|---|
-| `infra/modules/ci-runners`, `infra/live/shared-services/eu-central-1/ci-runners` | Runner pools |
+| `infra/modules/ci-runners`, `infra/live/shared-services/eu-central-1/ci-runners` | Runner pools, the jit-config Lambda (`functions/jit-config`), boot script |
+| `infra/modules/vpc`, `infra/live/shared-services/eu-central-1/vpc` | Untrusted subnet tier and its route tables |
+| `infra/modules/network-firewall`, `infra/modules/egress-routing`, `infra/live/shared-services/eu-central-1/{tgw,egress-vpc,firewall,egress-routing}` | CI egress path and allowlists |
 | `infra/modules/ci-oidc-roles`, `infra/modules/bedrock-access` | OIDC roles |
 | `.github/workflows/` | Jobs, permissions, `runs-on` |
 | `policy/opa/github` | Workflow rules (permissions per job, `id-token` only for AWS) |

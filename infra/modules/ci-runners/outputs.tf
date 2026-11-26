@@ -3,6 +3,11 @@ output "secret_names" {
   value       = { for n, s in aws_secretsmanager_secret.github_app : n => s.name }
 }
 
+output "jit_config_function_name" {
+  description = "Function that issues the one-time runner configs of the untrusted pools; null without an untrusted pool."
+  value       = one(aws_lambda_function.jit_config[*].function_name)
+}
+
 output "asg_names" {
   description = "Auto Scaling group of each pool."
   value       = { for n, g in aws_autoscaling_group.pool : n => g.name }
