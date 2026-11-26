@@ -92,9 +92,60 @@ jobs:
             echo "hotfix=$hotfix"; echo "hold=$hold"; echo "sha=$sha"
           } >>"$GITHUB_OUTPUT"
 
-  pr:
+  # ---- stage verification: a planned prod promotion copies stage only after stage verified itself;
+  # a hotfix has its own approvals. Each check skips cleanly while its variable is unset ----
+
+  stage-integration:
     needs: plan
-    if: needs.plan.outputs.hold != 'true'
+    if: needs.plan.outputs.env == 'prod' && needs.plan.outputs.mode == 'copy' && needs.plan.outputs.hold != 'true'
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # the test code of the default branch, never a ref named by the event: this job holds stage credentials
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: API scenarios against stage
+        env:
+          INTEGRATION_API_URL: ${{ vars.STAGE_API_URL }}
+          INTEGRATION_API_KEY: ${{ secrets.STAGE_INTEGRATION_API_KEY }}
+          INTEGRATION_MERCHANT_ID: ${{ vars.STAGE_INTEGRATION_MERCHANT_ID }}
+          INTEGRATION_PROFILE_ID: ${{ vars.STAGE_INTEGRATION_PROFILE_ID }}
+          INTEGRATION_CONNECTOR: ${{ vars.STAGE_INTEGRATION_CONNECTOR || 'pretendpay' }}
+        run: python3 tests/integration/run.py --skip-unset
+
+  perf-gate:
+    # the k6 load runs in the cluster (k6 Operator); here only its latest TestRun result is read
+    needs: plan
+    if: needs.plan.outputs.env == 'prod' && needs.plan.outputs.mode == 'copy' && needs.plan.outputs.hold != 'true'
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # the test code of the default branch, never a ref named by the event: this job holds stage credentials
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: latest k6 TestRun of stage within the limits
+        env:
+          PERF_VM_URL: ${{ vars.PERF_VM_URL }}
+          PERF_VM_TOKEN: ${{ secrets.PERF_VM_TOKEN }}
+          PERF_SELECTOR: ${{ vars.PERF_SELECTOR }}
+          PERF_WINDOW: ${{ vars.PERF_WINDOW }}
+          PERF_MAX_P99_SECONDS: ${{ vars.PERF_MAX_P99_SECONDS }}
+          PERF_MAX_FAILED_RATE: ${{ vars.PERF_MAX_FAILED_RATE }}
+        run: python3 tools/ci/promote/perf_gate.py
+
+  pr:
+    needs: [plan, stage-integration, perf-gate]
+    # dev, stage and hotfix promotions skip the stage checks; a planned prod promotion needs both green
+    if: >-
+      always() && needs.plan.result == 'success' && needs.plan.outputs.hold != 'true' &&
+      ((needs.stage-integration.result == 'success' && needs.perf-gate.result == 'success') ||
+      (needs.plan.outputs.env != 'prod' || needs.plan.outputs.mode != 'copy'))
     runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 15
     # a running promotion is never cancelled; GitHub keeps only one pending run per group, see the report of the dev gap

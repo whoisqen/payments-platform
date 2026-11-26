@@ -1,15 +1,22 @@
 name: ci
 
+# Stage 1 of 3 (pull request): static and unit checks in parallel, component checks after the unit job
+# of their area, ci-gate last. Stage 2 is commit.yml (called by images.yml), stage 3 the PostSync smoke
+# and stage-verify.yml. tests/README.md has the map.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
   workflow_call:
+    inputs:
+      full:
+        description: every area and every crate, not only the changed ones (nightly)
+        type: boolean
+        default: false
 
 permissions: {}
 
 # a stale PR run is cancelled; merge queue and called runs never are
-# Every check job needs only `changes`; lint-fast runs beside them and ci-gate waits for all of them
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -33,6 +40,10 @@ jobs:
       area_helm: ${{ steps.paths.outputs.area_helm }}
       area_policy: ${{ steps.paths.outputs.area_policy }}
       area_python: ${{ steps.paths.outputs.area_python }}
+      area_node: ${{ steps.paths.outputs.area_node }}
+      area_alerts: ${{ steps.paths.outputs.area_alerts }}
+      area_compose: ${{ steps.paths.outputs.area_compose }}
+      area_workflows: ${{ steps.paths.outputs.area_workflows }}
       area_docker: ${{ steps.paths.outputs.area_docker }}
       area_migrations: ${{ steps.paths.outputs.area_migrations }}
     steps:
@@ -41,7 +52,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - id: paths
-        run: python3 tools/ci/changed_images.py --base "$BASE_SHA" --head "$HEAD_SHA"
+        env:
+          FULL: ${{ inputs.full }}
+        run: |
+          # without a range changed_images.py marks every area as changed
+          if [ "$FULL" = true ]; then python3 tools/ci/changed_images.py; else python3 tools/ci/changed_images.py --base "$BASE_SHA" --head "$HEAD_SHA"; fi
+
+  # ---- static: runs beside the unit jobs ----
 
   lint-fast:
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
@@ -62,10 +79,39 @@ jobs:
         continue-on-error: true
         run: python3 tools/ci/placeholder_report.py
       - name: gitleaks
-        run: gitleaks detect --no-banner --redact --config .github/gitleaks.toml --log-opts "${BASE_SHA}..${HEAD_SHA}"
+        env:
+          FULL: ${{ inputs.full }}
+        run: |
+          if [ "$FULL" = true ] || [ -z "$BASE_SHA" ]; then
+            gitleaks detect --no-banner --redact --config .github/gitleaks.toml
+          else
+            gitleaks detect --no-banner --redact --config .github/gitleaks.toml --log-opts "${BASE_SHA}..${HEAD_SHA}"
+          fi
+
+  lint-report:
+    # ruff, yamllint, tflint and kube-linter; report mode until the repository variable LINT_STRICT is true
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      LINT_STRICT: ${{ vars.LINT_STRICT == 'true' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python ruff yamllint tflint kube-linter helm
+      - name: linters
+        continue-on-error: ${{ vars.LINT_STRICT != 'true' }}
+        env:
+          # tflint --init downloads the pinned AWS ruleset from GitHub releases
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make -k lint-report
 
   commitlint:
-    if: github.event_name != 'workflow_call'
+    if: github.event_name != 'workflow_call' && inputs.full != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -82,6 +128,7 @@ jobs:
 
   spec-gate:
     name: spec-gate
+    if: inputs.full != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -93,11 +140,33 @@ jobs:
           persist-credentials: false
       - run: python3 tools/lint/spec-gate --range "${BASE_SHA}..${HEAD_SHA}"
 
+  security:
+    needs: [changes]
+    # SARIF upload; hotfix.yml and nightly.yml grant the same to their call of this workflow
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    uses: ./.github/workflows/security.yml
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+      head_sha: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+      rust: ${{ needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true' }}
+      python: ${{ needs.changes.outputs.area_python == 'true' }}
+      node: ${{ needs.changes.outputs.area_node == 'true' }}
+      terraform: ${{ needs.changes.outputs.area_terraform == 'true' }}
+      helm: ${{ needs.changes.outputs.area_helm == 'true' }}
+      docker: ${{ needs.changes.outputs.area_docker == 'true' }}
+      workflows: ${{ needs.changes.outputs.area_workflows == 'true' }}
+      policy: ${{ needs.changes.outputs.area_policy == 'true' }}
+
+  # ---- unit: one job per area, each only when its area changed ----
+
   python:
     needs: [changes]
     if: needs.changes.outputs.area_python == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -105,6 +174,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # includes the offline suites of tests/component and tests/integration (fakes, no services)
       - run: make lint-python test-python
 
   rust:
@@ -120,42 +190,71 @@ jobs:
         include:
           - dir: vendor/hyperswitch
             toolchain: 1.94.1
-            # upstream code: lint and test only the crate we patch (it has its own lint debt and needs the release features to build)
-            features: -p router_env
             area: area_rust_hyperswitch
+            # upstream code carries its own clippy debt: findings are reported, not blocking
+            clippy_blocking: false
           - dir: vendor/card-vault
             toolchain: 1.92.0
-            features: ""
             area: area_rust_card_vault
+            clippy_blocking: true
     # Each entry runs only when its own workspace changed; the others finish at once
     steps:
       - if: needs.changes.outputs[matrix.area] == 'true'
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - name: toolchain
+      - id: scope
         if: needs.changes.outputs[matrix.area] == 'true'
+        env:
+          DIR: ${{ matrix.dir }}
+          FULL: ${{ inputs.full }}
+        run: |
+          flag=()
+          if [ "$FULL" = true ]; then flag=(--all); fi
+          echo "packages=$(python3 tools/ci/rust/rust_scope.py --workspace "$DIR" --base "$BASE_SHA" --head "$HEAD_SHA" "${flag[@]}")" >>"$GITHUB_OUTPUT"
+      - name: toolchain
+        if: steps.scope.outputs.packages != ''
         env:
           TOOLCHAIN: ${{ matrix.toolchain }}
         run: |
           rustup toolchain install "$TOOLCHAIN" --profile minimal -c rustfmt,clippy
           rustup default "$TOOLCHAIN"
-          cargo install --locked cargo-nextest
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        if: steps.scope.outputs.packages != ''
+        with:
+          install_args: cargo-nextest
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.scope.outputs.packages != ''
+        with:
+          workspaces: ${{ matrix.dir }}
+          shared-key: ${{ matrix.area }}
+          save-if: ${{ github.event_name != 'pull_request' }}
       - name: protoc
-        if: needs.changes.outputs[matrix.area] == 'true'
+        if: steps.scope.outputs.packages != ''
         # the gRPC API types of the connector service are generated at build time
         run: command -v protoc >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq protobuf-compiler; }
-      - name: fmt, clippy, tests
-        if: needs.changes.outputs[matrix.area] == 'true'
+      - name: fmt
+        if: steps.scope.outputs.packages != ''
+        working-directory: ${{ matrix.dir }}
+        run: cargo fmt --check
+      - name: clippy
+        if: steps.scope.outputs.packages != ''
+        continue-on-error: ${{ !matrix.clippy_blocking }}
         working-directory: ${{ matrix.dir }}
         env:
-          FEATURES: ${{ matrix.features }}
+          PACKAGES: ${{ steps.scope.outputs.packages }}
         run: |
-          cargo fmt --check
           # shellcheck disable=SC2086
-          cargo clippy --locked --all-targets $FEATURES -- -D warnings
+          cargo clippy --locked --all-targets $PACKAGES -- -D warnings
+      - name: unit tests of the changed crates
+        if: steps.scope.outputs.packages != ''
+        working-directory: ${{ matrix.dir }}
+        env:
+          PACKAGES: ${{ steps.scope.outputs.packages }}
+        run: |
           # shellcheck disable=SC2086
-          cargo nextest run --locked $FEATURES --no-fail-fast
+          cargo nextest run --locked $PACKAGES --no-fail-fast
 
   terraform:
     needs: [changes]
@@ -171,13 +270,157 @@ jobs:
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
           install_args: terraform
-      - run: make lint-terraform test-terraform
+      - run: terraform fmt -check -recursive infra
+      - run: make test-terraform
 
   helm:
     needs: [changes]
     if: needs.changes.outputs.area_helm == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: helm
+      - name: helm-unittest
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
+      - run: make test-helm
+
+  alerts:
+    needs: [changes]
+    if: needs.changes.outputs.area_alerts == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python promtool
+      - run: python3 -m pip install --quiet pyyaml==6.0.2
+      - run: make test-alerts
+
+  node:
+    needs: [changes]
+    if: needs.changes.outputs.area_node == 'true'
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: node
+      - run: make test-node
+
+  # ---- component: after the unit job of the same area ----
+
+  rust-component:
+    needs: [changes, rust]
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: vendor/hyperswitch
+            toolchain: 1.94.1
+            area: area_rust_hyperswitch
+            build: cargo build --locked -p router --bin router --bin scheduler && cargo build --locked -p drainer
+            services: router drainer scheduler
+          - dir: vendor/card-vault
+            toolchain: 1.92.0
+            area: area_rust_card_vault
+            build: cargo build --locked --bin locker
+            services: locker
+    services:
+      postgres:
+        # Aurora PostgreSQL 16.8; the digest is the multi-arch index of the tag
+        image: postgres:16.8@sha256:301bcb60b8a3ee4ab7e147932723e3abd1cef53516ce5210b39fd9fe5e3602ae
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+    steps:
+      - if: needs.changes.outputs[matrix.area] == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: toolchain
+        if: needs.changes.outputs[matrix.area] == 'true'
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal
+          rustup default "$TOOLCHAIN"
+          command -v protoc >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq protobuf-compiler; }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: needs.changes.outputs[matrix.area] == 'true'
+        with:
+          workspaces: ${{ matrix.dir }}
+          shared-key: ${{ matrix.area }}
+          save-if: ${{ github.event_name != 'pull_request' }}
+      - name: schema
+        if: needs.changes.outputs[matrix.area] == 'true'
+        run: docker/compose/migrate.sh hyperswitch_db=vendor/hyperswitch/migrations locker=vendor/card-vault/migrations
+      - name: build the binaries (debug profile)
+        if: needs.changes.outputs[matrix.area] == 'true'
+        working-directory: ${{ matrix.dir }}
+        env:
+          BUILD: ${{ matrix.build }}
+        run: bash -c "$BUILD"
+      - name: start each binary, wait for its health endpoints, stop it
+        if: needs.changes.outputs[matrix.area] == 'true'
+        env:
+          SERVICES: ${{ matrix.services }}
+          COMPONENT_ROUTER_BIN: ${{ github.workspace }}/vendor/hyperswitch/target/debug/router
+          COMPONENT_SCHEDULER_BIN: ${{ github.workspace }}/vendor/hyperswitch/target/debug/scheduler
+          COMPONENT_DRAINER_BIN: ${{ github.workspace }}/vendor/hyperswitch/target/debug/drainer
+          COMPONENT_LOCKER_BIN: ${{ github.workspace }}/vendor/card-vault/target/debug/locker
+        run: |
+          # shellcheck disable=SC2086
+          python3 tests/component/run.py $SERVICES --timeout 180 --logs "$RUNNER_TEMP/component-logs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: component-logs-${{ matrix.area }}
+          path: ${{ runner.temp }}/component-logs
+          retention-days: 7
+
+  helm-render:
+    needs: [changes, helm]
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -187,9 +430,25 @@ jobs:
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         with:
           install_args: helm kubeconform
-      - name: helm-unittest
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
-      - run: make lint-helm test-helm
+      # helm lint, helm template and kubeconform -strict of every chart
+      - run: make lint-helm
+
+  terraform-validate:
+    needs: [changes, terraform]
+    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: terraform
+      - run: make lint-terraform
+
+  # ---- checks of a pull request that need no build ----
 
   promotion:
     needs: [changes]
@@ -282,9 +541,10 @@ jobs:
           install_args: hadolint shellcheck conftest python
       - run: make lint-docker
 
+  # component: expand-contract rules, squawk and the up, down, up round trip of new migrations
   migrations:
     needs: [changes, lint-fast]
-    if: needs.changes.outputs.area_migrations == 'true'
+    if: needs.changes.outputs.area_migrations == 'true' && inputs.full != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
@@ -342,10 +602,12 @@ jobs:
             tools/ci/migrations/migration_roundtrip.sh "$r/migrations" "${new[@]}"
           done
 
+
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [changes, lint-fast, commitlint, spec-gate, python, rust, terraform, helm, promotion, hotfix-guard, policy, docker, migrations]
+    needs: [changes, lint-fast, lint-report, commitlint, spec-gate, security, python, rust, terraform, helm, alerts, node,
+      rust-component, helm-render, terraform-validate, promotion, hotfix-guard, policy, docker, migrations]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

@@ -1,0 +1,6 @@
+# Lenient on purpose: syntax errors, pyflakes and bugbear only; style is not enforced.
+target-version = "py312"
+extend-exclude = ["vendor", ".worktrees", "node_modules"]
+
+[lint]
+select = ["E9", "F", "B"]

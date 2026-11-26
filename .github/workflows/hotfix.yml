@@ -80,6 +80,8 @@ jobs:
     if: github.event_name == 'push' && !github.event.created
     permissions:
       contents: read
+      security-events: write
+      actions: read
     uses: ./.github/workflows/ci.yml
 
   alert-full-ci:

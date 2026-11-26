@@ -50,7 +50,7 @@ def images_for(files, cfg):
     images = cfg["images"]
     selected, everything = set(), False
     for f in files:
-        if f.endswith("README.md"):
+        if f.endswith("README.md") or any_match(f, cfg.get("not_image_inputs", [])):
             continue
         if any_match(f, rebuild_all):
             everything = True
