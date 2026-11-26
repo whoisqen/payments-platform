@@ -1,0 +1,79 @@
+# Read by tools/ci/changed_images.py; which test areas of ci.yml a diff runs. Not an image input: editing it rebuilds nothing.
+# Prefixes end with / and match a directory, other entries match a file.
+areas:
+  # one area per vendored workspace: a change of one must not run the checks of the other
+  rust_hyperswitch:
+    - vendor/hyperswitch/
+  rust_card_vault:
+    - vendor/card-vault/
+  terraform:
+    - infra/
+  helm:
+    - deploy/
+  policy:
+    - policy/
+  python:
+    - tools/
+    - scripts/
+    - tests/
+  node:
+    - tests/load/
+    - tests/chaos/
+    - docker/control-center/
+  alerts:
+    - observability/
+  compose:
+    - docker/compose/
+    - tests/integration/
+    - tests/component/
+  workflows:
+    - .github/
+  docker:
+    - docker/
+  migrations:
+    - vendor/hyperswitch/migrations/
+    - vendor/card-vault/migrations/
+    - .squawk.toml
+# the areas that compile a vendored workspace; only the rust rules below, the label and the weekly run select them as a whole
+rust_areas:
+  - rust_hyperswitch
+  - rust_card_vault
+common:
+  # platform settings are read only by the config loader and its tests
+  python_only:
+    - config/
+  # shared tooling and pipeline definitions: every area except the Rust compile
+  all_but_rust:
+    - Makefile
+    - mise.toml
+    - tools/ci/
+    - .github/workflows/ci.yml
+    - .github/workflows/security.yml
+  # the toolchain of both workspaces; a vendor Cargo.lock selects only its own area through the map above
+  rust:
+    - rust-toolchain
+    - rust-toolchain.toml
+  # mise.toml keys whose changed lines select the Rust areas; other mise.toml lines do not
+  rust_mise_tools:
+    - rust
+    - cargo-nextest
+# pull request labels that select every area and every crate
+full_labels:
+  - ci:full
+# top-level entries no test area reads; they get only the always-on lint jobs (lint-fast, commitlint, spec-gate)
+lint_only:
+  - .claude/
+  - docs/
+  - manifests/
+  - specs/
+  - .gitignore
+  - .mcp.json
+  - .pre-commit-config.yaml
+  - AGENTS.md
+  - CLAUDE.md
+  - CODEOWNERS
+  - LICENSE
+  - README.md
+  - SECURITY.md
+  - commitlint.config.js
+  - renovate.json5

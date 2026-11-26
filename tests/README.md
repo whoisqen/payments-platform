@@ -17,7 +17,8 @@ Each stage runs only after the previous one is green; within a stage the rows ru
 | | | integration | `integration/run.py` on the compose stack (dummy connector), `contracts/`, read-only `terraform plan` of changed stacks | yes; a red run stops the dev promotion |
 | 3 deploy | Argo CD sync | dev, stage | PostSync smoke (`smoke/live.py`) | yes, rollback |
 | | `smoke-green-stage`, jobs of `promote.yml` | stage verify | `integration/run.py` against `STAGE_API_URL`, perf gate on the latest k6 TestRun in VictoriaMetrics | yes; the prod pull request waits for it |
-| nightly | `nightly.yml` calls `ci.yml` with `full: true` | all | unit and component of every area and every crate | opens an incident issue |
+| nightly | `nightly.yml` calls `ci.yml` with `full: true` | all except Rust | unit and component of every area | opens an incident issue |
+| weekly | `nightly.yml` Sunday 02:00 UTC, `rust-ci` | Rust | fmt, clippy, unit and component tests of both Rust workspaces, every crate | opens an incident issue |
 
 Stage 1 targets 10 minutes for a pull request without Rust changes; a Rust change adds the build of its workspace (debug profile, `Swatinem/rust-cache`).
 
@@ -33,3 +34,20 @@ ruff (`E9`, `F`, `B`), yamllint (relaxed, no line length), tflint (recommended p
 - `contracts/`: environment values against `deploy/charts/*/values.schema.json`, and alert `failure_mode` and `runbook_url` against `observability/coverage` and `docs/runbooks`.
 - `e2e/`: promotion dev to stage by image digest through `tools/ci/images_yaml.py` and `tools/ci/digest_compare.py`.
 - `chaos/` and `load/` have their own READMEs.
+
+## What a change runs
+
+The `changes` job reads `tools/ci/areas.yaml` and starts only the checks of the areas a pull request touches; `lint-fast`, `commitlint` and `spec-gate` always run.
+
+| Change | Runs |
+|---|---|
+| `docs/`, `specs/`, `manifests/`, root Markdown | nothing beyond the always-on checks |
+| `config/**` | Python (the `tools/config` tests of the generated files) |
+| `Makefile`, `mise.toml`, `tools/ci/**`, `ci.yml`, `security.yml` | every area except the Rust build |
+| other workflows | the workflow checks (actionlint, zizmor) |
+| `vendor/hyperswitch` or `vendor/card-vault` (including `Cargo.lock`) | that workspace only, changed crates |
+| `rust-toolchain`, the Rust or cargo-nextest line of `mise.toml` | both Rust workspaces, every crate |
+| `infra/`, `deploy/`, `policy/`, `observability/`, `docker/`, `tests/`, `scripts/` | their own area (Terraform, Helm, policy, alerts, Docker, Python, Node, compose) |
+| label `ci:full` | every area and every crate |
+
+A guard test fails when a new top-level directory or file is not claimed by an area, a common rule or the `lint_only` list, so nothing silently skips the heavy checks. Jobs that need Docker (component tests, the migration round trip) run pull-request code on GitHub-hosted runners: a fresh VM per job with Docker and no AWS access, never the self-hosted pools.

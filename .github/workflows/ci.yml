@@ -10,7 +10,11 @@ on:
   workflow_call:
     inputs:
       full:
-        description: every area and every crate, not only the changed ones (nightly)
+        description: every area except Rust, not only the changed ones (daily nightly)
+        type: boolean
+        default: false
+      rust_only:
+        description: only the Rust areas, every crate of both workspaces (weekly nightly)
         type: boolean
         default: false
 
@@ -46,6 +50,7 @@ jobs:
       area_workflows: ${{ steps.paths.outputs.area_workflows }}
       area_docker: ${{ steps.paths.outputs.area_docker }}
       area_migrations: ${{ steps.paths.outputs.area_migrations }}
+      rust_all: ${{ steps.paths.outputs.rust_all }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -54,13 +59,18 @@ jobs:
       - id: paths
         env:
           FULL: ${{ inputs.full }}
+          RUST_ONLY: ${{ inputs.rust_only }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
-          # without a range changed_images.py marks every area as changed
-          if [ "$FULL" = true ]; then python3 tools/ci/changed_images.py; else python3 tools/ci/changed_images.py --base "$BASE_SHA" --head "$HEAD_SHA"; fi
+          # tools/ci/areas.yaml maps paths to areas; without a range every area and every crate runs
+          if [ "$RUST_ONLY" = true ]; then python3 tools/ci/changed_images.py --mode rust
+          elif [ "$FULL" = true ]; then python3 tools/ci/changed_images.py --mode full
+          else python3 tools/ci/changed_images.py --base "$BASE_SHA" --head "$HEAD_SHA" --labels "$LABELS"; fi
 
   # ---- static: runs beside the unit jobs ----
 
   lint-fast:
+    if: inputs.rust_only != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -90,6 +100,7 @@ jobs:
 
   lint-report:
     # ruff, yamllint, tflint and kube-linter; report mode until the repository variable LINT_STRICT is true
+    if: inputs.rust_only != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -111,7 +122,7 @@ jobs:
         run: make -k lint-report
 
   commitlint:
-    if: github.event_name != 'workflow_call' && inputs.full != true
+    if: github.event_name != 'workflow_call' && inputs.full != true && inputs.rust_only != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -128,7 +139,7 @@ jobs:
 
   spec-gate:
     name: spec-gate
-    if: inputs.full != true
+    if: inputs.full != true && inputs.rust_only != true
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -142,6 +153,7 @@ jobs:
 
   security:
     needs: [changes]
+    if: inputs.rust_only != true
     # SARIF upload; hotfix.yml and nightly.yml grant the same to their call of this workflow
     permissions:
       contents: read
@@ -208,10 +220,11 @@ jobs:
         if: needs.changes.outputs[matrix.area] == 'true'
         env:
           DIR: ${{ matrix.dir }}
-          FULL: ${{ inputs.full }}
+          # a toolchain change, the ci:full label, an unknown diff or the weekly run checks every crate
+          RUST_ALL: ${{ needs.changes.outputs.rust_all }}
         run: |
           flag=()
-          if [ "$FULL" = true ]; then flag=(--all); fi
+          if [ "$RUST_ALL" = true ]; then flag=(--all); fi
           echo "packages=$(python3 tools/ci/rust/rust_scope.py --workspace "$DIR" --base "$BASE_SHA" --head "$HEAD_SHA" "${flag[@]}")" >>"$GITHUB_OUTPUT"
       - name: toolchain
         if: steps.scope.outputs.packages != ''
@@ -328,7 +341,7 @@ jobs:
 
   rust-component:
     needs: [changes, rust]
-    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest  # pull-request code with Docker service containers: GitHub-hosted, isolated per job, no AWS access; never the trusted self-hosted pool
     timeout-minutes: 45
     permissions:
       contents: read
@@ -545,7 +558,8 @@ jobs:
   migrations:
     needs: [changes, lint-fast]
     if: needs.changes.outputs.area_migrations == 'true' && inputs.full != true
-    runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
+    # the Postgres service container needs Docker, which only the trusted commit-stage pool has
+    runs-on: ubuntu-latest  # pull-request code with Docker service containers: GitHub-hosted, isolated per job, no AWS access; never the trusted self-hosted pool
     timeout-minutes: 30
     permissions:
       contents: read
