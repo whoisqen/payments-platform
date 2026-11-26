@@ -9,6 +9,10 @@ misconfigurations:
     paths:
       - infra/github/modules/repository/main.tf
     statement: vulnerability alerts are enabled by the separate github_repository_vulnerability_alerts resource in the same file.
+  - id: AWS-0132
+    paths:
+      - infra/modules/log-archive/main.tf
+    statement: the access-log bucket receives S3 server access logs, and S3 does not support SSE-KMS on a server access logging destination; it uses SSE-S3 (AES256), as AWS and the rule text require. The log buckets themselves use the KMS key.
   - id: AWS-0104
     paths:
       - infra/modules/eks/main.tf
