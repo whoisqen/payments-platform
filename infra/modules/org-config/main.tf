@@ -104,9 +104,10 @@ resource "aws_config_configuration_aggregator" "this" {
 
   name = "${local.name}-org"
 
+  # every region, not only the allowed ones: a resource created in an unexpected region must show up in the aggregator
   organization_aggregation_source {
-    regions  = var.regions
-    role_arn = aws_iam_role.aggregator[0].arn
+    all_regions = true
+    role_arn    = aws_iam_role.aggregator[0].arn
   }
 
   tags = var.tags

@@ -178,7 +178,7 @@ jobs:
         run: |
           status=0
           # with a console,<path> list each entry is the file of that output
-          mise exec -- checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov.sarif" || status=$?
+          mise --cd "$GITHUB_WORKSPACE" exec -- checkov --config-file "$CONFIG" -d infra -d rendered -o cli -o sarif --output-file-path "console,$RUNNER_TEMP/checkov.sarif" || status=$?
           report="$RUNNER_TEMP/checkov.sarif"
           [ -d "$report" ] && report="$report/results_sarif.sarif"
           if [ ! -s "$report" ]; then
