@@ -212,6 +212,7 @@ resource "aws_vpc_security_group_egress_rule" "locker_pod" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "node_from_cluster" {
+  # checkov:skip=CKV_AWS_25: the source is the EKS cluster security group, not 0.0.0.0/0; 1025-65535 is the range AWS documents for control plane to kubelet and webhooks
   security_group_id            = aws_security_group.node.id
   referenced_security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
   ip_protocol                  = "tcp"
