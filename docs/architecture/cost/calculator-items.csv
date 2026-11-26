@@ -1,0 +1,359 @@
+environment,region,group,service,resource,configuration,quantity,hours,unit,unit_price_usd,monthly_usd,pricing_model,committed_monthly_usd
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 storage,I/O-Optimized storage,2000,,GB-month,0.268,536.0,on-demand,536.0
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 storage,I/O-Optimized storage,2000,,GB-month,0.268,536.0,on-demand,536.0
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 storage,I/O-Optimized storage,2000,,GB-month,0.268,536.0,on-demand,536.0
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 storage,I/O-Optimized storage,2000,,GB-month,0.268,536.0,on-demand,536.0
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare storage,I/O-Optimized storage,100,,GB-month,0.268,26.8,on-demand,26.8
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,RDS RI 1yr no upfront,5835.3
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,RDS RI 1yr no upfront,1945.2
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker storage,I/O-Optimized storage,500,,GB-month,0.268,134.0,on-demand,134.0
+prod,eu-central-1,Aurora,Amazon RDS Proxy,proxies of 6 clusters,billed per vCPU of the cluster instances,384,730,vCPU-hour,0.018,5045.76,on-demand,5045.76
+prod,eu-central-1,Aurora,Amazon Aurora PostgreSQL,backup storage above the free allowance,35-day PITR,8600,,GB-month,0.023,197.8,on-demand,197.8
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,RDS RI 1yr no upfront,1615.5
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,8600,,GB-month,0.225,1935.0,on-demand,1935.0
+prod,us-east-1,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,1550000000.0,,I/O,2.2e-07,341.0,on-demand,341.0
+prod,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-1,inter-region,6200,,GB,0.02,124.0,on-demand,124.0
+prod,us-east-2,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,8600,,GB-month,0.225,1935.0,on-demand,1935.0
+prod,us-east-2,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,1550000000.0,,I/O,2.2e-07,341.0,on-demand,341.0
+prod,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-2,inter-region,6200,,GB,0.02,124.0,on-demand,124.0
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-0,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,MemoryDB reserved node 1yr no upfront,2207.52
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-1,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,MemoryDB reserved node 1yr no upfront,2207.52
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-2,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,MemoryDB reserved node 1yr no upfront,2207.52
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-3,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,MemoryDB reserved node 1yr no upfront,2207.52
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-spare,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,MemoryDB reserved node 1yr no upfront,2207.52
+prod,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-0 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,MemoryDB reserved node 1yr no upfront,1839.6
+prod,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-1 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,MemoryDB reserved node 1yr no upfront,1839.6
+prod,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-2 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,MemoryDB reserved node 1yr no upfront,1839.6
+prod,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-3 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,MemoryDB reserved node 1yr no upfront,1839.6
+prod,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-spare standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,MemoryDB reserved node 1yr no upfront,1839.6
+prod,eu-central-1,MemoryDB,Amazon MemoryDB,data written,all cells,6220,,GB,0.2,1244.0,on-demand,1244.0
+prod,eu-central-1,EKS,Amazon EKS,control planes,"4 cells, spare, analytics",6,730,cluster-hour,0.1,438.0,on-demand,438.0
+prod,us-east-1,EKS,Amazon EKS,"control planes, standby","4 cells, spare",5,730,cluster-hour,0.1,365.0,on-demand,365.0
+prod,eu-central-1,EKS nodes,Amazon EC2,"bootstrap node groups, 3 per cluster","m7g.large, Linux, shared tenancy",18,730,instance-hour,0.0978,1285.09,"Compute SP 1yr no upfront, 80% covered",1040.16
+prod,eu-central-1,EKS nodes,Amazon EC2,"payments pool, 4 working cells (router min 20, drainer 3, scheduler 5)","m7g.4xlarge, Linux, shared tenancy",12,730,instance-hour,0.7821,6851.2,"Compute SP 1yr no upfront, 80% covered",5549.11
+prod,eu-central-1,EKS nodes,Amazon EC2,"payments pool, spare cell (same minimum replicas)","m7g.4xlarge, Linux, shared tenancy",3,730,instance-hour,0.7821,1712.8,"Compute SP 1yr no upfront, 80% covered",1387.28
+prod,eu-central-1,EKS nodes,Amazon EC2,"workers pool, platform add-ons of 5 cell clusters","m7g.2xlarge, Linux, shared tenancy",5,730,instance-hour,0.391,1427.15,"Compute SP 1yr no upfront, 80% covered",1156.17
+prod,eu-central-1,EKS nodes,Amazon EC2,"cde pool, locker (min 5 pods)","m7g.xlarge, Linux, shared tenancy",3,730,instance-hour,0.1955,428.15,"Compute SP 1yr no upfront, 80% covered",346.85
+prod,eu-central-1,EKS nodes,Amazon EC2,"analytics stateful pool, ClickHouse 4 shards x 2 replicas","r7g.2xlarge, Linux, shared tenancy",8,730,instance-hour,0.5168,3018.11,"Compute SP 1yr no upfront, 80% covered",2352.82
+prod,eu-central-1,EKS nodes,Amazon EC2,"analytics stateful pool, ClickHouse Keeper","m7g.large, Linux, shared tenancy",3,730,instance-hour,0.0978,214.18,"Compute SP 1yr no upfront, 80% covered",173.36
+prod,eu-central-1,EKS nodes,Amazon EC2,analytics workers pool,"m7g.2xlarge, Linux, shared tenancy",2,730,instance-hour,0.391,570.86,"Compute SP 1yr no upfront, 80% covered",462.47
+prod,us-east-1,EKS nodes,Amazon EC2,"bootstrap node groups, standby","m7g.large, Linux, shared tenancy",15,730,instance-hour,0.0816,893.52,"Compute SP 1yr no upfront, 80% covered",703.43
+prod,us-east-1,EKS nodes,Amazon EC2,"payments pool, 5 standby clusters (40 vCPU cap each)","m7g.4xlarge, Linux, shared tenancy",10,730,instance-hour,0.6528,4765.44,"Compute SP 1yr no upfront, 80% covered",3753.95
+prod,us-east-1,EKS nodes,Amazon EC2,"payments pool, 5 standby clusters (remainder of the cap)","m7g.2xlarge, Linux, shared tenancy",5,730,instance-hour,0.3264,1191.36,"Compute SP 1yr no upfront, 80% covered",938.49
+prod,us-east-1,EKS nodes,Amazon EC2,"cde pool, standby locker","m7g.xlarge, Linux, shared tenancy",3,730,instance-hour,0.1632,357.41,"Compute SP 1yr no upfront, 80% covered",281.55
+prod,eu-central-1,EKS nodes,Amazon EBS,ClickHouse data volumes,"gp3, 8 x 1,000 GB",8000,,GB-month,0.0952,761.6,on-demand,761.6
+prod,eu-central-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 54 nodes x 84 GB",4536,,GB-month,0.0952,431.83,on-demand,431.83
+prod,us-east-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 33 nodes x 84 GB",2772,,GB-month,0.08,221.76,on-demand,221.76
+prod,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.xlarge, 3 AZ",9,730,broker-hour,0.4888,3211.42,on-demand,3211.42
+prod,eu-central-1,Analytics,Amazon MSK,broker storage,"9 x 2,000 GB",18000,,GB-month,0.119,2142.0,on-demand,2142.0
+prod,eu-central-1,Analytics,Amazon OpenSearch Service,data nodes,"r7g.xlarge.search, 3 AZ",6,730,instance-hour,0.429,1879.02,OpenSearch RI 1yr no upfront,1296.48
+prod,eu-central-1,Analytics,Amazon OpenSearch Service,dedicated masters,m7g.large.search,3,730,instance-hour,0.162,354.78,OpenSearch RI 1yr no upfront,245.28
+prod,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm nodes,ultrawarm1.medium.search,2,730,instance-hour,0.284,414.64,on-demand,414.64
+prod,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 6 x 1,024 GB",6144,,GB-month,0.1452,892.11,on-demand,892.11
+prod,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm managed storage,indices older than 30 days,1000,,GB-month,0.026,26.0,on-demand,26.0
+prod,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
+prod,us-east-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+prod,us-east-2,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+prod,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,2000,,GB,0.01,20.0,on-demand,20.0
+prod,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
+prod,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
+prod,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
+prod,eu-central-1,Network,AWS Transit Gateway,"VPC attachments, workload and egress",2 attachments,2,730,attachment-hour,0.06,87.6,on-demand,87.6
+prod,us-east-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
+prod,us-east-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
+prod,us-east-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
+prod,us-east-1,Network,AWS Transit Gateway,"VPC attachments, workload and egress",2 attachments,2,730,attachment-hour,0.05,73.0,on-demand,73.0
+prod,eu-central-1,Network,AWS Network Firewall,traffic processed,PSP calls and outgoing webhooks,10370,,GB,0.065,674.05,on-demand,674.05
+prod,eu-central-1,Network,AWS Transit Gateway,data processed,egress traffic through two attachments,20740,,GB,0.02,414.8,on-demand,414.8
+prod,global,Network,AWS Global Accelerator,accelerator,fixed fee,1,730,accelerator-hour,0.025,18.25,on-demand,18.25
+prod,global,Network,AWS Global Accelerator,"DT-Premium, Europe to Europe",API responses,8710,,GB,0.015,130.65,on-demand,130.65
+prod,eu-central-1,Network,Elastic Load Balancing,NLB of the payments gateway,one per region with cells,1,730,LB-hour,0.027,19.71,on-demand,19.71
+prod,eu-central-1,Network,Elastic Load Balancing,NLB capacity units,average LCU,10,730,LCU-hour,0.006,43.8,on-demand,43.8
+prod,us-east-1,Network,Elastic Load Balancing,NLB of the payments gateway,one per region with cells,1,730,LB-hour,0.0225,16.43,on-demand,16.43
+prod,us-east-1,Network,Elastic Load Balancing,NLB capacity units,average LCU,1,730,LCU-hour,0.006,4.38,on-demand,4.38
+prod,eu-central-1,Data transfer,AWS Data Transfer,out to the internet,"PSP requests and API responses, 19,080 GB, tiered",1,,month,1673.0,1673.0,on-demand,1673.0
+prod,eu-central-1,Data transfer,AWS Data Transfer,cross-AZ,"router to MemoryDB and RDS Proxy, producers to MSK",15350,,GB,0.02,307.0,on-demand,307.0
+prod,us-east-1,Edge,Amazon CloudFront,"panel distribution, data out","PriceClass_100, Europe",50,,GB,0.085,4.25,on-demand,4.25
+prod,us-east-1,Edge,Amazon CloudFront,panel HTTPS requests,Europe,5000000.0,,request,1.2e-06,6.0,on-demand,6.0
+prod,us-east-1,Edge,AWS WAF,web ACL,panel,1,,ACL-month,5.0,5.0,on-demand,5.0
+prod,us-east-1,Edge,AWS WAF,rules,managed groups and rate rules,10,,rule-month,1.0,10.0,on-demand,10.0
+prod,us-east-1,Edge,AWS WAF,requests,panel,5000000.0,,request,6e-07,3.0,on-demand,3.0
+prod,global,Edge,Amazon Route 53,hosted zone,public zone of the environment,1,,zone-month,0.5,0.5,on-demand,0.5
+prod,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map reads,on-demand,50000000.0,,read request unit,1.525e-07,7.62,on-demand,7.62
+prod,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map writes and replicated writes,on-demand,300000.0,,write request unit,7.625e-07,0.23,on-demand,0.23
+prod,eu-central-1,Backup and S3,Amazon S3,"backup and event archive, Standard (days 0-7)","backups/, exports/, events/",1500,,GB-month,0.0245,36.75,on-demand,36.75
+prod,eu-central-1,Backup and S3,Amazon S3,Glacier Instant Retrieval (days 7-14),D5,1500,,GB-month,0.005,7.5,on-demand,7.5
+prod,eu-central-1,Backup and S3,Amazon S3,Glacier Flexible Retrieval (days 14-35),D5,4500,,GB-month,0.00405,18.22,on-demand,18.22
+prod,eu-central-1,Backup and S3,Amazon S3,"monthly 7-year archive, Deep Archive",first-year average,6000,,GB-month,0.0018,10.8,on-demand,10.8
+prod,eu-central-1,Backup and S3,Amazon S3,Replication Time Control to 2 regions,new objects x 2,13000,,GB,0.015,195.0,on-demand,195.0
+prod,eu-central-1,Data transfer,AWS Data Transfer,S3 replication to the recovery regions,inter-region,13000,,GB,0.02,260.0,on-demand,260.0
+prod,us-east-1,Backup and S3,Amazon S3,"locked replica bucket, Glacier IR",35 days,6500,,GB-month,0.004,26.0,on-demand,26.0
+prod,us-east-2,Backup and S3,Amazon S3,"locked replica bucket, Glacier IR",35 days,6500,,GB-month,0.004,26.0,on-demand,26.0
+prod,eu-central-1,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,12900,,GB-month,0.023,296.7,on-demand,296.7
+prod,us-east-1,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,12900,,GB-month,0.021,270.9,on-demand,270.9
+prod,us-east-2,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,12900,,GB-month,0.021,270.9,on-demand,270.9
+prod,eu-central-1,Data transfer,AWS Data Transfer,backup copies to us-east-1 and us-east-2,inter-region,12400,,GB,0.02,248.0,on-demand,248.0
+prod,eu-central-1,Logs and security,Amazon CloudWatch,EKS control plane logs ingested,"5 log types, 11 clusters",660,,GB,0.63,415.8,on-demand,415.8
+prod,eu-central-1,Logs and security,Amazon CloudWatch,log storage,"365-day retention, steady state",8030.0,,GB-month,0.0324,260.17,on-demand,260.17
+prod,eu-central-1,Logs and security,Amazon CloudWatch,VPC flow logs and firewall logs to S3,vended log delivery,800,,GB,0.285,228.0,on-demand,228.0
+prod,eu-central-1,Logs and security,AWS KMS,customer managed keys,"10 per region with replicas, plus service keys",40,,key-month,1.0,40.0,on-demand,40.0
+prod,eu-central-1,Logs and security,AWS KMS,requests,,20000000.0,,request,3e-06,60.0,on-demand,60.0
+prod,eu-central-1,Logs and security,AWS Secrets Manager,secrets,with replicas,60,,secret-month,0.4,24.0,on-demand,24.0
+prod,eu-central-1,Logs and security,Amazon GuardDuty,RDS protection,Aurora vCPU,480,,vCPU-month,1.23,590.4,on-demand,590.4
+prod,eu-central-1,Logs and security,Amazon GuardDuty,EKS runtime monitoring,"656 node vCPU, tiered",1,,month,1109.76,1109.76,on-demand,1109.76
+prod,eu-central-1,Logs and security,Amazon GuardDuty,"CloudTrail, VPC flow and DNS analysis",foundational,300,,GB,1.15,345.0,on-demand,345.0
+prod,eu-central-1,Logs and security,AWS Security Hub,security checks,3 regions,60000,,check,0.001,60.0,on-demand,60.0
+prod,eu-central-1,Logs and security,AWS Config,configuration items,node and ENI churn,50000,,item,0.003,150.0,on-demand,150.0
+prod,eu-central-1,Logs and security,AWS Config,conformance pack evaluations,,100000,,evaluation,0.001,100.0,on-demand,100.0
+prod,eu-central-1,Logs and security,Amazon Inspector,EC2 scanning,nodes,87,730,instance-hour,0.0021,133.37,on-demand,133.37
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 storage,I/O-Optimized storage,200,,GB-month,0.268,53.6,on-demand,53.6
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 storage,I/O-Optimized storage,200,,GB-month,0.268,53.6,on-demand,53.6
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 storage,I/O-Optimized storage,200,,GB-month,0.268,53.6,on-demand,53.6
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 storage,I/O-Optimized storage,200,,GB-month,0.268,53.6,on-demand,53.6
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare storage,I/O-Optimized storage,50,,GB-month,0.268,13.4,on-demand,13.4
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker writer,"db.r7g.12xlarge, I/O-Optimized",1,730,instance-hour,10.381,7578.13,on-demand,7578.13
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,3.461,2526.53,on-demand,2526.53
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker storage,I/O-Optimized storage,50,,GB-month,0.268,13.4,on-demand,13.4
+stage,eu-central-1,Aurora,Amazon RDS Proxy,proxies of 6 clusters,billed per vCPU of the cluster instances,384,730,vCPU-hour,0.018,5045.76,on-demand,5045.76
+stage,eu-central-1,Aurora,Amazon Aurora PostgreSQL,backup storage above the free allowance,35-day PITR,900,,GB-month,0.023,20.7,on-demand,20.7
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker secondary reader,"db.r7g.4xlarge, I/O-Optimized",1,730,instance-hour,2.874,2098.02,on-demand,2098.02
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,900,,GB-month,0.225,202.5,on-demand,202.5
+stage,us-east-1,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,50000000.0,,I/O,2.2e-07,11.0,on-demand,11.0
+stage,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-1,inter-region,200,,GB,0.02,4.0,on-demand,4.0
+stage,us-east-2,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,900,,GB-month,0.225,202.5,on-demand,202.5
+stage,us-east-2,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,50000000.0,,I/O,2.2e-07,11.0,on-demand,11.0
+stage,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-2,inter-region,200,,GB,0.02,4.0,on-demand,4.0
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-0,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,on-demand,3245.58
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-1,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,on-demand,3245.58
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-2,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,on-demand,3245.58
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-3,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,on-demand,3245.58
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-spare,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.741,3245.58,on-demand,3245.58
+stage,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-0 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,on-demand,2702.46
+stage,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-1 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,on-demand,2702.46
+stage,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-2 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,on-demand,2702.46
+stage,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-cell-3 standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,on-demand,2702.46
+stage,us-east-1,MemoryDB,Amazon MemoryDB,memorydb-spare standby,"db.r7g.xlarge, 2 shard(s) x 3 nodes",6,730,node-hour,0.617,2702.46,on-demand,2702.46
+stage,eu-central-1,MemoryDB,Amazon MemoryDB,data written,all cells,200,,GB,0.2,40.0,on-demand,40.0
+stage,eu-central-1,EKS,Amazon EKS,control planes,"4 cells, spare, analytics",6,730,cluster-hour,0.1,438.0,on-demand,438.0
+stage,us-east-1,EKS,Amazon EKS,"control planes, standby","4 cells, spare",5,730,cluster-hour,0.1,365.0,on-demand,365.0
+stage,eu-central-1,EKS nodes,Amazon EC2,"bootstrap node groups, 3 per cluster","m7g.large, Linux, shared tenancy",18,730,instance-hour,0.0978,1285.09,on-demand,1285.09
+stage,eu-central-1,EKS nodes,Amazon EC2,"payments pool, 4 working cells (router min 20, drainer 3, scheduler 5)","m7g.4xlarge, Linux, Spot",12,730,instance-hour,0.7821,6851.2,Spot at 40% of on-demand,2740.48
+stage,eu-central-1,EKS nodes,Amazon EC2,"payments pool, spare cell (same minimum replicas)","m7g.4xlarge, Linux, Spot",3,730,instance-hour,0.7821,1712.8,Spot at 40% of on-demand,685.12
+stage,eu-central-1,EKS nodes,Amazon EC2,"workers pool, platform add-ons of 5 cell clusters","m7g.2xlarge, Linux, shared tenancy",5,730,instance-hour,0.391,1427.15,on-demand,1427.15
+stage,eu-central-1,EKS nodes,Amazon EC2,"cde pool, locker (min 5 pods)","m7g.xlarge, Linux, shared tenancy",3,730,instance-hour,0.1955,428.15,on-demand,428.15
+stage,eu-central-1,EKS nodes,Amazon EC2,"analytics stateful pool, ClickHouse 4 shards x 2 replicas","r7g.2xlarge, Linux, Spot",8,730,instance-hour,0.5168,3018.11,Spot at 40% of on-demand,1207.24
+stage,eu-central-1,EKS nodes,Amazon EC2,"analytics stateful pool, ClickHouse Keeper","m7g.large, Linux, Spot",3,730,instance-hour,0.0978,214.18,Spot at 40% of on-demand,85.67
+stage,eu-central-1,EKS nodes,Amazon EC2,analytics workers pool,"m7g.2xlarge, Linux, shared tenancy",2,730,instance-hour,0.391,570.86,on-demand,570.86
+stage,us-east-1,EKS nodes,Amazon EC2,"bootstrap node groups, standby","m7g.large, Linux, shared tenancy",15,730,instance-hour,0.0816,893.52,on-demand,893.52
+stage,us-east-1,EKS nodes,Amazon EC2,"payments pool, 5 standby clusters (40 vCPU cap each)","m7g.4xlarge, Linux, Spot",10,730,instance-hour,0.6528,4765.44,Spot at 40% of on-demand,1906.18
+stage,us-east-1,EKS nodes,Amazon EC2,"payments pool, 5 standby clusters (remainder of the cap)","m7g.2xlarge, Linux, Spot",5,730,instance-hour,0.3264,1191.36,Spot at 40% of on-demand,476.54
+stage,us-east-1,EKS nodes,Amazon EC2,"cde pool, standby locker","m7g.xlarge, Linux, shared tenancy",3,730,instance-hour,0.1632,357.41,on-demand,357.41
+stage,eu-central-1,EKS nodes,Amazon EBS,ClickHouse data volumes,"gp3, 8 x 1,000 GB",8000,,GB-month,0.0952,761.6,on-demand,761.6
+stage,eu-central-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 54 nodes x 84 GB",4536,,GB-month,0.0952,431.83,on-demand,431.83
+stage,us-east-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 33 nodes x 84 GB",2772,,GB-month,0.08,221.76,on-demand,221.76
+stage,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.xlarge, 3 AZ",9,730,broker-hour,0.4888,3211.42,on-demand,3211.42
+stage,eu-central-1,Analytics,Amazon MSK,broker storage,"9 x 2,000 GB",18000,,GB-month,0.119,2142.0,on-demand,2142.0
+stage,eu-central-1,Analytics,Amazon OpenSearch Service,data nodes,"r7g.xlarge.search, 3 AZ",6,730,instance-hour,0.429,1879.02,on-demand,1879.02
+stage,eu-central-1,Analytics,Amazon OpenSearch Service,dedicated masters,m7g.large.search,3,730,instance-hour,0.162,354.78,on-demand,354.78
+stage,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm nodes,ultrawarm1.medium.search,2,730,instance-hour,0.284,414.64,on-demand,414.64
+stage,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 6 x 1,024 GB",6144,,GB-month,0.1452,892.11,on-demand,892.11
+stage,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm managed storage,indices older than 30 days,100,,GB-month,0.026,2.6,on-demand,2.6
+stage,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
+stage,us-east-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+stage,us-east-2,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+stage,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,500,,GB,0.01,5.0,on-demand,5.0
+stage,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
+stage,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
+stage,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
+stage,eu-central-1,Network,AWS Transit Gateway,"VPC attachments, workload and egress",2 attachments,2,730,attachment-hour,0.06,87.6,on-demand,87.6
+stage,us-east-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
+stage,us-east-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
+stage,us-east-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
+stage,us-east-1,Network,AWS Transit Gateway,"VPC attachments, workload and egress",2 attachments,2,730,attachment-hour,0.05,73.0,on-demand,73.0
+stage,eu-central-1,Network,AWS Network Firewall,traffic processed,PSP calls and outgoing webhooks,200,,GB,0.065,13.0,on-demand,13.0
+stage,eu-central-1,Network,AWS Transit Gateway,data processed,egress traffic through two attachments,400,,GB,0.02,8.0,on-demand,8.0
+stage,global,Network,AWS Global Accelerator,accelerator,fixed fee,1,730,accelerator-hour,0.025,18.25,on-demand,18.25
+stage,global,Network,AWS Global Accelerator,"DT-Premium, Europe to Europe",API responses,200,,GB,0.015,3.0,on-demand,3.0
+stage,eu-central-1,Network,Elastic Load Balancing,NLB of the payments gateway,one per region with cells,1,730,LB-hour,0.027,19.71,on-demand,19.71
+stage,eu-central-1,Network,Elastic Load Balancing,NLB capacity units,average LCU,2,730,LCU-hour,0.006,8.76,on-demand,8.76
+stage,us-east-1,Network,Elastic Load Balancing,NLB of the payments gateway,one per region with cells,1,730,LB-hour,0.0225,16.43,on-demand,16.43
+stage,us-east-1,Network,Elastic Load Balancing,NLB capacity units,average LCU,1,730,LCU-hour,0.006,4.38,on-demand,4.38
+stage,eu-central-1,Data transfer,AWS Data Transfer,out to the internet,"PSP requests and API responses, 400 GB, tiered",1,,month,36.0,36.0,on-demand,36.0
+stage,eu-central-1,Data transfer,AWS Data Transfer,cross-AZ,"router to MemoryDB and RDS Proxy, producers to MSK",1000,,GB,0.02,20.0,on-demand,20.0
+stage,us-east-1,Edge,Amazon CloudFront,"panel distribution, data out","PriceClass_100, Europe",10,,GB,0.085,0.85,on-demand,0.85
+stage,us-east-1,Edge,Amazon CloudFront,panel HTTPS requests,Europe,1000000.0,,request,1.2e-06,1.2,on-demand,1.2
+stage,us-east-1,Edge,AWS WAF,web ACL,panel,1,,ACL-month,5.0,5.0,on-demand,5.0
+stage,us-east-1,Edge,AWS WAF,rules,managed groups and rate rules,10,,rule-month,1.0,10.0,on-demand,10.0
+stage,us-east-1,Edge,AWS WAF,requests,panel,1000000.0,,request,6e-07,0.6,on-demand,0.6
+stage,global,Edge,Amazon Route 53,hosted zone,public zone of the environment,1,,zone-month,0.5,0.5,on-demand,0.5
+stage,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map reads,on-demand,5000000.0,,read request unit,1.525e-07,0.76,on-demand,0.76
+stage,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map writes and replicated writes,on-demand,30000.0,,write request unit,7.625e-07,0.02,on-demand,0.02
+stage,eu-central-1,Backup and S3,Amazon S3,"backup and event archive, Standard (days 0-7)","backups/, exports/, events/",100,,GB-month,0.0245,2.45,on-demand,2.45
+stage,eu-central-1,Backup and S3,Amazon S3,Glacier Instant Retrieval (days 7-14),D5,100,,GB-month,0.005,0.5,on-demand,0.5
+stage,eu-central-1,Backup and S3,Amazon S3,Glacier Flexible Retrieval (days 14-35),D5,300,,GB-month,0.00405,1.21,on-demand,1.21
+stage,eu-central-1,Backup and S3,Amazon S3,"monthly 7-year archive, Deep Archive",first-year average,300,,GB-month,0.0018,0.54,on-demand,0.54
+stage,eu-central-1,Backup and S3,Amazon S3,Replication Time Control to 2 regions,new objects x 2,600,,GB,0.015,9.0,on-demand,9.0
+stage,eu-central-1,Data transfer,AWS Data Transfer,S3 replication to the recovery regions,inter-region,600,,GB,0.02,12.0,on-demand,12.0
+stage,us-east-1,Backup and S3,Amazon S3,"locked replica bucket, Glacier IR",35 days,300,,GB-month,0.004,1.2,on-demand,1.2
+stage,us-east-2,Backup and S3,Amazon S3,"locked replica bucket, Glacier IR",35 days,300,,GB-month,0.004,1.2,on-demand,1.2
+stage,eu-central-1,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,1300,,GB-month,0.023,29.9,on-demand,29.9
+stage,us-east-1,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,1300,,GB-month,0.021,27.3,on-demand,27.3
+stage,us-east-2,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,1300,,GB-month,0.021,27.3,on-demand,27.3
+stage,eu-central-1,Data transfer,AWS Data Transfer,backup copies to us-east-1 and us-east-2,inter-region,400,,GB,0.02,8.0,on-demand,8.0
+stage,eu-central-1,Logs and security,Amazon CloudWatch,EKS control plane logs ingested,"5 log types, 11 clusters",330,,GB,0.63,207.9,on-demand,207.9
+stage,eu-central-1,Logs and security,Amazon CloudWatch,log storage,"365-day retention, steady state",4015.0,,GB-month,0.0324,130.09,on-demand,130.09
+stage,eu-central-1,Logs and security,Amazon CloudWatch,VPC flow logs and firewall logs to S3,vended log delivery,150,,GB,0.285,42.75,on-demand,42.75
+stage,eu-central-1,Logs and security,AWS KMS,customer managed keys,"10 per region with replicas, plus service keys",40,,key-month,1.0,40.0,on-demand,40.0
+stage,eu-central-1,Logs and security,AWS KMS,requests,,5000000.0,,request,3e-06,15.0,on-demand,15.0
+stage,eu-central-1,Logs and security,AWS Secrets Manager,secrets,with replicas,60,,secret-month,0.4,24.0,on-demand,24.0
+stage,eu-central-1,Logs and security,Amazon GuardDuty,RDS protection,Aurora vCPU,480,,vCPU-month,1.23,590.4,on-demand,590.4
+stage,eu-central-1,Logs and security,Amazon GuardDuty,EKS runtime monitoring,"656 node vCPU, tiered",1,,month,1109.76,1109.76,on-demand,1109.76
+stage,eu-central-1,Logs and security,Amazon GuardDuty,"CloudTrail, VPC flow and DNS analysis",foundational,100,,GB,1.15,115.0,on-demand,115.0
+stage,eu-central-1,Logs and security,AWS Security Hub,security checks,3 regions,60000,,check,0.001,60.0,on-demand,60.0
+stage,eu-central-1,Logs and security,AWS Config,configuration items,node and ENI churn,40000,,item,0.003,120.0,on-demand,120.0
+stage,eu-central-1,Logs and security,AWS Config,conformance pack evaluations,,100000,,evaluation,0.001,100.0,on-demand,100.0
+stage,eu-central-1,Logs and security,Amazon Inspector,EC2 scanning,nodes,87,730,instance-hour,0.0021,133.37,on-demand,133.37
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-0 storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-1 storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-2 storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-cell-3 storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-spare storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker writer,"db.r7g.large, I/O-Optimized",1,730,instance-hour,0.433,316.09,on-demand,316.09
+dev,eu-central-1,Aurora,Amazon Aurora PostgreSQL,aurora-locker storage,I/O-Optimized storage,20,,GB-month,0.268,5.36,on-demand,5.36
+dev,eu-central-1,Aurora,Amazon RDS Proxy,proxies of 6 clusters,billed per vCPU of the cluster instances,12,730,vCPU-hour,0.018,157.68,on-demand,157.68
+dev,us-east-1,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,120,,GB-month,0.225,27.0,on-demand,27.0
+dev,us-east-1,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,10000000.0,,I/O,2.2e-07,2.2,on-demand,2.2
+dev,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-1,inter-region,20,,GB,0.02,0.4,on-demand,0.4
+dev,us-east-2,Aurora,Amazon Aurora PostgreSQL,"global secondaries storage, 6 clusters",I/O-Optimized storage,120,,GB-month,0.225,27.0,on-demand,27.0
+dev,us-east-2,Aurora,Amazon Aurora PostgreSQL,replicated write I/O into this region,Aurora Global Database,10000000.0,,I/O,2.2e-07,2.2,on-demand,2.2
+dev,eu-central-1,Data transfer,AWS Data Transfer,Aurora global replication to us-east-2,inter-region,20,,GB,0.02,0.4,on-demand,0.4
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-0,"db.t4g.small, 1 shard(s) x 3 nodes",3,730,node-hour,0.054,118.26,on-demand,118.26
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-1,"db.t4g.small, 1 shard(s) x 3 nodes",3,730,node-hour,0.054,118.26,on-demand,118.26
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-2,"db.t4g.small, 1 shard(s) x 3 nodes",3,730,node-hour,0.054,118.26,on-demand,118.26
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-cell-3,"db.t4g.small, 1 shard(s) x 3 nodes",3,730,node-hour,0.054,118.26,on-demand,118.26
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,memorydb-spare,"db.t4g.small, 1 shard(s) x 3 nodes",3,730,node-hour,0.054,118.26,on-demand,118.26
+dev,eu-central-1,MemoryDB,Amazon MemoryDB,data written,all cells,20,,GB,0.2,4.0,on-demand,4.0
+dev,eu-central-1,EKS,Amazon EKS,control planes,"4 cells, spare, analytics",6,730,cluster-hour,0.1,438.0,on-demand,438.0
+dev,eu-central-1,EKS nodes,Amazon EC2,"bootstrap node groups, 3 per cluster","m7g.large, Linux, shared tenancy",18,730,instance-hour,0.0978,1285.09,on-demand,1285.09
+dev,eu-central-1,EKS nodes,Amazon EC2,"payments pool, 5 cells (router 3, drainer 3, scheduler 5 pods)","m7g.2xlarge, Linux, Spot",5,730,instance-hour,0.391,1427.15,Spot at 40% of on-demand,570.86
+dev,eu-central-1,EKS nodes,Amazon EC2,"workers pool, platform add-ons","m7g.xlarge, Linux, shared tenancy",6,730,instance-hour,0.1955,856.29,on-demand,856.29
+dev,eu-central-1,EKS nodes,Amazon EC2,"cde pool, locker (3 pods)","m7g.xlarge, Linux, shared tenancy",1,730,instance-hour,0.1955,142.72,on-demand,142.72
+dev,eu-central-1,EKS nodes,Amazon EC2,"analytics stateful pool, ClickHouse 1 replica","r7g.xlarge, Linux, Spot",1,730,instance-hour,0.2584,188.63,Spot at 40% of on-demand,75.45
+dev,eu-central-1,EKS nodes,Amazon EBS,ClickHouse data volume,"gp3, 1 x 100 GB",100,,GB-month,0.0952,9.52,on-demand,9.52
+dev,eu-central-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 31 nodes x 84 GB",2604,,GB-month,0.0952,247.9,on-demand,247.9
+dev,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.large, 3 AZ",3,730,broker-hour,0.2445,535.46,on-demand,535.46
+dev,eu-central-1,Analytics,Amazon MSK,broker storage,3 x 100 GB,300,,GB-month,0.119,35.7,on-demand,35.7
+dev,eu-central-1,Analytics,Amazon OpenSearch Service,data node,"m7g.medium.search, 1 AZ",1,730,instance-hour,0.081,59.13,on-demand,59.13
+dev,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 20 GB",20,,GB-month,0.1452,2.9,on-demand,2.9
+dev,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
+dev,us-east-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+dev,us-east-2,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
+dev,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,200,,GB,0.01,2.0,on-demand,2.0
+dev,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
+dev,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
+dev,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
+dev,eu-central-1,Network,AWS Transit Gateway,"VPC attachments, workload and egress",2 attachments,2,730,attachment-hour,0.06,87.6,on-demand,87.6
+dev,eu-central-1,Network,AWS Network Firewall,traffic processed,PSP calls and outgoing webhooks,50,,GB,0.065,3.25,on-demand,3.25
+dev,eu-central-1,Network,AWS Transit Gateway,data processed,egress traffic through two attachments,100,,GB,0.02,2.0,on-demand,2.0
+dev,global,Network,AWS Global Accelerator,accelerator,fixed fee,1,730,accelerator-hour,0.025,18.25,on-demand,18.25
+dev,global,Network,AWS Global Accelerator,"DT-Premium, Europe to Europe",API responses,50,,GB,0.015,0.75,on-demand,0.75
+dev,eu-central-1,Network,Elastic Load Balancing,NLB of the payments gateway,one per region with cells,1,730,LB-hour,0.027,19.71,on-demand,19.71
+dev,eu-central-1,Network,Elastic Load Balancing,NLB capacity units,average LCU,1,730,LCU-hour,0.006,4.38,on-demand,4.38
+dev,eu-central-1,Data transfer,AWS Data Transfer,out to the internet,"PSP requests and API responses, 100 GB, tiered",1,,month,9.0,9.0,on-demand,9.0
+dev,eu-central-1,Data transfer,AWS Data Transfer,cross-AZ,"router to MemoryDB and RDS Proxy, producers to MSK",200,,GB,0.02,4.0,on-demand,4.0
+dev,us-east-1,Edge,Amazon CloudFront,"panel distribution, data out","PriceClass_100, Europe",5,,GB,0.085,0.43,on-demand,0.43
+dev,us-east-1,Edge,Amazon CloudFront,panel HTTPS requests,Europe,500000.0,,request,1.2e-06,0.6,on-demand,0.6
+dev,us-east-1,Edge,AWS WAF,web ACL,panel,1,,ACL-month,5.0,5.0,on-demand,5.0
+dev,us-east-1,Edge,AWS WAF,rules,managed groups and rate rules,10,,rule-month,1.0,10.0,on-demand,10.0
+dev,us-east-1,Edge,AWS WAF,requests,panel,500000.0,,request,6e-07,0.3,on-demand,0.3
+dev,global,Edge,Amazon Route 53,hosted zone,public zone of the environment,1,,zone-month,0.5,0.5,on-demand,0.5
+dev,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map reads,on-demand,1000000.0,,read request unit,1.525e-07,0.15,on-demand,0.15
+dev,eu-central-1,Data services,Amazon DynamoDB,merchant-cell map writes and replicated writes,on-demand,10000.0,,write request unit,7.625e-07,0.01,on-demand,0.01
+dev,eu-central-1,Backup and S3,Amazon S3,"backup and event archive, Standard (days 0-7)","backups/, exports/, events/",20,,GB-month,0.0245,0.49,on-demand,0.49
+dev,eu-central-1,Backup and S3,Amazon S3,Glacier Instant Retrieval (days 7-14),D5,20,,GB-month,0.005,0.1,on-demand,0.1
+dev,eu-central-1,Backup and S3,Amazon S3,Glacier Flexible Retrieval (days 14-35),D5,60,,GB-month,0.00405,0.24,on-demand,0.24
+dev,eu-central-1,Backup and S3,Amazon S3,"monthly 7-year archive, Deep Archive",first-year average,50,,GB-month,0.0018,0.09,on-demand,0.09
+dev,eu-central-1,Backup and S3,AWS Backup,Aurora snapshots in the vault,35 days,150,,GB-month,0.023,3.45,on-demand,3.45
+dev,eu-central-1,Logs and security,Amazon CloudWatch,EKS control plane logs ingested,"5 log types, 6 clusters",60,,GB,0.63,37.8,on-demand,37.8
+dev,eu-central-1,Logs and security,Amazon CloudWatch,log storage,"30-day retention, steady state",60.0,,GB-month,0.0324,1.94,on-demand,1.94
+dev,eu-central-1,Logs and security,Amazon CloudWatch,VPC flow logs and firewall logs to S3,vended log delivery,50,,GB,0.285,14.25,on-demand,14.25
+dev,eu-central-1,Logs and security,AWS KMS,customer managed keys,"10 per region with replicas, plus service keys",40,,key-month,1.0,40.0,on-demand,40.0
+dev,eu-central-1,Logs and security,AWS KMS,requests,,2000000.0,,request,3e-06,6.0,on-demand,6.0
+dev,eu-central-1,Logs and security,AWS Secrets Manager,secrets,with replicas,40,,secret-month,0.4,16.0,on-demand,16.0
+dev,eu-central-1,Logs and security,Amazon GuardDuty,RDS protection,Aurora vCPU,12,,vCPU-month,1.23,14.76,on-demand,14.76
+dev,eu-central-1,Logs and security,Amazon GuardDuty,EKS runtime monitoring,"108 node vCPU, tiered",1,,month,207.36,207.36,on-demand,207.36
+dev,eu-central-1,Logs and security,Amazon GuardDuty,"CloudTrail, VPC flow and DNS analysis",foundational,30,,GB,1.15,34.5,on-demand,34.5
+dev,eu-central-1,Logs and security,AWS Security Hub,security checks,3 regions,50000,,check,0.001,50.0,on-demand,50.0
+dev,eu-central-1,Logs and security,AWS Config,configuration items,node and ENI churn,20000,,item,0.003,60.0,on-demand,60.0
+dev,eu-central-1,Logs and security,AWS Config,conformance pack evaluations,,50000,,evaluation,0.001,50.0,on-demand,50.0
+dev,eu-central-1,Logs and security,Amazon Inspector,EC2 scanning,nodes,31,730,instance-hour,0.0021,47.52,on-demand,47.52
+shared-services,eu-central-1,CI runners,Amazon EC2,"ci-build Auto Scaling group (2 average, working hours)","c7gd.4xlarge, Linux, Spot",2,260,instance-hour,0.8392,436.38,Spot at 40% of on-demand,174.55
+shared-services,eu-central-1,CI runners,Amazon EC2,"ci-test Auto Scaling group (2 average, working hours)","m7g.2xlarge, Linux, Spot",2,260,instance-hour,0.391,203.32,Spot at 40% of on-demand,81.33
+shared-services,eu-central-1,CI runners,Amazon EC2,"ci-light Auto Scaling group (2 average, working hours)","m7g.large, Linux, Spot",2,260,instance-hour,0.0978,50.86,Spot at 40% of on-demand,20.34
+shared-services,eu-central-1,CI runners,Amazon EC2,"ci-pr Auto Scaling group (2 average, working hours)","c7g.2xlarge, Linux, Spot",2,260,instance-hour,0.3298,171.5,Spot at 40% of on-demand,68.6
+shared-services,eu-central-1,CI runners,Amazon EBS,runner root volumes,"gp3, 8 x 35 GB, working hours only",99.7,,GB-month,0.0952,9.49,on-demand,9.49
+shared-services,eu-central-1,CI runners,Amazon S3,build cache bucket,14-day expiry,1000,,GB-month,0.0245,24.5,on-demand,24.5
+shared-services,eu-central-1,Registry,Amazon ECR,"image storage, source registry",,500,,GB-month,0.1,50.0,on-demand,50.0
+shared-services,eu-central-1,Registry,Amazon ECR,replicated images,7 environment registries x 200 GB,1400,,GB-month,0.1,140.0,on-demand,140.0
+shared-services,eu-central-1,Network,Amazon VPC,"interface endpoints, shared-services VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
+shared-services,eu-central-1,Access,AWS Private CA,admin gateway CA,short-lived certificate mode,1,,CA-month,50.0,50.0,on-demand,50.0
+shared-services,eu-central-1,Access,AWS Secrets Manager,secrets,"central, Okta, runners",15,,secret-month,0.4,6.0,on-demand,6.0
+shared-services,eu-central-1,Access,AWS KMS,customer managed keys,"ebs-nodes, shared, runner cache and secrets",6,,key-month,1.0,6.0,on-demand,6.0
+shared-services,global,Access,Amazon Route 53,private admin zone,,1,,zone-month,0.5,0.5,on-demand,0.5
+central-observability,eu-central-1,EKS,Amazon EKS,control plane,central cluster,1,730,cluster-hour,0.1,73.0,on-demand,73.0
+central-observability,eu-central-1,EKS nodes,Amazon EC2,bootstrap node group,"m7g.large, Linux, shared tenancy",3,730,instance-hour,0.0978,214.18,"Compute SP 1yr no upfront, 80% covered",173.36
+central-observability,eu-central-1,EKS nodes,Amazon EC2,"stateful pool: VictoriaMetrics, Loki, Tempo, Sentry stores","r7g.2xlarge, Linux, shared tenancy",4,730,instance-hour,0.5168,1509.06,"Compute SP 1yr no upfront, 80% covered",1176.41
+central-observability,eu-central-1,EKS nodes,Amazon EC2,"workers pool: Grafana, Alertmanager, vmalert, Sentry web and workers","m7g.2xlarge, Linux, shared tenancy",2,730,instance-hour,0.391,570.86,"Compute SP 1yr no upfront, 80% covered",462.47
+central-observability,eu-central-1,Storage,Amazon EBS,node volumes,"gp3, 9 nodes x 84 GB",756,,GB-month,0.0952,71.97,on-demand,71.97
+central-observability,eu-central-1,Storage,Amazon EBS,persistent volumes,"vmstorage 3 x 500, Sentry ClickHouse 3 x 200, Kafka, Postgres, WAL",2400,,GB-month,0.0952,228.48,on-demand,228.48
+central-observability,eu-central-1,Storage,Amazon EBS,vmstorage throughput above 125 MB/s,3 volumes x 125 MB/s,0.3662,,GiBps-month,48.7424,17.85,on-demand,17.85
+central-observability,eu-central-1,Storage,Amazon S3,Loki chunks,30-day retention,900,,GB-month,0.0245,22.05,on-demand,22.05
+central-observability,eu-central-1,Storage,Amazon S3,Tempo blocks,"14-day retention, tail sampling",300,,GB-month,0.0245,7.35,on-demand,7.35
+central-observability,eu-central-1,Storage,Amazon S3,Sentry files and vmbackup,"Intelligent-Tiering, frequent tier",500,,GB-month,0.0245,12.25,on-demand,12.25
+central-observability,eu-central-1,Network,AWS Transit Gateway,telemetry from the environments,"metrics, logs, traces",5000,,GB,0.02,100.0,on-demand,100.0
+central-observability,eu-central-1,Network,AWS Data Transfer,cross-AZ inside the cluster,"replication of VictoriaMetrics, Loki, Tempo",3000,,GB,0.02,60.0,on-demand,60.0
+organization,eu-central-1,Audit and logs,Amazon CloudWatch,organization trail log group,"management events, ingestion",50,,GB,0.63,31.5,on-demand,31.5
+organization,eu-central-1,Audit and logs,Amazon S3,"log-archive, days 0-90, Standard","trails, flow logs, firewall logs",4500,,GB-month,0.0245,110.25,on-demand,110.25
+organization,eu-central-1,Audit and logs,Amazon S3,"log-archive, days 90-400, Glacier Flexible",Object Lock 365 days,13500,,GB-month,0.00405,54.67,on-demand,54.67
+organization,eu-central-1,Audit and logs,AWS KMS,log-archive and trail keys,,3,,key-month,1.0,3.0,on-demand,3.0
+organization,eu-central-1,Security services,AWS Security Hub,"checks in management, security, shared-services",3 regions,60000,,check,0.001,60.0,on-demand,60.0
+organization,eu-central-1,Security services,Amazon Macie,bucket inventory,60 buckets x 30 days,1800,,bucket-day,0.003288,5.92,on-demand,5.92
+organization,eu-central-1,Security services,Amazon Macie,automated sensitive data discovery,sampled objects,20,,GB,1.25,25.0,on-demand,25.0
+organization,eu-central-1,Security services,Amazon GuardDuty,"CloudTrail and DNS analysis, other accounts",,50,,GB,1.15,57.5,on-demand,57.5
+organization,eu-central-1,Security services,AWS Config,"configuration items, other accounts",,10000,,item,0.003,30.0,on-demand,30.0
+organization,global,Security services,AWS Shield Advanced,subscription,not subscribed (security.shield_advanced_enabled unset),0,,month,3000.0,0.0,on-demand,0.0
