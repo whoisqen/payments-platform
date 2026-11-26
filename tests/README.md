@@ -50,4 +50,4 @@ The `changes` job reads `tools/ci/areas.yaml` and starts only the checks of the 
 | `infra/`, `deploy/`, `policy/`, `observability/`, `docker/`, `tests/`, `scripts/` | their own area (Terraform, Helm, policy, alerts, Docker, Python, Node, compose) |
 | label `ci:full` | every area and every crate |
 
-A guard test fails when a new top-level directory or file is not claimed by an area, a common rule or the `lint_only` list, so nothing silently skips the heavy checks. Jobs that need Docker (component tests, the migration round trip) run on the trusted pool, never on the pull-request runners.
+A guard test fails when a new top-level directory or file is not claimed by an area, a common rule or the `lint_only` list, so nothing silently skips the heavy checks. Jobs that need Docker (component tests, the migration round trip) run pull-request code on GitHub-hosted runners: a fresh VM per job with Docker and no AWS access, never the self-hosted pools.

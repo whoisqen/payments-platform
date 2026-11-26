@@ -341,7 +341,7 @@ jobs:
 
   rust-component:
     needs: [changes, rust]
-    runs-on: ${{ vars.RUNNER_COMMIT || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest  # pull-request code with Docker service containers: GitHub-hosted, isolated per job, no AWS access; never the trusted self-hosted pool
     timeout-minutes: 45
     permissions:
       contents: read
@@ -559,7 +559,7 @@ jobs:
     needs: [changes, lint-fast]
     if: needs.changes.outputs.area_migrations == 'true' && inputs.full != true
     # the Postgres service container needs Docker, which only the trusted commit-stage pool has
-    runs-on: ${{ vars.RUNNER_COMMIT || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest  # pull-request code with Docker service containers: GitHub-hosted, isolated per job, no AWS access; never the trusted self-hosted pool
     timeout-minutes: 30
     permissions:
       contents: read
