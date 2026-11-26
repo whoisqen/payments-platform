@@ -1,6 +1,7 @@
 # Read when sizing, scaling or choosing capacity types.
 dev:
   scale: all workloads, minimum replicas (1-2), one working cell (cell-0) plus spare
+  schedule: scaled down outside working hours
   eks_nodes: spot
   aurora: {writer: db.r7g.large, readers: 0}
   memorydb: {node_type: db.r7g.large, shards: 1, replicas_per_shard: 1}
@@ -8,23 +9,28 @@ dev:
   clickhouse: {shards: 1, replicas: 1}
   recovery_regions: none
 stage:
-  scale: same as prod (4 cells plus spare, same replicas and instance classes)
+  scale: dev size by default; prod-size windows (4 cells plus spare, prod replicas and instance classes) only while load, stress, spike and soak tests run
   eks_nodes: spot with interruption handling and PDB
   recovery_regions: [us-east-1, us-east-2]
+  recovery_compute: only during region-switch drills
 prod:
   scale: reference size of the architecture (section 5 and 8)
-  eks_nodes: on-demand, covered by Reserved Instances or Savings Plans (bought by FinOps, not by Terraform)
+  eks_nodes: on-demand, covered by Compute Savings Plans (bought by FinOps, not by Terraform)
+  commitments: "Savings Plans first: Compute for EKS nodes and Lambda, Database for Aurora, DynamoDB and OpenSearch; MemoryDB reserved nodes (no Savings Plan covers it); MSK on demand (no commitment exists)"
   aurora: {writer: db.r7g.12xlarge, readers: 1 x db.r7g.4xlarge, io_optimized: true}
+  aurora_exceptions: "spare and locker on standard storage; locker writer db.r7g.4xlarge"
+  spare_cell: minimal profile until it takes a merchant
   memorydb: {node_type: db.r7g.xlarge, shards: 2, replicas_per_shard: 2}
   msk: {brokers: 9, instance: kafka.m7g.xlarge}
   clickhouse: {shards: 4, replicas: 2}
   recovery_regions: [us-east-1, us-east-2]
+  recovery_compute: none standing; data replicas only, compute and MemoryDB are built by the switch runbook within the RTO (D6, D7)
 cde-prod: same as prod, CDE accounts only
 rules:
   - CDE node pools are never spot in any environment
   - managed data stores have no spot; spot applies to EKS nodes only
   - every environment runs every workload; only scale and capacity type differ
 ci_runners:
-  where: shared-services EKS cluster with Actions Runner Controller
-  scale_sets: {ci-prod: high PriorityClass with preemption, ci-stage: low PriorityClass, ci-pr: separate pool without write roles}
-  nodes: shared Karpenter NodePool; its limit caps the cost
+  where: ephemeral EC2 Spot runners in shared-services (infra/modules/ci-runners), one job per instance, registered by just-in-time config
+  pools: {ci-prod: "trusted; write roles for main and release/*", ci-stage: trusted, ci-pr: "untrusted subnets; no Docker, no secrets, no write roles"}
+  image_builds: rootless BuildKit pods in the build namespace

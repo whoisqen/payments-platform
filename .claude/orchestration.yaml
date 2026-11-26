@@ -14,7 +14,7 @@ agents:
   terraform-engineer:     { owns: ["infra/**"] }
   k8s-engineer:           { owns: ["deploy/**"] }
   rust-engineer:          { owns: ["vendor/hyperswitch/**", "vendor/card-vault/**",
-                                   "vendor/hyperswitch-e2e/**", "vendor/UPSTREAM.md"],
+                                   "vendor/hyperswitch-e2e/**", "vendor/UPSTREAM.md", "services/**"],
                             not: ["vendor/*/LICENSE*", "vendor/*/NOTICE*"] }
   policy-engineer:        { owns: ["policy/**"], not: ["policy/resilience/**", "policy/cde-paths.yaml"] }
   observability-engineer: { owns: ["observability/**", "policy/resilience/**",
