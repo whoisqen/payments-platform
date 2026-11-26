@@ -44,11 +44,12 @@
 {{- $descs := list -}}
 {{- $seen := dict -}}
 {{- range $i, $o := $rl.overrides -}}
-{{- if not (regexMatch "^[A-Za-z0-9_-]{1,64}$" ($o.merchant | default "" | toString)) -}}
-{{- fail (printf "overrides[%d]: merchant must match ^[A-Za-z0-9_-]{1,64}$" $i) -}}
+{{- if not (regexMatch "^[A-Za-z0-9_-]{1,64}$" ($o.name | default "" | toString)) -}}
+{{- fail (printf "overrides[%d]: name must match ^[A-Za-z0-9_-]{1,64}$" $i) -}}
 {{- end -}}
-{{- if hasKey $seen $o.merchant -}}{{- fail (printf "overrides[%d]: duplicate merchant %s" $i $o.merchant) -}}{{- end -}}
-{{- $_ := set $seen $o.merchant true -}}
+{{- if hasKey $seen (printf "name/%s" $o.name) -}}{{- fail (printf "overrides[%d]: duplicate name %s" $i $o.name) -}}{{- end -}}
+{{- $_ := set $seen (printf "name/%s" $o.name) true -}}
+{{- if not $o.rateKeys -}}{{- fail (printf "overrides[%d]: rateKeys must list at least one rate key" $i) -}}{{- end -}}
 {{- $base := $rl.defaults -}}
 {{- if $o.tier -}}
 {{- if not (hasKey $rl.tiers $o.tier) -}}{{- fail (printf "overrides[%d]: unknown tier %s" $i $o.tier) -}}{{- end -}}
@@ -59,8 +60,15 @@
 {{- if not (has $class $classes) -}}{{- fail (printf "overrides[%d]: unknown request class %s" $i $class) -}}{{- end -}}
 {{- end -}}
 {{- $limits := mergeOverwrite (deepCopy $base) (deepCopy $own) -}}
-{{- $entries := include "ratelimit.classEntries" (dict "limits" $limits "classes" $classes "shadow" $shadow "where" (printf "merchant %s" $o.merchant)) | fromYamlArray -}}
-{{- $descs = append $descs (dict "key" "merchant" "value" $o.merchant "descriptors" $entries) -}}
+{{- $entries := include "ratelimit.classEntries" (dict "limits" $limits "classes" $classes "shadow" $shadow "where" (printf "override %s" $o.name)) | fromYamlArray -}}
+{{- range $k := $o.rateKeys -}}
+{{- if not (regexMatch "^[0-9a-f]{16}$" ($k | toString)) -}}
+{{- fail (printf "overrides[%d]: rate key %v must be 16 lower-case hex digits" $i $k) -}}
+{{- end -}}
+{{- if hasKey $seen $k -}}{{- fail (printf "overrides[%d]: rate key %s is already in another override" $i $k) -}}{{- end -}}
+{{- $_ := set $seen $k true -}}
+{{- $descs = append $descs (dict "key" "merchant" "value" $k "descriptors" $entries) -}}
+{{- end -}}
 {{- end -}}
 {{- $default := include "ratelimit.classEntries" (dict "limits" $rl.defaults "classes" $classes "shadow" $shadow "where" "defaults") | fromYamlArray -}}
 {{- $descs = append $descs (dict "key" "merchant" "descriptors" $default) -}}

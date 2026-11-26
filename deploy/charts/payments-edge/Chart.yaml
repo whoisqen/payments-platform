@@ -2,5 +2,5 @@ apiVersion: v2
 name: payments-edge
 description: Gateway API entry, priority load shedding and routing of merchants to cells
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "0.0.0"

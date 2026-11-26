@@ -23,9 +23,13 @@ certificate:
   renewBefore: 720h
 
 routing:
-  # Set by the cell lookup (merchant to cell map) before the route match
+  # Cell named by the caller; the router of that cell rejects keys it does not hold
   cellHeader: x-payments-cell
-  merchantHeader: x-merchant-id
+  # Global rate limit bucket, set only by the edge: a hash of the caller's credential, never the credential
+  rateKeyHeader: x-payments-rate-key
+  # Credential order: api-key (secret, pk_ or epk_ key), then Authorization (JWT or basic), then route and client IP
+  apiKeyHeader: api-key
+  authHeader: authorization
   timeout: 20s
   cells: []
 

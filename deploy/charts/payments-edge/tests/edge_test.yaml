@@ -168,7 +168,10 @@ tests:
     asserts:
       - lengthEqual:
           path: spec.configPatches
-          count: 4
+          count: 5
+      - equal:
+          path: spec.configPatches[4].patch.value.name
+          value: payments-edge.header-trust
   - it: scales the generated proxy Deployment
     template: autoscaling.yaml
     documentIndex: 0
@@ -202,3 +205,66 @@ tests:
       gateway.hosts: []
     asserts:
       - failedTemplate: {}
+  - it: runs the header trust filter before every other filter
+    template: envoyfilter.yaml
+    asserts:
+      - equal:
+          path: spec.configPatches[8].applyTo
+          value: HTTP_FILTER
+      - equal:
+          path: spec.configPatches[8].patch.operation
+          value: INSERT_FIRST
+      - equal:
+          path: spec.configPatches[8].patch.value.name
+          value: payments-edge.header-trust
+  - it: removes client rate key and class headers before the limiters
+    template: envoyfilter.yaml
+    asserts:
+      - matchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'local strip = \{ "x-payments-rate-key", "x-payments-class" \}'
+      - matchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'for _, name in ipairs\(strip\) do\s+headers:remove\(name\)\s+end\s+local key = headers:get\("api-key"\)'
+  - it: keeps x-merchant-id and the cell header for the router and the route match
+    template: envoyfilter.yaml
+    asserts:
+      - notMatchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'x-merchant-id|x-payments-cell'
+  - it: derives the rate key from api-key, then Authorization, then route and client IP
+    template: envoyfilter.yaml
+    asserts:
+      - matchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: '(?s)source = "k:" \.\. key.*headers:get\("authorization"\).*source = "a:" \.\. auth.*source = "r:" \.\. route_and_ip'
+      - matchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'downstreamRemoteAddress\(\)'
+      - matchRegex:
+          path: spec.configPatches[8].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'headers:replace\("x-payments-rate-key", rate_key\(source\)\)'
+  - it: still routes on the cell header and answers 503 for a missing or unknown cell
+    template: envoyfilter.yaml
+    asserts:
+      - matchRegex:
+          path: spec.configPatches[2].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'local cell = headers:get\("x-payments-cell"\)\s+if cell == nil or not cells\[cell\] then\s+handle:respond\(\{\[":status"\] = "503"'
+  - it: feeds the rate limits only from headers the edge sets
+    template: envoyfilter.yaml
+    asserts:
+      - equal:
+          path: spec.configPatches[6].patch.value.rate_limits[0].actions[0].request_headers.header_name
+          value: x-payments-rate-key
+      - equal:
+          path: spec.configPatches[6].patch.value.rate_limits[0].actions[0].request_headers.descriptor_key
+          value: merchant
+      - equal:
+          path: spec.configPatches[6].patch.value.rate_limits[0].actions[1].request_headers.header_name
+          value: x-payments-class
+      - equal:
+          path: spec.configPatches[3].patch.value.typed_config.rate_limits[0].actions[0].request_headers.header_name
+          value: x-payments-class
+      - matchRegex:
+          path: spec.configPatches[2].patch.value.typed_config.default_source_code.inline_string
+          pattern: 'headers:replace\("x-payments-class", class\)'
