@@ -1,14 +1,23 @@
 name: nightly
 
+# Daily: every area except Rust, the clean image rebuild and drift. Weekly (Sunday): the Rust jobs only, every crate.
 on:
   schedule:
     - cron: "23 1 * * *"
-  workflow_dispatch: {}
+    # the jobs compare github.event.schedule with this exact string
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      run:
+        description: daily (everything but Rust) or rust (the weekly Rust run)
+        type: choice
+        options: [daily, rust]
+        default: daily
 
 permissions: {}
 
 concurrency:
-  group: nightly
+  group: nightly-${{ github.event.schedule || inputs.run }}
   cancel-in-progress: false
 
 env:
@@ -16,7 +25,8 @@ env:
 
 jobs:
   full-ci:
-    # unit and component checks of every area and every crate, not only the changed ones
+    # unit and component checks of every area except Rust, not only the changed ones
+    if: github.event.schedule != '0 2 * * 0' && inputs.run != 'rust'
     permissions:
       contents: read
       security-events: write
@@ -24,6 +34,33 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       full: true
+
+  rust-ci:
+    # fmt, clippy, unit and component checks of every crate of both vendored workspaces
+    if: github.event.schedule == '0 2 * * 0' || inputs.run == 'rust'
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      rust_only: true
+
+  alert-rust-ci:
+    needs: rust-ci
+    if: failure()
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: weekly Rust issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$REPO" --label incident --title "nightly: weekly Rust run failed" --body "See ${RUN_URL}."
 
   alert-full-ci:
     needs: full-ci
@@ -43,7 +80,7 @@ jobs:
 
   rebuild:
     # needs the rootless BuildKit namespace (repository variable BUILDKIT_NAMESPACE), which exists only after the build cluster is set up
-    if: vars.BUILDKIT_NAMESPACE != ''
+    if: vars.BUILDKIT_NAMESPACE != '' && github.event.schedule != '0 2 * * 0' && inputs.run != 'rust'
     runs-on: ${{ vars.RUNNER_BUILD || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
@@ -141,6 +178,7 @@ jobs:
           gh issue create --repo "$REPO" --label incident --title "nightly: rebuilt digests differ from incremental builds" --body "See ${RUN_URL}."
 
   discover:
+    if: github.event.schedule != '0 2 * * 0' && inputs.run != 'rust'
     runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
@@ -216,7 +254,7 @@ jobs:
     permissions:
       contents: read
     # runs once the backend and App ids exist; set the repository variable to enable it
-    if: vars.DRIFT_ENABLED == 'true'
+    if: vars.DRIFT_ENABLED == 'true' && github.event.schedule != '0 2 * * 0' && inputs.run != 'rust'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

@@ -28,7 +28,7 @@ flowchart LR
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | pull request, merge group | `changes` picks the areas touched; then `lint-fast`, `commitlint`, `spec-gate`, `python`, `rust`, `terraform` (fmt, validate, `terraform test` with mock providers), `helm` (lint, kubeconform, helm-unittest), `policy` (OPA, Kyverno tests), `docker`, `migrations`, `promotion` and `hotfix-guard`; calls `security.yml`. `ci-gate` and `spec-gate` are the required checks of the `main` ruleset. |
+| `ci.yml` | pull request, merge group | `changes` picks the areas touched from `tools/ci/areas.yaml` (what each change runs is in [tests/README.md](../../../tests/README.md#what-a-change-runs); label `ci:full` runs everything); then `lint-fast`, `commitlint`, `spec-gate`, `python`, `rust`, `terraform` (fmt, validate, `terraform test` with mock providers), `helm` (lint, kubeconform, helm-unittest), `policy` (OPA, Kyverno tests), `docker`, `migrations`, `promotion` and `hotfix-guard`; calls `security.yml`. `ci-gate` and `spec-gate` are the required checks of the `main` ruleset. |
 | `security.yml` | called by CI per area; a daily schedule scans everything | See the scan table below. |
 | `codeql.yml` | pull request, push, schedule | CodeQL static analysis. |
 | `ai-review.yml` | pull request | Advisory AI review, see [AI](ai.md). |
@@ -37,7 +37,7 @@ flowchart LR
 | `tag.yml` | `prod-rollout-complete` event or by hand | Next SemVer from the commits, evidence, `v*` tag. A tag builds nothing. |
 | `tag-deployed.yml` | merge that changes an `images.yaml` | Tags the promoted image digests in the registry. |
 | `hotfix.yml` | hotfix label or by hand | Creates a `release/*` branch, builds, runs full CI, backports to `main`. |
-| `nightly.yml` | schedule | Reproducible rebuild and digest compare, alert-rule graph, Terraform drift plan with the read-only plan role, GitHub settings drift. |
+| `nightly.yml` | schedule | Reproducible rebuild and digest compare, alert-rule graph, Terraform drift plan with the read-only plan role, GitHub settings drift; the daily run tests every area except Rust, a weekly run on Sunday checks both Rust workspaces in full. |
 
 ### Security scans
 
