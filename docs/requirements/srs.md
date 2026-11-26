@@ -1,5 +1,5 @@
 ---
-status: draft
+status: baseline
 ---
 
 # Software requirements specification: DevOps part
@@ -19,7 +19,7 @@ Out of scope:
 
 - Actors: `merchant` (the API consumer, never a platform operator), SRE on-call, platform engineer, security engineer (PCI), FinOps owner, auditor, CI and automation roles (Atlantis, ArgoCD, GitHub Actions), Claude Code agents with read-only access to observability.
 - The platform is a payment orchestrator over Hyperswitch; the components are router, locker, drainer, scheduler, control-center and analytics.
-- Frankfurt (eu-central-1) is the working region; us-east-1 and us-east-2 are recovery regions (D6, D7).
+- Frankfurt (eu-central-1) is the working region; us-east-1 is the recovery region with a warm standby and us-east-2 the data-only second recovery region (D6, D7, ADR-0017).
 - Four working cells and one spare cell; locker and its Aurora are shared by all cells.
 - A PSP timeout puts a payment in the `unknown state`; `sync` resolves it; a charge is never retried automatically.
 - Migrations are expand-contract only; `down.sql` is never applied in prod.
@@ -29,7 +29,7 @@ Out of scope:
 
 ## 3. ID scheme
 
-- Functional: `FR-<area>-<n>` with areas `INF`, `DAT`, `SEC`, `DEL`, `OBS`, `COST`.
+- Functional: `FR-<area>-<n>` with areas `INF`, `DAT`, `SEC`, `DEL`, `OBS`, `POL`, `COST`.
 - Non-functional: `NFR-<area>-<n>` defined only in `nfr.md` with areas `SLO`, `CAP`, `REC`, `COST`, `COV`; the other files cite them.
 - An ID is never reused or renumbered; a withdrawn requirement keeps its ID.
 - Row format: `| ID | Requirement | Verification | Implementation | Source |`.
@@ -61,7 +61,9 @@ Each decision is followed by the source passage it overrides.
   - Overrides: section 19 flat retention columns for the S3-based stores and section 5 backup tiers (no tiering).
 - D6: Frankfurt is the only writing region, with three AZs for high availability; us-east-1 is the recovery region that receives data and backups but runs no instance or cluster, all compute is Terraform and Terragrunt created at the switch; no active-active, no standby cluster; semi-automatic switch (ADR-015) with automatic detection and fencing and one on-call confirmation; us-east-2 is the second recovery region for when compute cannot be created in us-east-1.
   - Overrides: section 1 (two regions, eu-west-1 reserve), section 3 "DR between regions" (warm standby) and the VPC table, ADR-004, section 4 clusters per region, section 5 Multi-Region and Global Database to eu-west-1.
+  - Refined by the later owner choice recorded in ADR-0017: us-east-1 runs a warm standby (per cell EKS, capped node pools, MemoryDB, Aurora readers) and promotion of its data stores is automatic after 5 failing minutes of the Frankfurt health check, with fencing and a lock per cell; "no standby compute" and the one-confirmation switch apply to us-east-2 only.
 - D7: Aurora Global Database headless secondaries in us-east-1 and us-east-2 with lag alert at 5 s and RPO budget 10 s, managed RPO (`rds.global_db_rpo`) off; DynamoDB Global Tables (MREC) replicas in both, written only from Frankfurt; MemoryDB not replicated across regions, hourly snapshots copied and rebuilt from Aurora at the switch; MSK not replicated, rebuilt from the S3 archive; S3 with Replication Time Control (15 min) and Object Lock to both; ECR replication to both; non-compute resources prepared in both regions; switch tools replicated or created inside the RTO budget; RTO 60 min (plan B 75 min), RPO per store as in `nfr.md`; plan B in us-east-2 after 10 minutes without capacity, promotion in one region under a lock; recovery VPC CIDRs 10.102.0.0/16 (us-east-1) and 10.103.0.0/16 (us-east-2); accepted risk: a repeated request after the switch with the same idempotency key can create a second charge if the key was in MemoryDB and not yet in Aurora (at most the drain lag, p99 5 s); it is found by the 5-minute PSP reconciliation with the reference id and refunded, and the write-behind rule stays.
+  - Refined by ADR-0017: compute is created from Terraform at the switch only in us-east-2 (plan B); us-east-1 keeps running compute. RTO and RPO targets are unchanged. The recovery VPC CIDRs are one non-overlapping /16 per environment and region in `config/platform.yaml` (prod: 10.151.0.0/16 us-east-1, 10.152.0.0/16 us-east-2).
   - Overrides: section 1 RTO/RPO table (region loss rows 1 s and 5 min, locker row, Kubernetes state row) and the paragraph below it; section 3 DR steps 3 and 4 (RTO derivation) and the SCP region list; section 5 Global Database and MemoryDB Multi-Region; section 19 rows for MSK, S3, Terraform state and Velero; ADR-003, ADR-007, ADR-013.
 - D8: after a node replacement, AZ loss or recovery a cell takes traffic when at least 75% of the priority hot keys (merchant configuration, routing, limits) are in MemoryDB (`cache_warm_ratio`); the readiness probe waits at most 5 minutes, then the cell takes traffic and a non-paging alert fires.
   - Overrides: nothing; an owner addition that the source does not contain.
@@ -74,7 +76,7 @@ None of these is carried into a requirement.
 - Velero backup copy to eu-west-1 (section 4, Velero paragraph).
 - S3 and Terraform state copies to eu-west-1 (sections 9 and 19).
 - The cde-prod eu-west-1 VPC (section 3 VPC table).
-- Clusters in each region (sections 4 and 12).
+- Clusters in each region (sections 4 and 12), except the us-east-1 standby clusters of ADR-0017.
 - The eu-west-1 endpoint group of Global Accelerator (ADR-007).
 - The 5-minute PSP reconciliation after failover (sections 1 and 3); the window now follows D7.
 - The S3 audit copy target in eu-west-1 (sections 3 and 19); the audit copy goes to us-east-1 and us-east-2.
@@ -100,13 +102,14 @@ None of these is carried into a requirement.
 | `client` | Software client (Kafka, Vault, TLS client certificate), never a `merchant` | Security, data |
 | `order` | Sequence (ordered instance class list, rollout order), never a purchase | Plan B, upgrades |
 | `failed`, `pending` | Status of a job, pod or backup (`FAILED`, `Pending`), never the state of a payment | Backups, Kubernetes |
+| `recovery region` | us-east-1 runs warm standby compute that serves no requests until promotion (ADR-0017); us-east-2 runs none until plan B | Region model |
 | `replication lag` | Lag of Aurora Global Database or S3 replication between regions; the lag of the Redis stream is the `drain lag` | D7 |
 
 ## 8. Open issues
 
 Source passages that still name eu-west-1 or a second active region, are not on the withdrawn list and need an owner decision before the writers use them:
 
-- Section 12 cost rows: MemoryDB Multi-Region and a copy in eu-west-1, five clusters per region, warm standby to pilot light, and MemoryDB snapshot in eu-west-1 every 15 minutes.
+- Section 12 cost rows: MemoryDB Multi-Region and a copy in eu-west-1, five clusters per region, and MemoryDB snapshot in eu-west-1 every 15 minutes; the warm standby to pilot light row is settled by ADR-0017.
 - Section 9: the stage row "2 regions", the prod row "3 AZ x 2 regions", and the EKS upgrade sequence "prod eu-west-1, then prod eu-central-1".
 - Section 23.5: the prod MCP row naming eu-west-1 and eu-central-1.
 - Section 1: the opening sentence ("two regions, eu-central-1 primary, eu-west-1 reserve").
