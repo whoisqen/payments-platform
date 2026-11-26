@@ -16,10 +16,11 @@ tests:
       - matchRegex:
           path: data["payments-edge.yaml"]
           pattern: "requests_per_unit: 100\\n\\s+unit: second\\n\\s+value: payments"
-  - it: renders a named merchant with its tier and a class override
+  - it: renders every rate key of an override with its tier and a class override
     set:
       rateLimit.overrides:
-        - merchant: m_ent_1
+        - name: m_ent_1
+          rateKeys: ["0123456789abcdef", "fedcba9876543210"]
           tier: enterprise
           limits:
             list: {unit: minute, requestsPerUnit: 600}
@@ -32,7 +33,13 @@ tests:
           pattern: "requests_per_unit: 600\\n\\s+unit: minute\\n\\s+value: list"
       - matchRegex:
           path: data["payments-edge.yaml"]
-          pattern: "value: m_ent_1"
+          pattern: "key: merchant\\n\\s+value: 0123456789abcdef"
+      - matchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "key: merchant\\n\\s+value: fedcba9876543210"
+      - notMatchRegex:
+          path: data["payments-edge.yaml"]
+          pattern: "m_ent_1"
   - it: sets shadow mode on every limit
     set:
       rateLimit.shadowMode: true
@@ -59,25 +66,41 @@ tests:
           errorPattern: "tier thin: no limit for request class read"
   - it: fails on an unknown tier
     set:
-      rateLimit.overrides: [{merchant: m1, tier: gold}]
+      rateLimit.overrides: [{name: m1, rateKeys: ["0123456789abcdef"], tier: gold}]
     asserts:
       - failedTemplate:
           errorPattern: unknown tier gold
-  - it: fails on a duplicate merchant
+  - it: fails on a duplicate override name
     set:
-      rateLimit.overrides: [{merchant: m1}, {merchant: m1, tier: hot}]
+      rateLimit.overrides: [{name: m1, rateKeys: ["0123456789abcdef"]}, {name: m1, rateKeys: ["fedcba9876543210"], tier: hot}]
     asserts:
       - failedTemplate:
-          errorPattern: duplicate merchant m1
-  - it: fails on a malformed merchant id
+          errorPattern: duplicate name m1
+  - it: fails on a rate key in two overrides
     set:
-      rateLimit.overrides: [{merchant: "bad id!"}]
+      rateLimit.overrides: [{name: m1, rateKeys: ["0123456789abcdef"]}, {name: m2, rateKeys: ["0123456789abcdef"]}]
     asserts:
       - failedTemplate:
-          errorPattern: merchant must match
+          errorPattern: rate key 0123456789abcdef is already in another override
+  - it: fails on a malformed override name
+    set:
+      rateLimit.overrides: [{name: "bad id!", rateKeys: ["0123456789abcdef"]}]
+    asserts:
+      - failedTemplate:
+          errorPattern: name must match
+  - it: fails on a rate key that is not a 16-digit hex hash
+    set:
+      rateLimit.overrides: [{name: m1, rateKeys: ["m_ent_1"]}]
+    asserts:
+      - failedTemplate: {}
+  - it: fails on an override without rate keys
+    set:
+      rateLimit.overrides: [{name: m1, rateKeys: []}]
+    asserts:
+      - failedTemplate: {}
   - it: fails on an override of an unknown class
     set:
-      rateLimit.overrides: [{merchant: m1, limits: {export: {unit: second, requestsPerUnit: 1}}}]
+      rateLimit.overrides: [{name: m1, rateKeys: ["0123456789abcdef"], limits: {export: {unit: second, requestsPerUnit: 1}}}]
     asserts:
       - failedTemplate:
           errorPattern: unknown request class export

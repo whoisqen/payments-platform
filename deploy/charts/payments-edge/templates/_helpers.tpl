@@ -16,6 +16,50 @@ token_bucket:
   fill_interval: {{ .fillInterval }}
 {{- end -}}
 
+{{/* Lua source run first: drop client copies of edge headers, set the rate key from the caller's credential */}}
+{{- define "payments-edge.trustLua" -}}
+{{- $r := .Values.routing -}}
+local strip = { {{ $r.rateKeyHeader | quote }}, {{ .Values.classes.header | quote }} }
+
+-- Two 32-bit string hashes kept below 2^53 so double arithmetic stays exact without the bit library
+local function rate_key(s)
+  local a, b = 5381, 0
+  for i = 1, #s do
+    local c = string.byte(s, i)
+    a = (a * 33 + c) % 4294967296
+    b = (b * 65599 + c) % 4294967296
+  end
+  return string.format("%04x%04x%04x%04x", math.floor(a / 65536), a % 65536, math.floor(b / 65536), b % 65536)
+end
+
+local function route_and_ip(handle, headers)
+  local path = string.match(headers:get(":path") or "/", "^[^?]*")
+  local route = string.match(path, "^/[^/]*/?[^/]*/?[^/]*") or "/"
+  local addr = handle:streamInfo():downstreamRemoteAddress() or ""
+  return route .. "|" .. (string.match(addr, "^(.*):%d+$") or addr)
+end
+
+function envoy_on_request(handle)
+  local headers = handle:headers()
+  for _, name in ipairs(strip) do
+    headers:remove(name)
+  end
+  local key = headers:get({{ $r.apiKeyHeader | quote }})
+  local source
+  if key ~= nil and key ~= "" then
+    source = "k:" .. key
+  else
+    local auth = headers:get({{ $r.authHeader | quote }})
+    if auth ~= nil and auth ~= "" then
+      source = "a:" .. auth
+    else
+      source = "r:" .. route_and_ip(handle, headers)
+    end
+  end
+  headers:replace({{ $r.rateKeyHeader | quote }}, rate_key(source))
+end
+{{- end -}}
+
 {{/* Lua source: cell guard, class assignment by path and Retry-After on every 429 */}}
 {{- define "payments-edge.lua" -}}
 local cells = { {{- range .Values.routing.cells }}[{{ .name | quote }}] = true, {{ end -}} }

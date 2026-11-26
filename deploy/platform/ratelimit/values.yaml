@@ -85,7 +85,7 @@ serviceMonitor:
   enabled: true
   interval: 30s
 
-# Limits of domain `domain`; descriptors are merchant (header x-merchant-id) then request_class
+# Limits of domain `domain`; descriptors are merchant (edge-set rate key, header x-payments-rate-key) then request_class
 rateLimit:
   domain: payments-edge
   requestClasses: [payments, read, list]
@@ -106,5 +106,5 @@ rateLimit:
       payments: {unit: second, requestsPerUnit: 1600}
       read: {unit: second, requestsPerUnit: 1600}
       list: {unit: second, requestsPerUnit: 100}
-  # Named merchants: {merchant: <id>, tier: <tier, optional>, limits: {<class>: {unit, requestsPerUnit}, optional}}
+  # {name: <merchant label>, rateKeys: [<16-hex rate key per credential>], tier: <optional>, limits: {<class>: {unit, requestsPerUnit}, optional}}
   overrides: []

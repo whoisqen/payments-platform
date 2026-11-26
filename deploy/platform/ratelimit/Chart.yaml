@@ -2,7 +2,7 @@ apiVersion: v2
 name: ratelimit
 description: Global rate limit service of the edge gateway (envoyproxy/ratelimit) with the limit config rendered from values
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "62db6639"
 dependencies:
   - name: platform-common

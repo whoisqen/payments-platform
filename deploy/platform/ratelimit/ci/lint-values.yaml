@@ -7,9 +7,11 @@ redis:
   endpoint: ratelimit.example.test:6379
 rateLimit:
   overrides:
-    - merchant: m_hot_0001
+    - name: m_hot_0001
+      rateKeys: [0123456789abcdef]
       tier: hot
-    - merchant: m_ent_0002
+    - name: m_ent_0002
+      rateKeys: [fedcba9876543210, 00000000ffffffff]
       tier: enterprise
       limits:
         list: {unit: minute, requestsPerUnit: 600}

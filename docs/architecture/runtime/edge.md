@@ -21,6 +21,7 @@ Gateway API is the standard, role-split model for traffic entry; the repository 
 - Route 53 (`infra/modules/dns-routing`) holds a failover CNAME for `api.<zone>`. Frankfurt is primary and serves all traffic while its HTTPS health check on `/health/deep` passes. The us-east-1 standby is checked too and is answered only when Frankfurt fails.
 - `edge-accelerator` keeps the static anycast addresses of Global Accelerator with one active endpoint group, the working region.
 - The `payments-edge` chart creates the Gateway (class `istio`), its TLS certificate from cert-manager, an HTTPRoute per cell and the EnvoyFilter with the Lua filter, the rate limits and the overload manager. Istio scales the proxy from 3 to 12 pods on CPU.
+- The first filter of the proxy (`payments-edge.header-trust`) removes client-supplied `x-payments-rate-key` and `x-payments-class` and sets the rate key from the caller's credential (see [rate limiting](rate-limiting.md)).
 - One HTTPRoute per cell matches the `x-payments-cell` header of the request. The Lua filter rejects a request with 503 when that header is missing or names an unknown cell, assigns the request class by path and method, and adds `Retry-After` to every 429.
 - Requests to the router use mTLS inside the mesh; the router's AuthorizationPolicy admits the edge proxy identity.
 - The server-to-server API cannot take AWS WAF; it is protected by the [rate limits](rate-limiting.md).

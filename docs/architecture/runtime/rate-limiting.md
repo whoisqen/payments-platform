@@ -39,7 +39,7 @@ flowchart TB
   G -->|"within, or service unreachable"| ROUTER["Router of the cell"]
 ```
 
-- Global: `envoyproxy/ratelimit` (3 to 9 pods across zones) with its own small Redis, not the cell MemoryDB. Descriptors are `merchant` (header `x-merchant-id`) then `request_class`. Limits come from `rateLimit` values: defaults, tiers, and overrides per merchant. The client is fail-open with a 100 ms timeout: a limiter outage never blocks a payment.
+- Global: `envoyproxy/ratelimit` (3 to 9 pods across zones) with its own small Redis, not the cell MemoryDB. Descriptors are `merchant` (header `x-payments-rate-key`) then `request_class`. The edge sets `x-payments-rate-key` itself and drops any value sent by the client: it is a hash of the caller's credential (secret or publishable API key, else the `Authorization` token), or of the route and client IP for keyless calls such as PSP webhooks, so no caller can spend another merchant's budget. Limits come from `rateLimit` values: defaults, tiers, and overrides listed by rate key (computed when a key is issued, see the chart README). The client is fail-open with a 100 ms timeout: a limiter outage never blocks a payment.
 - Local: token buckets per pod, 2,000 requests per second in total, of which at most 200 for lists and 800 for reads. Runtime keys allow shadow mode without a rollout.
 - Overload manager: refreshes every 250 ms. At 85% of heap or connections the proxy stops keep-alive; at 92% heap or 95% connections it stops accepting requests; at 95% heap or 98% connections it stops accepting connections.
 - Every 429 carries `Retry-After` (1 second by default).

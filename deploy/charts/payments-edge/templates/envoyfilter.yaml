@@ -40,7 +40,7 @@ spec:
             retry_policy:
               retry_on: ""
               num_retries: 0
-    # Cell guard (503), request class and Retry-After; first in the chain so local replies pass it
+    # Cell guard (503), request class and Retry-After; ahead of the limiters so local replies pass it
     - applyTo: HTTP_FILTER
       match:
         context: GATEWAY
@@ -166,7 +166,7 @@ spec:
                 envoy_grpc:
                   cluster_name: {{ $g.cluster }}
                 timeout: {{ $g.timeout }}
-    # Descriptors [merchant, request_class]; skipped when a header is absent
+    # Descriptors [merchant, request_class] from edge-derived headers only; skipped when absent
     - applyTo: VIRTUAL_HOST
       match:
         context: GATEWAY
@@ -176,7 +176,7 @@ spec:
           rate_limits:
             - actions:
                 - request_headers:
-                    header_name: {{ .Values.routing.merchantHeader }}
+                    header_name: {{ .Values.routing.rateKeyHeader }}
                     descriptor_key: merchant
                     skip_if_absent: true
                 - request_headers:
@@ -213,3 +213,22 @@ spec:
                       value: {{ index $o.connections $a.key }}
               {{- end }}
 {{- end }}
+    # Header trust, ahead of every other filter (INSERT_FIRST, whatever its place in this list)
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+      patch:
+        operation: INSERT_FIRST
+        value:
+          name: payments-edge.header-trust
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            default_source_code:
+              inline_string: |
+                {{- include "payments-edge.trustLua" . | nindent 16 }}

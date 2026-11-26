@@ -77,10 +77,12 @@
     "routing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cellHeader", "merchantHeader", "timeout", "cells"],
+      "required": ["cellHeader", "rateKeyHeader", "apiKeyHeader", "authHeader", "timeout", "cells"],
       "properties": {
         "cellHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "merchantHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "rateKeyHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "apiKeyHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "authHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
         "timeout": { "$ref": "#/$defs/seconds" },
         "cells": {
           "type": "array",
