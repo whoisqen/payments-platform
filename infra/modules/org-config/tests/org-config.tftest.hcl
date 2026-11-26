@@ -59,7 +59,7 @@ run "admin_builds_aggregator_recorders_and_pack" {
   }
 
   assert {
-    condition     = toset(aws_config_configuration_aggregator.this[0].organization_aggregation_source[0].regions) == toset(var.regions)
+    condition     = aws_config_configuration_aggregator.this[0].organization_aggregation_source[0].all_regions
     error_message = "the aggregator covers every allowed region"
   }
 
