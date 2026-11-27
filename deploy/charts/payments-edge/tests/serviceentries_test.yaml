@@ -13,7 +13,7 @@ tests:
             - router.payments.svc.spare.dev.example.internal
       - equal:
           path: spec.ports
-          value: [{number: 8080, name: http-router-8080, protocol: HTTP}]
+          value: [{number: 8443, name: http-router-8443, protocol: HTTP}]
   - it: derives the router host of a cell without one from the cluster domain
     set:
       routing.clusterDomain: dev.example.internal

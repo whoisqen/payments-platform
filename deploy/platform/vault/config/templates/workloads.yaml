@@ -40,6 +40,14 @@ data:
     path "{{ $w.pki.mount }}/issue/locker-gateway" {
       capabilities = ["update"]
     }
+  pay-cell-gateway.hcl: |
+    path "{{ $w.pki.mount }}/issue/cell-gateway" {
+      capabilities = ["update"]
+    }
+  pay-edge-client.hcl: |
+    path "{{ $w.pki.mount }}/issue/edge-client" {
+      capabilities = ["update"]
+    }
   {{- end }}
   # Rights of the bootstrap on later syncs: the cluster mounts and roles, the platform policies and the mesh PKI roles; no KV, no sys/ beyond that
   vault-workloads.hcl: |
@@ -93,7 +101,15 @@ data:
       server_flag=false client_flag=true key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
     vault write "{{ $p.mount }}/roles/locker-gateway" allowed_domains="{{ $lg.domain }}" allow_subdomains=true allow_bare_domains=false \
       server_flag=true client_flag=false key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
-    log "{{ $p.mount }}: roles router-client and locker-gateway written"
+    {{- $cg := $p.cellGateway }}
+    {{- $ec := $p.edgeClient }}
+    # The edge reaches every cell through the router gateway of the cell: server certificates for <cell>.<domain>, client
+    # certificates with the SPIFFE ID of the edge that the gateways admit
+    vault write "{{ $p.mount }}/roles/cell-gateway" allowed_domains="{{ $cg.domain }}" allow_subdomains=true allow_bare_domains=false \
+      server_flag=true client_flag=false key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
+    vault write "{{ $p.mount }}/roles/edge-client" allow_any_name=true enforce_hostnames=false allowed_uri_sans="{{ join "," $ec.uriSans }}" \
+      server_flag=false client_flag=true key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
+    log "{{ $p.mount }}: roles router-client, locker-gateway, cell-gateway and edge-client written"
     {{- end }}
     # jwt_role <mount> <role> <policy> <subjects...>: a role that accepts the service account tokens of the listed subjects only
     jwt_role() {
@@ -113,6 +129,12 @@ data:
     {{- range $svc, $s := $w.services }}
     jwt_role "${mount}" "{{ $c.component }}-{{ $svc }}" "pay-{{ $c.environment }}-{{ $c.component }}-{{ $svc }}"{{ range $s.serviceAccounts }} "system:serviceaccount:{{ $w.namespace }}:{{ . }}"{{ end }}
     {{- end }}
+    {{- end }}
+    {{- if and (eq $c.kind "cell") $w.pki.enabled }}
+    jwt_role "${mount}" router-gateway pay-cell-gateway "system:serviceaccount:{{ $w.pki.cellGateway.namespace }}:{{ $w.pki.cellGateway.serviceAccount }}"
+    {{- end }}
+    {{- if and (eq $c.kind "edge") $w.pki.enabled }}
+    jwt_role "${mount}" edge-client pay-edge-client "system:serviceaccount:{{ $w.pki.edgeClient.namespace }}:{{ $w.pki.edgeClient.serviceAccount }}"
     {{- end }}
     {{- if and (eq $c.kind "locker") $w.pki.enabled }}
     jwt_role "${mount}" locker-gateway pay-locker-gateway "system:serviceaccount:{{ $w.pki.lockerGateway.namespace }}:{{ $w.pki.lockerGateway.serviceAccount }}"

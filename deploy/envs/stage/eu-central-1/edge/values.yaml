@@ -7,6 +7,11 @@ gateway:
   hosts:
     - api.stage.payments.example.com
 
+# Client certificate of the edge for the router gateways of the cells, from the central Vault (vault.host of config/platform.yaml)
+edgeClient:
+  pki:
+    vaultServer: https://vault.payments.internal
+
 routing:
   cells:
     - name: cell-0
