@@ -52,3 +52,27 @@ global:
     events:
       kafka: false
       brokers: []
+
+# Cross-cluster entry of the cell from the edge (infra/modules/cell-endpoint): mutual-TLS Gateway behind an internal NLB
+routerGateway:
+  enabled: true
+  # deploy.<env>.cluster_domain of config/platform.yaml; the host is router.payments.svc.<cell>.<clusterDomain>
+  clusterDomain: ""
+  port: 8443
+  routerPort: 8080
+  secretName: router-gateway-tls
+  # Terraform output target_group_arn of infra/live/<env>/<region>/<cell>/endpoint
+  targetGroupArn: REPLACE_ROUTER_TARGET_GROUP_ARN
+  # URI SANs of the edge client certificates (Vault role edge-client), as Istio principals
+  clientPrincipals:
+    - payments-platform/ns/payments-edge/sa/edge
+  pki:
+    mount: pki-mesh
+    # the central Vault (vault.host of config/platform.yaml)
+    vaultServer: ""
+    caBundle: ""
+    # empty: k8s-<prefix>-<env>-<region short>-<cell>, the jwt mount of the cell cluster
+    authMount: ""
+    serviceAccount: router-gateway-pki
+    ttl: 72h
+    refreshInterval: 24h

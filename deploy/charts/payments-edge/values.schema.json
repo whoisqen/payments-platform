@@ -250,6 +250,11 @@
         "clusterDomain": {
           "type": "string",
           "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]*$"
+        },
+        "cellPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
         }
       }
     },
@@ -446,6 +451,63 @@
         },
         "connections": {
           "$ref": "#/$defs/thresholds"
+        }
+      }
+    },
+    "edgeClient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "secretName",
+        "pki"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "secretName": {
+          "type": "string"
+        },
+        "pki": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mount",
+            "vaultServer",
+            "serviceAccount",
+            "uriSan",
+            "ttl",
+            "refreshInterval"
+          ],
+          "properties": {
+            "mount": {
+              "type": "string"
+            },
+            "vaultServer": {
+              "type": "string",
+              "pattern": "^(https://[a-z0-9.-]+(:[0-9]+)?)?$"
+            },
+            "caBundle": {
+              "type": "string"
+            },
+            "authMount": {
+              "type": "string"
+            },
+            "serviceAccount": {
+              "type": "string"
+            },
+            "uriSan": {
+              "type": "string",
+              "pattern": "^spiffe://"
+            },
+            "ttl": {
+              "type": "string"
+            },
+            "refreshInterval": {
+              "type": "string"
+            }
+          }
         }
       }
     }

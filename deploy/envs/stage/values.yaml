@@ -60,3 +60,9 @@ gateway:
   clusterDomain: stage.example.internal
   pki:
     vaultServer: https://vault.payments.internal
+
+# Cell releases (payments-cell): the cross-cluster entry from the edge (infra/modules/cell-endpoint) and the central Vault
+routerGateway:
+  clusterDomain: stage.example.internal
+  pki:
+    vaultServer: https://vault.payments.internal

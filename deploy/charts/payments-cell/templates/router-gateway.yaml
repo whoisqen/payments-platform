@@ -1,0 +1,147 @@
+{{- /* The cross-cluster entry of the cell from the edge: internal NLB (infra/modules/cell-endpoint) -> this Gateway, mutual TLS with Vault mesh PKI certificates -> router */ -}}
+{{- $gw := .Values.routerGateway -}}
+{{- $g := .Values.global -}}
+{{- if and $gw.enabled $gw.clusterDomain }}
+{{- $cell := required "global.cell is required" $g.cell }}
+{{- $host := printf "router.payments.svc.%s.%s" $cell $gw.clusterDomain }}
+{{- $rs := regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" ($g.region | default "eu-central-1") "${1}${2}${3}" }}
+{{- $labels := dict "app.kubernetes.io/part-of" "payments-platform" "app.kubernetes.io/managed-by" .Release.Service "app.kubernetes.io/component" "router-gateway" "payments-platform/cell" $cell }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: router
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  annotations:
+    # The NLB comes from Terraform and reaches the pods through the TargetGroupBinding below, so no load balancer from this Service
+    networking.istio.io/service-type: ClusterIP
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: router
+      hostname: {{ $host }}
+      port: {{ $gw.port }}
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $gw.secretName }}
+        options:
+          # Clients must present a certificate of the mesh PKI (ca.crt of the same Secret)
+          gateway.istio.io/tls-terminate-mode: MUTUAL
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: router-cross-cluster
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  parentRefs:
+    - name: router
+  hostnames:
+    - {{ $host }}
+  rules:
+    - backendRefs:
+        - name: router
+          port: {{ $gw.routerPort }}
+---
+# Only the edge client certificate (URI SAN spiffe://<principal>) passes; the listener host and SNI scope the traffic
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: router-gateway
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: router
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              {{- toYaml $gw.clientPrincipals | nindent 14 }}
+---
+# The Terraform target group of the NLB registers the gateway pod IPs
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: router-gateway
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  serviceRef:
+    name: router-istio
+    port: {{ $gw.port }}
+  targetGroupARN: {{ required "routerGateway.targetGroupArn is required" $gw.targetGroupArn | quote }}
+  targetType: ip
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $gw.pki.serviceAccount }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Server certificate of the gateway and the mesh root that checks client certificates, from the Vault mesh PKI (role cell-gateway)
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: VaultDynamicSecret
+metadata:
+  name: router-gateway-certificate
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  method: POST
+  path: {{ printf "%s/issue/cell-gateway" $gw.pki.mount | quote }}
+  parameters:
+    common_name: {{ $host | quote }}
+    ttl: {{ $gw.pki.ttl | quote }}
+  resultType: Data
+  provider:
+    server: {{ required "routerGateway.pki.vaultServer is required" $gw.pki.vaultServer | quote }}
+    {{- with $gw.pki.caBundle }}
+    # the AWS Private CA root that signs the internal gateway in front of the central Vault
+    caBundle: {{ . | quote }}
+    {{- end }}
+    auth:
+      kubernetes:
+        # the jwt mount of this cell cluster in the central Vault
+        mountPath: {{ $gw.pki.authMount | default (printf "k8s-%s-%s-%s-%s" ((($g.hyperswitch | default dict).namePrefix) | default "pay") ($g.environment | default "dev") $rs $cell) | quote }}
+        role: router-gateway
+        serviceAccountRef:
+          name: {{ $gw.pki.serviceAccount }}
+          audiences: [vault]
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $gw.secretName }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  refreshInterval: {{ $gw.pki.refreshInterval }}
+  target:
+    name: {{ $gw.secretName }}
+    creationPolicy: Owner
+    template:
+      # A TLS Secret with ca.crt, the format the Gateway reads for mutual TLS
+      type: kubernetes.io/tls
+      engineVersion: v2
+      data:
+        tls.crt: '{{`{{ .certificate }}`}}'
+        tls.key: '{{`{{ .private_key }}`}}'
+        ca.crt: '{{`{{ .issuing_ca }}`}}'
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: VaultDynamicSecret
+          name: router-gateway-certificate
+{{- end }}

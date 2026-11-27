@@ -16,8 +16,9 @@ spec:
   resolution: DNS
   ports:
     {{- $ports := list }}
-    {{- range . }}{{ $ports = append $ports (.port | default 8080 | int) }}{{ end }}
+    {{- range . }}{{ $ports = append $ports (.port | default $.Values.routing.cellPort | int) }}{{ end }}
     {{- range ($ports | uniq) }}
+    # HTTP from the gateway proxy; the DestinationRule below originates mutual TLS to the router gateway of the cell
     - {number: {{ . }}, name: http-router-{{ . }}, protocol: HTTP}
     {{- end }}
 {{- end }}

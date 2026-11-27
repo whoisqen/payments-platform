@@ -85,6 +85,15 @@ bootstrap:
       rootTtl: 87600h
       leafTtl: 72h
       routerUriSans: [spiffe://payments-platform/ns/payments/sa/router]
+      # Cross-cluster entry of each cell from the edge: the router gateway of the cell (server) and the edge gateway (client)
+      cellGateway:
+        namespace: payments
+        serviceAccount: router-gateway-pki
+        domain: example.internal
+      edgeClient:
+        namespace: payments-edge
+        serviceAccount: edge-gateway-pki
+        uriSans: [spiffe://payments-platform/ns/payments-edge/sa/edge]
       lockerGateway:
         # Logs in on the jwt mount of its locker cluster; the env layer may override the domain
         namespace: payments

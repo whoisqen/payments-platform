@@ -352,6 +352,84 @@
     },
     "migrations": {
       "type": "object"
+    },
+    "routerGateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "clusterDomain",
+        "port",
+        "routerPort",
+        "secretName",
+        "targetGroupArn",
+        "clientPrincipals",
+        "pki"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clusterDomain": {
+          "type": "string",
+          "pattern": "^([a-z0-9.-]+)?$"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "routerPort": {
+          "type": "integer"
+        },
+        "secretName": {
+          "type": "string"
+        },
+        "targetGroupArn": {
+          "type": "string",
+          "pattern": "^(arn:aws:elasticloadbalancing:.+|REPLACE_ROUTER_TARGET_GROUP_ARN)$"
+        },
+        "clientPrincipals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "pki": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mount",
+            "vaultServer",
+            "serviceAccount",
+            "ttl",
+            "refreshInterval"
+          ],
+          "properties": {
+            "mount": {
+              "type": "string"
+            },
+            "vaultServer": {
+              "type": "string",
+              "pattern": "^(https://[a-z0-9.-]+(:[0-9]+)?)?$"
+            },
+            "caBundle": {
+              "type": "string"
+            },
+            "authMount": {
+              "type": "string"
+            },
+            "serviceAccount": {
+              "type": "string"
+            },
+            "ttl": {
+              "type": "string"
+            },
+            "refreshInterval": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   }
 }
