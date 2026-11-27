@@ -27,6 +27,7 @@ This page lists the controls of the platform, grouped by what they protect, and 
 | Admin tools | Okta OIDC per tool; Grafana organizations per group | administrators re-authenticate every 2 hours |
 | Argo CD | access entry scoped to the platform namespaces | never cluster-admin |
 | CI | GitHub OIDC: plan role read-only, apply role per component trusting only `main` and `release/*` | 1 hour, permissions boundary |
+| Region-switch fallback (the one cluster-admin exception) | `pay-prod-glob-dr-apply`, trusted only by the GitHub environment `dr-compute-prod` with required reviewers; it gets cluster-admin on `pay-prod-use1-eks-cell-0` only while `argocd-standby` is applied with `PAY_ARGOCD_INSTALL=true`, to install Argo CD core when the central Argo CD in Frankfurt is unreachable | removed by the next apply without the flag; the hot standby normally needs none of it |
 | Merchants | API keys stored as hashes | rate limited per merchant |
 
 Quarterly access review (PCI DSS 7.2.4) reads the standing assignments output of `infra/modules/identity-center`.
