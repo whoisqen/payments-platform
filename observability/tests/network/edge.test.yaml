@@ -9,7 +9,7 @@ tests:
   input_series:
   - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use1"}
     values: '0x19'
-  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use2"}
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext2"}
     values: '0x19'
   - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext"}
     values: '0x19'
@@ -36,7 +36,7 @@ tests:
   input_series:
   - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use1"}
     values: 1x19
-  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="use2"}
+  - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext2"}
     values: 1x19
   - series: probe_success{probe_target="region-health",region="eu-central-1",probe_point="ext"}
     values: 1x19

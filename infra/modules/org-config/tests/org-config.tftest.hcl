@@ -7,7 +7,7 @@ mock_provider "aws" {
 variables {
   region_short           = "euc1"
   region_name            = "eu-central-1"
-  regions                = ["eu-central-1", "us-east-1", "us-east-2"]
+  regions                = ["eu-central-1", "us-east-1"]
   admin_account_id       = "777777777777"
   recorder_target_ou_ids = ["ou-ab12-11111111", "ou-ab12-33333333"]
   delivery_bucket_name   = "pay-security-euc1-log-archive"
@@ -68,7 +68,7 @@ run "admin_builds_aggregator_recorders_and_pack" {
       aws_cloudformation_stack_set.recorder[0].permission_model == "SERVICE_MANAGED" &&
       aws_cloudformation_stack_set.recorder[0].call_as == "DELEGATED_ADMIN" &&
       aws_cloudformation_stack_set.recorder[0].auto_deployment[0].enabled &&
-      length(aws_cloudformation_stack_set_instance.recorder) == 3
+      length(aws_cloudformation_stack_set_instance.recorder) == 2
     )
     error_message = "a service-managed, auto-deployed stack set per region"
   }
@@ -87,7 +87,7 @@ run "admin_builds_aggregator_recorders_and_pack" {
   }
 
   assert {
-    condition     = length(aws_config_organization_conformance_pack.this) == 3 && aws_config_organization_conformance_pack.this["us-east-1"].region == "us-east-1"
+    condition     = length(aws_config_organization_conformance_pack.this) == 2 && aws_config_organization_conformance_pack.this["us-east-1"].region == "us-east-1"
     error_message = "the PCI DSS pack runs in every region"
   }
 }

@@ -7,7 +7,7 @@ variables {
   account_id           = "333333333333"
   repositories         = ["router", "locker", "drainer"]
   kms_key_arn          = "arn:aws:kms:eu-central-1:333333333333:key/mrk-0123456789abcdef0123456789abcdef"
-  replication_regions  = ["us-east-1", "us-east-2"]
+  replication_regions  = ["us-east-1"]
   tags = {
     environment = "prod", team = "platform", owner = "platform@example.com", cost-center = "cc-100", cell = "shared"
     component   = "ecr", pci-scope = "connected", data-class = "internal", backup-tier = "silver", managed-by = "terraform", repo = "infra/modules/ecr"
@@ -31,16 +31,16 @@ run "immutable_scanned_encrypted" {
   }
 }
 
-run "replicates_to_both_recovery_regions" {
+run "replicates_to_the_recovery_region" {
   command = plan
 
   assert {
-    condition     = length(aws_ecr_replication_configuration.this[0].replication_configuration[0].rule[0].destination) == 2
+    condition     = length(aws_ecr_replication_configuration.this[0].replication_configuration[0].rule[0].destination) == 1
     error_message = "two destinations"
   }
   assert {
-    condition     = toset([for d in aws_ecr_replication_configuration.this[0].replication_configuration[0].rule[0].destination : d.region]) == toset(["us-east-1", "us-east-2"])
-    error_message = "us-east-1 and us-east-2 receive images"
+    condition     = toset([for d in aws_ecr_replication_configuration.this[0].replication_configuration[0].rule[0].destination : d.region]) == toset(["us-east-1"])
+    error_message = "us-east-1 receives images"
   }
 }
 

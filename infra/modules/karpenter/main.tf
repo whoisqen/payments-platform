@@ -17,7 +17,7 @@ locals {
     enabled = true
   EOT
 
-  # Payment pools use Spot only where the environment lists them in spot_pools (dev, stage); the CDE pool never does, and the workers pool may.
+  # Payment pools use Spot only where the environment lists them in spot_pools (dev, stage); the CDE pool never does, and prod lists none.
   # An interrupted pod in the middle of a PSP call leaves the payment in the unknown state, which is why production lists none.
   all_pools = {
     payments = { taint = "payments", expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
@@ -25,7 +25,7 @@ locals {
     cde      = { taint = "cde", expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     workers  = { taint = "workers", expire = "168h", grace = "90s", consolidation = "WhenEmptyOrUnderutilized" }
   }
-  capacity = { for name in keys(local.all_pools) : name => (name == "workers" || contains(var.spot_pools, name)) ? ["spot", "on-demand"] : ["on-demand"] }
+  capacity = { for name in keys(local.all_pools) : name => contains(var.spot_pools, name) ? ["spot", "on-demand"] : ["on-demand"] }
   pools    = { for name, p in local.all_pools : name => merge({ scope = "cde", capacity = local.capacity[name] }, p) if contains(var.enabled_pools, name) }
 
   ec2_node_class = {

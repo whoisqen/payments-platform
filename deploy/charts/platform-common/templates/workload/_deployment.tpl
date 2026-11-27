@@ -12,7 +12,7 @@ metadata:
   {{- end }}
 spec:
   {{- /* the HPA or ScaledObject owns the replica count when autoscaling is on */}}
-  {{- if not (.cfg.autoscaling | default dict).enabled }}
+  {{- if not (include "platform-common.scaled" .) }}
   replicas: {{ $w.replicas | default 1 }}
   {{- end }}
   minReadySeconds: {{ $w.minReadySeconds | default 10 }}

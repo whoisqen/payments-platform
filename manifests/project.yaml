@@ -11,10 +11,10 @@ components:
 cells: {working: [cell-0, cell-1, cell-2, cell-3], spare: spare, routing: DynamoDB map merchant_id -> cell}
 regions:
   working: eu-central-1        # the only region that writes; 3 AZs
-  recovery: [us-east-1, us-east-2]  # data and backups only, compute created at the switch
+  recovery: [us-east-1]  # hot standby at full production size, ready to take the whole load at any moment
 environments: [dev, stage, prod, cde-prod]   # sizes in manifests/environment.yaml
 accounts: [management, log-archive, audit, network, shared-services, backup, cde-dev, cde-stage, cde-prod, platform-dev, platform-stage, platform-prod]
-naming: "pay-<env>-<region-short>-<component>"   # region-short: euc1, use1, use2, glob
+naming: "pay-<env>-<region-short>-<component>"   # region-short: euc1, use1, glob
 tags: [environment, team, owner, cost-center, cell, component, pci-scope, data-class, backup-tier, managed-by, repo]
 delivery:
   branches: one trunk `main`; short-lived `<type>/<n>-<slug>`; agents `agent/<area>-<slug>`

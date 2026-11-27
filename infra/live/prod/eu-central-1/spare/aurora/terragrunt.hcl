@@ -67,4 +67,10 @@ inputs = {
   availability_zones       = include.envcommon.locals.env_cfg.azs["eu-central-1"]
   # Writers rotate over the AZs so that one AZ loss never takes every writer.
   writer_az = include.envcommon.locals.env_cfg.azs["eu-central-1"][1]
+
+  # Minimal profile of the spare (section 12); the merchant-move runbook raises it to the cell classes before a hot merchant lands.
+  writer_instance_class = "db.r7g.2xlarge"
+  reader_instance_class = "db.r7g.2xlarge"
+  # Low I/O while empty: Standard storage is cheaper than I/O-Optimized here.
+  storage_type = "aurora"
 }

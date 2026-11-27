@@ -67,4 +67,6 @@ inputs = {
   availability_zones       = include.envcommon.locals.env_cfg.azs["eu-central-1"]
   # Writers rotate over the AZs so that one AZ loss never takes every writer.
   writer_az = include.envcommon.locals.env_cfg.azs["eu-central-1"][1]
+  # Low I/O: Standard storage is cheaper than I/O-Optimized here.
+  storage_type = "aurora"
 }

@@ -69,4 +69,6 @@ inputs = {
 
   # The locker reads a static password once at start; the same value is in Vault secret/<env>/locker/database and both rotate together.
   proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]
+  # Low I/O: Standard storage is cheaper than I/O-Optimized here.
+  storage_type = "aurora"
 }

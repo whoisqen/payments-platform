@@ -78,5 +78,6 @@ inputs = {
   availability_zones        = include.envcommon.locals.env_cfg.azs["us-east-1"]
   writer_az                 = include.envcommon.locals.env_cfg.azs["us-east-1"][0]
   recovery_instance_count   = include.envcommon.locals.env_cfg.standby_enabled ? include.envcommon.locals.env_cfg.standby_reader_count : 0
-  recovery_instance_class   = include.envcommon.locals.env_cfg.standby_reader_class
+  # Hot standby: the writer class of the working spare cluster (its own minimal profile).
+  recovery_instance_class = "db.r7g.2xlarge"
 }

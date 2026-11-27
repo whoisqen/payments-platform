@@ -165,7 +165,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
+  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-1"}
     values: '0x134'
   alert_rule_test:
   - eval_time: 130m
@@ -179,7 +179,7 @@ tests:
         layer: backup-dr
         failure_mode: backup-dr-snapshot-copy-stale
         store: memorydb-cell-1
-        region: us-east-2
+        region: us-east-1
       exp_annotations:
         summary: The latest snapshot copy in a recovery region is older than 2 hours
         runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#snapshot-copy-stale
@@ -189,7 +189,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-2"}
+  - series: snapshot_copy_last_success_timestamp_seconds{store="memorydb-cell-1",region="us-east-1"}
     values: 0+60x134
   alert_rule_test:
   - eval_time: 130m

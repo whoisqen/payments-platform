@@ -70,18 +70,18 @@ class SyntheticPayment(unittest.TestCase):
             self.assertEqual(edge.request(host, "POST", "/payments", body, {})[0], 421)
             self.assertEqual(edge.request(host, "POST", "/payments", body, {edge.header: "cell-9"})[0], 421)
             bad = {"amount": 1, "payment_method_token": "pm_other"}
-            self.assertEqual(edge.request(host, "POST", "/payments", bad, {edge.header: "cell-1"})[0], 402)
+            self.assertEqual(edge.request(host, "POST", "/payments", bad, {edge.header: "spare"})[0], 402)
 
     def test_idempotent_replay_returns_the_same_payment(self):
         for env, region, values in edges():
             edge = FakeEdge(values)
             host = values["gateway"]["hosts"][0]
-            h = {edge.header: "cell-2", "idempotency-key": "same"}
+            h = {edge.header: "spare", "idempotency-key": "same"}
             body = {"amount": 5, "payment_method_token": TOKEN}
             first = edge.request(host, "POST", "/payments", body, h)[1]
             second = edge.request(host, "POST", "/payments", body, h)[1]
             self.assertEqual(first["id"], second["id"])
-            self.assertEqual(len(edge.cells["cell-2"].payments), 1)
+            self.assertEqual(len(edge.cells["spare"].payments), 1)
 
     def test_invalid_state_transitions_are_refused(self):
         for env, region, values in edges():

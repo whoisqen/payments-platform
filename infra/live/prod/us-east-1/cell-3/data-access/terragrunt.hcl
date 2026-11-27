@@ -23,13 +23,26 @@ dependency "vpc" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
+dependency "eks" {
+  config_path = "../eks"
+
+  mock_outputs = {
+    cluster_name           = "pay-mock-use1-eks"
+    cluster_arn            = "arn:aws:eks:us-east-1:000000000000:cluster/pay-mock-use1-eks"
+    node_security_group_id = "sg-00000000"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+}
+
+# Hot standby: the cells read the local Aurora through RDS Proxy at any moment, so the clients match the working region.
 inputs = {
-  component       = "data-cell-3"
-  vpc_id          = dependency.vpc.outputs.vpc_id
-  data_subnet_ids = dependency.vpc.outputs.subnet_ids["data"]
-  # No client group exists before the switch, so nothing can connect to the headless cluster.
+  component                 = "data-cell-3"
+  vpc_id                    = dependency.vpc.outputs.vpc_id
+  data_subnet_ids           = dependency.vpc.outputs.subnet_ids["data"]
+  client_security_group_ids = [dependency.eks.outputs.node_security_group_id]
   stores = {
     aurora       = { port = 5432, clients = "aurora-proxy" }
     aurora-proxy = { port = 5432, clients = "workload" }
+    memorydb     = { port = 6379, clients = "workload" }
   }
 }

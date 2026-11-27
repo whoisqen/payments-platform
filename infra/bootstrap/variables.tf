@@ -65,3 +65,20 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "dr_apply_role_arns" {
+  type        = list(string)
+  default     = []
+  description = "DR apply roles of the environment account (ci-oidc-roles output dr_apply_role_arn): read and write <environment>/ in the bucket and its replica, use of both keys. Empty until the role exists."
+
+  validation {
+    condition     = alltrue([for a in var.dr_apply_role_arns : can(regex("^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$", a))])
+    error_message = "dr_apply_role_arns must be IAM role ARNs."
+  }
+}
+
+variable "replication_enabled" {
+  type        = bool
+  default     = true
+  description = "Replication to us-east-1; false during a failback so that the stale working bucket cannot overwrite state written in the replica."
+}

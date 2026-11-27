@@ -468,4 +468,15 @@ Every item is one unit of work for one agent and one GitHub issue. The `id` beco
   requires: ["charts"]
   acceptance: the report lists no `REPLACE_*` for the environment about to be applied, or each remaining one has an owner in the ticket; locker pod security group id is set in dev and stage values
   issue: "#82"
+
+- id: T41
+  title: Write the SRS addendum for the two-region model and the FinOps sizes
+  agent: docs-writer
+  milestone: M7 Verification and release readiness
+  paths: ["docs/requirements/addenda/001-two-regions-finops.md"]
+  depends_on: ["T9"]
+  provides: two-region addendum
+  requires: ["baseline"]
+  acceptance: `tools/lint/srs-lint` exits 0 with the addendum; every changed or withdrawn requirement ID names its reason
+  issue: "#199"
 ```

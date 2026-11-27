@@ -11,5 +11,5 @@
 
 ## Behaviour
 
-- Green: sync Succeeded and health Healthy of the `cell-3` Application of dev or stage sends `smoke-green-<env>`; `cell-3` is the last RollingSync step. Payload: `environment`, `app`, `cell`, `revisions`.
+- Green: sync Succeeded and health Healthy of the `spare` Application of dev or stage sends `smoke-green-<env>`; `spare` is the last RollingSync step and exists in every environment (dev runs only `cell-0` and `spare`). Payload: `environment`, `app`, `cell`, `revisions`.
 - Failed sync or smoke: an alert to Alertmanager only, nothing to GitHub.

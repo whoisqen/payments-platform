@@ -33,7 +33,7 @@ flowchart LR
 ```
 
 - An image is built once per merge and identified by its digest. Promotion is a pull request that changes `deploy/envs/<env>/images.yaml`; the next environment runs the same bytes.
-- dev and stage sync automatically. The `payments-cells` ApplicationSet uses a RollingSync: `cell-0` first, so a bad migration stops there, then `cell-1`, `cell-2`, `cell-3`.
+- dev and stage sync automatically. The `payments-cells` ApplicationSet uses a RollingSync: `cell-0` first, so a bad migration stops there, then `cell-1`, `cell-2`, `cell-3`, and the spare last on its own (dev has `cell-0` and the spare only). The prod hot standby in us-east-1 has its own cell Applications, synced from `deploy/envs/prod/us-east-1/`.
 - After a sync, a PostSync smoke Job makes a synthetic payment through the dummy connector. Green on the last cell sends `smoke-green-<env>` to GitHub, which opens the next promotion.
 - Production Applications (`applicationset-gated`) are pinned to one release tag and have no automated sync. A merge to `main` changes nothing in prod until the tag moves and each cell is synced, one at a time.
 - A `v*` SemVer tag is created only by the tagging workflow after a prod rollout in all cells.

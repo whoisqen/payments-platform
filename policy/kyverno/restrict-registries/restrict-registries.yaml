@@ -23,5 +23,5 @@ spec:
     - name: images
       expression: "(object.spec.containers + object.spec.?initContainers.orValue([])).map(c, c.image)"
   validations:
-    - expression: "variables.images.all(i, i.matches('^123456789012\\\\.dkr\\\\.ecr\\\\.(eu-central-1|us-east-1|us-east-2)\\\\.amazonaws\\\\.com/'))"
-      message: "Images must come from the platform ECR in eu-central-1, us-east-1 or us-east-2."
+    - expression: "variables.images.all(i, i.matches('^123456789012\\\\.dkr\\\\.ecr\\\\.(eu-central-1|us-east-1)\\\\.amazonaws\\\\.com/'))"
+      message: "Images must come from the platform ECR in eu-central-1 or us-east-1."

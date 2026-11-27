@@ -5,7 +5,7 @@ Dashboard: https://grafana.payments.internal/d/dr-switch
 
 ## Symptom
 
-The replication lag to a headless secondary in us-east-1 or us-east-2 exceeds 5 s (the metric is in milliseconds).
+The replication lag to the headless secondary in us-east-1 exceeds 5 s (the metric is in milliseconds).
 
 ## Diagnostics
 

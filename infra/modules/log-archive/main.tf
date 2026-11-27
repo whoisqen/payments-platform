@@ -4,6 +4,11 @@ locals {
   access_name = "${local.name}-access-logs"
   access_arn  = "arn:aws:s3:::${local.access_name}"
   org_source  = { StringEquals = { "aws:SourceOrgID" = var.organization_id } }
+  # Firehose roles of the member accounts (eks module, log_archive input) are named <cluster>-log-export.
+  log_export_principal = {
+    StringEquals = { "aws:PrincipalOrgID" = var.organization_id }
+    ArnLike      = { "aws:PrincipalArn" = "arn:aws:iam::*:role/*-log-export" }
+  }
 
   tls_only = {
     Sid       = "DenyInsecureTransport"
@@ -84,6 +89,22 @@ locals {
         Resource  = "${local.bucket_arn}/${var.prefixes.flow_logs}/AWSLogs/*"
         Condition = { StringEquals = { "aws:SourceOrgID" = var.organization_id, "s3:x-amz-acl" = "bucket-owner-full-control" } }
       },
+      {
+        Sid       = "EksLogExportList"
+        Effect    = "Allow"
+        Principal = { AWS = "*" }
+        Action    = ["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"]
+        Resource  = local.bucket_arn
+        Condition = local.log_export_principal
+      },
+      {
+        Sid       = "EksLogExportWrite"
+        Effect    = "Allow"
+        Principal = { AWS = "*" }
+        Action    = ["s3:PutObject", "s3:AbortMultipartUpload"]
+        Resource  = "${local.bucket_arn}/${var.prefixes.eks}/*"
+        Condition = local.log_export_principal
+      },
     ], local.readers)
   }
 
@@ -142,6 +163,14 @@ locals {
         Resource  = "*"
         Condition = local.org_source
       },
+      {
+        Sid       = "EksLogExportEncrypt"
+        Effect    = "Allow"
+        Principal = { AWS = "*" }
+        Action    = ["kms:GenerateDataKey", "kms:Encrypt"]
+        Resource  = "*"
+        Condition = merge(local.log_export_principal, { StringLike = { "kms:ViaService" = "s3.*.amazonaws.com" } })
+      },
       ], length(var.reader_principal_arns) > 0 ? [{
         Sid       = "AuditReadersDecrypt"
         Effect    = "Allow"
@@ -153,7 +182,7 @@ locals {
 }
 
 resource "aws_kms_key" "this" {
-  description             = "Encrypts the organization trail, Config and VPC Flow Logs in ${local.name}."
+  description             = "Encrypts the organization trail, Config, VPC Flow Logs and EKS control-plane logs in ${local.name}."
   enable_key_rotation     = true
   deletion_window_in_days = var.kms_deletion_window_days
   policy                  = jsonencode(local.key_policy)

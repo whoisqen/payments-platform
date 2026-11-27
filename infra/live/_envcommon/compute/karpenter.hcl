@@ -1,8 +1,7 @@
 locals {
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
-  region  = regex("/live/[^/]+/(?P<region>[^/]+)/", get_terragrunt_dir()).region
-  # The standby region keeps small node pools until it is promoted.
-  cpu_limits = local.region == local.env_cfg.cfg.regions.working ? local.env_cfg.karpenter_cpu_limits : try(local.env_cfg.standby_node_pool, local.env_cfg.karpenter_cpu_limits)
+  # Hot standby: us-east-1 takes the whole load at any moment, so its node pools have the working limits.
+  cpu_limits = local.env_cfg.karpenter_cpu_limits
 }
 
 terraform {

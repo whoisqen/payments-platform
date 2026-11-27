@@ -1,6 +1,11 @@
 # Not layered: the digest comes from images.yaml through the ApplicationSet, the rest is here
 global:
   environment: stage
+  # Working window of the dev Aurora schedule (aurora-schedule: 08:00-20:00 Mon-Fri, Europe/Berlin); outside it KEDA scales the workloads to zero
+  workingHours:
+    timezone: Europe/Berlin
+    start: "0 8 * * 1-5"
+    end: "0 20 * * 1-5"
 
 container:
   env:

@@ -26,8 +26,8 @@ owner_decisions:
   D3: MemoryDB, ClickHouse, Velero hourly, 35 days; snapshot taken by the migration Job before every schema change, kept 35 days
   D4: logical-error restore 30 min; backup_restore_duration_seconds with alert at 80%; zstd low level, restore as code, warm-up before traffic
   D5: object backups colder after 7 and 14 days; monthly 7-year archive in the coldest tier
-  D6: Frankfurt is the only writing region; HA only from 3 AZs; no active-active, no standby compute; semi-automatic switch with fencing
-  D7: data replicated to us-east-1 and us-east-2 (headless Aurora Global secondaries, DynamoDB Global Tables MREC written only from Frankfurt, S3 RTC, ECR, hourly snapshot copies); MemoryDB rebuilt from Aurora; MSK rebuilt from the S3 archive; compute from Terraform at the switch; plan B us-east-2 after 10 min without capacity
+  D6: two regions only - Frankfurt (eu-central-1) is the only writing region, us-east-1 a hot standby at full production size, ready to take the whole load at any moment; HA inside Frankfurt from 3 AZs; no active-active; automatic switch with fencing
+  D7: data replicated to us-east-1 (Aurora Global secondaries, DynamoDB Global Tables MREC written only from Frankfurt, S3 RTC, ECR, hourly snapshot copies, Terraform state replica); clusters, node pools, services and MemoryDB run in us-east-1 at full size, one Aurora instance per cluster with its writer class; MSK rebuilt from the S3 archive; the switch promotes Aurora and moves DNS (ADR-0019)
   D8: a cell takes traffic at 75% of priority hot keys warm; after 5 min it takes traffic anyway with a non-paging alert
 cost: {finops_approval_above_usd_month: 1000, budgets_alert: [80%, 100%], reservation_utilization: "> 95%", coverage: 70-80%}
 open_issues:

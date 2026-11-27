@@ -10,6 +10,13 @@ snapshot:
 bootstrap:
   region: us-east-1
   initSecretId: pay/prod/vault/init
+  workloads:
+    cells:
+      - {name: cell-0, authMount: kubernetes}
+      - {name: cell-1, authMount: kubernetes-cell-1}
+      - {name: cell-2, authMount: kubernetes-cell-2}
+      - {name: cell-3, authMount: kubernetes-cell-3}
+      - {name: spare, authMount: kubernetes-spare}
 
 networkPolicy:
   # Other clusters of the VPC call Vault through its load balancer

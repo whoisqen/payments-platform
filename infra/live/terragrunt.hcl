@@ -5,11 +5,17 @@ locals {
   region       = local.parts[1]
   component    = element(local.parts, length(local.parts) - 1)
   cell         = length(local.parts) == 4 ? local.parts[2] : "shared"
-  region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1", "us-east-2" = "use2" }[local.region]
+  region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1" }[local.region]
 
   # The account comes from env.hcl because the path carries no account segment.
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
   cfg     = local.env_cfg.cfg
+
+  # PAY_STATE_REGION picks the working bucket (default) or a recovery replica; an unknown value fails instead of naming a new bucket.
+  state_region       = get_env("PAY_STATE_REGION", local.cfg.regions.working)
+  state_region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1" }[local.state_region]
+  # The replica of a multi-Region key keeps the key id, so only the region part of the ARN changes.
+  state_kms_key_arn = replace(local.env_cfg.state_kms_key_arn, ":${local.cfg.regions.working}:", ":${local.state_region}:")
 }
 
 remote_state {
@@ -20,14 +26,14 @@ remote_state {
     if_exists = "overwrite_terragrunt"
   }
 
-  # Every stack keeps its state in the eu-central-1 bucket of infra/bootstrap, under its own <env>/ prefix.
+  # Every stack keeps its state in the bucket of infra/bootstrap under its own <env>/ prefix; dependencies read the same bucket.
   config = {
-    bucket       = "${local.cfg.naming.prefix}-${local.env}-euc1-tf-state-${local.env_cfg.shared_services_account_id}"
+    bucket       = "${local.cfg.naming.prefix}-${local.env}-${local.state_region_short}-tf-state-${local.env_cfg.shared_services_account_id}"
     key          = "${path_relative_to_include("root")}/terraform.tfstate"
-    region       = local.cfg.regions.working
+    region       = local.state_region
     encrypt      = true
     use_lockfile = true
-    kms_key_id   = local.env_cfg.state_kms_key_arn
+    kms_key_id   = local.state_kms_key_arn
   }
 }
 

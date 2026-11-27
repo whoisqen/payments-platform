@@ -167,6 +167,10 @@ resource "aws_lambda_function" "failover" {
       FENCE_RULE_GROUP = var.fence_rule_group
       DENY_POLICY_ARN  = var.deny_policy_arn
       CELLS            = jsonencode(var.cells)
+      # Pilot light: writers to add to headless secondaries, and the build of the standby compute started with the promotion.
+      SWITCH_WRITER_CLASSES = jsonencode(var.switch_writer_instance_classes)
+      COMPUTE_BUILD_URL     = var.compute_build == null ? "" : var.compute_build.dispatch_url
+      COMPUTE_BUILD_SECRET  = var.compute_build == null ? "" : var.compute_build.token_secret_arn
     }
   }
 
@@ -239,7 +243,25 @@ resource "aws_iam_role_policy" "function" {
         Action   = ["network-firewall:DescribeRuleGroup", "network-firewall:UpdateRuleGroup"]
         Resource = "arn:aws:network-firewall:${var.source_region}:${var.account_id}:stateful-rulegroup/${var.fence_rule_group}"
       },
-      ], var.deny_policy_arn == "" ? [] : [{
+      ], [for st in [
+        {
+          Sid      = "AddSwitchWriters"
+          Effect   = "Allow"
+          Action   = ["rds:CreateDBInstance", "rds:AddTagsToResource"]
+          Resource = ["arn:aws:rds:${data.aws_region.current.region}:${var.account_id}:db:${var.name_prefix}-${var.env}-${var.region_short}-aurora-*", "arn:aws:rds:${data.aws_region.current.region}:${var.account_id}:cluster:${var.name_prefix}-${var.env}-${var.region_short}-aurora-*"]
+        },
+        {
+          Sid      = "WatchSwitchWriters"
+          Effect   = "Allow"
+          Action   = ["rds:DescribeDBInstances", "rds:DescribeDBClusters"]
+          Resource = "*"
+        },
+        ] : st if length(var.switch_writer_instance_classes) > 0], var.compute_build == null ? [] : [{
+        Sid      = "ComputeBuildToken"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = var.compute_build.token_secret_arn
+        }], var.deny_policy_arn == "" ? [] : [{
         Sid      = "AllowStandbyDynamoDbWrites"
         Effect   = "Allow"
         Action   = ["iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion"]

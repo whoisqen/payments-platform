@@ -13,22 +13,15 @@ dependency "primary" {
 
   mock_outputs = {
     key_arns = {
-      "ebs-nodes" = "arn:aws:kms:eu-central-1:000000000000:key/mrk-ebs-nodes"
-      "logs"      = "arn:aws:kms:eu-central-1:000000000000:key/mrk-logs"
-      "shared"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-shared"
-      "locker"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-locker"
-      "backup"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-backup"
-      "cell-0"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-0"
-      "cell-1"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-1"
-      "cell-2"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-2"
-      "cell-3"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-3"
-      "spare"     = "arn:aws:kms:eu-central-1:000000000000:key/mrk-spare"
+      "logs" = "arn:aws:kms:eu-central-1:000000000000:key/mrk-logs"
     }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
+# Only the edge runs here (panel-edge, waf-edge) and it uses only the logs key; no cell or locker key exists in this region.
 inputs = {
+  keys             = { logs = include.envcommon.locals.env_cfg.kms_keys["logs"] }
   is_replica       = true
   primary_key_arns = dependency.primary.outputs.key_arns
 }

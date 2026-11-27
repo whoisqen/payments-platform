@@ -1,5 +1,5 @@
 locals {
-  region_short = { "us-east-1" = "use1", "us-east-2" = "use2" }[var.region]
+  region_short = { "us-east-1" = "use1" }[var.region]
   name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}-${var.account_id}"
 }
 
@@ -52,19 +52,49 @@ resource "aws_s3_bucket_public_access_block" "this" {
   restrict_public_buckets = true
 }
 
+# During a region switch the DR apply role reads and writes the <env>/ prefix here; everything else only replicates in.
 resource "aws_s3_bucket_policy" "tls_only" {
   bucket = aws_s3_bucket.this.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid       = "TlsOnly"
-      Effect    = "Deny"
-      Principal = "*"
-      Action    = "s3:*"
-      Resource  = [aws_s3_bucket.this.arn, "${aws_s3_bucket.this.arn}/*"]
-      Condition = { Bool = { "aws:SecureTransport" = "false" } }
-    }]
+    Statement = concat(
+      [
+        {
+          Sid       = "TlsOnly"
+          Effect    = "Deny"
+          Principal = "*"
+          Action    = "s3:*"
+          Resource  = [aws_s3_bucket.this.arn, "${aws_s3_bucket.this.arn}/*"]
+          Condition = { Bool = { "aws:SecureTransport" = "false" } }
+        },
+        {
+          Sid       = "KmsEncryptedWritesOnly"
+          Effect    = "Deny"
+          Principal = "*"
+          Action    = "s3:PutObject"
+          Resource  = "${aws_s3_bucket.this.arn}/*"
+          Condition = { StringNotEquals = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
+        },
+      ],
+      [for st in [
+        {
+          Sid       = "SwitchStateReadWrite"
+          Effect    = "Allow"
+          Principal = { AWS = var.writer_role_arns }
+          Action    = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"]
+          Resource  = "${aws_s3_bucket.this.arn}/${var.environment}/*"
+        },
+        {
+          Sid       = "SwitchStateList"
+          Effect    = "Allow"
+          Principal = { AWS = var.writer_role_arns }
+          Action    = "s3:ListBucket"
+          Resource  = aws_s3_bucket.this.arn
+          Condition = { StringLike = { "s3:prefix" = ["${var.environment}/*"] } }
+        },
+      ] : st if length(var.writer_role_arns) > 0],
+    )
   })
 
   depends_on = [aws_s3_bucket_public_access_block.this]

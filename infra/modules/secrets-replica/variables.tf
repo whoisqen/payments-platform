@@ -51,7 +51,7 @@ variable "secrets" {
 }
 
 variable "recovery_regions" {
-  description = "Replica regions with the replica KMS key of each (us-east-1, us-east-2)."
+  description = "Replica region with its replica KMS key (us-east-1)."
   type = map(object({
     kms_key_arn = string
   }))

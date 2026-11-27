@@ -1,0 +1,94 @@
+suite: working hours scale dev and stage workloads to zero outside the window
+templates:
+  - charts/router/templates/autoscaling.yaml
+  - charts/router/templates/workload.yaml
+  - charts/drainer/templates/autoscaling.yaml
+  - charts/scheduler/templates/producer/autoscaling.yaml
+  - charts/scheduler/templates/producer/workload.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.cell: cell-0
+  global.environment: dev
+  global.region: eu-central-1
+  global.dataCidrs: ["10.120.0.0/16"]
+  global.endpointCidrs: ["10.120.255.0/24"]
+  global.hyperswitch.database.host: pay-dev-euc1-aurora-cell-0.proxy-example.eu-central-1.rds.amazonaws.com
+  global.hyperswitch.redis.host: clustercfg.pay-dev-euc1-memorydb-cell-0.example.memorydb.eu-central-1.amazonaws.com
+  global.hyperswitch.tenant.baseUrl: https://api.dev.payments.example.com
+  global.workingHours:
+    timezone: Europe/Berlin
+    start: "0 8 * * 1-5"
+    end: "0 20 * * 1-5"
+  router.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  drainer.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  scheduler.image.digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  migrations.image.digest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  router.autoscaling.minReplicas: 3
+  router.autoscaling.maxReplicas: 6
+tests:
+  - it: turns the router HPA into a ScaledObject with a cron floor and the CPU target
+    template: charts/router/templates/autoscaling.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.maxReplicaCount
+          value: 6
+      - equal:
+          path: spec.triggers[0]
+          value:
+            type: cron
+            metadata: {timezone: Europe/Berlin, start: "0 8 * * 1-5", end: "0 20 * * 1-5", desiredReplicas: "3"}
+      - equal:
+          path: spec.triggers[1]
+          value: {type: cpu, metricType: Utilization, metadata: {value: "70"}}
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds
+          value: 600
+  - it: leaves the replica count of the router to KEDA
+    template: charts/router/templates/workload.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: spec.replicas
+  - it: keeps the drainer stream triggers after the cron floor
+    template: charts/drainer/templates/autoscaling.yaml
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.triggers[0].type
+          value: cron
+      - equal:
+          path: spec.triggers[1].type
+          value: redis-streams
+  - it: scales the scheduler producer between zero and its fixed count
+    template: charts/scheduler/templates/producer/autoscaling.yaml
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.maxReplicaCount
+          value: 2
+      - lengthEqual:
+          path: spec.triggers
+          count: 1
+      - notExists:
+          path: spec.advanced
+  - it: leaves the replica count of the producer to KEDA
+    template: charts/scheduler/templates/producer/workload.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: spec.replicas
+  - it: rejects a window that is not a five-field cron
+    set:
+      global.workingHours.start: "cron(0 8 ? * MON-FRI *)"
+    template: charts/router/templates/autoscaling.yaml
+    asserts:
+      - failedTemplate: {}

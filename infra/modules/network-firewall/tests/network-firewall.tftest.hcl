@@ -174,3 +174,28 @@ run "trusted_runners_get_extra_aws_domains_before_the_ci_allowlist" {
     error_message = "fence, then the trusted extras, then the CI allowlist"
   }
 }
+
+run "one_firewall_az_only_in_dev" {
+  command = plan
+
+  variables {
+    environment         = "dev"
+    firewall_subnet_ids = ["subnet-a1"]
+  }
+
+  assert {
+    condition     = length(aws_networkfirewall_firewall.this.subnet_mapping) == 1 && length(aws_nat_gateway.this) == 3
+    error_message = "dev maps one firewall subnet and keeps the three NAT gateways and their EIPs"
+  }
+}
+
+run "one_firewall_az_rejected_outside_dev" {
+  command = plan
+
+  variables {
+    environment         = "prod"
+    firewall_subnet_ids = ["subnet-a1"]
+  }
+
+  expect_failures = [var.firewall_subnet_ids]
+}

@@ -109,12 +109,12 @@ tests:
             path: deploy/envs/prod/images.yaml
             exclude: true
         documentIndex: 2
-  - it: allows exactly the 15 cluster kinds in the platform project and none in payments
+  - it: allows exactly the 16 cluster kinds in the platform project and none in payments
     template: appprojects.yaml
     asserts:
       - lengthEqual:
           path: spec.clusterResourceWhitelist
-          count: 15
+          count: 16
         documentIndex: 0
       - equal:
           path: spec.clusterResourceWhitelist

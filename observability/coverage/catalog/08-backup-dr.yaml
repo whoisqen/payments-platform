@@ -130,7 +130,7 @@ modes:
   id: backup-dr-dr-switch-test-overdue
   component: dr-test
   failure: quarterly switch test overdue
-  impact: the 60 min RTO (75 min in plan B) is not measured; the switch runbook may have rotted
+  impact: the 60 min RTO is not measured; the switch runbook may have rotted
   severity: warning
   alert: DrSwitchTestOverdue
   signal: metric
@@ -147,8 +147,8 @@ modes:
 - layer: backup-dr
   id: backup-dr-recovery-region-quota-low
   component: recovery-regions
-  failure: Service quotas in us-east-1 or us-east-2 below the switch plan
-  impact: compute cannot be created at the switch (plan B trigger)
+  failure: Service quotas in us-east-1 below the switch plan
+  impact: compute cannot be built at the switch, so the RTO is missed
   severity: warning
   alert: null
   signal: metric

@@ -1,0 +1,24 @@
+# Two replicas of each part: the drainer and scheduler scalers and the dev and stage working window depend on them
+operator:
+  replicaCount: 2
+metricsServer:
+  replicaCount: 2
+webhooks:
+  replicaCount: 2
+
+podDisruptionBudget:
+  operator: {minAvailable: 1}
+  metricServer: {minAvailable: 1}
+  webhooks: {minAvailable: 1}
+
+# Off the nodes Karpenter provisions, like the other controllers
+nodeSelector:
+  karpenter.sh/nodepool: system
+
+prometheus:
+  metricServer:
+    enabled: true
+    serviceMonitor: {enabled: true}
+  operator:
+    enabled: true
+    serviceMonitor: {enabled: true}

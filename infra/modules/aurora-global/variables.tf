@@ -118,6 +118,17 @@ variable "reader_instance_class" {
   default     = "db.r7g.4xlarge"
 }
 
+variable "storage_type" {
+  description = "Cluster storage of the working region: aurora-iopt1 (I/O-Optimized) for busy clusters, aurora (Standard) where I/O stays under about 25% of the bill; changeable once every 30 days."
+  type        = string
+  default     = "aurora-iopt1"
+
+  validation {
+    condition     = contains(["aurora", "aurora-iopt1"], var.storage_type)
+    error_message = "storage_type must be aurora or aurora-iopt1."
+  }
+}
+
 variable "reader_count" {
   description = "Number of readers in the working region."
   type        = number

@@ -2,6 +2,11 @@
 global:
   environment: stage
   region: eu-central-1
+  # Working window of the dev Aurora schedule (aurora-schedule: 08:00-20:00 Mon-Fri, Europe/Berlin); outside it KEDA scales the workloads to zero
+  workingHours:
+    timezone: Europe/Berlin
+    start: "0 8 * * 1-5"
+    end: "0 20 * * 1-5"
   dataCidrs:
     - 10.130.8.0/22
   endpointCidrs:

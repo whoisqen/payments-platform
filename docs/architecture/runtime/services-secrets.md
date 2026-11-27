@@ -51,7 +51,7 @@ flowchart LR
 - Paths: `secret/<env>/<cell>/{router,drainer,scheduler}/{database,redis}`, `secret/<env>/<cell>/shared/app`, `secret/<env>/<cell>/shared/locker`, `secret/<env>/locker/...`.
 - The admin tools of the central cluster read `pay/shared-services/...` from Secrets Manager, including their Okta client secrets.
 - Pods read secrets at start, so a rotation is: write the new version, wait for the ExternalSecret refresh, restart the deployment.
-- Hourly Raft snapshots go to a locked bucket replicated to both recovery regions. Break-glass access is described in `deploy/platform/vault/README.md`.
+- Hourly Raft snapshots go to a locked bucket, replicated to us-east-1 in prod. Break-glass access is described in `deploy/platform/vault/README.md`.
 
 ## Where in the repo
 

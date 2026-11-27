@@ -70,7 +70,7 @@ class BlackboxProbePointsTest(unittest.TestCase):
 
     def test_three_independent_points_outside_the_working_region(self):
         points = {p["spec"]["targets"]["staticConfig"]["labels"]["probe_point"] for p in self.probes}
-        self.assertEqual(points, {"use1", "use2", "ext"})
+        self.assertEqual(points, {"use1", "ext", "ext2"})
         urls = [p["spec"]["prober"]["url"] for p in self.probes]
         self.assertEqual(len(set(urls)), 3)
         for url in urls:

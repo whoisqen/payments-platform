@@ -127,3 +127,33 @@ variable "sns_kms_key_arn" {
     error_message = "sns_kms_key_arn must be a KMS key ARN (not an alias, never alias/aws/sns)."
   }
 }
+
+variable "switch_writer_instance_classes" {
+  description = "Pilot light: instance class by cell (cells, spare, locker) of the writer the failover adds to each headless secondary before promoting it; empty when the standby keeps readers."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = length(var.switch_writer_instance_classes) == 0 || alltrue([for c in var.cells : contains(keys(var.switch_writer_instance_classes), c)])
+    error_message = "switch_writer_instance_classes must name every entry of cells."
+  }
+
+  validation {
+    condition     = alltrue([for c in values(var.switch_writer_instance_classes) : can(regex("^db\\.[a-z0-9]+\\.[a-z0-9]+$", c))])
+    error_message = "instance classes must look like db.r7g.4xlarge."
+  }
+}
+
+variable "compute_build" {
+  description = "Pilot light: CI workflow-dispatch URL that builds the standby compute and MemoryDB (Terragrunt with PAY_STANDBY_COMPUTE=true) and the Secrets Manager secret of its token; null leaves the build to the on-call."
+  type = object({
+    dispatch_url     = string
+    token_secret_arn = string
+  })
+  default = null
+
+  validation {
+    condition     = var.compute_build == null || (startswith(var.compute_build.dispatch_url, "https://") && can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$", var.compute_build.token_secret_arn)))
+    error_message = "compute_build needs an https dispatch URL and a Secrets Manager secret ARN."
+  }
+}

@@ -1,7 +1,7 @@
 locals {
   env_cfg      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
   region       = basename(dirname(get_terragrunt_dir()))
-  region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1", "us-east-2" = "use2" }[local.region]
+  region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1" }[local.region]
   chaos        = try(local.env_cfg.cfg.chaos[local.env_cfg.environment], {})
   name         = "${local.env_cfg.cfg.naming.prefix}-${local.env_cfg.environment}-${local.region_short}"
   cell         = try(local.chaos.target_cell, "cell-1")

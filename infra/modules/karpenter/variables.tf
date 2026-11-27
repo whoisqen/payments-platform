@@ -51,10 +51,10 @@ variable "security_group_ids" {
 
 variable "bottlerocket_version" {
   type        = string
-  description = "Pinned Bottlerocket release, for example v1.49.0; latest is rejected so that a node image changes only through a pull request."
+  description = "Pinned Bottlerocket release, for example v1.70.0; latest is rejected so that a node image changes only through a pull request."
   validation {
     condition     = can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+$", var.bottlerocket_version))
-    error_message = "bottlerocket_version must look like v1.49.0."
+    error_message = "bottlerocket_version must look like v1.70.0."
   }
 }
 
@@ -66,7 +66,7 @@ variable "max_pods" {
 
 variable "instance_families" {
   type        = map(list(string))
-  description = "Instance families per pool; several families and both architectures keep the switch possible when one family has no capacity (plan B of D7)."
+  description = "Instance families per pool; several families and both architectures keep capacity in us-east-1 when one family runs short."
   default = {
     payments = ["m7g", "m6g", "m7i", "m6i"]
     stateful = ["r7g", "r6g", "r7i", "r6i"]
@@ -99,10 +99,10 @@ variable "enabled_pools" {
 variable "spot_pools" {
   type        = list(string)
   default     = []
-  description = "Pools that may use Spot nodes besides the on-demand fallback; the workers pool always may. Never the cde pool."
+  description = "Pools that may use Spot nodes besides the on-demand fallback; production lists none. Never the cde pool."
   validation {
-    condition     = alltrue([for n in var.spot_pools : contains(["payments", "stateful"], n)])
-    error_message = "spot_pools may contain payments and stateful only: CDE nodes are never Spot, workers always may be."
+    condition     = alltrue([for n in var.spot_pools : contains(["payments", "stateful", "workers"], n)])
+    error_message = "spot_pools may contain payments, stateful and workers only: CDE nodes are never Spot."
   }
 }
 

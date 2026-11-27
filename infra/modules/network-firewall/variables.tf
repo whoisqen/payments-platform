@@ -31,11 +31,11 @@ variable "vpc_id" {
 
 variable "firewall_subnet_ids" {
   type        = list(string)
-  description = "Dedicated firewall subnets, one per AZ."
+  description = "Dedicated firewall subnets, one per AZ; dev may map one and route the other AZs to its endpoint."
 
   validation {
-    condition     = length(var.firewall_subnet_ids) == 3
-    error_message = "firewall_subnet_ids needs one subnet in each of the three AZs."
+    condition     = length(var.firewall_subnet_ids) == 3 || (length(var.firewall_subnet_ids) == 1 && var.environment == "dev")
+    error_message = "firewall_subnet_ids needs one subnet in each of the three AZs (dev may use one)."
   }
 }
 

@@ -52,7 +52,7 @@ tests:
   input_series:
   - series: synthetic_payment_success{probe_point="use1"}
     values: '0x19'
-  - series: synthetic_payment_success{probe_point="use2"}
+  - series: synthetic_payment_success{probe_point="ext2"}
     values: '0x19'
   - series: synthetic_payment_success{probe_point="ext"}
     values: '0x19'
@@ -78,7 +78,7 @@ tests:
   input_series:
   - series: synthetic_payment_success{probe_point="use1"}
     values: 1x19
-  - series: synthetic_payment_success{probe_point="use2"}
+  - series: synthetic_payment_success{probe_point="ext2"}
     values: 1x19
   - series: synthetic_payment_success{probe_point="ext"}
     values: 1x19

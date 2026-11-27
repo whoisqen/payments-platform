@@ -14,10 +14,6 @@
             "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup": {
               "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup"},
               "lifecycle": {"delete_after_days": {"@@assign": "35"}}
-            },
-            "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup": {
-              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup"},
-              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
             }
           }
         },
@@ -53,10 +49,6 @@
           "copy_actions": {
             "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup": {
               "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-1:000000000000:backup-vault:payments-backup"},
-              "lifecycle": {"delete_after_days": {"@@assign": "35"}}
-            },
-            "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup": {
-              "target_backup_vault_arn": {"@@assign": "arn:aws:backup:us-east-2:000000000000:backup-vault:payments-backup"},
               "lifecycle": {"delete_after_days": {"@@assign": "35"}}
             }
           }

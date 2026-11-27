@@ -62,4 +62,6 @@ inputs = {
   kms_key_arn        = dependency.kms.outputs.key_arns["spare"]
   subnet_ids         = dependency.vpc.outputs.subnet_ids["data"]
   security_group_ids = [dependency.data_access.outputs.security_group_ids["memorydb"]]
+  # Minimal profile of the spare; the merchant-move runbook reshards it before a hot merchant lands.
+  num_shards = 1
 }

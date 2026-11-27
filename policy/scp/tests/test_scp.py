@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # SCP limit 5120 characters, backup policy limit 10000 characters, both counted without whitespace.
 SCP_LIMIT = 5120
 BACKUP_LIMIT = 10000
-REGIONS = ["eu-central-1", "us-east-1", "us-east-2"]
+REGIONS = ["eu-central-1", "us-east-1"]
 
 
 def load(path):
@@ -209,8 +209,8 @@ class DynamoDbRecoveryRegions(unittest.TestCase):
             "DenyDynamoDbWritesInRecoveryRegionsExceptReplication"
         ]
 
-    def test_writes_are_denied_in_both_recovery_regions_only(self):
-        self.assertEqual(self.s["Condition"]["StringEquals"]["aws:RequestedRegion"], ["us-east-1", "us-east-2"])
+    def test_writes_are_denied_in_the_standby_region_only(self):
+        self.assertEqual(self.s["Condition"]["StringEquals"]["aws:RequestedRegion"], ["us-east-1"])
 
     def test_every_write_api_is_listed(self):
         for a in ("PutItem", "UpdateItem", "DeleteItem", "BatchWriteItem", "TransactWriteItems", "ExecuteStatement"):
@@ -253,7 +253,7 @@ class BackupPolicy(unittest.TestCase):
         self.assertIs(rule["enable_continuous_backup"]["@@assign"], True)
         copies = " ".join(rule["copy_actions"])
         self.assertIn("us-east-1", copies)
-        self.assertIn("us-east-2", copies)
+        self.assertNotIn("us-east-2", copies)
         self.assertNotIn("eu-west-1", copies)
 
     def test_gold_keeps_a_monthly_copy_for_seven_years(self):

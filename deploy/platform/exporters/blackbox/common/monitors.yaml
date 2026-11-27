@@ -45,7 +45,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
-  name: probe-use2
+  name: probe-ext2
   namespace: monitoring
   labels:
     app.kubernetes.io/part-of: payments-platform
@@ -55,11 +55,11 @@ spec:
   interval: 30s
   module: http_2xx
   prober:
-    url: blackbox.use2.probes.payments.internal:9115
+    url: blackbox.ext2.probes.payments.internal:9115
   targets:
     staticConfig:
       labels:
-        probe_point: use2
+        probe_point: ext2
       static:
       - https://api.eu-central-1.payments.internal/probe/region-health
       - https://api.payments.internal/probe/api

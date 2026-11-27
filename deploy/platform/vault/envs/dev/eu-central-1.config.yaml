@@ -10,6 +10,10 @@ snapshot:
 bootstrap:
   region: eu-central-1
   initSecretId: pay/dev/vault/init
+  workloads:
+    cells:
+      - {name: cell-0, authMount: kubernetes}
+      - {name: spare, authMount: kubernetes-spare}
 
 networkPolicy:
   # Other clusters of the VPC call Vault through its load balancer

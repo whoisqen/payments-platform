@@ -42,7 +42,7 @@ tests:
           pattern: 'event_type": "smoke-green-\{\{index .app.metadata.labels "payments-platform/environment"\}\}"'
       - matchRegex:
           path: data["subscriptions"]
-          pattern: "recipients: \\[webhook:github-dispatch\\]\\n  selector: payments-platform/cell=cell-3,payments-platform/environment in \\(dev,stage\\)\\n  triggers: \\[smoke-green\\]"
+          pattern: "recipients: \\[webhook:github-dispatch\\]\\n  selector: payments-platform/cell=spare,payments-platform/environment in \\(dev,stage\\)\\n  triggers: \\[smoke-green\\]"
       - matchRegex:
           path: data["subscriptions"]
           pattern: "recipients: \\[webhook:alertmanager\\]\\n  selector: payments-platform/environment in \\(dev,stage\\)\\n  triggers: \\[smoke-failed\\]"

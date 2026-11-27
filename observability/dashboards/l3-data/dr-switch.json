@@ -1,7 +1,7 @@
 {
   "uid": "dr-switch",
   "title": "L3 DR switch readiness",
-  "description": "Recovery regions us-east-1 and us-east-2: replication, probes, test history.",
+  "description": "Standby region us-east-1 (pilot light): replication, probes, test history.",
   "tags": [
     "payments-platform",
     "l3",
@@ -401,7 +401,7 @@
         "h": 4
       },
       "title": "dr test: days since last switch",
-      "description": "The test is quarterly, to us-east-1 and us-east-2 in turn; DrSwitchTestOverdue warns after 100 days.",
+      "description": "The test is quarterly, to us-east-1; DrSwitchTestOverdue warns after 100 days.",
       "targets": [
         {
           "refId": "A",
@@ -478,7 +478,7 @@
         "h": 4
       },
       "title": "dr test: last switch duration",
-      "description": "RTO target 60 minutes, 75 in plan B; a target, not an alert.",
+      "description": "RTO target 60 minutes, critical path 54; a target, not an alert.",
       "targets": [
         {
           "refId": "A",
@@ -503,11 +503,11 @@
               },
               {
                 "color": "yellow",
-                "value": 60
+                "value": 54
               },
               {
                 "color": "red",
-                "value": 75
+                "value": 60
               }
             ]
           },

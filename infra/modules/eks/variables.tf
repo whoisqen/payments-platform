@@ -26,7 +26,7 @@ variable "kubernetes_version" {
   description = "Control plane version; node images and add-ons follow it."
   validation {
     condition     = can(regex("^1\\.[0-9]{2}$", var.kubernetes_version))
-    error_message = "kubernetes_version must look like 1.34."
+    error_message = "kubernetes_version must look like 1.37."
   }
 }
 
@@ -72,7 +72,21 @@ variable "permissions_boundary_arn" {
 variable "log_retention_days" {
   type        = number
   default     = 365
-  description = "Retention of control-plane logs; PCI DSS 10.5.1 keeps one year."
+  description = "CloudWatch retention of control-plane logs; PCI DSS 10.5.1 keeps one year, so below 365 needs log_archive."
+}
+
+variable "log_archive" {
+  type = object({
+    bucket_arn = string
+    account_id = string
+    prefix     = optional(string, "eks")
+  })
+  default     = null
+  description = "Log archive bucket (Object Lock, one year) that receives the control-plane logs through Firehose; null keeps them in CloudWatch only."
+  validation {
+    condition     = var.log_archive == null || (can(regex("^arn:aws:s3:::[a-z0-9.-]+$", var.log_archive.bucket_arn)) && can(regex("^[0-9]{12}$", var.log_archive.account_id)))
+    error_message = "log_archive needs a bucket ARN and the 12-digit account id of the archive."
+  }
 }
 
 variable "access_entries" {
@@ -94,7 +108,7 @@ variable "access_entries" {
 variable "addon_versions" {
   type        = map(string)
   default     = {}
-  description = "Pinned add-on versions by add-on name; an add-on without an entry takes the default version of the cluster version."
+  description = "Pinned add-on versions by add-on name; an add-on without an entry takes the default version of kubernetes_version."
 }
 
 variable "bootstrap_instance_types" {

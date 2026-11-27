@@ -86,7 +86,7 @@ resource "aws_rds_cluster" "primary" {
   master_user_secret_kms_key_id       = var.kms_key_arn
   iam_database_authentication_enabled = true
 
-  storage_type                    = "aurora-iopt1"
+  storage_type                    = var.storage_type
   storage_encrypted               = true
   kms_key_id                      = var.kms_key_arn
   db_subnet_group_name            = var.db_subnet_group_name

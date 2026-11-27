@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-keda
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/addons: enabled
+  template:
+    metadata:
+      name: 'keda-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: keda
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: keda
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://kedacore.github.io/charts
+          chart: keda
+          targetRevision: 2.21.1
+          helm:
+            valueFiles:
+              - $values/deploy/platform/keda/values.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

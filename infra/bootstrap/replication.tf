@@ -3,27 +3,23 @@ module "replica_use1" {
 
   providers = { aws = aws.use1 }
 
-  region         = "us-east-1"
-  environment    = var.environment
-  name_prefix    = var.name_prefix
-  account_id     = var.account_id
-  kms_key_arn    = module.state_key_use1.key_arn
-  retention_days = var.state_retention_days
-  tags           = var.tags
+  region           = "us-east-1"
+  environment      = var.environment
+  name_prefix      = var.name_prefix
+  account_id       = var.account_id
+  kms_key_arn      = module.state_key_use1.key_arn
+  retention_days   = var.state_retention_days
+  writer_role_arns = var.dr_apply_role_arns
+  tags             = var.tags
 }
 
-module "replica_use2" {
-  source = "./modules/replica-bucket"
+# The recovery region us-east-2 is withdrawn; its locked replica is forgotten, not deleted, and expires by hand after the retention.
+removed {
+  from = module.replica_use2
 
-  providers = { aws = aws.use2 }
-
-  region         = "us-east-2"
-  environment    = var.environment
-  name_prefix    = var.name_prefix
-  account_id     = var.account_id
-  kms_key_arn    = module.state_key_use2.key_arn
-  retention_days = var.state_retention_days
-  tags           = var.tags
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "aws_iam_role" "replication" {
@@ -60,15 +56,15 @@ resource "aws_iam_role_policy" "replication" {
         Sid      = "WriteReplicas"
         Effect   = "Allow"
         Action   = ["s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags"]
-        Resource = ["${module.replica_use1.bucket_arn}/*", "${module.replica_use2.bucket_arn}/*"]
+        Resource = "${module.replica_use1.bucket_arn}/*"
       },
       { Sid = "DecryptSource", Effect = "Allow", Action = "kms:Decrypt", Resource = module.state_key.key_arn },
-      { Sid = "EncryptReplicas", Effect = "Allow", Action = ["kms:Encrypt", "kms:GenerateDataKey"], Resource = [module.state_key_use1.key_arn, module.state_key_use2.key_arn] },
+      { Sid = "EncryptReplicas", Effect = "Allow", Action = ["kms:Encrypt", "kms:GenerateDataKey"], Resource = module.state_key_use1.key_arn },
     ]
   })
 }
 
-# Replication Time Control gives the 15 minute S3 RPO of decision D7.
+# Replication Time Control gives the 15 minute S3 RPO of decision D7; replication_enabled = false holds it during a failback.
 resource "aws_s3_bucket_replication_configuration" "state" {
   bucket = aws_s3_bucket.state.id
   role   = aws_iam_role.replication.arn
@@ -76,13 +72,12 @@ resource "aws_s3_bucket_replication_configuration" "state" {
   dynamic "rule" {
     for_each = {
       use1 = { priority = 1, bucket = module.replica_use1.bucket_arn, key = module.state_key_use1.key_arn }
-      use2 = { priority = 2, bucket = module.replica_use2.bucket_arn, key = module.state_key_use2.key_arn }
     }
 
     content {
       id       = "to-${rule.key}"
       priority = rule.value.priority
-      status   = "Enabled"
+      status   = var.replication_enabled ? "Enabled" : "Disabled"
 
       filter {}
 
@@ -123,5 +118,5 @@ resource "aws_s3_bucket_replication_configuration" "state" {
     }
   }
 
-  depends_on = [aws_s3_bucket_versioning.state, module.replica_use1, module.replica_use2]
+  depends_on = [aws_s3_bucket_versioning.state, module.replica_use1]
 }

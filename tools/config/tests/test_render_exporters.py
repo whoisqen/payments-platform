@@ -56,9 +56,9 @@ class RenderExportersTest(unittest.TestCase):
             self.assertEqual(len(np["spec"]["egress"]), 2)
 
     def test_standby_region_uses_its_own_data_cidrs(self):
-        np = doc(BASE / "postgres" / "envs" / "stage" / "us-east-1" / "networkpolicy.yaml")
+        np = doc(BASE / "postgres" / "envs" / "prod" / "us-east-1" / "networkpolicy.yaml")
         cidrs = [t["ipBlock"]["cidr"] for e in np["spec"]["egress"] for t in e["to"] if "ipBlock" in t]
-        self.assertEqual(cidrs, CFG["deploy"]["stage"]["standby"]["us-east-1"]["data_cidrs"])
+        self.assertEqual(cidrs, CFG["deploy"]["prod"]["standby"]["us-east-1"]["data_cidrs"])
 
     def test_monitors_are_the_source_documents_with_the_kafka_port_fixed(self):
         kinds = {n: [d["kind"] for d in yaml.safe_load_all(OUT[BASE / n / "common" / "monitors.yaml"])] for n in ("postgres", "redis", "kafka", "clickhouse", "blackbox")}

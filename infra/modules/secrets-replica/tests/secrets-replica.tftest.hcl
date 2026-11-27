@@ -13,7 +13,6 @@ variables {
 
   recovery_regions = {
     "us-east-1" = { kms_key_arn = "arn:aws:kms:us-east-1:111111111111:key/mrk-0006" }
-    "us-east-2" = { kms_key_arn = "arn:aws:kms:us-east-2:111111111111:key/mrk-0006" }
   }
 
   tags = {
@@ -36,7 +35,7 @@ run "every_secret_is_replicated_to_both_regions" {
   assert {
     condition = alltrue([
       for s in aws_secretsmanager_secret.this :
-      toset([for r in s.replica : r.region]) == toset(["us-east-1", "us-east-2"])
+      toset([for r in s.replica : r.region]) == toset(["us-east-1"])
     ])
     error_message = "each secret needs a replica in both recovery regions"
   }

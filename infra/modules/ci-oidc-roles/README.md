@@ -6,4 +6,5 @@ Plan reads metadata, the state of its environment and writes only `.tflock` file
 An apply role gets its named actions on named resources, its own state prefix `<env>/<component>/`, a 1 hour session,
 the permissions boundary, and a deny on roles created without that boundary. `*`, `iam:*` and wildcard resources are rejected.
 `plan_refs` accepts only `refs/heads/main`; `ecr_read_repository_arns` creates `<prefix>-<env>-glob-ecr-read` (main only, read-only images). `environment` may be shared-services.
+`dr_apply` creates `<prefix>-<env>-glob-dr-apply` (region switch): trusted only by the `dr-compute-<env>` GitHub environment, read and write `<env>/` in the state bucket and its us-east-1 replica.
 Test: `terraform init -backend=false && terraform test`.

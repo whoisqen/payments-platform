@@ -1,3 +1,8 @@
 # stage is a copy of prod in size and topology (tests of the whole platform run here); only the capacity type of its nodes differs.
 eks:
-  spot_pools: [payments, stateful]
+  spot_pools: [payments, stateful, workers]
+# Only prod has a standby region; stage runs in eu-central-1 alone.
+standby:
+  enabled: false
+  compute_enabled: false
+  reader_count: 0

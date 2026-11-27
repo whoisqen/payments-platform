@@ -10,7 +10,7 @@
       "uniqueItems": true,
       "items": {"enum": ["dev", "stage"]}
     },
-    "dispatchCell": {"type": "string", "pattern": "^cell-[0-9]+$"},
+    "dispatchCell": {"type": "string", "pattern": "^(cell-[0-9]+|spare)$"},
     "secret": {
       "type": "object",
       "additionalProperties": false,

@@ -12,7 +12,6 @@ variables {
       active        = false
       endpoint_arns = ["arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/net/pay-prod-use1-ingress/0123456789abcdef"]
     }
-    "us-east-2" = { active = false }
   }
   tags = {
     environment = "prod", team = "platform", owner = "platform@example.com", cost-center = "cc-100", cell = "shared"
@@ -28,7 +27,7 @@ run "listener_and_groups" {
     error_message = "accelerator name and TCP listener"
   }
   assert {
-    condition     = length(aws_globalaccelerator_endpoint_group.this) == 3
+    condition     = length(aws_globalaccelerator_endpoint_group.this) == 2
     error_message = "one group per region"
   }
 }
@@ -37,7 +36,7 @@ run "recovery_groups_have_weight_zero" {
   command = plan
 
   assert {
-    condition     = alltrue([for e in aws_globalaccelerator_endpoint_group.this["us-east-1"].endpoint_configuration : e.weight == 0]) && aws_globalaccelerator_endpoint_group.this["us-east-1"].traffic_dial_percentage == 0 && aws_globalaccelerator_endpoint_group.this["us-east-2"].traffic_dial_percentage == 0
+    condition     = alltrue([for e in aws_globalaccelerator_endpoint_group.this["us-east-1"].endpoint_configuration : e.weight == 0]) && aws_globalaccelerator_endpoint_group.this["us-east-1"].traffic_dial_percentage == 0
     error_message = "recovery groups take no traffic"
   }
   assert {

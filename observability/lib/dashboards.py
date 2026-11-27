@@ -404,15 +404,15 @@ def build_all():
     out.append(("l3-data", d))
 
     d = Dashboard("dr-switch", TITLES["dr-switch"], "l3", ["dr", "switch"], links=nav("platform-overview", "backup", "data-stores"), runbooks=["backup-dr", "network", "meta"],
-                  description="Recovery regions us-east-1 and us-east-2: replication, probes, test history.")
+                  description="Standby region us-east-1 (pilot light): replication, probes, test history.")
     probe = f'min by (probe_point) (probe_success{{env=~"$env",probe_target="region-health"}})'
     d.row("Overview")
     d.stat("aurora global: worst lag", f'max(aws_rds_aurora_global_db_replication_lag_maximum{{{F}}})', "ms", thr=steps(T.AURORA_GLOBAL_LAG_MS / 2, T.AURORA_GLOBAL_LAG_MS), decimals=0,
            desc="Pages above 5 s; the RPO budget is 10 s (D7).")
     d.stat("probes: points failing", f"count({probe} == 0) or vector(0)", "short", thr=steps(1, 2), desc="RegionDown pages when two of the three independent points fail.")
     d.stat("dr test: days since last switch", f'(time() - max(dr_switch_test_last_success_timestamp_seconds{{env=~"$env"}})) / 86400', "suffix: days", thr=steps(T.DR_TEST_OVERDUE_D),
-           decimals=0, desc="The test is quarterly, to us-east-1 and us-east-2 in turn; DrSwitchTestOverdue warns after 100 days.")
-    d.stat("dr test: last switch duration", f'max(dr_switch_test_duration_seconds{{env=~"$env"}}) / 60', "suffix: min", thr=steps(60, 75), decimals=0, desc="RTO target 60 minutes, 75 in plan B; a target, not an alert.")
+           decimals=0, desc="The test is quarterly, to us-east-1; DrSwitchTestOverdue warns after 100 days.")
+    d.stat("dr test: last switch duration", f'max(dr_switch_test_duration_seconds{{env=~"$env"}}) / 60', "suffix: min", thr=steps(54, 60), decimals=0, desc="RTO target 60 minutes, critical path 54; a target, not an alert.")
     d.stat("dr: lowest cache warm ratio", f'100 * min(cache_warm_ratio{{{F}}})', "percent", hi=100, thr=steps(T.CACHE_WARM_RATIO * 100, invert=True),
            desc="A cell takes traffic at 75% of the priority keys.")
     d.row("Replication")

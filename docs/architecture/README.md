@@ -21,7 +21,7 @@ flowchart LR
   ROUTER -->|"events"| MSK[("MSK")] --> CH[("ClickHouse")]
 ```
 
-1. The merchant calls `api.<zone>`. Route 53 answers with the ingress name of the working region (Frankfurt, `eu-central-1`) while its health check passes, and with the us-east-1 warm standby only when it fails.
+1. The merchant calls `api.<zone>`. Route 53 answers with the ingress name of the working region (Frankfurt, `eu-central-1`) while its health check passes, and with us-east-1 only when that check fails and the us-east-1 ingress passes its own check (prod only).
 2. A network load balancer passes the TCP connection to the `payments-edge` Gateway. Its Envoy proxies terminate TLS, give the request a request class (payments, read or list), apply the local and global rate limits and send the request to the router of the cell named in the `x-payments-cell` header. A request whose cell header is missing or unknown gets 503. The router of that cell authenticates the merchant's API key against its own database.
 3. The router keeps the payment state in MemoryDB and appends it to a Redis stream. It never writes PostgreSQL on the hot path (write-behind).
 4. When the payment carries card data, the router asks the locker for a token. The locker is the only place a PAN lives.
@@ -46,8 +46,8 @@ flowchart LR
 ## Regions
 
 - `eu-central-1` is the working region and the only one that writes. It runs in three Availability Zones, so losing one zone loses no data.
-- `us-east-1` is a warm standby in stage and prod: per cell a cluster, node pools, MemoryDB and Aurora readers that receive no traffic while Frankfurt is healthy. See [disaster recovery](../dr/README.md).
-- `us-east-2` holds data and backups only: Aurora Global secondaries, KMS replicas, ECR replicas, backup copies.
+- The platform has two regions. `us-east-1` is the hot standby of prod: its cells run at the working size all the time, with one Aurora instance per global secondary, and take the whole load at any moment. A switch fences Frankfurt, promotes Aurora, warms the cache and moves traffic within the 60-minute RTO ([ADR-0019](../adr/0019-hot-standby-recovery-region.md)). See [disaster recovery](../dr/README.md).
+- Stage and dev run in eu-central-1 alone. dev runs `cell-0` and the spare. In both, us-east-1 holds only the panel edge and its KMS keys.
 
 ## Pages
 

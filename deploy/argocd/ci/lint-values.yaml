@@ -16,3 +16,6 @@ central:
   tracesOtlpEndpoint: tempo.example.test:4317
 gated:
   revision: v1.0.0
+pilotLight:
+  - {environment: stage, region: us-east-1}
+  - {environment: prod, region: us-east-1}
