@@ -22,3 +22,6 @@ gatedEnvironments:
   - cde-prod
 gated:
   revision: ""
+# Recovery regions kept as a pilot light: no cluster runs there until the failover builds one, so their directories get no Application.
+# Generated from standby.compute_enabled in config/environments; the switch sets it and regenerates these values.
+pilotLight: []

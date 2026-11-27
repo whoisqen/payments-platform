@@ -38,7 +38,7 @@ From `policy/scp/`: allowed regions only; CloudTrail, Config and GuardDuty canno
 ## Secrets and keys
 
 - No secret in Git. Vault (KV v2) and AWS Secrets Manager hold them; External Secrets Operator delivers them; Terraform creates secret shells without values.
-- Customer managed KMS keys per purpose and cell, yearly rotation, multi-Region replicas for the recovery regions.
+- Customer managed KMS keys per purpose and cell, yearly rotation, multi-Region replicas in us-east-1 for prod.
 - gitleaks scans the full Git history in CI and locally with `make lint-secrets`.
 - Vault: auto-unseal with KMS, root token revoked after bootstrap, audit device on, break-glass procedure in `deploy/platform/vault/README.md`.
 

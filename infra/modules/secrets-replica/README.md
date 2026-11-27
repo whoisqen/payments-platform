@@ -1,6 +1,6 @@
 # secrets-replica
 
-Secrets Manager secrets with multi-Region replicas in us-east-1 and us-east-2, each encrypted with the replica KMS key of its region (D7).
+Secrets Manager secrets with a multi-Region replica in us-east-1, encrypted with the replica KMS key of that region (D7).
 
 - Creates containers only; no `aws_secretsmanager_secret_version`, so no value ever enters state or code.
 - Names follow `pay-<env>-<region-short>-<key>`.

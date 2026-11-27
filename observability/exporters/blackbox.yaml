@@ -38,21 +38,21 @@ spec:
         - {action: replace, sourceLabels: [__param_target], regex: "https://[^/]+/probe/([a-z-]+)", targetLabel: probe_target, replacement: "$1"}
         - {action: replace, sourceLabels: [__param_target], regex: "https://[^.]+\\.([a-z0-9-]+)\\.payments\\.internal/.*", targetLabel: region, replacement: "$1"}
 ---
-# Probe point use2: blackbox-exporter in us-east-2, the second recovery region.
+# Probe point ext2: blackbox-exporter at a second external synthetic-monitoring provider, independent of AWS and of ext.
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
-  name: probe-use2
+  name: probe-ext2
   namespace: monitoring
   labels: {app.kubernetes.io/part-of: payments-platform, prometheus: platform}
 spec:
   jobName: blackbox
   interval: 30s
   module: http_2xx
-  prober: {url: blackbox.use2.probes.payments.internal:9115}
+  prober: {url: blackbox.ext2.probes.payments.internal:9115}
   targets:
     staticConfig:
-      labels: {probe_point: use2}
+      labels: {probe_point: ext2}
       static:
         - https://api.eu-central-1.payments.internal/probe/region-health
         - https://api.payments.internal/probe/api

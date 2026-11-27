@@ -12,7 +12,7 @@ CFG = {
     "naming": {"prefix": "acme"},
     "registry": {"ecr_prefix": "1.dkr.ecr.eu-central-1.amazonaws.com", "ecr_repo_prefix": "pay"},
     "accounts": {"dev": "111111111111", "stage": "333333333333"},
-    "regions": {"working": "eu-central-1", "recovery": ["us-east-1", "us-east-2"]},
+    "regions": {"working": "eu-central-1", "recovery": ["us-east-1"]},
     "network": {"dev": {"eu-central-1": "10.1.0.0/16"},
                 "stage": {"eu-central-1": "10.2.0.0/16", "us-east-1": "10.3.0.0/16"}},
     "dns": {"dev_zone": "dev.example.com", "stage_zone": "stage.example.com"},
@@ -40,6 +40,15 @@ class RenderVaultTest(unittest.TestCase):
         self.assertEqual(cfg["networkPolicy"]["awsEndpointCidrs"], ["10.3.0.0/18"])
         eso = yaml.safe_load(self.files["external-secrets/envs/stage/eu-central-1.yaml"])
         self.assertEqual(eso["vault"]["server"], "https://vault.stage.example.com:8200")
+
+    def test_vault_roles_follow_the_cells_of_each_environment(self):
+        for env, regions in rv.environments(CFG).items():
+            work = rv.ROOT / "deploy" / "envs" / env / CFG["regions"]["working"]
+            expected = sorted(d.name for d in work.iterdir() if d.name.startswith("cell-") or d.name == "spare")
+            for region in regions:
+                got = yaml.safe_load(self.files[f"vault/envs/{env}/{region}.config.yaml"])["bootstrap"]["workloads"]["cells"]
+                self.assertEqual([c["name"] for c in got], expected)
+                self.assertEqual(got[0], {"name": "cell-0", "authMount": "kubernetes"})
 
     def test_no_placeholder_is_written(self):
         for text in self.files.values():

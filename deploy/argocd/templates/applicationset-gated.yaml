@@ -22,6 +22,10 @@ spec:
 {{- range .Values.gatedEnvironments }}
           - path: deploy/envs/{{ . }}/*/spare
 {{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
+            exclude: true
+{{- end }}
   template:
     metadata:
       name: 'payments-cell-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}-{{`{{ .path.basename }}`}}'
@@ -65,6 +69,10 @@ spec:
 {{- range .Values.gatedEnvironments }}
           - path: deploy/envs/{{ . }}/*/locker
 {{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
+            exclude: true
+{{- end }}
   template:
     metadata:
       name: 'payments-locker-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
@@ -105,6 +113,10 @@ spec:
         directories:
 {{- range .Values.gatedEnvironments }}
           - path: deploy/envs/{{ . }}/*/edge
+{{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
+            exclude: true
 {{- end }}
   template:
     metadata:

@@ -60,12 +60,12 @@ locals {
   }
 
   # Central observability cluster (outside the CDE): same cluster build as a cell, without the cde pool.
-  kubernetes_version     = "1.34"
-  bottlerocket_version   = "v1.49.0"
+  kubernetes_version     = "1.36"
+  bottlerocket_version   = "v1.70.0"
   eks_log_retention_days = 90
   central_cpu_limits     = { workers = 200, stateful = 200 }
   central_enabled_pools  = ["workers", "stateful"]
-  # The workers pool may use Spot; the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
+  # The karpenter module always lets the workers pool use Spot (preferred, on-demand fallback); the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
   central_spot_pools = []
   access_entries = {
     sre-view = {

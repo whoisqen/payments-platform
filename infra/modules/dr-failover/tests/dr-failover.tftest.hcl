@@ -153,3 +153,53 @@ run "short_alarm_window_rejected" {
 
   expect_failures = [var.alarm_evaluation_periods]
 }
+
+run "warm_standby_adds_no_writers" {
+  command = plan
+
+  assert {
+    condition     = jsondecode(aws_lambda_function.failover.environment[0].variables.SWITCH_WRITER_CLASSES) == {} && aws_lambda_function.failover.environment[0].variables.COMPUTE_BUILD_URL == ""
+    error_message = "without pilot-light inputs the function only promotes"
+  }
+
+  assert {
+    condition     = !anytrue([for s in jsondecode(aws_iam_role_policy.function.policy).Statement : s.Sid == "AddSwitchWriters" || s.Sid == "ComputeBuildToken"])
+    error_message = "no instance creation or token rights without pilot-light inputs"
+  }
+}
+
+run "pilot_light_adds_writers_and_starts_the_compute_build" {
+  command = plan
+
+  variables {
+    switch_writer_instance_classes = { "cell-0" = "db.r7g.12xlarge", "cell-1" = "db.r7g.12xlarge", locker = "db.r7g.4xlarge" }
+    compute_build = {
+      dispatch_url     = "https://api.github.com/repos/example/platform/actions/workflows/dr-build-compute.yml/dispatches"
+      token_secret_arn = "arn:aws:secretsmanager:us-east-1:111111111111:secret:pay-stage-dr-build-token"
+    }
+  }
+
+  assert {
+    condition     = jsondecode(aws_lambda_function.failover.environment[0].variables.SWITCH_WRITER_CLASSES).locker == "db.r7g.4xlarge" && startswith(aws_lambda_function.failover.environment[0].variables.COMPUTE_BUILD_URL, "https://")
+    error_message = "writer classes and the build URL reach the function"
+  }
+
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_iam_role_policy.function.policy).Statement :
+      alltrue([for r in s.Resource : strcontains(r, ":pay-stage-use1-aurora-")])
+      if s.Sid == "AddSwitchWriters"
+    ]) && anytrue([for s in jsondecode(aws_iam_role_policy.function.policy).Statement : s.Sid == "ComputeBuildToken" && s.Resource == var.compute_build.token_secret_arn])
+    error_message = "writers only in this region's project clusters; the token is the one secret"
+  }
+}
+
+run "switch_writers_must_cover_every_cell" {
+  command = plan
+
+  variables {
+    switch_writer_instance_classes = { "cell-0" = "db.r7g.12xlarge" }
+  }
+
+  expect_failures = [var.switch_writer_instance_classes]
+}

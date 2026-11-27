@@ -11,11 +11,5 @@ routing:
   cells:
     - name: cell-0
       host: router.payments.svc.cell-0.dev.example.internal
-    - name: cell-1
-      host: router.payments.svc.cell-1.dev.example.internal
-    - name: cell-2
-      host: router.payments.svc.cell-2.dev.example.internal
-    - name: cell-3
-      host: router.payments.svc.cell-3.dev.example.internal
     - name: spare
       host: router.payments.svc.spare.dev.example.internal

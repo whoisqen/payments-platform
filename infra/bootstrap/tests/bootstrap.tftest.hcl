@@ -2,8 +2,17 @@ mock_provider "aws" {}
 mock_provider "aws" {
   alias = "use1"
 }
-mock_provider "aws" {
-  alias = "use2"
+
+override_resource {
+  target          = aws_s3_bucket.state
+  override_during = plan
+  values          = { arn = "arn:aws:s3:::pay-prod-euc1-tf-state-555555555555", id = "pay-prod-euc1-tf-state-555555555555" }
+}
+
+override_resource {
+  target          = module.replica_use1.aws_s3_bucket.this
+  override_during = plan
+  values          = { arn = "arn:aws:s3:::pay-prod-use1-tf-state-555555555555", id = "pay-prod-use1-tf-state-555555555555" }
 }
 
 variables {
@@ -38,29 +47,64 @@ run "state_bucket_is_protected" {
   }
 }
 
-run "replicated_with_rtc_to_both_recovery_regions" {
+run "replicated_with_rtc_to_the_recovery_region" {
   command = plan
 
   assert {
-    condition     = length(aws_s3_bucket_replication_configuration.state.rule) == 2
-    error_message = "two replication rules"
+    condition     = length(aws_s3_bucket_replication_configuration.state.rule) == 1
+    error_message = "one replication rule, to us-east-1"
   }
   assert {
-    condition     = alltrue([for r in aws_s3_bucket_replication_configuration.state.rule : r.destination[0].replication_time[0].time[0].minutes == 15])
-    error_message = "RTC of 15 minutes"
-  }
-  assert {
-    condition     = toset([for r in aws_s3_bucket_replication_configuration.state.rule : r.priority]) == toset([1, 2])
-    error_message = "one rule per recovery region"
+    condition     = alltrue([for r in aws_s3_bucket_replication_configuration.state.rule : r.destination[0].replication_time[0].time[0].minutes == 15 && r.status == "Enabled"])
+    error_message = "RTC of 15 minutes, enabled by default"
   }
 }
 
-run "key_is_multi_region_with_two_replicas" {
+run "failback_holds_replication" {
+  command = plan
+
+  variables {
+    replication_enabled = false
+  }
+
+  assert {
+    condition     = alltrue([for r in aws_s3_bucket_replication_configuration.state.rule : r.status == "Disabled"])
+    error_message = "replication disabled during a failback"
+  }
+}
+
+run "dr_role_reads_and_writes_the_environment_prefix" {
+  command = plan
+
+  variables {
+    dr_apply_role_arns = ["arn:aws:iam::444444444444:role/pay-prod-glob-dr-apply"]
+  }
+
+  assert {
+    condition     = one([for s in jsondecode(aws_s3_bucket_policy.state.policy).Statement : s.Resource if s.Sid == "DrStateReadWrite"]) == "arn:aws:s3:::pay-prod-euc1-tf-state-555555555555/prod/*"
+    error_message = "working bucket: prod/ only"
+  }
+  assert {
+    condition     = module.replica_use1.bucket_name == "pay-prod-use1-tf-state-555555555555" && module.replica_use1.bucket_arn == "arn:aws:s3:::pay-prod-use1-tf-state-555555555555"
+    error_message = "replica follows the name that infra/live/terragrunt.hcl builds for PAY_STATE_REGION=us-east-1"
+  }
+}
+
+run "no_dr_grant_by_default" {
   command = plan
 
   assert {
-    condition     = module.state_key.alias_name == "alias/pay-prod-euc1-tf-state" && module.state_key_use1.alias_name == "alias/pay-prod-use1-tf-state" && module.state_key_use2.alias_name == "alias/pay-prod-use2-tf-state"
-    error_message = "primary and two replicas"
+    condition     = length(jsondecode(aws_s3_bucket_policy.state.policy).Statement) == 2
+    error_message = "only the two denies"
+  }
+}
+
+run "key_is_multi_region_with_a_replica" {
+  command = plan
+
+  assert {
+    condition     = module.state_key.alias_name == "alias/pay-prod-euc1-tf-state" && module.state_key_use1.alias_name == "alias/pay-prod-use1-tf-state"
+    error_message = "primary and its us-east-1 replica"
   }
 }
 

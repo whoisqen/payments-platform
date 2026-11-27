@@ -10,7 +10,7 @@ mock_provider "aws" {
 variables {
   region_short       = "euc1"
   region_name        = "eu-central-1"
-  regions            = ["eu-central-1", "us-east-1", "us-east-2"]
+  regions            = ["eu-central-1", "us-east-1"]
   admin_account_id   = "777777777777"
   root_id            = "r-ab12"
   member_account_ids = ["111111111111", "333333333333"]
@@ -34,9 +34,9 @@ run "management_designates_the_audit_account" {
 
   assert {
     condition = (
-      length(aws_guardduty_organization_admin_account.this) == 3 &&
-      length(aws_inspector2_delegated_admin_account.this) == 3 &&
-      length(aws_macie2_organization_admin_account.this) == 3 &&
+      length(aws_guardduty_organization_admin_account.this) == 2 &&
+      length(aws_inspector2_delegated_admin_account.this) == 2 &&
+      length(aws_macie2_organization_admin_account.this) == 2 &&
       aws_securityhub_organization_admin_account.this[0].region == "eu-central-1"
     )
     error_message = "GuardDuty, Inspector and Macie in every region, Security Hub in the home region"
@@ -61,7 +61,7 @@ run "admin_enables_guardduty_for_all_members" {
   }
 
   assert {
-    condition     = alltrue([for c in aws_guardduty_organization_configuration.this : c.auto_enable_organization_members == "ALL"]) && length(aws_guardduty_organization_configuration.this) == 3
+    condition     = alltrue([for c in aws_guardduty_organization_configuration.this : c.auto_enable_organization_members == "ALL"]) && length(aws_guardduty_organization_configuration.this) == 2
     error_message = "every member in every region"
   }
 
@@ -90,7 +90,7 @@ run "admin_centralizes_security_hub" {
   }
 
   assert {
-    condition     = toset(aws_securityhub_finding_aggregator.this[0].specified_regions) == toset(["us-east-1", "us-east-2"])
+    condition     = toset(aws_securityhub_finding_aggregator.this[0].specified_regions) == toset(["us-east-1"])
     error_message = "the home region aggregates the other regions"
   }
 
@@ -122,7 +122,7 @@ run "admin_enables_inspector_and_macie" {
   }
 
   assert {
-    condition     = length(aws_inspector2_member_association.this) == 6 && toset(aws_inspector2_enabler.this["us-east-1"].account_ids) == toset(["777777777777", "111111111111", "333333333333"])
+    condition     = length(aws_inspector2_member_association.this) == 4 && toset(aws_inspector2_enabler.this["us-east-1"].account_ids) == toset(["777777777777", "111111111111", "333333333333"])
     error_message = "existing members are associated and enabled in every region"
   }
 

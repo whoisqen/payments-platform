@@ -45,39 +45,6 @@ dependency "eks_cell_0" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
-dependency "eks_cell_1" {
-  config_path = "../../cell-1/eks"
-
-  mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks-cell-1"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks-cell-1"
-    node_security_group_id = "sg-00000000"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
-}
-
-dependency "eks_cell_2" {
-  config_path = "../../cell-2/eks"
-
-  mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks-cell-2"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks-cell-2"
-    node_security_group_id = "sg-00000000"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
-}
-
-dependency "eks_cell_3" {
-  config_path = "../../cell-3/eks"
-
-  mock_outputs = {
-    cluster_name           = "pay-mock-euc1-eks-cell-3"
-    cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks-cell-3"
-    node_security_group_id = "sg-00000000"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
-}
-
 dependency "eks_spare" {
   config_path = "../../spare/eks"
 
@@ -97,9 +64,6 @@ inputs = {
   client_security_group_ids = [
     dependency.eks.outputs.node_security_group_id,
     dependency.eks_cell_0.outputs.node_security_group_id,
-    dependency.eks_cell_1.outputs.node_security_group_id,
-    dependency.eks_cell_2.outputs.node_security_group_id,
-    dependency.eks_cell_3.outputs.node_security_group_id,
     dependency.eks_spare.outputs.node_security_group_id,
   ]
   stores = {

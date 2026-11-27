@@ -14,7 +14,7 @@ variables {
   ebs_kms_key_arn          = "arn:aws:kms:eu-central-1:111111111111:key/cccc"
   subnet_ids               = ["subnet-a", "subnet-b", "subnet-c"]
   security_group_ids       = ["sg-0node"]
-  bottlerocket_version     = "v1.49.0"
+  bottlerocket_version     = "v1.70.0"
   tags = {
     team = "platform", owner = "platform@example.com", pci-scope = "cde", data-class = "card-data", backup-tier = "none"
   }
@@ -36,7 +36,7 @@ run "nodeclass_is_hardened" {
     error_message = "nodes have no public IP"
   }
   assert {
-    condition     = yamldecode(output.manifests["ec2nodeclass-hardened.yaml"]).spec.amiSelectorTerms[0].alias == "bottlerocket@v1.49.0"
+    condition     = yamldecode(output.manifests["ec2nodeclass-hardened.yaml"]).spec.amiSelectorTerms[0].alias == "bottlerocket@v1.70.0"
     error_message = "the image is a pinned Bottlerocket release"
   }
   assert {
@@ -83,7 +83,7 @@ run "plan_b_families_and_architectures" {
   }
   assert {
     condition     = alltrue([for n, p in { for k, v in output.manifests : trimprefix(trimsuffix(k, ".yaml"), "nodepool-") => yamldecode(v) if startswith(k, "nodepool-") } : contains(flatten([for r in p.spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"]), "amd64")])
-    error_message = "amd64 stays allowed for plan B"
+    error_message = "amd64 stays allowed so that capacity does not hang on one architecture"
   }
 }
 
@@ -159,7 +159,7 @@ run "spot_pools_follow_the_environment_and_cde_never_does" {
   command = plan
 
   variables {
-    spot_pools = ["payments", "stateful"]
+    spot_pools = ["payments", "stateful", "workers"]
   }
 
   assert {

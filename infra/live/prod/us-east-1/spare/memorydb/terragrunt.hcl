@@ -1,3 +1,14 @@
+locals {
+  env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
+}
+
+# Hot standby: applied all the time; the exclude is only a fallback switch and excluding a unit does not destroy it.
+exclude {
+  if                   = !local.env_cfg.standby_compute_enabled
+  actions              = ["all"]
+  exclude_dependencies = false
+}
+
 include "root" {
   path   = find_in_parent_folders("terragrunt.hcl")
   expose = true
@@ -62,4 +73,6 @@ inputs = {
   kms_key_arn        = dependency.kms.outputs.key_arns["spare"]
   subnet_ids         = dependency.vpc.outputs.subnet_ids["data"]
   security_group_ids = [dependency.data_access.outputs.security_group_ids["memorydb"]]
+  # Hot standby: the same minimal profile as the working spare.
+  num_shards = 1
 }

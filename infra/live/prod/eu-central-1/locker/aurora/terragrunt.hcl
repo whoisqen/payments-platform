@@ -66,6 +66,10 @@ inputs = {
   proxy_subnet_ids         = dependency.vpc.outputs.subnet_ids["data"]
   availability_zones       = include.envcommon.locals.env_cfg.azs["eu-central-1"]
   writer_az                = include.envcommon.locals.env_cfg.azs["eu-central-1"][2]
+  # About 2.4 requests per payment (section 12); the reader in another AZ stays for the 99.99% locker SLO.
+  writer_instance_class = "db.r7g.4xlarge"
+  # Low I/O: Standard storage is cheaper than I/O-Optimized here.
+  storage_type = "aurora"
 
   # The locker reads a static password once at start; the same value is in Vault secret/<env>/locker/database and both rotate together.
   proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]

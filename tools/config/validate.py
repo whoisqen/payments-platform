@@ -19,7 +19,7 @@ REQUIRED = {
     "runners": ["version", "sha256"],
     "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
 }
-STANDBY_ENVS = ("stage", "prod")
+STANDBY_ENVS = ("prod",)  # only prod has a standby region
 GRAFANA_GROUPS = ("admin", "sre", "security", "engineering", "finance", "audit")
 ACCOUNT = re.compile(r"^\d{12}$")
 REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
@@ -106,9 +106,11 @@ def check_sizing(reference, own, env):
     if not CLASS.match(str(merged.get("memorydb", {}).get("node_type", ""))):
         errors.append(f"{env}: memorydb.node_type must look like db.r7g.large")
     spot = merged.get("eks", {}).get("spot_pools", [])
-    if "cde" in spot or set(spot) - {"payments", "stateful"}:
-        errors.append(f"{env}: eks.spot_pools may hold payments and stateful only; CDE nodes are never Spot")
-    if merged.get("standby", {}).get("enabled") and not merged.get("standby", {}).get("reader_count", 0):
+    if "cde" in spot or set(spot) - {"payments", "stateful", "workers"}:
+        errors.append(f"{env}: eks.spot_pools may hold payments, stateful and workers only; CDE nodes are never Spot")
+    standby = merged.get("standby", {})
+    # A pilot light (compute_enabled false) keeps headless secondaries; only a standing warm standby needs readers
+    if standby.get("enabled") and standby.get("compute_enabled", True) and not standby.get("reader_count", 0):
         errors.append(f"{env}: a warm standby needs standby.reader_count of at least 1")
     return errors
 

@@ -36,7 +36,7 @@ In stage the k6 Operator runs the scenarios as CronJobs: daily peak every night,
 | PSP latency | FIS pod network latency | unknown state and sync, no double charge |
 | PSP timeout, drainer stall, DNS failure | Chaos Mesh | as above, no duplicates, pooled connections keep serving |
 | Hot merchant | k6 | the hot tenant gets 429 with `Retry-After`, the others keep their SLOs |
-| Region switch, plan B | step DAG run by SSM Automation | see [DR drills](../../dr/drills.md) |
+| Region switch (prod game day) | step DAG run by SSM Automation | see [DR drills](../../dr/drills.md) |
 
 Every experiment has a written hypothesis and a stop condition. The composite `chaos-stop` alarm combines an SLO burn rate of 14.4, an authorization rate drop over 2 points, edge health and an Aurora writer check; missing data counts as breaching and blocks the run. Blast radius is at most one AZ or one cell, and a guard (`tests/chaos/lib/guard.py`) refuses prod, a freeze or an open incident. The catalog in `docs/chaos/catalog.md` links each experiment to the alert it must raise.
 

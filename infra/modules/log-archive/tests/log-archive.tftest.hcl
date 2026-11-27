@@ -87,6 +87,14 @@ run "policy_is_tls_only_denies_delete_and_scopes_writers" {
   }
 
   assert {
+    condition = alltrue([
+      for s in local.bucket_policy.Statement : s.Condition.StringEquals["aws:PrincipalOrgID"] == "o-abcdefghij" && s.Condition.ArnLike["aws:PrincipalArn"] == "arn:aws:iam::*:role/*-log-export"
+      if s.Effect == "Allow" && s.Principal == { AWS = "*" }
+    ]) && contains([for s in local.bucket_policy.Statement : s.Resource if s.Sid == "EksLogExportWrite"], "arn:aws:s3:::pay-security-euc1-log-archive/eks/*")
+    error_message = "EKS log export roles of the organization write only under eks/"
+  }
+
+  assert {
     condition     = contains(local.bucket_policy.Statement[3].Resource, "arn:aws:s3:::pay-security-euc1-log-archive/cloudtrail/AWSLogs/o-abcdefghij/*")
     error_message = "the organization trail writes under cloudtrail/AWSLogs/<org-id>/"
   }

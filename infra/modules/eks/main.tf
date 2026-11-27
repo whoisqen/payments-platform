@@ -333,12 +333,20 @@ resource "aws_launch_template" "bootstrap" {
   }
 }
 
+# An unpinned add-on follows the default version of the cluster version, so a control-plane upgrade moves it too.
+data "aws_eks_addon_version" "default" {
+  for_each = setsubtract(setunion(keys(local.before_compute), keys(local.after_compute)), keys(var.addon_versions))
+
+  addon_name         = each.key
+  kubernetes_version = var.kubernetes_version
+}
+
 resource "aws_eks_addon" "before_compute" {
   for_each = local.before_compute
 
   cluster_name         = aws_eks_cluster.this.name
   addon_name           = each.key
-  addon_version        = lookup(var.addon_versions, each.key, null)
+  addon_version        = try(var.addon_versions[each.key], data.aws_eks_addon_version.default[each.key].version)
   configuration_values = try(each.value.config, null)
   tags                 = var.tags
 
@@ -356,10 +364,12 @@ resource "aws_eks_node_group" "bootstrap" {
   node_group_name = "bootstrap"
   node_role_arn   = aws_iam_role.bootstrap_node.arn
   subnet_ids      = var.subnet_ids
-  ami_type        = "BOTTLEROCKET_ARM_64"
-  capacity_type   = "ON_DEMAND"
-  instance_types  = var.bootstrap_instance_types
-  tags            = var.tags
+  # Follows the control plane; without it the group keeps the version it was created with.
+  version        = aws_eks_cluster.this.version
+  ami_type       = "BOTTLEROCKET_ARM_64"
+  capacity_type  = "ON_DEMAND"
+  instance_types = var.bootstrap_instance_types
+  tags           = var.tags
 
   launch_template {
     id      = aws_launch_template.bootstrap.id
@@ -423,7 +433,7 @@ resource "aws_eks_addon" "after_compute" {
 
   cluster_name         = aws_eks_cluster.this.name
   addon_name           = each.key
-  addon_version        = lookup(var.addon_versions, each.key, null)
+  addon_version        = try(var.addon_versions[each.key], data.aws_eks_addon_version.default[each.key].version)
   configuration_values = try(each.value.config, null)
   tags                 = var.tags
 

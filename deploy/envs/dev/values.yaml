@@ -2,6 +2,11 @@
 global:
   registry: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments
   environment: dev
+  # Working window of the dev Aurora schedule (aurora-schedule: 08:00-20:00 Mon-Fri, Europe/Berlin); outside it KEDA scales the workloads to zero
+  workingHours:
+    timezone: Europe/Berlin
+    start: "0 8 * * 1-5"
+    end: "0 20 * * 1-5"
   hyperswitch:
     # PSP test endpoints
     configFile: sandbox.toml

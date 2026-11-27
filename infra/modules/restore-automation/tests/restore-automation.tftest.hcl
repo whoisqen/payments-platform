@@ -3,14 +3,14 @@ mock_provider "aws" {
     defaults = { account_id = "111111111111" }
   }
   mock_data "aws_region" {
-    defaults = { region = "us-east-2" }
+    defaults = { region = "us-east-1" }
   }
 }
 
 variables {
   name_prefix  = "pay"
-  env          = "stage"
-  region_short = "use2"
+  env          = "prod"
+  region_short = "use1"
   tags = {
     team          = "platform"
     owner         = "platform@example.com"
@@ -24,7 +24,7 @@ run "document_publishes_metrics_with_30_minute_target" {
   command = plan
 
   assert {
-    condition     = aws_ssm_document.restore_test.document_type == "Automation" && aws_ssm_document.restore_test.name == "pay-stage-use2-restore-test"
+    condition     = aws_ssm_document.restore_test.document_type == "Automation" && aws_ssm_document.restore_test.name == "pay-prod-use1-restore-test"
     error_message = "The automation document must be named pay-<env>-<region-short>-restore-test."
   }
 
@@ -43,7 +43,7 @@ run "validator_is_passed_to_the_script_and_invoked_by_role" {
   command = plan
 
   variables {
-    validator_lambda_arn = "arn:aws:lambda:us-east-2:111111111111:function:validator"
+    validator_lambda_arn = "arn:aws:lambda:us-east-1:111111111111:function:validator"
   }
 
   assert {

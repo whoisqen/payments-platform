@@ -7,12 +7,15 @@ aurora:
 memorydb:
   node_type: db.r7g.xlarge
   shards: 2
-# Warm standby in the first recovery region: Aurora readers next to the secondary clusters and the CPU caps of its node pools.
+# Hot standby in us-east-1, the only standby region: clusters, node pools, services, MemoryDB and one Aurora instance per cluster run
+# all the time at the full production size and take the whole load at any moment; the switch only promotes Aurora and moves DNS.
+# The Aurora instance has the writer class of its working cluster (units override it for the spare and the locker).
 standby:
   enabled: true
+  compute_enabled: true
   reader_count: 1
-  reader_class: db.r7g.4xlarge
-  node_pool_cpu_limits: {payments: 40, stateful: 20, cde: 20, workers: 20}
+  reader_class: db.r7g.12xlarge
+  node_pool_cpu_limits: {payments: 400, stateful: 100, cde: 200, workers: 400}
 eks:
   log_retention_days: 365
   cpu_limits: {payments: 400, stateful: 100, cde: 200, workers: 400}

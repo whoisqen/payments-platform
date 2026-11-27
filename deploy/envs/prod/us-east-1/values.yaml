@@ -1,4 +1,4 @@
-# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values
+# Hot standby: the same Applications run here at full size against the local replicas; promotion changes no values
 global:
   region: us-east-1
   dataCidrs:

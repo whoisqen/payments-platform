@@ -8,6 +8,7 @@
       "required": ["cell", "environment", "region", "dataCidrs", "endpointCidrs", "registry", "hyperswitch"],
       "properties": {
         "registry": { "type": "string", "minLength": 1 },
+        "workingHours": { "type": "object", "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).", "required": ["timezone", "start", "end"], "additionalProperties": false, "properties": { "timezone": { "type": "string", "minLength": 1 }, "start": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" }, "end": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" } } },
         "cell": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" },
         "environment": { "enum": ["dev", "stage", "prod"] },
         "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },

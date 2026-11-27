@@ -72,7 +72,7 @@ variable "data_kms_key_arns" {
 }
 
 variable "recovery_regions" {
-  description = "Vaults that receive copies in us-east-1 and us-east-2: short code and backup-account replica key."
+  description = "Vault that receives copies in us-east-1: short code and backup-account replica key."
   type = map(object({
     short       = string
     kms_key_arn = string

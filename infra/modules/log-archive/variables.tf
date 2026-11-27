@@ -78,11 +78,13 @@ variable "prefixes" {
     cloudtrail = string
     config     = string
     flow_logs  = string
+    eks        = optional(string, "eks")
   })
   default = {
     cloudtrail = "cloudtrail"
     config     = "config"
     flow_logs  = "flow-logs"
+    eks        = "eks"
   }
 }
 

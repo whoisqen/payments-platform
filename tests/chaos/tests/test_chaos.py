@@ -19,7 +19,6 @@ except ImportError:
     yaml = None
 
 PRIMARY = runner.load(ROOT / "region-switch" / "scenario.json")
-PLAN_B = runner.load(ROOT / "region-switch" / "plan-b.json")
 
 
 class FisTemplates(unittest.TestCase):
@@ -161,17 +160,14 @@ class GuardCli(unittest.TestCase):
 class RegionSwitch(unittest.TestCase):
     def test_scenarios_are_valid(self):
         self.assertEqual(runner.validate(PRIMARY), [])
-        self.assertEqual(runner.validate(PLAN_B), [])
 
     def test_critical_path_matches_the_d7_budget(self):
-        self.assertEqual(runner.rto_minutes(PRIMARY), 54)
+        self.assertEqual(runner.rto_minutes(PRIMARY), 32)
         self.assertEqual(PRIMARY["rto_target_min"], 60)
-        self.assertEqual(runner.rto_minutes(PLAN_B), 64)
-        self.assertEqual(PLAN_B["rto_target_min"], 75)
-        self.assertEqual({PRIMARY["target_region"], PLAN_B["target_region"]}, {"us-east-1", "us-east-2"})
+        self.assertEqual(PRIMARY["target_region"], "us-east-1")
 
     def test_overrun_beyond_the_target_is_caught(self):
-        self.assertGreater(runner.rto_minutes(PRIMARY, {"create-eks-base": 7}), PRIMARY["rto_target_min"])
+        self.assertGreater(runner.rto_minutes(PRIMARY, {"warm-cache": 30}), PRIMARY["rto_target_min"])
 
     def test_cycle_and_missing_fence_are_rejected(self):
         broken = json.loads(json.dumps(PRIMARY))

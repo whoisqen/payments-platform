@@ -1,0 +1,179 @@
+name: dr-compute-build
+# Pilot light: builds EKS, Karpenter, workload IAM and MemoryDB of every cell in the standby region during a region switch.
+# Dispatched by the dr-failover Lambda (scripts/dr/failover.py) or the on-call; the failover finds this run by its name.
+run-name: dr-compute-build ${{ inputs.environment }} ${{ inputs.incident }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: environment whose standby region is built
+        type: choice
+        options: [prod]
+        required: true
+      region:
+        description: standby region
+        type: choice
+        options: [us-east-1]
+        default: us-east-1
+      incident:
+        description: incident id of the switch (the failover passes its build id)
+        type: string
+        required: true
+      trigger:
+        description: drill (always the working state) or switch (a real region switch; the failover Lambda sends it)
+        type: choice
+        options: [drill, switch]
+        default: drill
+      state:
+        description: Terraform state; auto = working for a drill, the standby region's replica bucket for a switch; a drill rejects replica
+        type: choice
+        options: [auto, working, replica]
+        default: auto
+      confirm:
+        description: a switch needs "switch <environment>"
+        type: string
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: dr-compute-build-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    # Deployment branch policy main only, no required reviewers: an approval would stop the automated switch inside the RTO.
+    environment: dr-compute-${{ inputs.environment }}
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: check the inputs
+        env:
+          INCIDENT: ${{ inputs.incident }}
+        run: |
+          set -euo pipefail
+          [[ $INCIDENT =~ ^[A-Za-z0-9:.+_-]{1,80}$ ]] || { echo "::error::incident must be 1-80 characters of A-Z a-z 0-9 : . + _ -"; exit 1; }
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: state
+        name: resolve the Terraform state (a drill can never write the replica)
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          TRIGGER: ${{ inputs.trigger }}
+          STATE: ${{ inputs.state }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          state=$(python3 scripts/dr/compute_build.py resolve-state --env "$ENVIRONMENT" --region "$REGION" --trigger "$TRIGGER" --state "$STATE" \
+            --confirm "$CONFIRM")
+          echo "state=${state}" >>"$GITHUB_OUTPUT"
+          echo "trigger ${TRIGGER}: Terraform state ${state}"
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: terraform terragrunt
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DR_APPLY }}
+          aws-region: ${{ inputs.region }}
+          role-session-name: dr-compute-build-${{ github.run_id }}
+          role-duration-seconds: 3600
+      - name: apply the standby compute (all cells in parallel)
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          STATE: ${{ steps.state.outputs.state }}
+        run: |
+          set -euo pipefail
+          args=(apply --env "$ENVIRONMENT" --region "$REGION")
+          # PAY_STATE_REGION: infra/live/terragrunt.hcl reads and writes the replica bucket, which works while eu-central-1 is down
+          if [ "$STATE" = replica ]; then args+=(--state-region "$REGION"); fi
+          python3 scripts/dr/compute_build.py "${args[@]}"
+
+  argocd:
+    # Owns the end of the build: registration and the wait for the Applications, independent of the Lambda that dispatched it.
+    needs: apply
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    environment: dr-compute-${{ inputs.environment }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # v* tags: the release the gated environments run
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: helm
+      - run: python3 -m pip install --quiet pyyaml==6.0.2
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DR_APPLY }}
+          aws-region: ${{ inputs.region }}
+          role-session-name: dr-argocd-${{ github.run_id }}
+      - id: mode
+        env:
+          ARGOCD_REGION: ${{ vars.ARGOCD_CLUSTER_REGION }}
+        run: |
+          set -euo pipefail
+          working=$(awk '/^regions:/{n=1;next} n&&/^[^ ]/{n=0} n&&$1=="working:"{print $2;exit}' config/platform.yaml)
+          # the central Argo CD runs in the working region: when that region failed, a core-mode Argo CD in the standby takes over
+          if [ -z "$ARGOCD_REGION" ] || [ "$ARGOCD_REGION" = "$working" ]; then mode=core; else mode=central; fi
+          echo "mode=${mode}" >>"$GITHUB_OUTPUT"
+          echo "Argo CD mode: ${mode} (working region ${working}, central Argo CD in ${ARGOCD_REGION:-unset})"
+      - name: Argo CD core in the first standby cell cluster
+        if: steps.mode.outputs.mode == 'core'
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          CONTROLLER_ROLE_ARN: ${{ vars.ARGOCD_CORE_CONTROLLER_ROLE_ARN }}
+          APPS_RELEASE: ${{ vars.ARGOCD_APPS_RELEASE }}
+        run: |
+          python3 scripts/dr/compute_build.py argocd-core --env "$ENVIRONMENT" --region "$REGION" \
+            --argocd-controller-role-arn "$CONTROLLER_ROLE_ARN" --apps-release "$APPS_RELEASE"
+      - name: point kubectl at the central Argo CD
+        if: steps.mode.outputs.mode == 'central'
+        env:
+          ARGOCD_CLUSTER: ${{ vars.ARGOCD_CLUSTER_NAME }}
+          ARGOCD_REGION: ${{ vars.ARGOCD_CLUSTER_REGION }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ARGOCD_CLUSTER" ]; then echo "::error::set ARGOCD_CLUSTER_NAME on the environment"; exit 1; fi
+          aws eks update-kubeconfig --name "$ARGOCD_CLUSTER" --region "$ARGOCD_REGION" --alias argocd
+      - name: register the clusters in Argo CD
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          ARGOCD_ROLE_ARN: ${{ vars.ARGOCD_CLUSTER_ROLE_ARN }}
+          APPS_RELEASE: ${{ vars.ARGOCD_APPS_RELEASE || 'platform-apps' }}
+        # cluster Secrets first, then the region leaves pilotLight of the deploy/argocd release and its Applications appear
+        run: |
+          python3 scripts/dr/compute_build.py register --env "$ENVIRONMENT" --region "$REGION" --argocd-role-arn "$ARGOCD_ROLE_ARN" \
+            --apps-release "$APPS_RELEASE"
+      - name: wait for the Applications of the standby region
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+        # prod: one sync per cell at the release prod already runs, cell by cell with a health check in between (DR build only;
+        # the ApplicationSets keep the manual gate for new releases)
+        run: python3 scripts/dr/compute_build.py wait-apps --env "$ENVIRONMENT" --region "$REGION" --wait-minutes 25 --dr-sync
+      - name: summary
+        if: always()
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          INCIDENT: ${{ inputs.incident }}
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          {
+            echo "Standby compute of ${ENVIRONMENT} for incident ${INCIDENT}; Argo CD mode: ${MODE:-unknown}."
+            echo "Prod Applications were synced once at the deployed v* release, cell by cell; new releases keep the manual gate."
+            echo "Set standby.compute_enabled: true in config/environments/${ENVIRONMENT}.yaml by pull request, so later applies keep the compute."
+          } >>"$GITHUB_STEP_SUMMARY"

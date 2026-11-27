@@ -9,7 +9,6 @@ variables {
 
   recovery_regions = {
     "us-east-1" = { kms_key_arn = "arn:aws:kms:us-east-1:111111111111:key/mrk-0002" }
-    "us-east-2" = { kms_key_arn = "arn:aws:kms:us-east-2:111111111111:key/mrk-0002" }
   }
 
   tags = {
@@ -30,8 +29,8 @@ run "global_table_with_pitr_and_replicas" {
   }
 
   assert {
-    condition     = length(aws_dynamodb_table.this.replica) == 2 && alltrue([for r in aws_dynamodb_table.this.replica : r.consistency_mode == "EVENTUAL" && r.point_in_time_recovery])
-    error_message = "two MREC replicas with PITR"
+    condition     = length(aws_dynamodb_table.this.replica) == 1 && alltrue([for r in aws_dynamodb_table.this.replica : r.consistency_mode == "EVENTUAL" && r.point_in_time_recovery])
+    error_message = "one MREC replica in us-east-1 with PITR"
   }
 
   assert {
@@ -40,17 +39,16 @@ run "global_table_with_pitr_and_replicas" {
   }
 }
 
-run "writes_denied_in_both_recovery_regions" {
+run "writes_denied_in_the_recovery_region" {
   command = plan
 
   assert {
     condition = (
       strcontains(aws_iam_policy.deny_recovery_writes.policy, "\"Effect\":\"Deny\"") &&
       strcontains(aws_iam_policy.deny_recovery_writes.policy, "arn:aws:dynamodb:us-east-1:111111111111:table/pay-prod-euc1-merchant-cell-map") &&
-      strcontains(aws_iam_policy.deny_recovery_writes.policy, "arn:aws:dynamodb:us-east-2:111111111111:table/pay-prod-euc1-merchant-cell-map") &&
       !strcontains(aws_iam_policy.deny_recovery_writes.policy, "eu-central-1")
     )
-    error_message = "deny must cover both recovery regions and never Frankfurt"
+    error_message = "deny must cover us-east-1 and never Frankfurt"
   }
 }
 
@@ -58,7 +56,7 @@ run "switch_moves_the_deny" {
   command = plan
 
   variables {
-    deny_write_regions = ["eu-central-1", "us-east-2"]
+    deny_write_regions = ["eu-central-1"]
   }
 
   assert {
@@ -81,7 +79,7 @@ run "replication_latency_alarm_per_replica" {
   command = plan
 
   assert {
-    condition     = length(aws_cloudwatch_metric_alarm.replication_latency) == 2 && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].dimensions["ReceivingRegion"] == "us-east-1" && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].threshold == 5000
+    condition     = length(aws_cloudwatch_metric_alarm.replication_latency) == 1 && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].dimensions["ReceivingRegion"] == "us-east-1" && aws_cloudwatch_metric_alarm.replication_latency["us-east-1"].threshold == 5000
     error_message = "one latency alarm per replica region with the 5 s default"
   }
 }

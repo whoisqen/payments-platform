@@ -48,31 +48,10 @@ dependency "kms_use1" {
   mock_outputs_allowed_terraform_commands = ["init", "validate"]
 }
 
-dependency "kms_use2" {
-  config_path = "../../us-east-2/kms"
-
-  mock_outputs = {
-    key_arns = {
-      "ebs-nodes" = "arn:aws:kms:us-east-2:000000000000:key/mrk-ebs-nodes"
-      "logs"      = "arn:aws:kms:us-east-2:000000000000:key/mrk-logs"
-      "shared"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-shared"
-      "locker"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-locker"
-      "backup"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-backup"
-      "cell-0"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-cell-0"
-      "cell-1"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-cell-1"
-      "cell-2"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-cell-2"
-      "cell-3"    = "arn:aws:kms:us-east-2:000000000000:key/mrk-cell-3"
-      "spare"     = "arn:aws:kms:us-east-2:000000000000:key/mrk-spare"
-    }
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate"]
-}
-
 inputs = {
   component   = "backup"
   kms_key_arn = dependency.kms.outputs.key_arns["shared"]
   recovery_regions = {
     "us-east-1" = { short = "use1", kms_key_arn = dependency.kms_use1.outputs.key_arns["shared"] }
-    "us-east-2" = { short = "use2", kms_key_arn = dependency.kms_use2.outputs.key_arns["shared"] }
   }
 }

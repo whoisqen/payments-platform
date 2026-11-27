@@ -16,6 +16,21 @@ mock_provider "aws" {
       arn = "arn:aws:iam::111111111111:role/mock"
     }
   }
+  mock_resource "aws_kinesis_firehose_delivery_stream" {
+    defaults = {
+      arn = "arn:aws:firehose:eu-central-1:111111111111:deliverystream/mock"
+    }
+  }
+  mock_data "aws_caller_identity" {
+    defaults = {
+      account_id = "111111111111"
+    }
+  }
+  mock_data "aws_eks_addon_version" {
+    defaults = {
+      version = "v1.0.0-eksbuild.1"
+    }
+  }
 }
 
 variables {
@@ -23,7 +38,7 @@ variables {
   region                   = "eu-central-1"
   environment              = "dev"
   component                = "eks-cell-0"
-  kubernetes_version       = "1.34"
+  kubernetes_version       = "1.37"
   vpc_id                   = "vpc-0abc"
   vpc_cidr_block           = "10.104.0.0/16"
   subnet_ids               = ["subnet-a", "subnet-b", "subnet-c"]
@@ -229,4 +244,73 @@ run "locker_pod_cidrs_are_validated" {
   }
 
   expect_failures = [var.locker_pod_database_cidrs]
+}
+
+run "unpinned_addons_follow_the_cluster_version" {
+  command = plan
+
+  variables {
+    addon_versions = { coredns = "v1.13.1-eksbuild.1" }
+  }
+
+  assert {
+    condition     = aws_eks_addon.after_compute["coredns"].addon_version == "v1.13.1-eksbuild.1" && aws_eks_addon.before_compute["kube-proxy"].addon_version == "v1.0.0-eksbuild.1"
+    error_message = "a pinned add-on keeps its version, the others take the default of kubernetes_version"
+  }
+  assert {
+    condition     = !contains(keys(data.aws_eks_addon_version.default), "coredns") && data.aws_eks_addon_version.default["kube-proxy"].kubernetes_version == "1.37"
+    error_message = "defaults are looked up only for unpinned add-ons, for kubernetes_version"
+  }
+}
+
+run "control_plane_logs_stay_in_cloudwatch_without_archive" {
+  command = plan
+
+  assert {
+    condition     = length(aws_cloudwatch_log_subscription_filter.log_export) == 0 && length(aws_kinesis_firehose_delivery_stream.log_export) == 0
+    error_message = "no export without log_archive"
+  }
+}
+
+run "control_plane_logs_are_exported_to_the_archive" {
+  command = plan
+
+  variables {
+    log_retention_days = 90
+    log_archive = {
+      bucket_arn = "arn:aws:s3:::pay-security-euc1-log-archive"
+      account_id = "000000000002"
+    }
+  }
+
+  assert {
+    condition     = aws_kinesis_firehose_delivery_stream.log_export[0].extended_s3_configuration[0].bucket_arn == "arn:aws:s3:::pay-security-euc1-log-archive" && aws_kinesis_firehose_delivery_stream.log_export[0].extended_s3_configuration[0].prefix == "eks/pay-dev-euc1-eks-cell-0/"
+    error_message = "the stream writes to the archive under eks/<cluster>/"
+  }
+  assert {
+    condition     = aws_kinesis_firehose_delivery_stream.log_export[0].server_side_encryption[0].key_type == "CUSTOMER_MANAGED_CMK" && aws_kinesis_firehose_delivery_stream.log_export[0].server_side_encryption[0].key_arn == var.logs_kms_key_arn
+    error_message = "the stream encrypts with the logs key"
+  }
+  assert {
+    condition     = aws_cloudwatch_log_subscription_filter.log_export[0].log_group_name == "/aws/eks/pay-dev-euc1-eks-cell-0/cluster" && aws_cloudwatch_log_subscription_filter.log_export[0].filter_pattern == ""
+    error_message = "every event of the control-plane group is subscribed"
+  }
+  assert {
+    condition     = endswith(aws_iam_role.log_export_firehose[0].name, "-log-export") && aws_iam_role.log_export_firehose[0].permissions_boundary == var.permissions_boundary_arn
+    error_message = "the writer role carries the name the archive policies admit and the boundary"
+  }
+  assert {
+    condition     = aws_cloudwatch_log_group.cluster.retention_in_days == 90
+    error_message = "with the export the group may keep 90 days"
+  }
+}
+
+run "log_archive_is_validated" {
+  command = plan
+
+  variables {
+    log_archive = { bucket_arn = "pay-security-euc1-log-archive", account_id = "2" }
+  }
+
+  expect_failures = [var.log_archive]
 }

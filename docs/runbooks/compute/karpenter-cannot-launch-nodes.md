@@ -18,7 +18,7 @@ Karpenter node creation calls keep failing: capacity, quota or an instance famil
 
 1. Widen the NodePool instance families or AZs through a PR (step `widen-nodepool`).
 2. Ask for a quota increase through the Terraform quota module.
-3. During a switch this is the trigger of plan B: after 10 minutes without capacity the runbook starts compute in us-east-2.
+3. During a switch the failover builds the us-east-1 node pools from nothing, so this alert during the first build is as urgent as during scale-out: the RTO depends on it. Widen the instance families and architectures of the pool (`FR-INF-16`), check the EC2 quotas of us-east-1 and raise a quota request at once.
 
 Every action runs through GitHub Actions `runbook-actions` (`workflow_dispatch`, input `document=pay-runbook-karpenter-cannot-launch-nodes`), which is audited.
 

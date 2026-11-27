@@ -43,7 +43,7 @@ The payments platform is a multi-tenant payment orchestrator on Hyperswitch, run
 |---|---|
 | `architecture/` | Overview and one page per subsystem; `domain/` for the payments primer; `cost/` for cost and FinOps |
 | `security/` | Controls and threat model |
-| `dr/` | Warm standby, failover, drills |
+| `dr/` | Hot standby in us-east-1, failover, game days |
 | `runbooks/` | One runbook per alert or operation |
 | `adr/` | Architecture decision records |
 | `requirements/` | Software requirements specification |

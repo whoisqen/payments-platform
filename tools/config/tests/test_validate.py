@@ -20,10 +20,11 @@ class SizingTest(unittest.TestCase):
         for env in ("dev", "stage", "prod"):
             self.assertEqual(validate.check_sizing(load("prod"), load(env), env), [])
 
-    def test_stage_repeats_prod_except_the_capacity_type(self):
+    def test_stage_repeats_prod_except_the_capacity_type_and_the_standby(self):
         stage = load("stage")
-        self.assertEqual(set(stage), {"eks"})
+        self.assertEqual(set(stage), {"eks", "standby"})
         self.assertEqual(set(stage["eks"]), {"spot_pools"})
+        self.assertFalse(stage["standby"]["enabled"])
 
     def test_production_uses_no_spot_and_has_a_standby(self):
         prod = load("prod")
@@ -43,8 +44,12 @@ class SizingTest(unittest.TestCase):
         self.assertTrue(any("writer_class" in e for e in errors))
 
     def test_a_warm_standby_needs_a_reader(self):
-        errors = validate.check_sizing(load("prod"), {"standby": {"reader_count": 0}}, "x")
+        errors = validate.check_sizing(load("prod"), {"standby": {"reader_count": 0, "compute_enabled": True}}, "x")
         self.assertTrue(any("reader_count" in e for e in errors))
+
+    def test_a_pilot_light_needs_no_reader(self):
+        errors = validate.check_sizing(load("prod"), {"standby": {"reader_count": 0, "compute_enabled": False}}, "x")
+        self.assertFalse(any("reader_count" in e for e in errors))
 
     def test_dev_has_no_standby_and_no_readers(self):
         dev = load("dev")

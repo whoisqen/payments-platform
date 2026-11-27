@@ -6,5 +6,5 @@ The private tier reaches the internet only through `egress_transit_gateway_id` (
 The optional `untrusted` tier (pull request runners) has its own route tables: only the transit gateway (Network Firewall CI allowlist) and the S3 gateway endpoint.
 Gateway endpoints (S3, DynamoDB) and interface endpoints (ECR, STS, KMS, Secrets Manager, SSM, logs) keep AWS API traffic private.
 Flow logs go to the S3 bucket `flow_logs_bucket_arn` in parquet.
-Recovery regions use the same module (`region = us-east-1` or `us-east-2`, CIDRs 10.102.0.0/16 and 10.103.0.0/16); it creates no compute.
+The standby region uses the same module (`region = us-east-1`, its own CIDR from config/platform.yaml).
 Test: `terraform init -backend=false && terraform test`.

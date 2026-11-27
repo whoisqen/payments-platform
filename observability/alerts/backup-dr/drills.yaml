@@ -37,6 +37,6 @@ spec:
         layer: backup-dr
         failure_mode: backup-dr-dr-switch-test-overdue
       annotations:
-        summary: The quarterly switch test of a recovery region is overdue
+        summary: The quarterly switch test of the standby region is overdue
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/backup-dr/warnings.md#dr-switch-test-overdue'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/dr-switch'

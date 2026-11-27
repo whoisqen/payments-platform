@@ -16,6 +16,10 @@ spec:
           - path: deploy/envs/{{ . }}/*/*
             exclude: true
 {{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
+            exclude: true
+{{- end }}
   template:
     metadata:
       name: 'payments-locker-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}'
@@ -58,6 +62,10 @@ spec:
           - path: deploy/envs/*/*/edge
 {{- range .Values.gatedEnvironments }}
           - path: deploy/envs/{{ . }}/*/*
+            exclude: true
+{{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
             exclude: true
 {{- end }}
   template:

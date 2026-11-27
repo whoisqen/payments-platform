@@ -18,7 +18,7 @@ Gateway API is the standard, role-split model for traffic entry; the repository 
 
 ### Payments API
 
-- Route 53 (`infra/modules/dns-routing`) holds a failover CNAME for `api.<zone>`. Frankfurt is primary and serves all traffic while its HTTPS health check on `/health/deep` passes. The us-east-1 standby is checked too and is answered only when Frankfurt fails.
+- Route 53 (`infra/modules/dns-routing`) holds a failover CNAME for `api.<zone>`. Frankfurt is primary and serves all traffic while its HTTPS health check on `/health/deep` passes. The us-east-1 ingress of the prod hot standby is checked too, and it is answered only when Frankfurt fails.
 - `edge-accelerator` keeps the static anycast addresses of Global Accelerator with one active endpoint group, the working region.
 - The `payments-edge` chart creates the Gateway (class `istio`), its TLS certificate from cert-manager, an HTTPRoute per cell and the EnvoyFilter with the Lua filter, the rate limits and the overload manager. Istio scales the proxy from 3 to 12 pods on CPU.
 - The first filter of the proxy (`payments-edge.header-trust`) removes client-supplied `x-payments-rate-key` and `x-payments-class` and sets the rate key from the caller's credential (see [rate limiting](rate-limiting.md)).

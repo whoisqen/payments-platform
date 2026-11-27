@@ -591,7 +591,33 @@
       "additionalProperties": false
     },
     "global": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "workingHours": {
+          "type": "object",
+          "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).",
+          "required": [
+            "timezone",
+            "start",
+            "end"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+            }
+          }
+        }
+      }
     },
     "platform-common": {
       "type": "object"

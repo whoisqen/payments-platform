@@ -13,13 +13,12 @@ locals {
   flow_logs_bucket_arn     = "arn:aws:s3:::${local.cfg.storage.state_bucket_prefix}-dev-log-archive-flow-logs"
   autoscaling_slr_arn      = "arn:aws:iam::${local.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
 
-  kubernetes_version   = "1.34"
-  bottlerocket_version = "v1.49.0"
+  kubernetes_version   = "1.36"
+  bottlerocket_version = "v1.70.0"
 
   azs = {
     "eu-central-1" = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
     "us-east-1"    = ["us-east-1a", "us-east-1b", "us-east-1c"]
-    "us-east-2"    = ["us-east-2a", "us-east-2b", "us-east-2c"]
   }
 
   vpc_cidrs   = { for region, cidr in local.cfg.network.dev : region => cidr if region != "egress" }
@@ -31,7 +30,8 @@ locals {
   psp_domains = local.cfg.dns.psp_domains
   zone_name   = local.cfg.dns.dev_zone
 
-  cells = ["cell-0", "cell-1", "cell-2", "cell-3", "spare"]
+  # One working cell plus the spare; us-east-1 keeps only the edge (panel-edge, waf-edge and their key replicas). Multi-cell routing is tested in stage.
+  cells = ["cell-0", "spare"]
   kms_keys = merge(
     {
       "ebs-nodes" = { user_role_arns = [local.autoscaling_slr_arn] }
@@ -40,7 +40,7 @@ locals {
       "locker"    = {}
       "backup"    = {}
     },
-    { for c in ["cell-0", "cell-1", "cell-2", "cell-3", "spare"] : c => {} },
+    { for c in local.cells : c => {} },
   )
 
   memorydb_users = {
@@ -72,17 +72,16 @@ locals {
   karpenter_cpu_limits   = local.sizing.eks.cpu_limits
   karpenter_spot_pools   = local.sizing.eks.spot_pools
 
-  aurora_writer_class  = local.sizing.aurora.writer_class
-  aurora_reader_class  = local.sizing.aurora.reader_class
-  aurora_reader_count  = local.sizing.aurora.reader_count
-  memorydb_node_type   = local.sizing.memorydb.node_type
-  memorydb_shards      = local.sizing.memorydb.shards
-  deletion_protection  = local.sizing.protection.deletion_protection
-  vault_lock_enabled   = local.sizing.protection.vault_lock_enabled
-  standby_enabled      = local.sizing.standby.enabled
-  standby_reader_count = local.sizing.standby.reader_count
-  standby_reader_class = local.sizing.standby.reader_class
-  standby_node_pool    = local.sizing.standby.node_pool_cpu_limits
+  aurora_writer_class = local.sizing.aurora.writer_class
+  aurora_reader_class = local.sizing.aurora.reader_class
+  aurora_reader_count = local.sizing.aurora.reader_count
+  memorydb_node_type  = local.sizing.memorydb.node_type
+  memorydb_shards     = local.sizing.memorydb.shards
+  deletion_protection = local.sizing.protection.deletion_protection
+  vault_lock_enabled  = local.sizing.protection.vault_lock_enabled
+  # Only prod has a standby region.
+  standby_compute_enabled = false
+  standby_enabled         = false
 
   # Analytics outside the CDE: MSK, OpenSearch and ClickHouse on its own cluster. config/environments may set msk, opensearch and
   # analytics_eks (prod.yaml is the reference, so dev.yaml must lower them); until then these defaults hold, the lowest sizes (one OpenSearch node, three small brokers).
@@ -103,7 +102,7 @@ locals {
     }
     # ClickHouse (1 shard, 1 replica) runs in the stateful pool; Spot only where the cells allow it.
     cpu_limits = try(local.sizing.analytics_eks.cpu_limits, { stateful = 16, workers = 8 })
-    spot_pools = [for p in local.karpenter_spot_pools : p if p == "stateful"]
+    spot_pools = [for p in local.karpenter_spot_pools : p if contains(["stateful", "workers"], p)]
   }
 
   # Argo CD of the analytics cluster reaches only its own namespaces.

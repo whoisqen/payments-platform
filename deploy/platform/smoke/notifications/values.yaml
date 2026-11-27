@@ -1,8 +1,8 @@
 # Allowlist; the trigger condition and the subscription selector both use it. Never add prod or a cde-* environment
 environments: [dev, stage]
 
-# RollingSync reaches this cell only after cell-0..2 are healthy, so one cell stands for the whole environment
-dispatchCell: cell-3
+# The spare is the last RollingSync step and every environment has one, so its healthy sync stands for the whole environment
+dispatchCell: spare
 
 # Secret keys are read by the notification services as $key
 secret:

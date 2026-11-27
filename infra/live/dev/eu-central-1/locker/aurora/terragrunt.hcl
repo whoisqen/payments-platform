@@ -34,9 +34,6 @@ dependency "kms" {
       "locker"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-locker"
       "backup"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-backup"
       "cell-0"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-0"
-      "cell-1"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-1"
-      "cell-2"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-2"
-      "cell-3"    = "arn:aws:kms:eu-central-1:000000000000:key/mrk-cell-3"
       "spare"     = "arn:aws:kms:eu-central-1:000000000000:key/mrk-spare"
     }
   }
@@ -69,4 +66,6 @@ inputs = {
 
   # The locker reads a static password once at start; the same value is in Vault secret/<env>/locker/database and both rotate together.
   proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]
+  # Low I/O: Standard storage is cheaper than I/O-Optimized here.
+  storage_type = "aurora"
 }

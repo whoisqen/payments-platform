@@ -121,7 +121,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-1"}
     values: 9000x26
   alert_rule_test:
   - eval_time: 22m
@@ -135,7 +135,7 @@ tests:
         layer: backup-dr
         failure_mode: backup-dr-dynamo-db-global-table-lag-high
         table_name: merchant-cell-map
-        receiving_region: us-east-2
+        receiving_region: us-east-1
       exp_annotations:
         summary: DynamoDB Global Table replication latency above 5 seconds
         runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/backup-dr/warnings.md#dynamo-db-global-table-lag-high
@@ -145,7 +145,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-1"}
     values: 500x26
   alert_rule_test:
   - &id002
@@ -157,7 +157,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-2"}
+  - series: aws_dynamodb_replication_latency_maximum{table_name="merchant-cell-map",receiving_region="us-east-1"}
     values: 500x9 9000x1 500x14
   alert_rule_test:
   - *id002

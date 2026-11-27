@@ -13,7 +13,7 @@ modes:
   id: compute-karpenter-cannot-launch-nodes
   component: karpenter
   failure: Karpenter fails to launch nodes
-  impact: no scale-out, pending pods; during a switch the cells cannot be created (plan B of D7)
+  impact: no scale-out, pending pods; during a switch the standby cells cannot be built
   severity: critical
   alert: KarpenterCannotLaunchNodes
   signal: metric

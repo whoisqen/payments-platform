@@ -1,5 +1,11 @@
 mock_provider "aws" {}
 
+override_resource {
+  target          = aws_s3_bucket.this
+  override_during = plan
+  values          = { arn = "arn:aws:s3:::pay-prod-use1-tf-state-555555555555", id = "pay-prod-use1-tf-state-555555555555" }
+}
+
 variables {
   name_prefix = "pay"
   region      = "us-east-1"
@@ -38,4 +44,44 @@ run "wrong_region_rejected" {
   }
 
   expect_failures = [var.region]
+}
+
+run "no_writer_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(jsondecode(aws_s3_bucket_policy.tls_only.policy).Statement) == 2
+    error_message = "only the TLS and SSE-KMS denies without writers"
+  }
+}
+
+run "dr_role_writes_its_environment_prefix_only" {
+  command = plan
+
+  variables {
+    writer_role_arns = ["arn:aws:iam::444444444444:role/pay-prod-glob-dr-apply"]
+  }
+
+  assert {
+    condition     = one([for s in jsondecode(aws_s3_bucket_policy.tls_only.policy).Statement : s.Resource if s.Sid == "SwitchStateReadWrite"]) == "arn:aws:s3:::pay-prod-use1-tf-state-555555555555/prod/*"
+    error_message = "read and write on prod/ only"
+  }
+  assert {
+    condition     = one([for s in jsondecode(aws_s3_bucket_policy.tls_only.policy).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "SwitchStateList"]) == ["prod/*"]
+    error_message = "list limited to prod/"
+  }
+  assert {
+    condition     = contains([for s in jsondecode(aws_s3_bucket_policy.tls_only.policy).Statement : s.Sid], "KmsEncryptedWritesOnly")
+    error_message = "unencrypted writes denied"
+  }
+}
+
+run "writer_must_be_a_role" {
+  command = plan
+
+  variables {
+    writer_role_arns = ["*"]
+  }
+
+  expect_failures = [var.writer_role_arns]
 }

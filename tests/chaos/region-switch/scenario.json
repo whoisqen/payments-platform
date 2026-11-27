@@ -1,7 +1,7 @@
 {
   "id": "region-switch-quarterly",
   "decision": "D7",
-  "environment": "stage",
+  "environment": "prod",
   "target_region": "us-east-1",
   "rto_target_min": 60,
   "rpo": { "aurora_s": 10, "drain_lag_p99_s": 5, "psp_reconciliation_window_min": 5 },
@@ -38,11 +38,8 @@
     { "id": "detect-confirm", "budget_min": 10, "after": [], "action": "alarm-quorum-and-oncall-confirmation" },
     { "id": "fence-frankfurt", "budget_min": 2, "after": ["detect-confirm"], "action": "ssm:pay-dr-fence-frankfurt" },
     { "id": "promote-aurora", "budget_min": 3, "after": ["fence-frankfurt"], "action": "ssm:pay-dr-promote-aurora", "point_of_no_return": true },
-    { "id": "create-aurora-instances", "budget_min": 12, "after": ["promote-aurora"], "action": "terragrunt:aurora-instances" },
-    { "id": "create-eks-base", "budget_min": 25, "after": ["fence-frankfurt"], "action": "terragrunt:eks-runners-vault-argocd" },
-    { "id": "create-memorydb", "budget_min": 15, "after": ["fence-frankfurt"], "action": "terragrunt:memorydb-from-aurora" },
-    { "id": "sync-cells-warmup", "budget_min": 15, "after": ["create-aurora-instances", "create-eks-base", "create-memorydb"], "action": "argocd:sync-cells-and-warm-cache" },
-    { "id": "traffic-switch", "budget_min": 2, "after": ["sync-cells-warmup"], "action": "global-accelerator:endpoint-weight" },
+    { "id": "warm-cache", "budget_min": 15, "after": ["promote-aurora"], "action": "cells:warm-priority-keys-from-aurora" },
+    { "id": "traffic-switch", "budget_min": 2, "after": ["warm-cache"], "action": "global-accelerator:endpoint-weight" },
     { "id": "verify-reconciliation", "budget_min": 5, "after": ["traffic-switch"], "action": "scheduler:psp-reconciliation", "post_rto": true }
   ]
 }

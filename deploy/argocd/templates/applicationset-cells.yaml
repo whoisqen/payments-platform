@@ -18,6 +18,10 @@ spec:
           - path: deploy/envs/{{ . }}/*/*
             exclude: true
 {{- end }}
+{{- range .Values.pilotLight }}
+          - path: deploy/envs/{{ .environment }}/{{ .region }}/*
+            exclude: true
+{{- end }}
   # Migrations and rollouts go cell-0 first: a bad migration stops there (section 17)
   strategy:
     type: RollingSync
@@ -38,7 +42,12 @@ spec:
         - matchExpressions:
             - key: payments-platform/cell
               operator: In
-              values: [cell-3, spare]
+              values: [cell-3]
+        # The spare goes last on its own: its healthy sync dispatches the environment's smoke-green event
+        - matchExpressions:
+            - key: payments-platform/cell
+              operator: In
+              values: [spare]
   template:
     metadata:
       name: 'payments-cell-{{`{{ index .path.segments 2 }}`}}-{{`{{ index .path.segments 3 }}`}}-{{`{{ .path.basename }}`}}'

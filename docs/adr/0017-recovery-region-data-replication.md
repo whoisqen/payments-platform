@@ -1,11 +1,14 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-26
+superseded_by: ADR-0019
 supersedes: [ADR-004, "ADR-015 (confirmation step)"]
 requirements: [FR-INF-12, FR-INF-13, FR-INF-14, FR-INF-15, FR-INF-16, FR-INF-17, FR-DAT-18, FR-DAT-25, FR-DAT-26, NFR-REC-2, NFR-REC-3, NFR-REC-18, NFR-REC-19, NFR-REC-20]
 ---
 
 # ADR-0017: region model, data replicated to two recovery regions, warm standby in us-east-1
+
+Superseded by [ADR-0019](0019-hot-standby-recovery-region.md) on 2026-11-27: two regions only, us-east-1 is a hot standby at the working size for prod, and the second recovery region is removed. The promotion, fencing and failback rules below still apply.
 
 ## Context
 

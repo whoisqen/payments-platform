@@ -13,7 +13,6 @@ variables {
 
   recovery_regions = {
     "us-east-1" = { short = "use1", kms_key_arn = "arn:aws:kms:us-east-1:111111111111:key/mrk-0004" }
-    "us-east-2" = { short = "use2", kms_key_arn = "arn:aws:kms:us-east-2:111111111111:key/mrk-0004" }
   }
 
   tags = {
@@ -29,8 +28,8 @@ run "working_region_replicates_with_rtc" {
   command = apply
 
   assert {
-    condition     = length(aws_s3_bucket.this) == 3 && alltrue([for b in aws_s3_bucket.this : b.object_lock_enabled])
-    error_message = "source plus two destinations, all with Object Lock"
+    condition     = length(aws_s3_bucket.this) == 2 && alltrue([for b in aws_s3_bucket.this : b.object_lock_enabled])
+    error_message = "source plus the us-east-1 destination, both with Object Lock"
   }
 
   assert {
@@ -40,7 +39,7 @@ run "working_region_replicates_with_rtc" {
 
   assert {
     condition = (
-      length(aws_s3_bucket_replication_configuration.this[0].rule) == 2 &&
+      length(aws_s3_bucket_replication_configuration.this[0].rule) == 1 &&
       alltrue([for r in aws_s3_bucket_replication_configuration.this[0].rule :
         r.destination[0].replication_time[0].time[0].minutes == 15 &&
         r.destination[0].metrics[0].event_threshold[0].minutes == 15 &&
@@ -50,7 +49,7 @@ run "working_region_replicates_with_rtc" {
   }
 
   assert {
-    condition     = alltrue([for r in aws_s3_bucket_replication_configuration.this[0].rule : r.priority >= 1]) && length(distinct([for r in aws_s3_bucket_replication_configuration.this[0].rule : r.priority])) == 2
+    condition     = alltrue([for r in aws_s3_bucket_replication_configuration.this[0].rule : r.priority >= 1]) && length(distinct([for r in aws_s3_bucket_replication_configuration.this[0].rule : r.priority])) == 1
     error_message = "rules need distinct priorities"
   }
 
@@ -60,7 +59,7 @@ run "working_region_replicates_with_rtc" {
   }
 
   assert {
-    condition     = length(aws_cloudwatch_metric_alarm.replication_latency) == 2
+    condition     = length(aws_cloudwatch_metric_alarm.replication_latency) == 1
     error_message = "one latency alarm per destination"
   }
 }

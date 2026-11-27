@@ -78,7 +78,8 @@ inputs = {
   availability_zones        = include.envcommon.locals.env_cfg.azs["us-east-1"]
   writer_az                 = include.envcommon.locals.env_cfg.azs["us-east-1"][0]
   recovery_instance_count   = include.envcommon.locals.env_cfg.standby_enabled ? include.envcommon.locals.env_cfg.standby_reader_count : 0
-  recovery_instance_class   = include.envcommon.locals.env_cfg.standby_reader_class
+  # Hot standby: the writer class of the working locker cluster.
+  recovery_instance_class = "db.r7g.4xlarge"
 
   # The locker reads a static password once at start; the same value is in Vault secret/<env>/locker/database and both rotate together.
   proxy_auth_entries = [{ name = "locker_app", iam_auth = "DISABLED" }]

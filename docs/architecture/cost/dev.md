@@ -1,32 +1,32 @@
 # Cost of dev
 
-Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-1, us-east-2, global). Method and assumptions: [README.md](README.md).
+Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-1, global). Method and assumptions: [README.md](README.md).
 
 - Sizing: `config/environments/dev.yaml` over `config/environments/prod.yaml`, stacks in `infra/live/dev/`.
-- The stacks create four working cells and the spare (`infra/live/dev/eu-central-1/cell-*`, `spare`), each with Aurora `db.r7g.large` (no readers), MemoryDB `db.t4g.small` (1 shard x 3 nodes) and its own EKS cluster.
-- Aurora global secondaries without instances exist in us-east-1 and us-east-2 (`infra/live/dev/us-east-*/`).
+- The stacks create cell-0 and the spare (`infra/live/dev/eu-central-1/cell-0`, `spare`), each with Aurora `db.r7g.large` (no readers), MemoryDB `db.t4g.small` (1 shard x 3 nodes) and its own EKS cluster. The spare and the locker use Standard storage.
+- dev runs in eu-central-1 alone. Its us-east-1 holds only `panel-edge`, `waf-edge` and `kms`. The egress firewall uses one endpoint.
 - Payments and stateful node pools run on Spot; the cde and workers pools run on demand.
-- Every line runs 730 hours: the repository has no schedule that stops dev (see [audit.md](audit.md)).
+- `aurora-schedule` stops the Aurora clusters outside the working window (60 of 168 hours: 08:00-20:00 Europe/Berlin on weekdays), so their instance lines run 260.71 hours. KEDA scales the workloads to zero on the same window (`global.workingHours`), so the payments and cde nodes run 260.71 hours too. `env-up` keeps dev up outside the window. Every other line runs 730 hours.
 - Commitments: none; the committed column applies the Spot planning rate only.
 
-Total: **10,229 USD/month on demand**, **9,259 USD/month committed**.
+Total: **4,238 USD/month on demand**, **4,003 USD/month committed**.
 
 ## By group
 
 | Group | On-demand (USD/month) | Committed (USD/month) |
 |---|---:|---:|
-| EKS nodes | 4,157.30 | 3,187.83 |
-| Aurora | 2,144.78 | 2,144.78 |
-| Network | 1,644.66 | 1,644.66 |
+| EKS nodes | 1,651.65 | 1,416.14 |
+| Network | 673.76 | 673.76 |
 | Analytics | 633.19 | 633.19 |
-| MemoryDB | 595.30 | 595.30 |
-| Logs and security | 580.13 | 580.13 |
-| EKS | 438.00 | 438.00 |
+| Logs and security | 410.53 | 410.53 |
+| Aurora | 375.49 | 375.49 |
+| MemoryDB | 240.52 | 240.52 |
+| EKS | 219.00 | 219.00 |
 | Edge | 16.83 | 16.83 |
-| Data transfer | 13.80 | 13.80 |
+| Data transfer | 13.00 | 13.00 |
 | Backup and S3 | 4.37 | 4.37 |
 | Data services | 0.16 | 0.16 |
-| **Total** | **10,228.52** | **9,259.05** |
+| **Total** | **4,238.50** | **4,002.99** |
 
 ## Line items
 
@@ -34,48 +34,31 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 
 | Group | Region | Service | Resource | Configuration | Quantity | Hours | Unit | Unit price (USD) | Monthly on-demand (USD) | Pricing model | Monthly committed (USD) |
 |---|---|---|---|---|---:|---:|---|---:|---:|---|---:|
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-0 writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
+| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-0 writer | db.r7g.large, I/O-Optimized | 1 | 260.71 | instance-hour | 0.433 | 112.89 | on-demand | 112.89 |
 | Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-0 storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-1 writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-1 storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-2 writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-2 storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-3 writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-cell-3 storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-spare writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-spare storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-locker writer | db.r7g.large, I/O-Optimized | 1 | 730 | instance-hour | 0.433 | 316.09 | on-demand | 316.09 |
-| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-locker storage | I/O-Optimized storage | 20 |  | GB-month | 0.268 | 5.36 | on-demand | 5.36 |
-| Aurora | eu-central-1 | Amazon RDS Proxy | proxies of 6 clusters | billed per vCPU of the cluster instances | 12 | 730 | vCPU-hour | 0.018 | 157.68 | on-demand | 157.68 |
-| Aurora | us-east-1 | Amazon Aurora PostgreSQL | global secondaries storage, 6 clusters | I/O-Optimized storage | 120 |  | GB-month | 0.225 | 27.00 | on-demand | 27.00 |
-| Aurora | us-east-1 | Amazon Aurora PostgreSQL | replicated write I/O into this region | Aurora Global Database | 10,000,000 |  | I/O | 2.2e-07 | 2.20 | on-demand | 2.20 |
-| Data transfer | eu-central-1 | AWS Data Transfer | Aurora global replication to us-east-1 | inter-region | 20 |  | GB | 0.02 | 0.40 | on-demand | 0.40 |
-| Aurora | us-east-2 | Amazon Aurora PostgreSQL | global secondaries storage, 6 clusters | I/O-Optimized storage | 120 |  | GB-month | 0.225 | 27.00 | on-demand | 27.00 |
-| Aurora | us-east-2 | Amazon Aurora PostgreSQL | replicated write I/O into this region | Aurora Global Database | 10,000,000 |  | I/O | 2.2e-07 | 2.20 | on-demand | 2.20 |
-| Data transfer | eu-central-1 | AWS Data Transfer | Aurora global replication to us-east-2 | inter-region | 20 |  | GB | 0.02 | 0.40 | on-demand | 0.40 |
+| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-spare writer | db.r7g.large, Standard | 1 | 260.71 | instance-hour | 0.333 | 86.82 | on-demand | 86.82 |
+| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-spare storage | Standard storage | 20 |  | GB-month | 0.119 | 2.38 | on-demand | 2.38 |
+| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-locker writer | db.r7g.large, Standard | 1 | 260.71 | instance-hour | 0.333 | 86.82 | on-demand | 86.82 |
+| Aurora | eu-central-1 | Amazon Aurora PostgreSQL | aurora-locker storage | Standard storage | 20 |  | GB-month | 0.119 | 2.38 | on-demand | 2.38 |
+| Aurora | eu-central-1 | Amazon RDS Proxy | proxies of 3 clusters | billed per vCPU of the cluster instances | 6 | 730 | vCPU-hour | 0.018 | 78.84 | on-demand | 78.84 |
 | MemoryDB | eu-central-1 | Amazon MemoryDB | memorydb-cell-0 | db.t4g.small, 1 shard(s) x 3 nodes | 3 | 730 | node-hour | 0.054 | 118.26 | on-demand | 118.26 |
-| MemoryDB | eu-central-1 | Amazon MemoryDB | memorydb-cell-1 | db.t4g.small, 1 shard(s) x 3 nodes | 3 | 730 | node-hour | 0.054 | 118.26 | on-demand | 118.26 |
-| MemoryDB | eu-central-1 | Amazon MemoryDB | memorydb-cell-2 | db.t4g.small, 1 shard(s) x 3 nodes | 3 | 730 | node-hour | 0.054 | 118.26 | on-demand | 118.26 |
-| MemoryDB | eu-central-1 | Amazon MemoryDB | memorydb-cell-3 | db.t4g.small, 1 shard(s) x 3 nodes | 3 | 730 | node-hour | 0.054 | 118.26 | on-demand | 118.26 |
 | MemoryDB | eu-central-1 | Amazon MemoryDB | memorydb-spare | db.t4g.small, 1 shard(s) x 3 nodes | 3 | 730 | node-hour | 0.054 | 118.26 | on-demand | 118.26 |
 | MemoryDB | eu-central-1 | Amazon MemoryDB | data written | all cells | 20 |  | GB | 0.2 | 4.00 | on-demand | 4.00 |
-| EKS | eu-central-1 | Amazon EKS | control planes | 4 cells, spare, analytics | 6 | 730 | cluster-hour | 0.1 | 438.00 | on-demand | 438.00 |
-| EKS nodes | eu-central-1 | Amazon EC2 | bootstrap node groups, 3 per cluster | m7g.large, Linux, shared tenancy | 18 | 730 | instance-hour | 0.0978 | 1,285.09 | on-demand | 1,285.09 |
-| EKS nodes | eu-central-1 | Amazon EC2 | payments pool, 5 cells (router 3, drainer 3, scheduler 5 pods) | m7g.2xlarge, Linux, Spot | 5 | 730 | instance-hour | 0.391 | 1,427.15 | Spot at 40% of on-demand | 570.86 |
-| EKS nodes | eu-central-1 | Amazon EC2 | workers pool, platform add-ons | m7g.xlarge, Linux, shared tenancy | 6 | 730 | instance-hour | 0.1955 | 856.29 | on-demand | 856.29 |
-| EKS nodes | eu-central-1 | Amazon EC2 | cde pool, locker (3 pods) | m7g.xlarge, Linux, shared tenancy | 1 | 730 | instance-hour | 0.1955 | 142.72 | on-demand | 142.72 |
+| EKS | eu-central-1 | Amazon EKS | control planes | cell-0, spare, analytics | 3 | 730 | cluster-hour | 0.1 | 219.00 | on-demand | 219.00 |
+| EKS nodes | eu-central-1 | Amazon EC2 | bootstrap node groups, 3 per cluster | m7g.large, Linux, shared tenancy | 9 | 730 | instance-hour | 0.0978 | 642.55 | on-demand | 642.55 |
+| EKS nodes | eu-central-1 | Amazon EC2 | payments pool, cell-0 and spare (working hours) | m7g.2xlarge, Linux, Spot | 2 | 260.71 | instance-hour | 0.391 | 203.88 | Spot at 40% of on-demand | 81.55 |
+| EKS nodes | eu-central-1 | Amazon EC2 | workers pool, platform add-ons | m7g.xlarge, Linux, shared tenancy | 3 | 730 | instance-hour | 0.1955 | 428.15 | on-demand | 428.15 |
+| EKS nodes | eu-central-1 | Amazon EC2 | cde pool, locker (working hours) | m7g.xlarge, Linux, shared tenancy | 1 | 260.71 | instance-hour | 0.1955 | 50.97 | on-demand | 50.97 |
 | EKS nodes | eu-central-1 | Amazon EC2 | analytics stateful pool, ClickHouse 1 replica | r7g.xlarge, Linux, Spot | 1 | 730 | instance-hour | 0.2584 | 188.63 | Spot at 40% of on-demand | 75.45 |
 | EKS nodes | eu-central-1 | Amazon EBS | ClickHouse data volume | gp3, 1 x 100 GB | 100 |  | GB-month | 0.0952 | 9.52 | on-demand | 9.52 |
-| EKS nodes | eu-central-1 | Amazon EBS | node volumes (4 GiB OS + 80 GiB data) | gp3, 31 nodes x 84 GB | 2,604 |  | GB-month | 0.0952 | 247.90 | on-demand | 247.90 |
+| EKS nodes | eu-central-1 | Amazon EBS | node volumes (4 GiB OS + 80 GiB data) | gp3, 16 nodes x 84 GB | 1,344 |  | GB-month | 0.0952 | 127.95 | on-demand | 127.95 |
 | Analytics | eu-central-1 | Amazon MSK | brokers | kafka.m7g.large, 3 AZ | 3 | 730 | broker-hour | 0.2445 | 535.46 | on-demand | 535.46 |
 | Analytics | eu-central-1 | Amazon MSK | broker storage | 3 x 100 GB | 300 |  | GB-month | 0.119 | 35.70 | on-demand | 35.70 |
 | Analytics | eu-central-1 | Amazon OpenSearch Service | data node | m7g.medium.search, 1 AZ | 1 | 730 | instance-hour | 0.081 | 59.13 | on-demand | 59.13 |
 | Analytics | eu-central-1 | Amazon OpenSearch Service | data node storage | gp3, 20 GB | 20 |  | GB-month | 0.1452 | 2.90 | on-demand | 2.90 |
 | Network | eu-central-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.012 | 236.52 | on-demand | 236.52 |
-| Network | us-east-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.01 | 197.10 | on-demand | 197.10 |
-| Network | us-east-2 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.01 | 197.10 | on-demand | 197.10 |
 | Network | eu-central-1 | Amazon VPC | interface endpoint data processed | AWS API traffic kept off NAT | 200 |  | GB | 0.01 | 2.00 | on-demand | 2.00 |
-| Network | eu-central-1 | AWS Network Firewall | firewall endpoints, egress VPC | 3 AZ | 3 | 730 | endpoint-hour | 0.395 | 865.05 | on-demand | 865.05 |
+| Network | eu-central-1 | AWS Network Firewall | firewall endpoints, egress VPC | 1 AZ | 1 | 730 | endpoint-hour | 0.395 | 288.35 | on-demand | 288.35 |
 | Network | eu-central-1 | Amazon VPC | NAT gateways behind the firewall | 3 AZ; hours and GB waived by the firewall endpoints | 3 | 730 | gateway-hour | 0 | 0.00 | on-demand | 0.00 |
 | Network | eu-central-1 | Amazon VPC | public IPv4 of the NAT gateways | 3 addresses | 3 | 730 | address-hour | 0.005 | 10.95 | on-demand | 10.95 |
 | Network | eu-central-1 | AWS Transit Gateway | VPC attachments, workload and egress | 2 attachments | 2 | 730 | attachment-hour | 0.06 | 87.60 | on-demand | 87.60 |
@@ -100,17 +83,18 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | Backup and S3 | eu-central-1 | Amazon S3 | Glacier Flexible Retrieval (days 14-35) | D5 | 60 |  | GB-month | 0.00405 | 0.24 | on-demand | 0.24 |
 | Backup and S3 | eu-central-1 | Amazon S3 | monthly 7-year archive, Deep Archive | first-year average | 50 |  | GB-month | 0.0018 | 0.09 | on-demand | 0.09 |
 | Backup and S3 | eu-central-1 | AWS Backup | Aurora snapshots in the vault | 35 days | 150 |  | GB-month | 0.023 | 3.45 | on-demand | 3.45 |
-| Logs and security | eu-central-1 | Amazon CloudWatch | EKS control plane logs ingested | 5 log types, 6 clusters | 60 |  | GB | 0.63 | 37.80 | on-demand | 37.80 |
-| Logs and security | eu-central-1 | Amazon CloudWatch | log storage | 30-day retention, steady state | 60 |  | GB-month | 0.0324 | 1.94 | on-demand | 1.94 |
+| Logs and security | eu-central-1 | Amazon CloudWatch | EKS control plane logs ingested | 5 log types, 3 clusters | 30 |  | GB | 0.63 | 18.90 | on-demand | 18.90 |
+| Logs and security | eu-central-1 | Amazon CloudWatch | log storage | 30-day retention, steady state | 30 |  | GB-month | 0.0324 | 0.97 | on-demand | 0.97 |
+| Logs and security | eu-central-1 | Amazon Data Firehose | EKS control plane logs to the log archive | subscription filter, Direct PUT ingestion | 30 |  | GB | 0.033 | 0.99 | on-demand | 0.99 |
 | Logs and security | eu-central-1 | Amazon CloudWatch | VPC flow logs and firewall logs to S3 | vended log delivery | 50 |  | GB | 0.285 | 14.25 | on-demand | 14.25 |
 | Logs and security | eu-central-1 | AWS KMS | customer managed keys | 10 per region with replicas, plus service keys | 40 |  | key-month | 1 | 40.00 | on-demand | 40.00 |
 | Logs and security | eu-central-1 | AWS KMS | requests |  | 2,000,000 |  | request | 3e-06 | 6.00 | on-demand | 6.00 |
 | Logs and security | eu-central-1 | AWS Secrets Manager | secrets | with replicas | 40 |  | secret-month | 0.4 | 16.00 | on-demand | 16.00 |
-| Logs and security | eu-central-1 | Amazon GuardDuty | RDS protection | Aurora vCPU | 12 |  | vCPU-month | 1.23 | 14.76 | on-demand | 14.76 |
-| Logs and security | eu-central-1 | Amazon GuardDuty | EKS runtime monitoring | 108 node vCPU, tiered | 1 |  | month | 207.36 | 207.36 | on-demand | 207.36 |
+| Logs and security | eu-central-1 | Amazon GuardDuty | RDS protection | Aurora vCPU | 6 |  | vCPU-month | 1.23 | 7.38 | on-demand | 7.38 |
+| Logs and security | eu-central-1 | Amazon GuardDuty | EKS runtime monitoring | 54 node vCPU, tiered | 1 |  | month | 103.68 | 103.68 | on-demand | 103.68 |
 | Logs and security | eu-central-1 | Amazon GuardDuty | CloudTrail, VPC flow and DNS analysis | foundational | 30 |  | GB | 1.15 | 34.50 | on-demand | 34.50 |
-| Logs and security | eu-central-1 | AWS Security Hub | security checks | 3 regions | 50,000 |  | check | 0.001 | 50.00 | on-demand | 50.00 |
+| Logs and security | eu-central-1 | AWS Security Hub | security checks | 2 regions | 33,333 |  | check | 0.001 | 33.33 | on-demand | 33.33 |
 | Logs and security | eu-central-1 | AWS Config | configuration items | node and ENI churn | 20,000 |  | item | 0.003 | 60.00 | on-demand | 60.00 |
 | Logs and security | eu-central-1 | AWS Config | conformance pack evaluations |  | 50,000 |  | evaluation | 0.001 | 50.00 | on-demand | 50.00 |
-| Logs and security | eu-central-1 | Amazon Inspector | EC2 scanning | nodes | 31 | 730 | instance-hour | 0.0021 | 47.52 | on-demand | 47.52 |
-| **Total** | | | | | | | | | **10,228.52** | | **9,259.05** |
+| Logs and security | eu-central-1 | Amazon Inspector | EC2 scanning | nodes | 16 | 730 | instance-hour | 0.0021 | 24.53 | on-demand | 24.53 |
+| **Total** | | | | | | | | | **4,238.50** | | **4,002.99** |

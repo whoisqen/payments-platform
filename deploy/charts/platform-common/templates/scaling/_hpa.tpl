@@ -29,16 +29,20 @@ spec:
           averageValue: {{ . | quote }}
     {{- end }}
   behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
-    scaleDown:
-      stabilizationWindowSeconds: 600
-      policies:
-        - type: Percent
-          value: 10
-          periodSeconds: 60
+    {{- include "platform-common.hpaBehavior" . | nindent 4 }}
+{{- end }}
+
+{{- define "platform-common.hpaBehavior" -}}
+scaleUp:
+  stabilizationWindowSeconds: 0
+  policies:
+    - type: Percent
+      value: 100
+      periodSeconds: 15
+scaleDown:
+  stabilizationWindowSeconds: 600
+  policies:
+    - type: Percent
+      value: 10
+      periodSeconds: 60
 {{- end }}

@@ -18,7 +18,13 @@ migrations:
   database:
     host: pay-prod-use1-aurora-spare.cluster-example.us-east-1.rds.amazonaws.com
 
+router:
+  autoscaling:
+    minReplicas: 3
+
 drainer:
+  autoscaling:
+    minReplicas: 3
   container:
     env:
       REDIS_ADDRESS: clustercfg.pay-prod-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com:6379
@@ -28,3 +34,5 @@ scheduler:
     container:
       env:
         REDIS_ADDRESS: clustercfg.pay-prod-use1-memorydb-spare.example.memorydb.us-east-1.amazonaws.com:6379
+    autoscaling:
+      minReplicas: 3

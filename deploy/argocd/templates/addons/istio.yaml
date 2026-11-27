@@ -41,7 +41,7 @@ spec:
         # The upstream chart version is pinned here and bumped by Renovate
         - repoURL: https://istio-release.storage.googleapis.com/charts
           chart: '{{`{{ .chart }}`}}'
-          targetRevision: 1.30.8
+          targetRevision: 1.31.4
           helm:
             ignoreMissingValueFiles: true
             valueFiles:

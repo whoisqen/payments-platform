@@ -46,12 +46,6 @@ variables {
       db_subnet_group    = "pay-prod-use1-data"
       security_group_ids = ["sg-1001"]
     }
-    "us-east-2" = {
-      short              = "use2"
-      kms_key_arn        = "arn:aws:kms:us-east-2:111111111111:key/mrk-0001"
-      db_subnet_group    = "pay-prod-use2-data"
-      security_group_ids = ["sg-2001"]
-    }
   }
 }
 
@@ -66,6 +60,11 @@ run "working_region_cluster" {
   assert {
     condition     = aws_rds_cluster.primary[0].backup_retention_period == 35 && aws_rds_cluster.primary[0].storage_encrypted
     error_message = "writer cluster needs 35 days of PITR and encryption"
+  }
+
+  assert {
+    condition     = aws_rds_cluster.primary[0].storage_type == "aurora-iopt1"
+    error_message = "working cells keep I/O-Optimized storage by default"
   }
 
   assert {
@@ -97,8 +96,8 @@ run "headless_secondaries_and_lag_alarm" {
   command = plan
 
   assert {
-    condition     = length(aws_rds_cluster.secondary) == 2 && length(aws_rds_cluster_instance.recovery) == 0
-    error_message = "both recovery regions get a storage-only cluster and no instance"
+    condition     = length(aws_rds_cluster.secondary) == 1 && length(aws_rds_cluster_instance.recovery) == 0
+    error_message = "the recovery region gets a storage-only cluster and no instance"
   }
 
   assert {
@@ -107,7 +106,7 @@ run "headless_secondaries_and_lag_alarm" {
   }
 
   assert {
-    condition     = aws_cloudwatch_metric_alarm.global_lag["us-east-2"].region == "us-east-2"
+    condition     = aws_cloudwatch_metric_alarm.global_lag["us-east-1"].region == "us-east-1"
     error_message = "the lag alarm lives in the secondary region"
   }
 }
@@ -348,4 +347,28 @@ run "proxy_auth_iam_auth_is_validated" {
   }
 
   expect_failures = [var.proxy_auth_entries]
+}
+
+run "standard_storage_for_low_io_clusters" {
+  command = plan
+
+  variables {
+    component    = "aurora-spare"
+    storage_type = "aurora"
+  }
+
+  assert {
+    condition     = aws_rds_cluster.primary[0].storage_type == "aurora"
+    error_message = "storage_type must reach the working-region cluster"
+  }
+}
+
+run "rejects_unknown_storage_type" {
+  command = plan
+
+  variables {
+    storage_type = "gp3"
+  }
+
+  expect_failures = [var.storage_type]
 }

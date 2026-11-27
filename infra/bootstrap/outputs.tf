@@ -9,8 +9,13 @@ output "state_kms_key_arn" {
 }
 
 output "replica_buckets" {
-  value       = { "us-east-1" = module.replica_use1.bucket_name, "us-east-2" = module.replica_use2.bucket_name }
-  description = "State replicas in the recovery regions."
+  value       = { "us-east-1" = module.replica_use1.bucket_name }
+  description = "State replica in the recovery region; PAY_STATE_REGION=us-east-1 makes infra/live use it."
+}
+
+output "replica_kms_key_arns" {
+  value       = { "us-east-1" = module.state_key_use1.key_arn }
+  description = "Replica of the state key in the recovery region (same key id as state_kms_key_arn)."
 }
 
 output "plan_role_arn" {

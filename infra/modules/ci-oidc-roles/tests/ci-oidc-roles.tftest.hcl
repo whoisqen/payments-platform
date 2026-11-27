@@ -234,3 +234,61 @@ run "no_ecr_read_role_without_repositories" {
     error_message = "no repositories, no role"
   }
 }
+
+run "dr_apply_role_trusts_its_environment_and_reaches_both_state_buckets" {
+  command = plan
+
+  variables {
+    dr_apply = {
+      github_environment        = "dr-compute-prod"
+      state_replica_bucket_arn  = "arn:aws:s3:::pay-prod-use1-tf-state-222222222222"
+      state_replica_kms_key_arn = "arn:aws:kms:us-east-1:222222222222:key/mrk-0123456789abcdef0123456789abcdef"
+      actions                   = ["eks:CreateCluster"]
+      resource_arns             = ["arn:aws:eks:us-east-1:444444444444:cluster/pay-prod-use1-*"]
+    }
+  }
+
+  assert {
+    condition     = aws_iam_role.dr_apply[0].name == "pay-prod-glob-dr-apply" && aws_iam_role.dr_apply[0].permissions_boundary == var.permissions_boundary_arn
+    error_message = "named pay-<env>-glob-dr-apply with the boundary"
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role.dr_apply[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:example-org/payments-platform:environment:dr-compute-prod"
+    error_message = "only jobs of the dr-compute-prod environment"
+  }
+  assert {
+    condition = one([for s in jsondecode(aws_iam_role_policy.dr_apply[0].policy).Statement : s.Resource if s.Sid == "EnvironmentState"]) == [
+      "arn:aws:s3:::pay-prod-euc1-tf-state-444444444444/prod/*", "arn:aws:s3:::pay-prod-use1-tf-state-222222222222/prod/*",
+    ]
+    error_message = "read and write prod/ in the working bucket and the replica"
+  }
+  assert {
+    condition     = length(one([for s in jsondecode(aws_iam_role_policy.dr_apply[0].policy).Statement : s.Resource if s.Sid == "StateKeys"])) == 2
+    error_message = "both state keys"
+  }
+}
+
+run "no_dr_apply_role_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_iam_role.dr_apply) == 0
+    error_message = "no DR role without dr_apply"
+  }
+}
+
+run "dr_apply_from_another_environment_rejected" {
+  command = plan
+
+  variables {
+    dr_apply = {
+      github_environment        = "prod"
+      state_replica_bucket_arn  = "arn:aws:s3:::pay-prod-use1-tf-state-222222222222"
+      state_replica_kms_key_arn = "arn:aws:kms:us-east-1:222222222222:key/mrk-0123456789abcdef0123456789abcdef"
+      actions                   = ["iam:*"]
+      resource_arns             = ["*"]
+    }
+  }
+
+  expect_failures = [var.dr_apply]
+}

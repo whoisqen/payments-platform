@@ -4,15 +4,14 @@ dev:
   schedule: scaled down outside working hours
   eks_nodes: spot
   aurora: {writer: db.r7g.large, readers: 0}
-  memorydb: {node_type: db.r7g.large, shards: 1, replicas_per_shard: 1}
+  memorydb: {node_type: db.t4g.small, shards: 1, replicas_per_shard: 1}
   msk: {brokers: 3, instance: kafka.m7g.large}
   clickhouse: {shards: 1, replicas: 1}
   recovery_regions: none
 stage:
   scale: dev size by default; prod-size windows (4 cells plus spare, prod replicas and instance classes) only while load, stress, spike and soak tests run
   eks_nodes: spot with interruption handling and PDB
-  recovery_regions: [us-east-1, us-east-2]
-  recovery_compute: only during region-switch drills
+  recovery_regions: none (only prod has a standby region)
 prod:
   scale: reference size of the architecture (section 5 and 8)
   eks_nodes: on-demand, covered by Compute Savings Plans (bought by FinOps, not by Terraform)
@@ -21,10 +20,10 @@ prod:
   aurora_exceptions: "spare and locker on standard storage; locker writer db.r7g.4xlarge"
   spare_cell: minimal profile until it takes a merchant
   memorydb: {node_type: db.r7g.xlarge, shards: 2, replicas_per_shard: 2}
-  msk: {brokers: 9, instance: kafka.m7g.xlarge}
-  clickhouse: {shards: 4, replicas: 2}
-  recovery_regions: [us-east-1, us-east-2]
-  recovery_compute: none standing; data replicas only, compute and MemoryDB are built by the switch runbook within the RTO (D6, D7)
+  msk: {brokers: 3, instance: kafka.m7g.large, volume_gb: 1000}
+  clickhouse: {shards: 2, replicas: 2}
+  recovery_regions: [us-east-1]
+  recovery_compute: hot standby in us-east-1 at full prod size, ready for the whole load (D6, D7)
 cde-prod: same as prod, CDE accounts only
 rules:
   - CDE node pools are never spot in any environment

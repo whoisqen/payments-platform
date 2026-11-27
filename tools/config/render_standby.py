@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-ENVS = {"stage": "sandbox", "prod": "production"}  # environment -> RUN_ENV of its workloads
+ENVS = {"prod": "production"}  # environment -> RUN_ENV of its workloads; only prod has a standby region
 
 
 def short(region):
@@ -38,10 +38,13 @@ def render(cfg, env):
     cells = sorted(p.name for p in (base / work).iterdir() if p.name.startswith("cell-") or p.name == "spare")
     files = {}
     files[f"{standby}/values.yaml"] = (
-        "# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values\n"
+        "# Hot standby: the same Applications run here at full size against the local replicas; promotion changes no values\n"
         f"global:\n  region: {standby}\n  dataCidrs:\n{lines(cidrs['data_cidrs'], 4)}  endpointCidrs:\n{lines(cidrs['endpoint_cidrs'], 4)}")
     for c in cells:
         r_redis = redis(c)
+        # The spare keeps three pods of each workload, like the working region's spare
+        floor = lambda indent: f"{' ' * indent}autoscaling:\n{' ' * indent}  minReplicas: 3\n" if c == "spare" else ""
+        router = "router:\n" + floor(2) + "\n" if c == "spare" else ""
         # Tenant, users (<cell>-<service>), locker host and the rest of global.hyperswitch come from envs/<env>/values.yaml, shared with the working region
         files[f"{standby}/{c}/values.yaml"] = f"""# Cell {c} in the standby region: local Aurora secondary (through RDS Proxy) and MemoryDB, ready to become the writer on promotion; endpoints are placeholders until infra/live exports them
 global:
@@ -63,8 +66,8 @@ migrations:
   database:
     host: {writer(c)}
 
-drainer:
-  container:
+{router}drainer:
+{floor(2)}  container:
     env:
       REDIS_ADDRESS: {r_redis}:6379
 
@@ -73,7 +76,7 @@ scheduler:
     container:
       env:
         REDIS_ADDRESS: {r_redis}:6379
-"""
+{floor(4)}"""
     files[f"{standby}/locker/values.yaml"] = f"""# Locker of the standby region; its database is the local global-database secondary
 global:
   environment: {ENV}

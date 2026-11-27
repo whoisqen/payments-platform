@@ -12,7 +12,14 @@ migrations:
   database:
     host: pay-stage-euc1-aurora-spare.cluster-example.eu-central-1.rds.amazonaws.com
 
+# The spare keeps three pods of each workload, so it takes traffic right after a failover; the scalers grow it from there
+router:
+  autoscaling:
+    minReplicas: 3
+
 drainer:
+  autoscaling:
+    minReplicas: 3
   container:
     env:
       REDIS_ADDRESS: clustercfg.pay-stage-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com:6379
@@ -22,3 +29,5 @@ scheduler:
     container:
       env:
         REDIS_ADDRESS: clustercfg.pay-stage-euc1-memorydb-spare.example.memorydb.eu-central-1.amazonaws.com:6379
+    autoscaling:
+      minReplicas: 3

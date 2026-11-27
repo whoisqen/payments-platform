@@ -44,4 +44,10 @@ inputs = {
   kms_key_arn     = dependency.kms.outputs.key_arns["shared"]
   health_check_id = dependency.routing.outputs.health_check_ids[include.envcommon.locals.cfg.regions.working]
   deny_policy_arn = dependency.dynamodb.outputs.deny_recovery_writes_policy_arn
+
+  # Same classes as the eu-central-1 writers: spare at its minimal profile, locker at its own size.
+  switch_writer_instance_classes = include.envcommon.locals.env_cfg.standby_enabled ? {} : merge(
+    { for c in include.envcommon.locals.env_cfg.cells : c => include.envcommon.locals.env_cfg.aurora_writer_class },
+    { spare = "db.r7g.2xlarge", locker = "db.r7g.4xlarge" },
+  )
 }

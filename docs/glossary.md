@@ -72,13 +72,14 @@ New to card payments? Read [Payments in 10 minutes](architecture/domain/README.m
 
 | Term | Meaning | Do not call it |
 |---|---|---|
-| cell | An independent copy of the stack (EKS cluster, router, drainer, scheduler, MemoryDB, Aurora) serving a share of the merchants; four working cells ([primer](architecture/domain/platform-concepts.md#cells)) | |
+| cell | An independent copy of the stack (EKS cluster, router, drainer, scheduler, MemoryDB, Aurora) serving a share of the merchants; four working cells in stage and prod, cell-0 only in dev ([primer](architecture/domain/platform-concepts.md#cells)) | |
 | spare cell | The fifth cell without merchants, kept in a minimal profile and raised to the prod profile to take a hot merchant ([primer](architecture/domain/platform-concepts.md#the-spare-cell)) | |
 | edge | The `payments-edge` Gateway and its Envoy proxies: TLS, request class, rate limits, routing to the cell named in the request ([primer](architecture/domain/platform-concepts.md#the-edge-and-request-classes)) | |
 | request class | `payments`, `read` or `list`, set at the edge by path and method; decides the order of load shedding ([primer](architecture/domain/platform-concepts.md#the-edge-and-request-classes)) | |
 | load shedding | Refusing requests under overload, lists first, reads next, payments last ([primer](architecture/domain/platform-concepts.md#load-shedding)) | |
 | admin entry | The internal Gateway on the private zone that serves the admin tools after Okta sign-in | |
 | central cluster | The EKS cluster in shared-services that runs metrics, logs, traces, Grafana, Alertmanager and Sentry outside the CDE | |
+| size window | The `size_window` of `infra/live/stage/env.hcl`: `scheduled` runs stage at the dev sizes, `prod-size` is a booked test window at the prod sizes | |
 | slow request | A request over the threshold of its type (status 50 ms; create, confirm, capture, refund 1,150 ms total; others 300 ms) | |
 | generator | A script in `tools/config/` or `observability/` that writes files from config; its `--check` mode fails on hand edits | |
 | SLO | Service level objective: a target over 30 days for authorization availability, overhead latency, status reads and webhooks ([primer](architecture/domain/platform-concepts.md#slos-for-a-business-reader)) | |
@@ -93,10 +94,11 @@ New to card payments? Read [Payments in 10 minutes](architecture/domain/README.m
 | Term | Meaning | Do not call it |
 |---|---|---|
 | working region | The only region that accepts writes: Frankfurt (eu-central-1) | |
-| recovery region | A region that receives data and backups continuously: us-east-1 (warm standby) and us-east-2 (data and backups only) | |
-| warm standby | The compute, MemoryDB and Aurora readers kept running in us-east-1 for stage and prod; it serves no traffic until the region switch | |
-| region switch | Moving traffic and writes from the working region to the warm standby (automatic) or to us-east-2 (plan B) | |
-| standby promotion | Making the us-east-1 Aurora secondaries writers and allowing DynamoDB writes there during a region switch; `promotion` alone means moving a digest | |
+| recovery region | The standby region: us-east-1, in prod only; stage and dev have none | |
+| hot standby | The us-east-1 setup of prod: the cells run at the working size all the time (same clusters, node pools, replicas and MemoryDB, one Aurora instance per global secondary with the writer class of its working cluster) and take the whole load at any moment ([ADR-0019](adr/0019-hot-standby-recovery-region.md)) | warm standby, pilot light (rejected alternatives of ADR-0019) |
+| region switch | Moving the traffic and writes of prod from the working region to the us-east-1 hot standby: fencing, Aurora promotion, cache warm-up, traffic move | |
+| standby promotion | Making the us-east-1 Aurora instance of each global secondary the writer and allowing DynamoDB writes there during a region switch; `promotion` alone means moving a digest | |
+| game day | A planned, announced region switch of prod to the hot standby and back, run quarterly with on-call approval | |
 | fence | The drop rule in the `psp-fence` Network Firewall rule group that stops the old working region from reaching PSPs | |
 | failback | The planned return to Frankfurt after it is rebuilt, approved by a person | |
 
@@ -108,4 +110,4 @@ New to card payments? Read [Payments in 10 minutes](architecture/domain/README.m
 | ci-pr pool | The runner pool for pull request jobs: no role to assume, no registry access, no cache write | |
 | plan role / apply role | GitHub OIDC roles: the plan role reads only; an apply role per component trusts only `main` and `release/*` | |
 
-Resource naming: `<prefix>-<env>-<region-short>-<component>`, for example `pay-prod-euc1-router` or `pay-prod-use1-aurora-cell-0`. Region short codes: `euc1`, `use1`, `use2`, `glob`.
+Resource naming: `<prefix>-<env>-<region-short>-<component>`, for example `pay-prod-euc1-router` or `pay-prod-use1-aurora-cell-0`. Region short codes: `euc1`, `use1`, `glob`.

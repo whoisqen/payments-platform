@@ -8,7 +8,7 @@ Alert `BackupCopyFailed`, severity warning, owner data-platform-oncall, dashboar
 
 ### Symptom
 
-A copy job to us-east-1, us-east-2 or the backup account failed.
+A copy job to us-east-1 or the backup account failed.
 
 ### Diagnostics
 
@@ -59,7 +59,7 @@ Alert `SnapshotCopyStale`, severity warning, owner data-platform-oncall, dashboa
 
 ### Symptom
 
-The hourly snapshot copy to us-east-1 or us-east-2 is late.
+The hourly snapshot copy to us-east-1 is late.
 
 ### Diagnostics
 
@@ -209,7 +209,7 @@ Alert `DrSwitchTestOverdue`, severity warning, owner data-platform-oncall, dashb
 
 ### Symptom
 
-A recovery region has no successful full switch test in the last 100 days (the test is quarterly, to us-east-1 and us-east-2 in turn).
+The us-east-1 standby has no successful full switch test in the last 100 days (the test is quarterly).
 
 ### Diagnostics
 

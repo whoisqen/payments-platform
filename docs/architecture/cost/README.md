@@ -9,7 +9,7 @@ Each environment file lists its line items, [calculator.md](calculator.md) shows
 | [shared-services.md](shared-services.md) | CI runners, registry, admin access |
 | [central-observability.md](central-observability.md) | Central metrics, logs, traces and Sentry cluster |
 | [organization.md](organization.md) | Management and security accounts: trail, log archive, security services |
-| [calculator-items.csv](calculator-items.csv) | All 358 line items in one table, same columns as the files |
+| [calculator-items.csv](calculator-items.csv) | All 293 line items in one table, same columns as the files |
 | [calculator.md](calculator.md) | AWS Pricing Calculator entry, group by group |
 | [audit.md](audit.md) | Findings ranked by monthly saving, with the file to change and the risk |
 
@@ -17,30 +17,38 @@ Each environment file lists its line items, [calculator.md](calculator.md) shows
 
 Target load: 160 TPS average (`docs/capacity/forecast.yaml`), so **414.7 million payments per month** (160 x 2,592,000 s).
 Hours: 730 per month. Currency: USD. Taxes and AWS Support are not included.
+The totals include every adopted finding of [audit.md](audit.md) and the owner decisions on the region model: two regions, a hot standby in us-east-1 for prod only.
 
 | Environment | On-demand (USD/month) | Committed (USD/month) | On-demand per 1,000 payments | Committed per 1,000 payments |
 |---|---:|---:|---:|---:|
-| prod | 161,487 | 129,881 | 0.389 | 0.313 |
-| stage | 148,093 | 137,441 | 0.357 | 0.331 |
-| dev | 10,229 | 9,259 | 0.025 | 0.022 |
-| shared-services | 1,385 | 868 | 0.003 | 0.002 |
-| central observability | 2,887 | 2,405 | 0.007 | 0.006 |
-| organization (management, security) | 378 | 378 | 0.001 | 0.001 |
-| **Total** | **324,458** | **280,232** | **0.782** | **0.676** |
-| Total after the findings of [audit.md](audit.md) | 122,870 | 102,108 | 0.296 | 0.246 |
+| prod | 149,044 | 121,242 | 0.359 | 0.292 |
+| stage (`size_window = "scheduled"`) | 12,747 | 11,254 | 0.031 | 0.027 |
+| dev | 4,238 | 4,003 | 0.010 | 0.010 |
+| shared-services | 1,325 | 808 | 0.003 | 0.002 |
+| central observability | 2,887 | 2,171 | 0.007 | 0.005 |
+| organization (management, security) | 421 | 421 | 0.001 | 0.001 |
+| **Total** | **170,662** | **139,898** | **0.412** | **0.337** |
+| Total before the findings of [audit.md](audit.md) | 324,458 | 280,232 | 0.782 | 0.676 |
 
-Per 1,000 payments divides the monthly cost of the line by 414,720 (thousands of payments per month); non-prod lines are spread over the same payments.
+Per 1,000 payments divides the monthly cost of the line by 414,720 (thousands of payments per month). Non-prod lines are spread over the same payments.
+Stage hours at `size_window = "prod-size"` (booked load test windows, [stage.md](stage.md)) come on top of the stage line.
 
-"Committed" applies the price model of architecture section 12:
+"Committed" applies the commitments chosen for prod (`manifests/environment.yaml`, `commitments`):
 
 | Workload | Model in the committed column | Discount from the Price List |
 |---|---|---|
-| Aurora prod (both regions) | RDS Reserved Instance, 1 year, no upfront; the same discount applies to the I/O-Optimized rate | 23% |
-| MemoryDB prod (both regions) | Reserved node, 1 year, no upfront | 32% |
-| OpenSearch prod data and master nodes | Reserved instance, 1 year, no upfront | 31% |
-| EC2 of prod and central observability | Compute Savings Plan, 1 year, no upfront, covering 80% of the steady hours (section 12) | 24% on the covered part |
-| Payments and stateful pools of dev and stage, CI runners | Spot, as configured in `config/environments/*.yaml` and `infra/live/shared-services/env.hcl` | planning rate 60% |
+| Aurora prod instances (eu-central-1 and the us-east-1 hot standby) | Database Savings Plan, 1 year, no upfront, at the plan rate of each instance class and storage type | 20% |
+| OpenSearch prod data and master nodes | Database Savings Plan, 1 year, no upfront | 20% |
+| DynamoDB prod requests | Database Savings Plan, 1 year, no upfront | 18% |
+| MemoryDB prod | Reserved node, 1 year, no upfront (no Savings Plan covers MemoryDB) | 32% |
+| EC2 of prod and central observability, Lambda | Compute Savings Plan, 1 year, no upfront, covering 80% of the steady hours (section 12) | 24% on the covered part |
+| MSK, RDS Proxy, UltraWarm | On-demand: no Savings Plan or reservation covers them | none |
+| Payments and stateful pools of dev and stage, workers pool of central observability, CI runners | Spot, as configured in `config/environments/*.yaml`, `infra/modules/karpenter` and `infra/live/shared-services/env.hcl` | planning rate 60% |
 | router and locker above the base, managed stores in non-prod | On-demand | none |
+
+- The Database Savings Plan rates come from the `AWSDatabaseSavingsPlans` offer of 2026-11-26, for example 8.3048 instead of 10.381 USD/hour for `db.r7g.12xlarge` I/O-Optimized and 2.1296 instead of 2.662 for `db.r7g.4xlarge` Standard.
+- At 20%, the Database Savings Plan saves 1,353 USD/month less on prod Aurora than the 1-year RDS Reserved Instances it replaces (23%). In return it covers DynamoDB and OpenSearch, and it follows class changes such as the spare and locker resizes.
+- The Lambda functions (`dr-failover`, schedulers) cost under 1 USD/month at their call rates. They have no line of their own, and the Compute Savings Plan covers them.
 
 Prod lists no Spot pools (`spot_pools: []`): an interrupted pod during a PSP call leaves the payment in the unknown state.
 
@@ -48,27 +56,29 @@ Prod lists no Spot pools (`spot_pools: []`): an interrupted pod during a PSP cal
 
 | Driver | On-demand (USD/month, all environments) | Share |
 |---|---:|---:|
-| Aurora: instance classes, I/O-Optimized storage, RDS Proxy, recovery regions | 166,412 | 51% |
-| MemoryDB: 2 shards x 3 nodes per cell in two regions | 61,360 | 19% |
-| Compute: EKS control planes and nodes, CI runners | 55,358 | 17% |
-| Analytics: MSK, OpenSearch (ClickHouse nodes are in compute) | 18,450 | 6% |
-| Network and data transfer: firewall, endpoints, transit gateway, accelerator, egress | 11,304 | 3% |
-| Logs and security services, observability, backup, registry | 11,573 | 4% |
+| Aurora: instance classes in both regions, I/O-Optimized storage of the working cells, RDS Proxy, standby storage | 87,350 | 51% |
+| Compute: EKS control planes and nodes in both prod regions, CI runners | 34,484 | 20% |
+| MemoryDB: 2 shards x 3 nodes per working cell, in eu-central-1 and the us-east-1 hot standby | 28,882 | 17% |
+| Network and data transfer: firewall, endpoints, transit gateway, accelerator, egress | 8,461 | 5% |
+| Logs and security services, observability storage, backup, registry, edge | 7,001 | 4% |
+| Analytics: MSK, OpenSearch (ClickHouse nodes are in compute) | 4,483 | 3% |
 
-- Database classes drive the bill. Every Aurora cluster of prod and stage, including the spare and the locker, has a `db.r7g.12xlarge` writer (`config/environments/prod.yaml`).
-- Stage repeats prod 24/7: `config/environments/stage.yaml` changes only the node capacity type.
-- us-east-1 (the warm standby with EKS, MemoryDB and an Aurora reader per cell, plus the panel edge) costs 37,663 USD/month in prod and 35,321 USD/month in stage.
-- Traffic-driven lines are small. At 415 million payments the firewall, transit gateway, internet egress, accelerator and cross-AZ traffic together come to about 3,200 USD/month, 2% of prod.
+- Database classes still drive the bill. The four working cells of prod keep a `db.r7g.12xlarge` writer and a `db.r7g.4xlarge` reader on I/O-Optimized storage (`config/environments/prod.yaml`). The spare runs `db.r7g.2xlarge` and the locker `db.r7g.4xlarge`, both on Standard storage.
+- Stage runs the dev sizes by default (`size_window = "scheduled"` in `infra/live/stage/env.hcl`) and the prod sizes only in booked test windows. In dev and stage, KEDA scales the cell and locker workloads to zero outside the working window (`global.workingHours`, 60 of 168 hours), and Karpenter removes their nodes. The dev Aurora clusters stop on the same window (`aurora-schedule`).
+- The us-east-1 hot standby runs the prod cells at the working size: 5 clusters with the same node pools, MemoryDB, and one Aurora instance per cluster with the writer class of its working cluster ([ADR-0019](../../adr/0019-hot-standby-recovery-region.md)). With its data replicas, egress path and panel edge, the prod us-east-1 lines come to 54,822 USD/month on demand, about 37% of the prod bill. Stage and dev have no standby region.
+- Traffic-driven lines are small. At 415 million payments, the firewall, transit gateway, internet egress, accelerator and cross-AZ traffic together come to about 3,200 USD/month.
 
 ## Price source
 
-AWS Price List bulk API, regional offer files (`https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<service>/current/<region>/index.json`) and the Compute Savings Plan rate files, read on 2026-11-26.
+AWS Price List bulk API, regional offer files (`https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<service>/current/<region>/index.json`) and the Compute and Database Savings Plan rate files, read on 2026-11-26. The Database Savings Plan rates, the Aurora Standard rates and the Firehose rate were read on 2026-11-27.
 
 | Offer file | Publication date |
 |---|---|
 | Service index | 2026-11-26 05:42 UTC |
 | AmazonEC2 (eu-central-1, us-east-1) | 2026-11-24 23:14 UTC |
 | AWSComputeSavingsPlan | 2026-11-24 13:03 UTC |
+| AWSDatabaseSavingsPlans | 2026-11-26 01:17 UTC |
+| AmazonKinesisFirehose (eu-central-1) | read 2026-11-27 |
 | AmazonRDS | 2026-11-24 23:30 UTC |
 | AmazonES (OpenSearch) | 2026-11-25 15:02 UTC |
 | AmazonS3, AmazonCloudWatch, AmazonVPC | 2026-11-25 |
@@ -77,7 +87,7 @@ AWS Price List bulk API, regional offer files (`https://pricing.us-east-1.amazon
 | AmazonGuardDuty, AmazonCloudFront | 2026-10-30, 2026-10-19 |
 | AmazonMemoryDB, AWSShield, AWSGlobalAccelerator | 2026-09-11 to 2026-09-16 |
 
-- Regions: eu-central-1 (working region), us-east-1 (standby, CloudFront and WAF), us-east-2 (headless secondaries); global services from the `aws-other` offers.
+- Regions: eu-central-1 (working region), us-east-1 (prod hot standby, CloudFront and WAF); global services from the `aws-other` offers. The us-east-1 Aurora instance rates are derived from the `db.r7g.4xlarge` I/O-Optimized rate of the offer file: linear in size, Standard at the I/O-Optimized rate divided by 1.3, the relation the eu-central-1 rates show. The us-east-1 RDS Proxy rate of 0.015 USD per vCPU-hour is assumed from the public price page, not read from an offer file.
 - Spot prices are not in the Price List. One planning rate applies everywhere: Spot at 40% of the on-demand price. The calculator shows its own historical Spot discount for each instance type.
 - NAT gateways sit behind Network Firewall endpoints: the Price List records the NAT discount (`NFW-Discount-Processed-Bytes`), and one NAT hour and GB are waived per firewall endpoint hour and GB, so NAT lines are 0.
 
@@ -88,16 +98,18 @@ Provisioned sizes come from the repository. Only consumed volumes are assumption
 | Quantity | Value in prod | Basis |
 |---|---|---|
 | Payments per month | 414,720,000 | 160 TPS x 2,592,000 s |
-| Router pods | 20 per cell | target capacity 60 RPS per pod (`docs/capacity`), HPA floor in `deploy/charts/router/values.yaml` |
+| Router pods | 20 per working cell, 3 in the spare | target capacity 60 RPS per pod (`docs/capacity`), HPA floor in `deploy/charts/router/values.yaml` |
 | Node shapes | 3 x m7g.4xlarge per cell, 3 x m7g.large bootstrap per cluster | pod requests of the charts with the spread over 3 AZs |
 | Aurora storage | 2,000 GB per working cell, 100 GB spare, 500 GB locker | hot data; older partitions go to S3 |
+| Aurora I/O of the spare and the locker | not priced | Standard storage bills 0.22 USD per million I/Os in eu-central-1. Standard stays cheaper than I/O-Optimized for these two clusters below about 9 billion I/Os a month together (1,988 USD/month of saving). Check this against 30 days of `VolumeReadIOPs` and `VolumeWriteIOPs` |
 | Aurora change volume | 6.2 TB per month, 1.55 billion 4 KB write I/Os | 10 rows per payment (drainer load per TPS) x 1.5 KB |
 | MemoryDB data written | 6.2 TB per month | 15 KB per payment |
 | Egress through the firewall | 10.4 TB per month | 25 KB per payment: PSP calls and outgoing webhooks |
 | API responses to merchants | 8.7 TB per month | 7 requests per payment x 3 KB |
 | Cross-AZ traffic | 15.4 TB per month | two thirds of cache, database and MSK traffic leaves the AZ |
-| EKS control plane logs | 60 GB per cluster per month | 5 log types, 365-day retention in prod and stage |
-| ClickHouse volumes | 8 x 1,000 GB gp3 | 4 shards x 2 replicas |
+| EKS control plane logs | 60 GB per cluster per month in prod, 30 in stage, 10 in dev | 5 log types; 365-day CloudWatch retention in prod and stage; streamed through Firehose to the log archive (90 days Standard, then Glacier Flexible) |
+| ClickHouse volumes | 4 x 1,000 GB gp3 | 2 shards x 2 replicas |
+| MSK | 3 x `kafka.m7g.large`, 1,000 GB each | about 4 TB of events a month; 7 days at replication factor 3 is about 2.8 TB |
 
 Stage and dev use test volumes (about 2% of prod traffic). Each line states its quantity, so a different volume is a one-cell change in the CSV.
 
@@ -107,24 +119,24 @@ Section 12 estimates about 105,000 USD/month for all environments (0.25 USD per 
 
 | Section 12 line | Section 12 (USD/month) | This estimate, on-demand (USD/month) | Why it differs |
 |---|---:|---:|---|
-| Aurora, 4 cells, spare, locker, recovery region | 37,000 | 85,316 (prod) | I/O-Optimized instances (+30%); spare and locker at the cell size instead of 2xlarge and 4xlarge; RDS Proxy (5,045); one reader per secondary in us-east-1 (12,588); storage in three regions |
-| MemoryDB, 4 cells and spare, second region | 10,000 | 30,984 (prod) | spare has 2 shards; full copy of 30 nodes in us-east-1; data written (1,244) |
-| Compute prod | 16,000 | 24,933 (prod EKS and nodes) | includes the ClickHouse nodes and the full-size standby clusters; section 12 has the second region at 30% |
-| MSK, ClickHouse, OpenSearch | 9,000 | 8,920 (prod) | close; ClickHouse nodes are counted in compute here |
-| Network | 8,000 | 6,621 (prod network and data transfer) | NAT charges are waived behind Network Firewall |
+| Aurora, 4 cells, spare, locker, recovery region | 37,000 | 84,819 (prod) | I/O-Optimized instances (+30%) on the working cells; RDS Proxy in both regions (6,360); one instance at the writer class per hot-standby secondary |
+| MemoryDB, 4 cells and spare, second region | 10,000 | 28,010 (prod) | full size in both regions (hot standby); data written (1,244) |
+| Compute prod | 16,000 | 22,780 (prod EKS and nodes) | includes the ClickHouse nodes; the us-east-1 hot standby runs the working-region pools |
+| MSK, ClickHouse, OpenSearch | 9,000 | 3,073 (prod, without ClickHouse nodes) | sized to the measured event volume; ClickHouse nodes are counted in compute here |
+| Network | 8,000 | 6,046 (prod network and data transfer) | NAT charges are waived behind Network Firewall |
 | Shield Advanced | 3,000 | 0 | not subscribed: `security.shield_advanced_enabled` is unset in `config/platform.yaml` |
 | Observability | 6,000 | 2,887 | central cluster only; the audit OpenSearch is in analytics |
-| Security services | 3,000 | 3,894 (prod logs and security plus organization) | GuardDuty RDS and EKS runtime protection are enabled for every account |
-| Backups, logs, S3 | 4,000 | 1,159 (prod) | object backups move to Glacier after 7 and 14 days (D5) |
-| Shared services | 3,000 | 1,385 | Vault runs in the cell-0 cluster; k6 Cloud is not an AWS charge |
-| Non-prod | 6,000 | 158,322 (stage and dev) | stage is a 24/7 copy of prod; section 12 has 1 stage cell on a schedule |
-| **Total** | **105,000** | **324,458** | |
+| Security services | 3,000 | 3,935 (prod logs and security plus organization) | GuardDuty RDS and EKS runtime protection are enabled for every account |
+| Backups, logs, S3 | 4,000 | 764 (prod) | object backups move to Glacier after 7 and 14 days (D5) |
+| Shared services | 3,000 | 1,325 | Vault runs in the cell-0 cluster; k6 Cloud is not an AWS charge |
+| Non-prod | 6,000 | 16,985 (stage and dev) | stage keeps 4 cells and the spare at the dev sizes in eu-central-1 alone, with cell nodes only in working hours; section 12 has 1 stage cell on a schedule |
+| **Total** | **105,000** | **170,662** | |
 
-- Section 12 places the recovery region in eu-west-1. Owner decisions D6 and D7 replace it with us-east-1 and us-east-2, which this estimate uses.
-- Section 12 adds about 30,000 USD/month for the baseline router capacity of 15 RPS per pod. The router HPA target is 10 RPS per pod today (`deploy/charts/router/values.yaml`, `rpsPerPod: 10`). At the average load that keeps about 28 pods per cell instead of 20: roughly one more m7g.4xlarge per working cell, +2,300 USD/month on demand.
-- After the findings of [audit.md](audit.md) the estimate is 122,870 USD/month on demand and 102,108 USD/month committed (0.246 USD per 1,000 payments), in line with section 12.
+- Section 12 places the recovery region in eu-west-1. Owner decisions D6 and D7 replace it with us-east-1, the only standby region, which this estimate uses.
+- Section 12 adds about 30,000 USD/month for the baseline router capacity of 15 RPS per pod. The router HPA target is 10 RPS per pod today (`deploy/charts/router/values.yaml`, `rpsPerPod: 10`). At the average load, that keeps about 28 pods per cell instead of 20: roughly one more m7g.4xlarge per working cell, +2,300 USD/month on demand.
+- The estimate is 170,662 USD/month on demand and 139,898 USD/month committed (0.337 USD per 1,000 payments committed). It is above the 0.25 of section 12 because the owner keeps a hot standby at the working size in us-east-1: 54,822 USD/month on demand in its own lines.
 
 ## Dates that change the totals
 
-- Kubernetes 1.34 leaves EKS standard support on 2026-12-02. From that day each of the 29 clusters costs 0.60 instead of 0.10 USD per hour, +10,585 USD/month in total. Version 1.35 stays in standard support until 2027-03-27.
-- Reserved Instances and Savings Plans run for 12 months from purchase; renewal follows the coverage and utilization targets of `manifests/constraints.yaml` (coverage 70-80%, utilization above 95%).
+- All 21 clusters run Kubernetes 1.36, the newest version every pinned add-on supports (cert-manager 1.21 stops at 1.36) (`kubernetes_version` in `infra/live/{dev,stage,prod,shared-services}/env.hcl`). They were upgraded one minor version at a time, which is the only path EKS allows; 1.37 follows once cert-manager supports it. A cluster that stays on a version past its end of standard support pays 0.60 instead of 0.10 USD per hour, +365 USD/month per cluster and +7,665 USD/month for all 21. Plan the next upgrade from the EKS version calendar before that date.
+- Savings Plans and MemoryDB reserved nodes run for 12 months from purchase; renewal follows the coverage and utilization targets of `manifests/constraints.yaml` (coverage 70-80%, utilization above 95%).

@@ -1,0 +1,240 @@
+name: env-up
+# Starts dev or stage outside the section 12 schedule for a number of hours, or books a stage prod-size window.
+# Aurora (dev only; stage keeps its secondaries running) starts now and gets a one-time stop at the end. Pods, and through Karpenter the node
+# pools, follow the values file deploy/envs/<env>/keep-alive.yaml: global.keepAlive is a one-off KEDA cron window next to global.workingHours.
+# It and the stage size window change by pull request.
+# The hourly run opens the pull request that removes an expired keep-alive and returns stage to the scheduled size.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: environment to keep up
+        type: choice
+        options: [dev, stage]
+        required: true
+      hours:
+        description: hours from now (1-72)
+        type: number
+        default: 4
+      prod_size:
+        description: stage only, book a prod-size window (load or failover test)
+        type: boolean
+        default: false
+      reason:
+        description: "why, shown in the pull request (letters, digits, spaces and , . : _ -)"
+        type: string
+        required: true
+      dry_run:
+        description: only print what would change
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: env-up-${{ inputs.environment || 'expire' }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      until: ${{ steps.check.outputs.until }}
+    steps:
+      - id: check
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          HOURS: ${{ inputs.hours }}
+          PROD_SIZE: ${{ inputs.prod_size }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          if ! [[ $HOURS =~ ^[0-9]+$ ]] || ((HOURS < 1 || HOURS > 72)); then echo "::error::hours must be 1 to 72"; exit 1; fi
+          [[ $REASON =~ ^[A-Za-z0-9\ ,.:_-]{3,120}$ ]] || { echo "::error::reason has characters outside the allowed set"; exit 1; }
+          if [ "$PROD_SIZE" = "true" ] && [ "$ENVIRONMENT" != "stage" ]; then echo "::error::prod_size is a stage window"; exit 1; fi
+          echo "until=$(date -u -d "+${HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)" >>"$GITHUB_OUTPUT"
+
+  aurora:
+    needs: plan
+    if: inputs.environment == 'dev'
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    environment: env-up-dev
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ENV_UP }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
+          role-session-name: env-up-${{ github.run_id }}
+      - name: start the stopped clusters and stop them again at the end
+        env:
+          UNTIL: ${{ needs.plan.outputs.until }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          prefix=$(awk '/^naming:/{n=1;next} n&&/^[^ ]/{n=0} n&&$1=="prefix:"{print $2;exit}' config/platform.yaml)
+          region=$(aws configure get region)
+          IFS=- read -r a b c <<<"$region"
+          base="${prefix}-dev-${a}${b:0:1}${c}-aurora"
+          account=$(aws sts get-caller-identity --query Account --output text)
+          # the schedule group and role of infra/modules/aurora-schedule (pay-dev-euc1-aurora-schedule)
+          group="${base}-schedule"
+          role="arn:aws:iam::${account}:role/${group}"
+          at="at(${UNTIL%Z})"
+          run() { if [ "$DRY_RUN" = "true" ]; then echo "would run: $*"; else "$@" >/dev/null; fi; }
+          mapfile -t clusters < <(aws rds describe-db-clusters --query "DBClusters[?starts_with(DBClusterIdentifier, '${base}-')].[DBClusterIdentifier,Status]" --output text)
+          [ "${#clusters[@]}" -gt 0 ] || { echo "::error::no cluster ${base}-*"; exit 1; }
+          for line in "${clusters[@]}"; do
+            read -r id status <<<"$line"
+            if [ "$status" = "stopped" ]; then run aws rds start-db-cluster --db-cluster-identifier "$id"; echo "start ${id}"; else echo "${id} is ${status}"; fi
+            name="env-up-stop-${id#"${base}"-}"
+            target=$(jq -cn --arg arn "arn:aws:scheduler:::aws-sdk:rds:stopDBCluster" --arg role "$role" --arg id "$id" \
+              '{Arn: $arn, RoleArn: $role, Input: ({DbClusterIdentifier: $id} | tojson)}')
+            # one-time stop at the end of the window; a later env-up moves it, AWS deletes it after it ran
+            verb=create-schedule
+            if aws scheduler get-schedule --group-name "$group" --name "$name" >/dev/null 2>&1; then verb=update-schedule; fi
+            run aws scheduler "$verb" --group-name "$group" --name "$name" --schedule-expression "$at" --schedule-expression-timezone UTC \
+              --flexible-time-window Mode=OFF --action-after-completion DELETE --target "$target"
+            echo "stop ${id} at ${UNTIL}"
+          done
+
+  keep-alive:
+    needs: plan
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - id: app
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.PROMOTE_APP_ID }}
+          private-key: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+      - name: pull request with the keep-alive and the size window
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          UNTIL: ${{ needs.plan.outputs.until }}
+          PROD_SIZE: ${{ inputs.prod_size }}
+          REASON: ${{ inputs.reason }}
+          ACTOR: ${{ github.actor }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          window=scheduled
+          [ "$PROD_SIZE" = "true" ] && window=prod-size
+          # one-off cron window in UTC: minute hour day month, from now until the end
+          from=$(date -u +'%-M %-H %-d %-m *')
+          to=$(date -u -d "$UNTIL" +'%-M %-H %-d %-m *')
+          keep=$(printf '%s\n' '# Written by .github/workflows/env-up.yml; the hourly env-up run removes it after "until".' 'global:' '  keepAlive:' \
+            "    until: \"${UNTIL}\"" '    timezone: UTC' "    start: \"${from}\"" "    end: \"${to}\"" "    sizeWindow: ${window}" \
+            "    reason: \"${REASON}\"" "    requestedBy: \"${ACTOR}\"")
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "would write deploy/envs/${ENVIRONMENT}/keep-alive.yaml:"; echo "$keep"
+            [ "$window" = prod-size ] && echo "would set size_window = \"prod-size\" in infra/live/stage/env.hcl"
+            exit 0
+          fi
+          branch="env-up/${ENVIRONMENT}-${RUN_ID}"
+          main=$(gh api "repos/${REPO}/git/ref/heads/main" --jq .object.sha)
+          gh api "repos/${REPO}/git/refs" -f "ref=refs/heads/${branch}" -f "sha=${main}" >/dev/null
+          # the spec gate of CI needs the trailer on every commit
+          msg=$(printf 'chore(deploy): keep %s up until %s\n\nSpec-Exempt: owner-directed' "$ENVIRONMENT" "$UNTIL")
+          put() {
+            local path=$1 content=$2 sha
+            sha=$(gh api "repos/${REPO}/contents/${path}?ref=${branch}" --jq .sha 2>/dev/null || true)
+            gh api -X PUT "repos/${REPO}/contents/${path}" -f "branch=${branch}" -f "message=${msg}" \
+              -f "content=$(printf '%s\n' "$content" | base64 -w0)" ${sha:+-f "sha=${sha}"} >/dev/null
+          }
+          put "deploy/envs/${ENVIRONMENT}/keep-alive.yaml" "$keep"
+          if [ "$window" = prod-size ]; then
+            hcl=$(gh api "repos/${REPO}/contents/infra/live/stage/env.hcl?ref=${branch}" --jq .content | base64 -d \
+              | sed -E 's/^(  size_window = )"[a-z-]+"/\1"prod-size"/')
+            put infra/live/stage/env.hcl "$hcl"
+          fi
+          body=$(printf 'Keeps %s up outside the schedule until %s (size window: %s).\n\nReason: %s\nRequested by: %s\n\nThe hourly env-up run opens the pull request that ends it.\n\nSpec-Exempt: owner-directed\n' \
+            "$ENVIRONMENT" "$UNTIL" "$window" "$REASON" "$ACTOR")
+          url=$(gh pr create --repo "$REPO" --base main --head "$branch" --title "chore(deploy): keep ${ENVIRONMENT} up until ${UNTIL}" --body "$body")
+          gh pr merge --repo "$REPO" --auto --squash "$url" || echo "::warning::auto-merge is not available; merge ${url} by hand"
+          echo "Keep-alive pull request: ${url}" >>"$GITHUB_STEP_SUMMARY"
+
+  expire:
+    if: github.event_name == 'schedule'
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: due
+        run: |
+          set -euo pipefail
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          due=()
+          for env in dev stage; do
+            f="deploy/envs/${env}/keep-alive.yaml"
+            [ -f "$f" ] || continue
+            until=$(sed -nE 's/^ *until: "?([0-9TZ:-]+)"?$/\1/p' "$f")
+            # ISO 8601 UTC timestamps compare as strings
+            if [[ -n $until && ! $until > $now ]]; then due+=("$env"); fi
+          done
+          echo "envs=${due[*]}" >>"$GITHUB_OUTPUT"
+          echo "expired keep-alives: ${due[*]:-none}"
+      - id: app
+        if: steps.due.outputs.envs != ''
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+        with:
+          app-id: ${{ vars.PROMOTE_APP_ID }}
+          private-key: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+      - name: pull request that ends each expired window
+        if: steps.due.outputs.envs != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          ENVS: ${{ steps.due.outputs.envs }}
+        run: |
+          set -euo pipefail
+          trailer=$'\n\nSpec-Exempt: owner-directed'
+          for env in $ENVS; do
+            title="chore(deploy): end the ${env} keep-alive"
+            open=$(gh pr list --repo "$REPO" --state open --search "\"${title}\" in:title" --json number --jq length)
+            if [ "$open" != 0 ]; then echo "a pull request that ends ${env} is already open"; continue; fi
+            branch="env-down/${env}-${GITHUB_RUN_ID}"
+            main=$(gh api "repos/${REPO}/git/ref/heads/main" --jq .object.sha)
+            gh api "repos/${REPO}/git/refs" -f "ref=refs/heads/${branch}" -f "sha=${main}" >/dev/null
+            sha=$(gh api "repos/${REPO}/contents/deploy/envs/${env}/keep-alive.yaml?ref=${branch}" --jq .sha)
+            gh api -X DELETE "repos/${REPO}/contents/deploy/envs/${env}/keep-alive.yaml" -f "branch=${branch}" -f "sha=${sha}" \
+              -f "message=${title}${trailer}" >/dev/null
+            if [ "$env" = stage ] && grep -qE '^  size_window = "prod-size"' infra/live/stage/env.hcl; then
+              file=$(gh api "repos/${REPO}/contents/infra/live/stage/env.hcl?ref=${branch}")
+              hcl=$(jq -r .content <<<"$file" | base64 -d | sed -E 's/^(  size_window = )"[a-z-]+"/\1"scheduled"/')
+              gh api -X PUT "repos/${REPO}/contents/infra/live/stage/env.hcl" -f "branch=${branch}" -f "sha=$(jq -r .sha <<<"$file")" \
+                -f "message=chore(infra): return stage to the scheduled size${trailer}" -f "content=$(printf '%s\n' "$hcl" | base64 -w0)" >/dev/null
+            fi
+            url=$(gh pr create --repo "$REPO" --base main --head "$branch" --title "$title" \
+              --body "$(printf 'The keep-alive window of %s has passed; this returns it to the schedule.\n\nSpec-Exempt: owner-directed\n' "$env")")
+            gh pr merge --repo "$REPO" --auto --squash "$url" || echo "::warning::auto-merge is not available; merge ${url} by hand"
+          done

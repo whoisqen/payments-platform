@@ -19,7 +19,6 @@ variables {
 
   recovery_regions = {
     "us-east-1" = { short = "use1", kms_key_arn = "arn:aws:kms:us-east-1:222222222222:key/mrk-0005" }
-    "us-east-2" = { short = "use2", kms_key_arn = "arn:aws:kms:us-east-2:222222222222:key/mrk-0005" }
   }
 
   tags = {
@@ -35,8 +34,8 @@ run "vaults_are_locked_in_compliance_mode" {
   command = apply
 
   assert {
-    condition     = length(aws_backup_vault.this) == 3 && length(aws_backup_vault_lock_configuration.this) == 3
-    error_message = "a locked vault in each of the three regions"
+    condition     = length(aws_backup_vault.this) == 2 && length(aws_backup_vault_lock_configuration.this) == 2
+    error_message = "a locked vault in each of the two regions"
   }
 
   assert {
@@ -55,14 +54,13 @@ run "vaults_are_locked_in_compliance_mode" {
   }
 }
 
-run "tiers_select_by_tag_and_copy_to_both_regions" {
+run "tiers_select_by_tag_and_copy_to_the_recovery_region" {
   command = apply
 
   variables {
     recovery_regions = {}
     copy_vault_arns = {
       "us-east-1" = "arn:aws:backup:us-east-1:222222222222:backup-vault:pay-prod-use1-backup"
-      "us-east-2" = "arn:aws:backup:us-east-2:222222222222:backup-vault:pay-prod-use2-backup"
     }
   }
 
@@ -74,11 +72,11 @@ run "tiers_select_by_tag_and_copy_to_both_regions" {
   assert {
     condition = (
       length(aws_backup_plan.tier["gold"].rule) == 3 &&
-      anytrue([for r in aws_backup_plan.tier["gold"].rule : r.rule_name == "hourly" && r.schedule == "cron(0 * * * ? *)" && length(r.copy_action) == 2 && one(r.lifecycle).delete_after == 35]) &&
+      anytrue([for r in aws_backup_plan.tier["gold"].rule : r.rule_name == "hourly" && r.schedule == "cron(0 * * * ? *)" && length(r.copy_action) == 1 && one(r.lifecycle).delete_after == 35]) &&
       anytrue([for r in aws_backup_plan.tier["gold"].rule : r.rule_name == "continuous" && r.enable_continuous_backup && one(r.lifecycle).delete_after == 35]) &&
-      anytrue([for r in aws_backup_plan.tier["gold"].rule : r.rule_name == "monthly" && one(r.lifecycle).delete_after == 2555 && length(r.copy_action) == 2])
+      anytrue([for r in aws_backup_plan.tier["gold"].rule : r.rule_name == "monthly" && one(r.lifecycle).delete_after == 2555 && length(r.copy_action) == 1])
     )
-    error_message = "gold: hourly 35 d with two copies, continuous 35 d, monthly 7 years"
+    error_message = "gold: hourly 35 d with a copy to us-east-1, continuous 35 d, monthly 7 years"
   }
 
   assert {
@@ -109,7 +107,7 @@ run "backup_account_stack_holds_only_vaults" {
   }
 
   assert {
-    condition     = length(aws_backup_vault.this) == 3 && length(aws_backup_plan.tier) == 0 && length(aws_backup_restore_testing_plan.application_databases) == 0
+    condition     = length(aws_backup_vault.this) == 2 && length(aws_backup_plan.tier) == 0 && length(aws_backup_restore_testing_plan.application_databases) == 0
     error_message = "no plans in a vault-only stack"
   }
 }

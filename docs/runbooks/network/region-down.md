@@ -5,7 +5,7 @@ Dashboard: https://grafana.payments.internal/d/edge
 
 ## Symptom
 
-Two or more of the three probe points (us-east-1, us-east-2, external) cannot reach the Frankfurt health endpoint for 2 minutes. This is the detection signal of the semi-automatic switch; inhibits component alerts of the region.
+Two or more of the three probe points (us-east-1 and two external providers) cannot reach the Frankfurt health endpoint for 2 minutes. This is the detection signal of the automatic switch to the us-east-1 hot standby; inhibits component alerts of the region.
 
 ## Diagnostics
 

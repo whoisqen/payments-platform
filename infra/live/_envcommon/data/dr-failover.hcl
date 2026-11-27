@@ -17,6 +17,10 @@ inputs = {
   # Every Aurora global cluster that a cell or the locker owns.
   cells            = concat(local.env_cfg.cells, ["locker"])
   fence_rule_group = "${local.cfg.naming.prefix}-${local.env_cfg.environment}-${local.working_short}-psp-fence"
+  # Hot standby keeps a writer-class instance per cluster; only the fallback with standby compute off adds writers (units override spare and locker).
+  switch_writer_instance_classes = local.env_cfg.standby_enabled ? {} : { for c in concat(local.env_cfg.cells, ["locker"]) : c => local.env_cfg.aurora_writer_class }
+  # The hot standby already runs its compute; the build workflow (config/platform.yaml deploy.<env>.dr_compute_build) is dispatched only in the fallback.
+  compute_build = local.env_cfg.standby_compute_enabled ? null : try(local.cfg.deploy[local.env_cfg.environment].dr_compute_build, null)
   tags = {
     team        = "platform"
     owner       = local.env_cfg.owner

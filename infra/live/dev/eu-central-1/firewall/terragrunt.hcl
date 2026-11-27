@@ -24,7 +24,8 @@ dependency "egress_vpc" {
 }
 
 inputs = {
-  vpc_id              = dependency.egress_vpc.outputs.vpc_id
-  firewall_subnet_ids = dependency.egress_vpc.outputs.subnet_ids["private"]
+  vpc_id = dependency.egress_vpc.outputs.vpc_id
+  # One firewall endpoint in dev: the transit gateway routes of every AZ must point at it. NAT gateways and their EIPs stay in three AZs.
+  firewall_subnet_ids = slice(dependency.egress_vpc.outputs.subnet_ids["private"], 0, 1)
   nat_subnet_ids      = dependency.egress_vpc.outputs.subnet_ids["public"]
 }

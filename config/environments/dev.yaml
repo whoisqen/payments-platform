@@ -12,6 +12,6 @@ standby:
 eks:
   log_retention_days: 30
   cpu_limits: {payments: 32, stateful: 16, cde: 16, workers: 32}
-  spot_pools: [payments, stateful]
+  spot_pools: [payments, stateful, workers]
 protection:
   deletion_protection: false

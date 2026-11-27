@@ -1,8 +1,0 @@
-# Warm standby: receives no traffic while the working region is healthy; replicated data is local and promotion changes no values
-global:
-  region: us-east-1
-  dataCidrs:
-    - 10.131.96.0/22
-  endpointCidrs:
-    - 10.131.0.0/18
-    - 10.131.64.0/19

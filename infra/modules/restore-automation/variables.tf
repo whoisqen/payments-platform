@@ -14,7 +14,7 @@ variable "env" {
 }
 
 variable "region_short" {
-  description = "Short region code of the provider region, for example use2."
+  description = "Short region code of the provider region, for example use1."
   type        = string
 
   validation {

@@ -157,3 +157,35 @@ variable "ecr_read_refs" {
     error_message = "ecr_read_refs may only be refs/heads/main, refs/heads/release/<name> or refs/heads/release/*."
   }
 }
+
+variable "dr_apply" {
+  type = object({
+    github_environment        = string
+    state_replica_bucket_arn  = string
+    state_replica_kms_key_arn = string
+    actions                   = list(string)
+    resource_arns             = list(string)
+    unscoped_actions          = optional(list(string), [])
+  })
+  default     = null
+  description = "Role <prefix>-<env>-glob-dr-apply of the region switch (vars.AWS_ROLE_DR_APPLY): trusted only by jobs of the GitHub environment, reads and writes <env>/ in the state bucket and its replica; null creates none."
+
+  validation {
+    condition     = var.dr_apply == null || can(regex("^dr-compute-[a-z]+$", var.dr_apply.github_environment))
+    error_message = "github_environment must be dr-compute-<env>."
+  }
+
+  validation {
+    condition = var.dr_apply == null || (
+      !contains(var.dr_apply.actions, "*") && !contains(var.dr_apply.unscoped_actions, "*") &&
+      alltrue([for a in concat(var.dr_apply.actions, var.dr_apply.unscoped_actions) : !contains(["iam:*", "organizations:*", "sts:*"], a)]) &&
+      length(var.dr_apply.resource_arns) > 0 && !contains(var.dr_apply.resource_arns, "*")
+    )
+    error_message = "the DR apply role may not hold *, iam:*, organizations:* or sts:*, and must name its resources."
+  }
+
+  validation {
+    condition     = var.dr_apply == null || (startswith(var.dr_apply.state_replica_bucket_arn, "arn:aws:s3:::") && startswith(var.dr_apply.state_replica_kms_key_arn, "arn:aws:kms:"))
+    error_message = "state_replica_bucket_arn must be an S3 bucket ARN and state_replica_kms_key_arn a KMS key ARN."
+  }
+}

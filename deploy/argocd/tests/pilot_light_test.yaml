@@ -1,0 +1,62 @@
+suite: pilot-light recovery regions get no Application until the failover builds their clusters
+templates:
+  - applicationset-cells.yaml
+  - applicationset-shared.yaml
+  - applicationset-gated.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+  gated.revision: v1.4.0
+  pilotLight:
+    - {environment: prod, region: us-east-1}
+tests:
+  - it: excludes a pilot-light standby (the fallback switch) from the cells
+    template: applicationset-cells.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+  - it: excludes them from the locker and the edge
+    template: applicationset-shared.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+        documentIndex: 0
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+        documentIndex: 1
+  - it: excludes them from every pinned production ApplicationSet
+    template: applicationset-gated.yaml
+    asserts:
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+        documentIndex: 0
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+        documentIndex: 1
+      - contains:
+          path: spec.generators[0].git.directories
+          content: {path: deploy/envs/prod/us-east-1/*, exclude: true}
+        documentIndex: 2
+  - it: deploys the spare after cell-3 in its own step, so its sync stands for the environment
+    template: applicationset-cells.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.rollingSync.steps[4].matchExpressions[0].values
+          value: [spare]
+      - equal:
+          path: spec.strategy.rollingSync.steps[3].matchExpressions[0].values
+          value: [cell-3]

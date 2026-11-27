@@ -44,9 +44,9 @@ run "three_endpoints_rejected" {
 
   variables {
     endpoints = {
-      euc1 = { target_dns = "a.example.com" }
-      use1 = { target_dns = "b.example.com" }
-      use2 = { target_dns = "c.example.com" }
+      euc1  = { target_dns = "a.example.com" }
+      use1  = { target_dns = "b.example.com" }
+      third = { target_dns = "c.example.com" }
     }
   }
 

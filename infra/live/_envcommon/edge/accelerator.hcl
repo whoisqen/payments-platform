@@ -7,11 +7,11 @@ terraform {
 }
 
 inputs = {
-  endpoint_groups = {
-    "eu-central-1" = { active = true }
-    "us-east-1"    = { active = false }
-    "us-east-2"    = { active = false }
-  }
+  # Only prod has the us-east-1 standby; dev and stage serve from the working region alone.
+  endpoint_groups = merge(
+    { "eu-central-1" = { active = true } },
+    local.env_cfg.standby_compute_enabled ? { "us-east-1" = { active = false } } : {},
+  )
   tags = {
     team        = "platform"
     owner       = local.env_cfg.owner

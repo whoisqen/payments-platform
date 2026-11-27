@@ -50,6 +50,14 @@ def endpoint_cidrs(cfg, env, region):
     return d["standby"][region]["endpoint_cidrs"]
 
 
+def cells(cfg, env):
+    """Cells of the environment: the working-region cell directories of deploy/envs, the same list the ApplicationSets deploy."""
+    base = ROOT / "deploy" / "envs" / env / cfg["regions"]["working"]
+    names = sorted(d.name for d in base.iterdir() if d.is_dir() and (d.name.startswith("cell-") or d.name == "spare"))
+    # cell-0 runs Vault, so its mount is the local one
+    return "".join(f"      - {{name: {c}, authMount: {'kubernetes' if c == 'cell-0' else 'kubernetes-' + c}}}\n" for c in names)
+
+
 def render(cfg):
     p, reg = cfg["naming"]["prefix"], cfg["registry"]
     repo = f"{reg['ecr_prefix']}/{reg['ecr_repo_prefix']}/vault-snapshot"
@@ -78,7 +86,9 @@ snapshot:
 bootstrap:
   region: {region}
   initSecretId: {p}/{env}/vault/init
-
+  workloads:
+    cells:
+{cells(cfg, env)}
 networkPolicy:
   # Other clusters of the VPC call Vault through its load balancer
   clientCidrs:

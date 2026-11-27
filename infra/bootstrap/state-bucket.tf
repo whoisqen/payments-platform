@@ -57,24 +57,44 @@ resource "aws_s3_bucket_policy" "state" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "TlsOnly"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource  = [aws_s3_bucket.state.arn, "${aws_s3_bucket.state.arn}/*"]
-        Condition = { Bool = { "aws:SecureTransport" = "false" } }
-      },
-      {
-        Sid       = "KmsEncryptedWritesOnly"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:PutObject"
-        Resource  = "${aws_s3_bucket.state.arn}/*"
-        Condition = { StringNotEquals = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
-      },
-    ]
+    Statement = concat(
+      [
+        {
+          Sid       = "TlsOnly"
+          Effect    = "Deny"
+          Principal = "*"
+          Action    = "s3:*"
+          Resource  = [aws_s3_bucket.state.arn, "${aws_s3_bucket.state.arn}/*"]
+          Condition = { Bool = { "aws:SecureTransport" = "false" } }
+        },
+        {
+          Sid       = "KmsEncryptedWritesOnly"
+          Effect    = "Deny"
+          Principal = "*"
+          Action    = "s3:PutObject"
+          Resource  = "${aws_s3_bucket.state.arn}/*"
+          Condition = { StringNotEquals = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
+        },
+      ],
+      # The DR apply role sits in the environment account, so its drills on the working state need this cross-account grant.
+      [for st in [
+        {
+          Sid       = "DrStateReadWrite"
+          Effect    = "Allow"
+          Principal = { AWS = var.dr_apply_role_arns }
+          Action    = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"]
+          Resource  = "${aws_s3_bucket.state.arn}/${var.environment}/*"
+        },
+        {
+          Sid       = "DrStateList"
+          Effect    = "Allow"
+          Principal = { AWS = var.dr_apply_role_arns }
+          Action    = "s3:ListBucket"
+          Resource  = aws_s3_bucket.state.arn
+          Condition = { StringLike = { "s3:prefix" = ["${var.environment}/*"] } }
+        },
+      ] : st if length(var.dr_apply_role_arns) > 0],
+    )
   })
 
   depends_on = [aws_s3_bucket_public_access_block.state]
