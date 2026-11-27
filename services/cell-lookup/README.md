@@ -113,7 +113,7 @@ cargo test --offline --locked
 # DynamoDB Local on :8000 with the table from INTEGRATION.md, any static credentials
 export AWS_REGION=eu-central-1 AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local
 export CELL_LOOKUP_TABLE=pay-dev-euc1-cell-lookup CELL_LOOKUP_DYNAMODB_ENDPOINT=http://127.0.0.1:8000/
-export CELL_LOOKUP_HASH_KEY_CELL_0=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+export CELL_LOOKUP_HASH_KEY_CELL_0=$(openssl rand -hex 32)  # a fresh 32-byte key for the local run
 export CELL_LOOKUP_DATABASE_URL='postgres://db_user:db_pass@127.0.0.1:5432/hyperswitch_db?sslmode=disable'
 cargo run --offline -- sync --cell cell-0
 CELL_LOOKUP_CELLS=cell-0 cargo run --offline -- serve
