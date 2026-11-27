@@ -1,0 +1,105 @@
+suite: router reaches the locker in its own cluster
+templates:
+  - workload.yaml
+  - istio/locker-serviceentry.yaml
+  - networkpolicy.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  global.hyperswitch.locker.clusterDomain: dev.example.internal
+  global.lockerCidrs: [10.120.32.0/20]
+  lockerClient.vaultServer: https://vault.dev.example.test:8200
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: names the locker of the locker cluster as the edge names the cells
+    template: workload.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__LOCKER__HOST, value: "http://locker.payments.svc.locker.dev.example.internal:3001"}
+  - it: keeps the in-cluster Service without a cluster domain
+    template: workload.yaml
+    documentIndex: 0
+    set:
+      global.hyperswitch.locker.clusterDomain: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__LOCKER__HOST, value: "http://locker.payments.svc.cluster.local:3001"}
+  - it: registers the cross-cluster locker host, which REGISTRY_ONLY would drop
+    template: istio/locker-serviceentry.yaml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ServiceEntry
+      - equal:
+          path: spec.hosts
+          value: [locker.payments.svc.locker.dev.example.internal]
+      - equal:
+          path: spec.ports[0].number
+          value: 3001
+      - equal:
+          path: spec.exportTo
+          value: ["."]
+  - it: renders no ServiceEntry for the in-cluster Service
+    template: istio/locker-serviceentry.yaml
+    set:
+      global.hyperswitch.locker.clusterDomain: ""
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: opens the locker port to the locker cluster addresses only
+    template: networkpolicy.yaml
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 10.120.32.0/20}}]
+            ports: [{port: 3001, protocol: TCP}]
+  - it: originates mutual TLS to the locker gateway with the Vault-issued client certificate
+    template: istio/locker-serviceentry.yaml
+    documentSelector: {path: kind, value: DestinationRule}
+    asserts:
+      - equal:
+          path: spec.trafficPolicy.tls
+          value:
+            mode: MUTUAL
+            credentialName: locker-client-tls
+            sni: locker.payments.svc.locker.dev.example.internal
+            subjectAltNames: [locker.payments.svc.locker.dev.example.internal]
+  - it: issues the client certificate with the router SPIFFE ID through the router's Vault login of its cell
+    template: istio/locker-serviceentry.yaml
+    documentSelector: {path: kind, value: VaultDynamicSecret}
+    asserts:
+      - equal:
+          path: spec.path
+          value: pki-mesh/issue/router-client
+      - equal:
+          path: spec.parameters.uri_sans
+          value: spiffe://payments-platform/ns/payments/sa/router
+      - equal:
+          path: spec.provider.auth.kubernetes
+          value: {mountPath: k8s-pay-dev-euc1-cell-0, role: cell-0-router, serviceAccountRef: {name: router, audiences: [vault]}}
+  - it: uses the auth mount of the cell cluster outside cell-0
+    template: istio/locker-serviceentry.yaml
+    documentSelector: {path: kind, value: VaultDynamicSecret}
+    set:
+      global.cell: cell-2
+    asserts:
+      - equal:
+          path: spec.provider.auth.kubernetes.mountPath
+          value: k8s-pay-dev-euc1-cell-2
+  - it: selects the router pods, so the sidecar loads the credential, and writes a TLS Secret
+    template: istio/locker-serviceentry.yaml
+    asserts:
+      - equal:
+          path: spec.workloadSelector.matchLabels
+          value: {app.kubernetes.io/name: router}
+        documentSelector: {path: kind, value: DestinationRule}
+      - equal:
+          path: spec.target.template.type
+          value: kubernetes.io/tls
+        documentSelector: {path: kind, value: ExternalSecret}

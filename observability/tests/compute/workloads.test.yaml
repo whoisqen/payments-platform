@@ -7,9 +7,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments",pod="router-7c9"}
     values: 1x21
-  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+  - series: kube_pod_info{namespace="payments",pod="router-7c9",node="ip-10-0-1-11"}
     values: 1x21
   alert_rule_test:
   - eval_time: 17m
@@ -22,7 +22,7 @@ tests:
         owner: platform-oncall
         layer: compute
         failure_mode: compute-crash-loop-back-off
-        namespace: payments-cell-1
+        namespace: payments
         pod: router-7c9
         node: ip-10-0-1-11
       exp_annotations:
@@ -34,9 +34,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments",pod="router-7c9"}
     values: '0x21'
-  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+  - series: kube_pod_info{namespace="payments",pod="router-7c9",node="ip-10-0-1-11"}
     values: 1x21
   alert_rule_test:
   - &id001
@@ -48,9 +48,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff",namespace="payments",pod="router-7c9"}
     values: 0x9 1x1 0x9
-  - series: kube_pod_info{namespace="payments-cell-1",pod="router-7c9",node="ip-10-0-1-11"}
+  - series: kube_pod_info{namespace="payments",pod="router-7c9",node="ip-10-0-1-11"}
     values: 1x9 1x1 1x9
   alert_rule_test:
   - *id001
@@ -59,9 +59,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments-cell-1",pod="router-7c9",container="router"}
+  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments",pod="router-7c9",container="router"}
     values: 1x19
-  - series: kube_pod_container_status_restarts_total{namespace="payments-cell-1",pod="router-7c9",container="router"}
+  - series: kube_pod_container_status_restarts_total{namespace="payments",pod="router-7c9",container="router"}
     values: 0+1x19
   alert_rule_test:
   - eval_time: 15m
@@ -74,7 +74,7 @@ tests:
         owner: payments-core-oncall
         layer: compute
         failure_mode: compute-pod-oom-killed
-        namespace: payments-cell-1
+        namespace: payments
         pod: router-7c9
         container: router
       exp_annotations:
@@ -86,9 +86,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments-cell-1",pod="router-7c9",container="router"}
+  - series: kube_pod_container_status_last_terminated_reason{reason="OOMKilled",namespace="payments",pod="router-7c9",container="router"}
     values: '0x19'
-  - series: kube_pod_container_status_restarts_total{namespace="payments-cell-1",pod="router-7c9",container="router"}
+  - series: kube_pod_container_status_restarts_total{namespace="payments",pod="router-7c9",container="router"}
     values: 0+0x19
   alert_rule_test:
   - eval_time: 15m
@@ -99,7 +99,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments",pod="router-7c9"}
     values: 1x31
   alert_rule_test:
   - eval_time: 27m
@@ -112,7 +112,7 @@ tests:
         owner: platform-oncall
         layer: compute
         failure_mode: compute-pods-pending-too-long
-        namespace: payments-cell-1
+        namespace: payments
       exp_annotations:
         summary: Pods stay Pending for 15 minutes
         runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/compute/warnings.md#pods-pending-too-long
@@ -122,7 +122,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments",pod="router-7c9"}
     values: '0x31'
   alert_rule_test:
   - &id002
@@ -134,7 +134,7 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_pod_status_phase{phase="Pending",namespace="payments-cell-1",pod="router-7c9"}
+  - series: kube_pod_status_phase{phase="Pending",namespace="payments",pod="router-7c9"}
     values: 0x9 1x1 0x19
   alert_rule_test:
   - *id002
@@ -143,9 +143,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 24x26
-  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 24x26
   alert_rule_test:
   - eval_time: 22m
@@ -158,7 +158,7 @@ tests:
         owner: payments-core-oncall
         layer: compute
         failure_mode: compute-hpa-at-max-replicas
-        namespace: payments-cell-1
+        namespace: payments
         horizontalpodautoscaler: router
       exp_annotations:
         summary: HPA stays at its maximum replicas for 10 minutes
@@ -169,9 +169,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 10x26
-  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 24x26
   alert_rule_test:
   - &id003
@@ -183,9 +183,9 @@ tests:
     runbook_base_url: https://git.example.test/acme/platform/blob/main
     grafana_url: https://grafana.example.test
   input_series:
-  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_status_current_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 10x9 24x1 10x14
-  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments-cell-1",horizontalpodautoscaler="router"}
+  - series: kube_horizontalpodautoscaler_spec_max_replicas{namespace="payments",horizontalpodautoscaler="router"}
     values: 24x9 24x1 24x14
   alert_rule_test:
   - *id003

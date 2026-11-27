@@ -7,6 +7,7 @@ set:
   global.registry: registry.example.test/acme
   global.environment: dev
   global.region: eu-central-1
+  global.accountId: "111111111111"
   global.dataCidrs: ["10.120.0.0/16"]
   global.endpointCidrs: ["10.120.255.0/24"]
   locker.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -53,3 +54,9 @@ tests:
           content:
             name: LOCKER__DATABASE__HOST
             value: pay-dev-euc1-aurora-locker.proxy-example.eu-central-1.rds.amazonaws.com
+  - it: snapshots the locker database before its migrations
+    template: charts/locker-migrations/templates/job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_RESOURCE_ARN, value: "arn:aws:rds:eu-central-1:111111111111:cluster:pay-dev-euc1-aurora-locker"}

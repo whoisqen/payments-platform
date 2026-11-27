@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "brokers",
+    "region",
+    "image",
+    "topicPrefix",
+    "topics",
+    "serviceAccountName",
+    "activeDeadlineSeconds",
+    "resources",
+    "networkPolicy"
+  ],
+  "properties": {
+    "global": {
+      "type": "object"
+    },
+    "platform-common": {
+      "type": "object"
+    },
+    "brokers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9.-]+:9098$"
+      }
+    },
+    "region": {
+      "type": "string",
+      "pattern": "^([a-z]{2}-[a-z]+-[0-9])?$"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "digest"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "topicPrefix": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "topics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partitions",
+        "replicationFactor",
+        "config"
+      ],
+      "properties": {
+        "partitions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "replicationFactor": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "serviceAccountName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "activeDeadlineSeconds": {
+      "type": "integer",
+      "minimum": 60
+    },
+    "resources": {
+      "type": "object"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "brokerCidrs",
+        "podIdentityAgentCidr"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "brokerCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9.]+/[0-9]+$"
+          }
+        },
+        "podIdentityAgentCidr": {
+          "type": "string",
+          "pattern": "^[0-9.]+/[0-9]+$"
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "description": "deploy/envs/<env>/images.yaml (CI-written digests); kafka-admin overrides image.digest",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$"
+      }
+    }
+  }
+}

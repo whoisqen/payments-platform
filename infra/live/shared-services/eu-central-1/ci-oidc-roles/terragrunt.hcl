@@ -14,4 +14,7 @@ inputs = {
   create_oidc_provider     = false
   oidc_provider_arn        = include.envcommon.locals.env_cfg.github_oidc_provider_arn
   ecr_read_repository_arns = include.envcommon.locals.env_cfg.ecr_repository_arns
+  # infra/bootstrap creates the CI roles of the other roots; the shared-services ones live here, one apply role per component of this tree.
+  apply_components = sort(distinct([for f in fileset("${get_repo_root()}/infra/live/shared-services", "**/terragrunt.hcl") : basename(dirname(f))]))
+  exec_account_ids = [include.envcommon.locals.env_cfg.account_id]
 }

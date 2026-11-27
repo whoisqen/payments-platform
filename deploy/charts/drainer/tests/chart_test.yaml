@@ -26,14 +26,14 @@ tests:
           path: spec.template.spec.nodeSelector["karpenter.sh/nodepool"]
           value: workers
   - it: scales on the Redis stream between 3 and 6
-    documentIndex: 0
+    documentIndex: 1
     template: autoscaling.yaml
     asserts:
       - isKind:
           of: ScaledObject
       - equal:
           path: spec.triggers[0].type
-          value: redis-streams
+          value: redis-cluster-streams
       - equal:
           path: spec.maxReplicaCount
           value: 6
@@ -49,3 +49,35 @@ tests:
       image.digest: null
     asserts:
       - failedTemplate: {}
+  - it: scales on the length of every shard stream, which XREAD reads without a consumer group
+    template: autoscaling.yaml
+    documentIndex: 1
+    set:
+      global.hyperswitch.drainer.numPartitions: 4
+    asserts:
+      - lengthEqual:
+          path: spec.triggers
+          count: 4
+      - equal:
+          path: spec.triggers[3].metadata.stream
+          value: "{shard_3}_DRAINER_STREAM"
+      - notExists:
+          path: spec.triggers[0].metadata.consumerGroup
+      - equal:
+          path: spec.triggers[0].metadata.streamLength
+          value: "1000"
+      - equal:
+          path: spec.triggers[0].metadata.usernameFromEnv
+          value: DRAINER__REDIS__USERNAME
+      - equal:
+          path: spec.triggers[0].authenticationRef.name
+          value: drainer-redis
+  - it: reads the MemoryDB password from the Vault Secret through a TriggerAuthentication
+    template: autoscaling.yaml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: TriggerAuthentication
+      - equal:
+          path: spec.secretTargetRef[0]
+          value: {parameter: password, name: drainer-vault, key: DRAINER__REDIS__PRIMARY_PASSWORD}

@@ -1,0 +1,70 @@
+suite: the cross-cluster locker entry - internal NLB, Gateway with mutual TLS, Vault mesh PKI
+templates:
+  - gateway.yaml
+  - serviceentries.yaml
+  - charts/locker/templates/istio/authorizationpolicy.yaml
+values:
+  - ../ci/lint-values.yaml
+tests:
+  - it: terminates mutual TLS for the host Terraform publishes, with no load balancer of its own
+    template: gateway.yaml
+    documentSelector: {path: kind, value: Gateway}
+    asserts:
+      - equal:
+          path: spec.listeners[0].hostname
+          value: locker.payments.svc.locker.dev.example.internal
+      - equal:
+          path: spec.listeners[0].tls.options["gateway.istio.io/tls-terminate-mode"]
+          value: MUTUAL
+      - equal:
+          path: metadata.annotations["networking.istio.io/service-type"]
+          value: ClusterIP
+  - it: admits only the router SPIFFE ID of the client certificate
+    template: gateway.yaml
+    documentSelector: {path: kind, value: AuthorizationPolicy}
+    asserts:
+      - equal:
+          path: spec.rules[0].from[0].source.principals
+          value: [payments-platform/ns/payments/sa/router]
+  - it: binds the Terraform target group to the gateway pods with the locker pod security group
+    template: gateway.yaml
+    documentSelector: {path: kind, value: TargetGroupBinding}
+    asserts:
+      - equal:
+          path: spec.serviceRef
+          value: {name: locker-istio, port: 3001}
+      - equal:
+          path: spec.targetType
+          value: ip
+  - it: takes the server certificate and the mesh root from the Vault PKI through the gateway's own login
+    template: gateway.yaml
+    documentSelector: {path: kind, value: VaultDynamicSecret}
+    asserts:
+      - equal:
+          path: spec.path
+          value: pki-mesh/issue/locker-gateway
+      - equal:
+          path: spec.provider.auth.kubernetes
+          value: {mountPath: k8s-pay-dev-euc1-locker, role: locker-gateway, serviceAccountRef: {name: locker-gateway-pki, audiences: [vault]}}
+  - it: lets the gateway call the locker
+    template: charts/locker/templates/istio/authorizationpolicy.yaml
+    asserts:
+      - contains:
+          path: spec.rules[0].from[0].source.principals
+          content: cluster.local/ns/payments/sa/locker-istio
+  - it: renders no entry without a cluster domain
+    template: gateway.yaml
+    set:
+      gateway.clusterDomain: ""
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: registers the locker Aurora proxy, KMS and the Pod Identity agent
+    template: serviceentries.yaml
+    asserts:
+      - hasDocuments:
+          count: 3
+      - contains:
+          path: spec.hosts
+          content: kms.eu-central-1.amazonaws.com
+        documentSelector: {path: metadata.name, value: egress-aws-apis}

@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(__file__).resolve().parent / "image-paths.yaml"
 AREAS = Path(__file__).resolve().parent / "areas.yaml"
-SERVICES = ["router", "drainer", "scheduler", "locker", "control-center", "vault-snapshot", "smoke"]
+SERVICES = ["router", "drainer", "scheduler", "locker", "control-center", "vault-snapshot", "smoke", "migrator", "kafka-admin", "cell-copy"]
 UNCLAIMED_ROOTS = ("docker/", "vendor/")
 
 

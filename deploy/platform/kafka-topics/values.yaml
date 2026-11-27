@@ -1,0 +1,35 @@
+# The environment layer (envs/<env>/<region>.yaml) sets the brokers and the region
+brokers: []
+region: ""
+
+# Image with the Apache Kafka CLI (kafka-topics.sh) and the aws-msk-iam-auth jar on its classpath. Without a real digest
+# (missing or all-zero) the chart renders nothing, so no Job runs against MSK with a placeholder image
+image:
+  repository: REPLACE_KAFKA_ADMIN_IMAGE
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+# <topicPrefix>-<event>-events for every event of the router (platform-common hyperswitch.topics), as upstream ClickHouse consumes them
+topicPrefix: hyperswitch
+topics:
+  partitions: 12
+  # The cluster default is RF 3 with min ISR 2; the topic repeats it so a changed default does not weaken it
+  replicationFactor: 3
+  config:
+    min.insync.replicas: "2"
+    retention.ms: "604800000"
+    cleanup.policy: delete
+
+serviceAccountName: kafka-topics
+activeDeadlineSeconds: 600
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 512Mi
+
+# MSK brokers (port 9098) sit in the data subnets; the Pod Identity agent gives the IAM credentials
+networkPolicy:
+  enabled: true
+  brokerCidrs: []
+  podIdentityAgentCidr: 169.254.170.23/32

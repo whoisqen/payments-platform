@@ -56,6 +56,7 @@ tests:
           path: spec.replicas
   - it: keeps the drainer stream triggers after the cron floor
     template: charts/drainer/templates/autoscaling.yaml
+    documentSelector: {path: kind, value: ScaledObject}
     asserts:
       - equal:
           path: spec.minReplicaCount
@@ -65,7 +66,7 @@ tests:
           value: cron
       - equal:
           path: spec.triggers[1].type
-          value: redis-streams
+          value: redis-cluster-streams
   - it: scales the scheduler producer between zero and its fixed count
     template: charts/scheduler/templates/producer/autoscaling.yaml
     asserts:

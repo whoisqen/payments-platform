@@ -34,7 +34,8 @@
       "properties": {
         "namePrefix": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*$"
         },
         "region": {
           "type": "string",
@@ -134,6 +135,78 @@
         }
       },
       "additionalProperties": false
+    },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "environment",
+          "region",
+          "component"
+        ],
+        "properties": {
+          "environment": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "stage",
+              "prod",
+              "cde-prod",
+              "shared-services"
+            ]
+          },
+          "region": {
+            "type": "string",
+            "pattern": "^[a-z]{2}-[a-z]+-[0-9]$"
+          },
+          "component": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+          },
+          "labels": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^payments-platform/[a-z0-9-]+$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$"
+            }
+          },
+          "eksName": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+          },
+          "inCluster": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "clusterSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "secretStore",
+        "refreshInterval"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretStore": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        }
+      }
     }
   }
 }

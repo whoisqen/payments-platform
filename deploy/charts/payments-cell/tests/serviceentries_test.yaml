@@ -1,0 +1,74 @@
+suite: every external host of the cell values has a ServiceEntry (Istio REGISTRY_ONLY)
+templates:
+  - serviceentries.yaml
+values:
+  - ../ci/lint-values.yaml
+  - ../../../envs/dev/values.yaml
+  - ../../../envs/dev/eu-central-1/values.yaml
+  - ../../../envs/dev/eu-central-1/cell-0/values.yaml
+tests:
+  - it: registers the Aurora proxy of the cell layer
+    documentSelector: {path: metadata.name, value: egress-aurora}
+    asserts:
+      - contains:
+          path: spec.hosts
+          content: pay-dev-euc1-aurora-cell-0.proxy-example.eu-central-1.rds.amazonaws.com
+      - equal:
+          path: spec.ports[0]
+          value: {number: 5432, name: tcp-postgres, protocol: TCP}
+      - equal:
+          path: spec.resolution
+          value: DNS
+  - it: registers the MemoryDB endpoint and keeps the node addresses of the data subnets
+    documentSelector: {path: metadata.name, value: egress-memorydb}
+    asserts:
+      - contains:
+          path: spec.hosts
+          content: clustercfg.pay-dev-euc1-memorydb-cell-0.example.memorydb.eu-central-1.amazonaws.com
+      - equal:
+          path: spec.addresses
+          value: [10.120.8.0/22]
+      - equal:
+          path: spec.ports[0].number
+          value: 6379
+  - it: registers the regional AWS APIs the services call
+    documentSelector: {path: metadata.name, value: egress-aws-apis}
+    asserts:
+      - contains: {path: spec.hosts, content: kms.eu-central-1.amazonaws.com}
+      - contains: {path: spec.hosts, content: sts.eu-central-1.amazonaws.com}
+      - contains: {path: spec.hosts, content: secretsmanager.eu-central-1.amazonaws.com}
+      - contains: {path: spec.hosts, content: dynamodb.eu-central-1.amazonaws.com}
+      - contains: {path: spec.hosts, content: s3.eu-central-1.amazonaws.com}
+  - it: registers the Pod Identity agent
+    documentSelector: {path: metadata.name, value: egress-pod-identity-agent}
+    asserts:
+      - equal:
+          path: spec.endpoints
+          value: [{address: 169.254.170.23}]
+  - it: registers every MSK broker of the region layer
+    documentSelector: {path: metadata.name, value: egress-msk}
+    asserts:
+      - equal:
+          path: spec.hosts
+          value:
+            - b-1.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com
+            - b-2.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com
+            - b-3.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com
+  - it: registers the PSP domains of the environment
+    documentSelector: {path: metadata.name, value: egress-psp}
+    asserts:
+      - equal:
+          path: spec.hosts
+          value: ["*.psp-sandbox.example.com"]
+  - it: keeps every entry inside the namespace
+    asserts:
+      - equal:
+          path: spec.exportTo
+          value: ["."]
+  - it: renders no MSK entry without events
+    set:
+      global.hyperswitch.events.kafka: false
+    asserts:
+      - notEqual:
+          path: metadata.name
+          value: egress-msk

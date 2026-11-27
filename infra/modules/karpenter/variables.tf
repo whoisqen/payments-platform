@@ -72,6 +72,7 @@ variable "instance_families" {
     stateful = ["r7g", "r6g", "r7i", "r6i"]
     cde      = ["m7g", "m6g", "m7i", "m6i"]
     workers  = ["m6g", "m7g", "m8g", "c7g", "c8g", "r7g", "m7i", "c7i"]
+    ci-build = ["c7gd", "c6gd", "m7gd", "c7g", "c8g"]
   }
 }
 
@@ -83,6 +84,7 @@ variable "cpu_limits" {
     stateful = 100
     cde      = 200
     workers  = 400
+    ci-build = 64
   }
 }
 
@@ -91,9 +93,15 @@ variable "enabled_pools" {
   description = "NodePools rendered for this cluster; a cluster that holds no CDE workload may leave the cde pool out."
   default     = ["payments", "stateful", "cde", "workers"]
   validation {
-    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers"], n)])
-    error_message = "enabled_pools may contain payments, stateful, cde and workers only."
+    condition     = length(var.enabled_pools) > 0 && alltrue([for n in var.enabled_pools : contains(["payments", "stateful", "cde", "workers", "ci-build"], n)])
+    error_message = "enabled_pools may contain payments, stateful, cde, workers and ci-build only."
   }
+}
+
+variable "workers_spot" {
+  type        = bool
+  default     = true
+  description = "Whether the workers pool may use Spot; false for the locker and edge clusters, where every node is in the CDE."
 }
 
 variable "spot_pools" {

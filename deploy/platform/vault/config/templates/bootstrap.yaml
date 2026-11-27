@@ -43,7 +43,17 @@ data:
       sleep 5
     done
     if [ "$(printf '%s' "${S}" | jq -r .initialized)" = "true" ]; then
-      log "already initialized; nothing to do"
+      # Later syncs only add what changed (a new cluster mount, a new policy): with the narrow vault-workloads role, never root
+      if [ -f /workloads/workloads.sh ]; then
+        export VAULT_ADDR="${ACTIVE_ADDR}"
+        VAULT_TOKEN=$(vault write -field=token "auth/${AUTH_MOUNT}/login" role=vault-workloads jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token)
+        export VAULT_TOKEN
+        trap 'vault token revoke -self >/dev/null 2>&1 || true' EXIT
+        sh /workloads/workloads.sh
+        log "already initialized; workloads reconciled"
+      else
+        log "already initialized; nothing to do"
+      fi
       exit 0
     fi
 
@@ -99,7 +109,12 @@ data:
     vault write "auth/${AUTH_MOUNT}/config" kubernetes_host="https://kubernetes.default.svc:443" >/dev/null
     vault write "auth/${AUTH_MOUNT}/role/${SNAPSHOT_ROLE}" bound_service_account_names="${SNAPSHOT_SA}" bound_service_account_namespaces="${NAMESPACE}" policies="${SNAPSHOT_ROLE}" ttl=15m >/dev/null
     vault write "auth/${AUTH_MOUNT}/role/${ESO_ROLE}" bound_service_account_names="${ESO_SA}" bound_service_account_namespaces="${ESO_NAMESPACE}" policies="${ESO_ROLE}" ttl=15m >/dev/null
-    if [ -f /workloads/workloads.sh ]; then sh /workloads/workloads.sh; fi
+    if [ -f /workloads/workloads.sh ]; then
+      sh /workloads/workloads.sh
+      # The bootstrap service account reconciles the workloads on later syncs with exactly these rights
+      vault policy write vault-workloads /workloads/vault-workloads.hcl >/dev/null
+      vault write "auth/${AUTH_MOUNT}/role/vault-workloads" bound_service_account_names="${BOOTSTRAP_SA}" bound_service_account_namespaces="${NAMESPACE}" policies=vault-workloads ttl=15m >/dev/null
+    fi
 
     vault token revoke -self >/dev/null
     log "configured; root token revoked"
@@ -165,6 +180,8 @@ spec:
               value: {{ $b.externalSecrets.serviceAccountName | quote }}
             - name: ESO_NAMESPACE
               value: {{ $b.externalSecrets.namespace | quote }}
+            - name: BOOTSTRAP_SA
+              value: {{ $b.serviceAccountName | quote }}
             - name: AP_CLEANUP
               value: {{ $b.autopilot.cleanupDeadServers | quote }}
             - name: AP_THRESHOLD

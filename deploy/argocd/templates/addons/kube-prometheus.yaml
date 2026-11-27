@@ -65,7 +65,13 @@ spec:
         # The client certificate Secret of the mutual TLS to the central stack
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
-          path: deploy/platform/kube-prometheus/manifests
+          path: deploy/platform/central-tls
+          helm:
+            parameters:
+              - name: namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
+              - name: secretName
+                value: prometheus-central-tls
       syncPolicy:
         automated:
           prune: true

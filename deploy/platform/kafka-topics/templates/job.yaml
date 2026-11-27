@@ -1,0 +1,58 @@
+{{- if include "kafka-topics.enabled" . }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # A new name per topic list and settings, so a change runs again and an unchanged sync does not
+  name: kafka-topics-{{ include "kafka-topics.names" . | cat (toJson .Values.topics) | sha256sum | trunc 8 }}
+  labels:
+    {{- include "kafka-topics.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "kafka-topics.labels" . | nindent 8 }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: create-topics
+          image: "{{ .Values.image.repository }}@{{ include "kafka-topics.digest" . }}"
+          command: ["/bin/sh", "/config/create-topics.sh"]
+          env:
+            - name: BOOTSTRAP
+              value: {{ join "," .Values.brokers | quote }}
+            - name: AWS_REGION
+              value: {{ required "region is required" .Values.region | quote }}
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx256m"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: kafka-topics
+        - name: tmp
+          emptyDir: {}
+{{- end }}

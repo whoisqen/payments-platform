@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namePrefix", "secretName", "namespace", "secretStore", "refreshInterval", "remoteKey"],
+  "properties": {
+    "namePrefix": {"type": "string", "pattern": "^[a-z][a-z0-9]*$"},
+    "secretName": {"type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?)?$"},
+    "namespace": {"type": "string", "minLength": 1},
+    "secretStore": {"type": "string", "minLength": 1},
+    "refreshInterval": {"type": "string", "pattern": "^[0-9]+(s|m|h)$"},
+    "remoteKey": {"type": "string", "pattern": "^shared-services/[a-z0-9/-]+$"}
+  }
+}

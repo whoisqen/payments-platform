@@ -40,6 +40,17 @@ variable "mode" {
   }
 }
 
+variable "count_overrides" {
+  type        = map(list(string))
+  default     = {}
+  description = "Rules kept in count while their group blocks, by group (common, bad-inputs, sqli, ip-reputation, bot-control, atp) -> rule names, for example { common = [\"SizeRestrictions_BODY\"] }."
+
+  validation {
+    condition     = alltrue([for k in keys(var.count_overrides) : contains(["common", "bad-inputs", "sqli", "ip-reputation", "bot-control", "atp"], k)])
+    error_message = "count_overrides keys must be common, bad-inputs, sqli, ip-reputation, bot-control or atp."
+  }
+}
+
 variable "entries" {
   type = map(object({
     bot_control    = optional(bool, false)

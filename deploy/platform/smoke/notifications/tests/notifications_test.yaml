@@ -67,3 +67,11 @@ tests:
       - equal:
           path: spec.data[1].remoteRef.key
           value: pay/shared-services/argocd/notifications
+  - it: takes the first segment of the secret name from the name prefix
+    template: externalsecret.yaml
+    set:
+      namePrefix: acme
+    asserts:
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: acme/shared-services/argocd/notifications

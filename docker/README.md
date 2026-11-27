@@ -2,6 +2,8 @@
 
 One Dockerfile per service (`docker/<service>/Dockerfile`), `budgets.yaml` with image size budgets, container-structure-test.
 
+`migrator` is the image of the migration Job (`deploy/charts/migrations`): diesel CLI (postgres only), the vendored `vendor/hyperswitch/migrations`, and `/opt/migrator/{migrate,snapshot,backfill}.sh`. The D3 snapshot script and the advisory lock are bash with the AWS CLI and psql, so the distroless runtime carries `bash`, `psql` and the few coreutils the scripts call (with their libraries via `collect-libs.sh`), and still no `/bin/sh` or package manager. `migrate.sh` holds `pg_advisory_lock` in its own psql session while `diesel migration run` applies the pending migrations, authenticates with an IAM token unless `PGPASSWORD` is set, and verifies the server against the Amazon RDS CA bundle, which the Job must provide at `PGSSLROOTCERT` (`/etc/ssl/rds/global-bundle.pem`). `snapshot.sh` also needs `SNAPSHOT_RESOURCE_ARN`, `SNAPSHOT_VAULT`, `SNAPSHOT_ROLE_ARN` and `AWS_REGION` from the Job.
+
 Kafka TLS (router, scheduler): `rdkafka` is built with the `ssl` feature and links the system libssl and libcrypto, which `collect-libs.sh` copies from the snapshot-pinned build stage. librdkafka verifies the MSK certificates through OpenSSL's default paths under `/usr/lib/ssl`, which distroless does not have, so the runtime stage sets `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` (the bundle of the digest-pinned base). The drainer does not link rdkafka.
 
 ## Rootless builds
@@ -24,7 +26,7 @@ In the build cluster (`deploy/platform/ci-build/`, not written by this change):
 - Node pool for the label of `BUILDKIT_NODE_SELECTOR`, arm64, taint matching a toleration if it is dedicated; nodes need user namespaces (kernel 5.11+, `kernel.unprivileged_userns_clone` or equivalent allowed) and egress to ECR, snapshot.debian.org, crates.io and the sccache S3 endpoint.
 - Identity of the runner: an EKS access entry (or the in-cluster ServiceAccount) bound to a Role in that namespace only: `deployments` get, list, watch, create, update, patch, delete; `pods` get, list, watch; `pods/exec` create; `configmaps` get, list, watch, create, update, delete (buildkitd config). No ClusterRole. For a runner outside the cluster, the runner instance role also needs `eks:DescribeCluster`.
 - A sweep of Deployments older than two hours in the namespace, for builders orphaned by a killed runner.
-- Quota: a builder requests 8 CPU and 16 GiB (limit 24 GiB memory); size the namespace quota for the matrix (6 services).
+- Quota: a builder requests 8 CPU and 16 GiB (limit 24 GiB memory); size the namespace quota for the matrix (8 services).
 
 ### Limits of rootless
 

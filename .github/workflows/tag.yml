@@ -1,15 +1,24 @@
 name: tag
 
 # The only creator of v* tags; it runs after a prod rollout finished in all cells and builds nothing.
+# The first tag is the exception: prod pins gated.revision to a tag before its first rollout, so while no v* tag exists
+# the merge of the first prod promotion (digests that passed stage) gets v0.1.0; see tools/ci/promote/first_release.py.
 on:
   repository_dispatch:
     types: [prod-rollout-complete]
+  push:
+    branches: [main]
+    paths: ["deploy/envs/prod/images.yaml"]
   workflow_dispatch:
     inputs:
       sha:
-        description: commit that runs in prod in all cells
+        description: commit that runs in prod in all cells, or for first-release the commit whose prod digests stage verified
         type: string
         required: true
+      first-release:
+        description: cut v0.1.0 (fails when any v* tag exists)
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -32,8 +41,10 @@ jobs:
         env:
           DISPATCHED: ${{ github.event.client_payload.sha }}
           INPUT: ${{ inputs.sha }}
+          EVENT: ${{ github.event_name }}
         run: |
           sha=${INPUT:-$DISPATCHED}
+          [ "$EVENT" = push ] && sha=$GITHUB_SHA
           [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a commit sha"; exit 1; }
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -54,7 +65,18 @@ jobs:
       - id: next
         env:
           SHA: ${{ steps.sha.outputs.sha }}
+          EVENT: ${{ github.event_name }}
+          FIRST: ${{ inputs.first-release }}
         run: |
+          if [ "$EVENT" = push ] || [ "$FIRST" = true ]; then
+            # a push only bootstraps; once a v* tag exists it is a no-op and prod-rollout-complete takes over
+            flag=(); [ "$EVENT" = push ] && flag=(--if-first)
+            out=$(python3 tools/ci/promote/first_release.py --sha "$SHA" --main origin/main "${flag[@]}" --changelog-out changelog.md)
+            echo "version=$(jq -r '.version // empty' <<<"$out")" >>"$GITHUB_OUTPUT"
+            echo "bump=$(jq -r .bump <<<"$out")" >>"$GITHUB_OUTPUT"
+            git show "${SHA}:deploy/envs/prod/images.yaml" >images.yaml
+            exit 0
+          fi
           existing=$(git tag --points-at "$SHA" --list 'v*' | head -n1)
           if [ -n "$existing" ]; then
             echo "version=$existing" >>"$GITHUB_OUTPUT"; echo "bump=none" >>"$GITHUB_OUTPUT"; exit 0

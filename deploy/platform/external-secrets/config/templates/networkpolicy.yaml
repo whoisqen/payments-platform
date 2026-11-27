@@ -73,13 +73,14 @@ spec:
           protocol: TCP
     {{- end }}
     {{- if and .Values.vault.enabled $np.vaultCidrs }}
+    # the central Vault behind the internal gateway of shared-services (HTTPS)
     - to:
         {{- range $np.vaultCidrs }}
         - ipBlock:
             cidr: {{ . }}
         {{- end }}
       ports:
-        - port: 8200
+        - port: 443
           protocol: TCP
     {{- end }}
     {{- if $np.apiServerCidrs }}

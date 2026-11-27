@@ -1,0 +1,16 @@
+schemaVersion: 2.0.0
+metadataTest:
+  user: "10001:10001"
+  entrypoint: ["kafka-topics.sh"]
+fileExistenceTests:
+  - name: kafka-topics
+    path: /opt/kafka/bin/kafka-topics.sh
+    shouldExist: true
+  - name: msk iam auth
+    path: /opt/kafka/libs/aws-msk-iam-auth.jar
+    shouldExist: true
+commandTests:
+  - name: kafka-topics runs
+    command: /opt/kafka/bin/kafka-topics.sh
+    args: ["--version"]
+    expectedOutput: ["4\\.3\\.2"]

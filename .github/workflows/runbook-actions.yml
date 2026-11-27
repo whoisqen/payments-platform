@@ -1,0 +1,95 @@
+name: runbook-actions
+
+# The actions of a runbook in docs/runbooks: one named step of its SSM document, after the approval of the runbook-<env>
+# GitHub Environment; the run, its approver and the execution id are the audit record.
+on:
+  workflow_dispatch:
+    inputs:
+      document:
+        description: SSM document named in the runbook, for example pay-runbook-psp-degraded
+        type: string
+        required: true
+      step:
+        description: document step named in the runbook, for example route-away-psp; empty when the runbook names none
+        type: string
+        default: ""
+      environment:
+        type: choice
+        options: [prod, stage, dev]
+        required: true
+      region:
+        type: choice
+        options: [eu-central-1, us-east-1, us-east-2]
+        default: eu-central-1
+      reason:
+        description: incident or ticket this action belongs to
+        type: string
+        required: true
+
+permissions: {}
+
+# one action per environment at a time; a second one waits instead of racing the first
+concurrency:
+  group: runbook-actions-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: main only
+        run: '[ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::runbooks run from main only"; exit 1; }'
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python
+      - run: python3 -m pip install --quiet pyyaml==6.0.2
+      # fails before anyone is asked to approve an action the runbooks do not name
+      - env:
+          DOCUMENT: ${{ inputs.document }}
+          STEP: ${{ inputs.step }}
+          TARGET_ENV: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          [ -n "${REASON// /}" ] || { echo "::error::reason is required"; exit 1; }
+          python3 tools/ci/runbook/runbook.py action --document "$DOCUMENT" --step "$STEP" --env "$TARGET_ENV" --region "$REGION"
+
+  act:
+    needs: validate
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    environment: runbook-${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: python
+      - run: python3 -m pip install --quiet pyyaml==6.0.2
+      - id: request
+        env:
+          DOCUMENT: ${{ inputs.document }}
+          STEP: ${{ inputs.step }}
+          TARGET_ENV: ${{ inputs.environment }}
+          REGION: ${{ inputs.region }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          python3 tools/ci/runbook/runbook.py action --document "$DOCUMENT" --step "$STEP" --env "$TARGET_ENV" --region "$REGION" >"$RUNNER_TEMP/request.json"
+          echo "role=$(jq -r .role "$RUNNER_TEMP/request.json")" >>"$GITHUB_OUTPUT"
+          printf 'Reason: %s\n\n' "$REASON" >>"$GITHUB_STEP_SUMMARY"
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ steps.request.outputs.role }}
+          aws-region: ${{ inputs.region }}
+      - name: run the document step
+        run: tools/ci/runbook/ssm-run.sh "$RUNNER_TEMP/request.json"

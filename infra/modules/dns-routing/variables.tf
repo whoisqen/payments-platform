@@ -42,7 +42,7 @@ variable "endpoints" {
 
 variable "health_check_path" {
   type    = string
-  default = "/health/deep"
+  default = "/health/ready"
 }
 
 variable "health_check_port" {

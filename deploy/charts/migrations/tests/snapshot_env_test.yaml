@@ -1,0 +1,104 @@
+suite: migrator contract - snapshot target, region and the RDS CA bundle
+templates:
+  - job.yaml
+  - backfill-job.yaml
+  - rds-ca-bundle.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.region: eu-central-1
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  snapshot.resourceArn: arn:aws:rds:eu-central-1:111111111111:cluster:pay-dev-euc1-aurora-cell-0
+  snapshot.vault: pay-dev-euc1-backup
+  snapshot.roleArn: arn:aws:iam::111111111111:role/pay-dev-euc1-backup
+tests:
+  - it: hands the snapshot script its target, vault, role and region
+    template: job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_RESOURCE_ARN, value: "arn:aws:rds:eu-central-1:111111111111:cluster:pay-dev-euc1-aurora-cell-0"}
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_VAULT, value: pay-dev-euc1-backup}
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_ROLE_ARN, value: "arn:aws:iam::111111111111:role/pay-dev-euc1-backup"}
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: AWS_REGION, value: eu-central-1}
+  - it: gives the migration its region for the IAM auth token
+    template: job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: AWS_REGION, value: eu-central-1}
+  - it: mounts the RDS CA bundle where PGSSLROOTCERT of the image points, in both containers
+    template: job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: rds-ca, mountPath: /etc/ssl/rds, readOnly: true}
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content: {name: rds-ca, mountPath: /etc/ssl/rds, readOnly: true}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: rds-ca
+            configMap:
+              name: rds-ca-bundle
+              items: [{key: global-bundle.pem, path: global-bundle.pem}]
+  - it: mounts the bundle in the backfill Job too
+    template: backfill-job.yaml
+    set:
+      backfill.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: rds-ca, mountPath: /etc/ssl/rds, readOnly: true}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: AWS_REGION, value: eu-central-1}
+  - it: ships the published bundle in a ConfigMap created before the migration hook
+    template: rds-ca-bundle.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["global-bundle.pem"]
+          pattern: "^-----BEGIN CERTIFICATE-----"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-11"
+  - it: derives the snapshot target from the naming convention when unset
+    template: job.yaml
+    set:
+      snapshot.resourceArn: ""
+      snapshot.vault: ""
+      global.environment: stage
+      global.cell: cell-2
+      global.accountId: "333333333333"
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_RESOURCE_ARN, value: "arn:aws:rds:eu-central-1:333333333333:cluster:pay-stage-euc1-aurora-cell-2"}
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_VAULT, value: pay-stage-euc1-backup}
+  - it: targets the locker database when the Aurora component is set
+    template: job.yaml
+    set:
+      snapshot.resourceArn: ""
+      snapshot.auroraComponent: aurora-locker
+      global.environment: dev
+      global.accountId: "111111111111"
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_RESOURCE_ARN, value: "arn:aws:rds:eu-central-1:111111111111:cluster:pay-dev-euc1-aurora-locker"}
+  - it: fails the render without a region
+    template: job.yaml
+    set:
+      global.region: ""
+    asserts:
+      - failedTemplate: {}

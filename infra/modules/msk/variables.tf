@@ -151,3 +151,9 @@ variable "name_prefix" {
     error_message = "name_prefix must be 2 to 11 lower-case letters or digits, starting with a letter."
   }
 }
+
+variable "client_cluster_name" {
+  description = "EKS cluster next to MSK where the kafka-topics Job and the kafka-exporter run; null creates no client roles."
+  type        = string
+  default     = null
+}

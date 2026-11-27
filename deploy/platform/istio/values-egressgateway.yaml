@@ -1,0 +1,25 @@
+# Egress gateway of the outgoing merchant webhooks (deploy/platform/istio/egress): an HTTP CONNECT proxy for the scheduler only
+service:
+  # Reached inside the cluster only; it leaves through the VPC egress (Network Firewall) on 443
+  type: ClusterIP
+  ports:
+    - name: https-proxy
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+labels:
+  istio: egressgateway
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        istio: egressgateway

@@ -42,8 +42,9 @@ spec:
             valueFiles:
               - $values/deploy/platform/karpenter/values-{{`{{ .chart }}`}}.yaml
             parameters:
+              # The EKS name, which differs from the Argo CD name for the cells (eks-cell-0 against cell-0)
               - name: settings.clusterName
-                value: '{{`{{ .name }}`}}'
+                value: '{{`{{ or (index .metadata.annotations "payments-platform/eks-cluster-name") .name }}`}}'
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values

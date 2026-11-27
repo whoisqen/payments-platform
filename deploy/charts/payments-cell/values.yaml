@@ -7,6 +7,17 @@ global:
   dataCidrs: []
   # VPC interface endpoints reached by the snapshot step of the migrations Job
   endpointCidrs: []
+  # The external dependencies of the cell as ServiceEntries (Istio outboundTrafficPolicy REGISTRY_ONLY)
+  egress:
+    serviceEntries: true
+    # <service>.<region>.amazonaws.com: KMS (data keys), STS, Secrets Manager, DynamoDB (cell routing map), S3, CloudWatch Logs
+    awsServices: [kms, sts, secretsmanager, dynamodb, s3, logs]
+    podIdentityAgent: 169.254.170.23
+    # PSP API hosts the egress firewall allows (dns.psp_domains of config/platform.yaml); wildcards allowed
+    pspHosts: []
+    # Host of central.sentry_url and the address range it is reached at (shared-services VPC through the transit gateway)
+    sentryHosts: []
+    sentryCidrs: []
   # Hyperswitch settings shared by router, drainer and scheduler; defaults live in platform-common (hyperswitch/_defaults.tpl).
   # Secrets are not here: each chart maps them to Vault paths <kvMount>/<env>/<cell>/{router,drainer,scheduler,shared}/...
   hyperswitch:

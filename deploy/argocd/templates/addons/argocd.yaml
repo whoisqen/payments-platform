@@ -38,6 +38,10 @@ spec:
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           path: deploy/platform/smoke/notifications
+          helm:
+            parameters:
+              - name: namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
       syncPolicy:
         automated:
           prune: false

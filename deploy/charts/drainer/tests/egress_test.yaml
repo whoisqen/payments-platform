@@ -1,0 +1,25 @@
+suite: drainer egress to the AWS interface endpoints
+templates:
+  - networkpolicy.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  global.endpointCidrs: [10.120.255.0/24]
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: reaches KMS and STS through the interface endpoints on 443
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 10.120.255.0/24}}]
+            ports: [{port: 443, protocol: TCP}]
+  - it: reaches the Pod Identity agent for its credentials
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 169.254.170.23/32}}]
+            ports: [{port: 80, protocol: TCP}]

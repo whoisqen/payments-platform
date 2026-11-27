@@ -1,0 +1,52 @@
+suite: webhook egress through the egress gateway
+templates:
+  - gateway.yaml
+  - envoyfilter.yaml
+  - networkpolicy.yaml
+tests:
+  - it: ends the scheduler's mutual TLS at the gateway, so the identity is checked there
+    template: gateway.yaml
+    documentSelector: {path: kind, value: Gateway}
+    asserts:
+      - equal:
+          path: spec.servers[0].tls.mode
+          value: ISTIO_MUTUAL
+      - equal:
+          path: spec.servers[0].port.number
+          value: 8080
+  - it: lets only the scheduler consumer open CONNECT tunnels, and only to port 443
+    template: gateway.yaml
+    documentSelector: {path: kind, value: AuthorizationPolicy}
+    asserts:
+      - equal:
+          path: spec.rules[0].from[0].source.principals
+          value: [cluster.local/ns/payments/sa/scheduler-consumer]
+      - equal:
+          path: spec.rules[0].to[0].operation.methods
+          value: [CONNECT]
+      - equal:
+          path: spec.rules[0].when[0].values
+          value: ["*:443"]
+  - it: terminates CONNECT with the dynamic forward proxy on the gateway only
+    template: envoyfilter.yaml
+    asserts:
+      - equal:
+          path: spec.workloadSelector.labels
+          value: {istio: egressgateway}
+      - equal:
+          path: spec.configPatches[2].patch.value.routes[0].route.cluster
+          value: webhook_egress_dynamic_forward_proxy
+      - equal:
+          path: spec.configPatches[3].patch.value.cluster_type.name
+          value: envoy.clusters.dynamic_forward_proxy
+  - it: admits the scheduler consumer pods only and leaves on 443 to public addresses
+    template: networkpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels
+          value: {app.kubernetes.io/name: scheduler, app.kubernetes.io/component: consumer}
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]}}]
+            ports: [{port: 443, protocol: TCP}]

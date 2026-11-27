@@ -1,4 +1,4 @@
-# Ids and names the security baseline stacks share; organization.* and accounts.* keys fall back to placeholders until the owner sets them.
+# Ids and names the security baseline stacks share; accounts come from config/platform.yaml, organization.* keys fall back to placeholders until the owner sets them.
 locals {
   cfg    = yamldecode(file("${get_repo_root()}/config/platform.yaml"))
   org    = try(local.cfg.organization, {})
@@ -18,14 +18,18 @@ locals {
     sandbox          = try(local.org.ou_ids.sandbox, "ou-0000-00000005")
   }
 
-  management_account_id  = try(local.cfg.accounts.management, "000000000001")
-  log_archive_account_id = try(local.cfg.accounts.log_archive, "000000000002")
-  audit_account_id       = try(local.cfg.accounts.audit, "000000000003")
+  management_account_id  = local.cfg.accounts.management
+  log_archive_account_id = local.cfg.accounts.log_archive
+  audit_account_id       = local.cfg.accounts.audit
   member_account_ids = try(local.sec.member_account_ids, distinct([
     for k, id in local.cfg.accounts : id if !contains(["management", "audit"], k)
   ]))
-  cde_account_ids        = try(local.sec.cde_account_ids, try(local.cfg.ai.cde_account_ids, []))
-  cde_s3_bucket_prefixes = try(local.sec.cde_s3_bucket_prefixes, ["${local.prefix}-cde-"])
+  cde_account_ids = try(local.sec.cde_account_ids, try(local.cfg.ai.cde_account_ids, []))
+  # Every bucket of the environment accounts (state, backups, event archive and their replicas) and the Vault snapshots, which hold the locker keys.
+  cde_s3_bucket_prefixes = try(local.sec.cde_s3_bucket_prefixes, concat(
+    [for env in ["dev", "stage", "prod"] : "${local.prefix}-${env}-"],
+    ["${local.prefix}-shared-services-euc1-vault-snapshots"],
+  ))
 
   # Fixed names break the cycle between the trail (needs the bucket) and the bucket policy (needs the trail ARN).
   trail_name      = "${local.prefix}-management-euc1-org-trail"

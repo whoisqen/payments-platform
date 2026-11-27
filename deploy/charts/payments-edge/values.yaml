@@ -31,6 +31,8 @@ routing:
   apiKeyHeader: api-key
   authHeader: authorization
   timeout: 20s
+  # A cell without host: router.payments.svc.<name>.<clusterDomain>, the name the cell endpoint publishes (infra outputs the real one)
+  clusterDomain: ""
   cells: []
 
 # Request classes are assigned by path in this order; anything unmatched is payments, shed last

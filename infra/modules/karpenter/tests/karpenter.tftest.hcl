@@ -181,3 +181,34 @@ run "cde_pool_cannot_be_listed_for_spot" {
 
   expect_failures = [var.spot_pools]
 }
+
+run "cde_clusters_keep_workers_on_demand" {
+  command = plan
+
+  variables {
+    enabled_pools = ["cde", "workers"]
+    workers_spot  = false
+  }
+
+  assert {
+    condition     = !contains(flatten([for r in yamldecode(output.manifests["nodepool-workers.yaml"]).spec.template.spec.requirements : r.values if r.key == "karpenter.sh/capacity-type"]), "spot")
+    error_message = "the workers pool of a CDE cluster stays On-Demand"
+  }
+}
+
+run "ci_build_pool_matches_the_buildkit_selector" {
+  command = plan
+
+  variables {
+    enabled_pools = ["workers", "ci-build"]
+  }
+
+  assert {
+    condition     = yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.metadata.labels["pay.io/pool"] == "ci-build"
+    error_message = "BuildKit selects pay.io/pool=ci-build"
+  }
+  assert {
+    condition     = flatten([for r in yamldecode(output.manifests["nodepool-ci-build.yaml"]).spec.template.spec.requirements : r.values if r.key == "kubernetes.io/arch"]) == ["arm64"]
+    error_message = "BuildKit selects kubernetes.io/arch=arm64"
+  }
+}

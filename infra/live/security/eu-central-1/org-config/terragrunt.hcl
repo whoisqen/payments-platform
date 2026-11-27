@@ -17,8 +17,8 @@ dependency "log_archive" {
   config_path = "../log-archive"
 
   mock_outputs = {
-    bucket_name = "pay-security-euc1-log-archive"
-    kms_key_arn = "arn:aws:kms:eu-central-1:000000000002:key/00000000-0000-0000-0000-000000000000"
+    bucket_name = include.envcommon.locals.base.log_bucket_name
+    kms_key_arn = "arn:aws:kms:${include.envcommon.locals.base.home_region}:${include.envcommon.locals.base.log_archive_account_id}:key/mrk-log-archive"
     prefixes    = { cloudtrail = "cloudtrail", config = "config", flow_logs = "flow-logs" }
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]

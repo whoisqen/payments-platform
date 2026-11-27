@@ -89,6 +89,8 @@ spec:
           path: deploy/charts/payments-locker
           helm:
             valueFiles:
+              # The environment layer carries what both regions share (account, cross-cluster entry); the locker layer what is regional
+              - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/values.yaml
               - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}/locker/values.yaml
               - $values/deploy/envs/{{`{{ index .path.segments 2 }}`}}/images.yaml
         - repoURL: {{ .Values.repo.url }}

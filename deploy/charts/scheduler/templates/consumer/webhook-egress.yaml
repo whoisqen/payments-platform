@@ -1,0 +1,16 @@
+{{- if .Values.consumer.networkPolicy.webhookEgress }}
+# The egress gateway has no sidecar label, so auto mTLS would send plaintext: mutual TLS to it is explicit, so its
+# AuthorizationPolicy sees the scheduler-consumer identity
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: webhook-egress
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values.consumer "name" "scheduler-consumer" "component" "consumer") | nindent 4 }}
+spec:
+  host: istio-egressgateway.istio-egress.svc.cluster.local
+  exportTo: ["."]
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+{{- end }}

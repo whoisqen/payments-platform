@@ -6,3 +6,45 @@ global:
   dataCidrs: []
   # VPC interface endpoints reached by the snapshot step of the migrations Job
   endpointCidrs: []
+
+locker-migrations:
+  # The pre-migration snapshot targets the locker database: <prefix>-<env>-<region short>-aurora-locker
+  snapshot:
+    auroraComponent: aurora-locker
+
+# The external dependencies of the locker as ServiceEntries (Istio outboundTrafficPolicy REGISTRY_ONLY)
+egress:
+  serviceEntries: true
+  awsServices: [kms, sts]
+  podIdentityAgent: 169.254.170.23
+
+# Cross-cluster entry of the cells (README): internal NLB -> Gateway locker with mutual TLS -> locker
+gateway:
+  enabled: true
+  # deploy.<env>.cluster_domain of config/platform.yaml; the host is locker.payments.svc.locker.<clusterDomain>, the alias of infra/modules/locker-endpoint
+  clusterDomain: ""
+  port: 3001
+  secretName: locker-gateway-tls
+  # Terraform output target_group_arn of infra/live/<env>/<region>/locker/endpoint
+  targetGroupArn: REPLACE_LOCKER_TARGET_GROUP_ARN
+  # URI SANs of the router client certificates (Vault role router-client), as Istio principals
+  clientPrincipals:
+    - payments-platform/ns/payments/sa/router
+  pki:
+    mount: pki-mesh
+    # https://vault.<zone>:8200 of the environment
+    vaultServer: ""
+    # empty: k8s-<prefix>-<env>-<region short>-locker, the jwt mount of the locker cluster (platform-common.vaultMount)
+    authMount: ""
+    serviceAccount: locker-gateway-pki
+    ttl: 72h
+    refreshInterval: 24h
+
+locker:
+  istio:
+    authorizationPolicy:
+      enabled: true
+      # The in-cluster router (local tests) and the locker gateway, which carries the cross-cluster calls
+      principals:
+        - cluster.local/ns/payments/sa/router
+        - cluster.local/ns/payments/sa/locker-istio

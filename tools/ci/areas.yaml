@@ -6,6 +6,9 @@ areas:
     - vendor/hyperswitch/
   rust_card_vault:
     - vendor/card-vault/
+  # the platform's own Rust service: the edge cell lookup
+  rust_cell_lookup:
+    - services/cell-lookup/
   terraform:
     - infra/
   helm:
@@ -16,6 +19,7 @@ areas:
     - tools/
     - scripts/
     - tests/
+    - services/cell-copy/
   node:
     - tests/load/
     - tests/chaos/
@@ -38,6 +42,7 @@ areas:
 rust_areas:
   - rust_hyperswitch
   - rust_card_vault
+  - rust_cell_lookup
 common:
   # platform settings are read only by the config loader and its tests
   python_only:

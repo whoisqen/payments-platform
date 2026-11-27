@@ -25,3 +25,12 @@ gated:
 # Recovery regions kept as a pilot light: no cluster runs there until the failover builds one, so their directories get no Application.
 # Generated from standby.compute_enabled in config/environments; the switch sets it and regenerates these values.
 pilotLight: []
+# Argo CD cluster Secrets: one ExternalSecret per entry renders <cluster.namePrefix>/argocd/clusters/<name> of Secrets Manager (shared-services),
+# where <name> is the destination.name of the ApplicationSets. One entry per cluster: environment, region, component (cell-0..3, spare, ...)
+# and the labels the add-on ApplicationSets select on (payments-platform/addons and payments-platform/gateway: enabled by default).
+# eksName overrides <namePrefix>-<env>-<region short>-eks-<component>; inCluster: true registers the cluster Argo CD runs in without credentials
+clusters: []
+clusterSecrets:
+  namespace: argocd
+  secretStore: aws-secrets-manager
+  refreshInterval: 1h

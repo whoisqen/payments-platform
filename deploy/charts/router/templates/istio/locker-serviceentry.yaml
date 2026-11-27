@@ -1,0 +1,105 @@
+{{- $c := include "platform-common.hyperswitch.config" (dict "root" .) | fromYaml }}
+{{- $url := include "platform-common.hyperswitch.lockerUrl" $c }}
+{{- $host := regexReplaceAll "^https?://([^:/]+).*$" $url "${1}" }}
+{{- if not (hasSuffix ".svc.cluster.local" $host) }}
+{{- $port := regexFind ":[0-9]+$" $url | trimPrefix ":" | default "80" }}
+{{- $lc := .Values.lockerClient }}
+{{- $g := .Values.global | default dict }}
+{{- $cell := $g.cell | default "cell-0" }}
+# The locker runs in its own cluster behind an internal NLB (infra/modules/locker-endpoint): REGISTRY_ONLY needs the host registered
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: locker
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "locker" "component" "router") | nindent 4 }}
+spec:
+  hosts:
+    - {{ $host }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - number: {{ $port }}
+      name: http-locker
+      protocol: HTTP
+---
+# The sidecar originates mutual TLS to the locker gateway with the router client certificate (URI SAN, the SPIFFE ID the gateway admits)
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: locker
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "locker" "component" "router") | nindent 4 }}
+spec:
+  host: {{ $host }}
+  exportTo: ["."]
+  # credentialName reaches a sidecar only with a workloadSelector (Istio 1.30 DestinationRule API); without it the router would send no certificate
+  workloadSelector:
+    matchLabels:
+      app.kubernetes.io/name: router
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      credentialName: {{ $lc.secretName }}
+      sni: {{ $host }}
+      subjectAltNames:
+        - {{ $host }}
+---
+# Client certificate from the Vault mesh PKI (role router-client), issued through the router's own Vault login and renewed before expiry
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: VaultDynamicSecret
+metadata:
+  name: locker-client-certificate
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "locker" "component" "router") | nindent 4 }}
+spec:
+  method: POST
+  path: {{ printf "%s/issue/router-client" $lc.pkiMount | quote }}
+  parameters:
+    common_name: {{ printf "router.%s.payments" $cell | quote }}
+    uri_sans: {{ $lc.uriSan | quote }}
+    ttl: {{ $lc.ttl | quote }}
+  resultType: Data
+  provider:
+    server: {{ required "lockerClient.vaultServer is required for the cross-cluster locker" $lc.vaultServer | quote }}
+    {{- with $lc.caBundle }}
+    # the AWS Private CA root that signs the internal gateway in front of the central Vault
+    caBundle: {{ . | quote }}
+    {{- end }}
+    auth:
+      kubernetes:
+        # the jwt mount of this cell cluster in the central Vault; the token carries the audience the mount requires
+        mountPath: {{ $lc.authMount | default (include "platform-common.vaultMount" (dict "root" . "component" $cell)) | quote }}
+        role: {{ printf "%s-router" $cell | quote }}
+        serviceAccountRef:
+          name: router
+          audiences: [vault]
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $lc.secretName }}
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "locker" "component" "router") | nindent 4 }}
+spec:
+  # Renewed at a third of the certificate lifetime
+  refreshInterval: {{ $lc.refreshInterval }}
+  target:
+    name: {{ $lc.secretName }}
+    creationPolicy: Owner
+    template:
+      # A TLS Secret with ca.crt, the format both the sidecar SDS and the Gateway read
+      type: kubernetes.io/tls
+      engineVersion: v2
+      data:
+        tls.crt: '{{`{{ .certificate }}`}}'
+        tls.key: '{{`{{ .private_key }}`}}'
+        ca.crt: '{{`{{ .issuing_ca }}`}}'
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: VaultDynamicSecret
+          name: locker-client-certificate
+{{- end }}

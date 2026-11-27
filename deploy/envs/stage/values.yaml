@@ -7,7 +7,23 @@ global:
     timezone: Europe/Berlin
     start: "0 8 * * 1-5"
     end: "0 20 * * 1-5"
+  # Account of the environment (accounts.stage of config/platform.yaml), for the ARNs the charts derive
+  accountId: "333333333333"
+  # The internal NLB of the locker cluster of each region (infra/modules/locker-endpoint), private subnets cidrsubnet(vpc, 3, 0..2)
+  lockerCidrs:
+    - 10.130.0.0/19
+    - 10.130.32.0/19
+    - 10.130.64.0/19
+  egress:
+    # dns.psp_domains of config/platform.yaml: the PSP domains the egress firewall allows
+    pspHosts: ["*.psp-sandbox.example.com"]
+    # central.sentry_url and the shared-services VPC (network.shared_services) it runs in
+    sentryHosts: [sentry.payments.internal]
+    sentryCidrs: [10.140.0.0/16]
   hyperswitch:
+    # The locker cluster of the region (deploy.stage.cluster_domain of config/platform.yaml), named as the edge names the cells
+    locker:
+      clusterDomain: stage.example.internal
     # PSP test endpoints
     configFile: sandbox.toml
     logLevel: INFO
@@ -16,6 +32,9 @@ global:
       controlCenterUrl: https://panel.stage.payments.example.com
 
 router:
+  # The central Vault (vault.host of config/platform.yaml), which issues the client certificate of the cross-cluster locker path
+  lockerClient:
+    vaultServer: https://vault.payments.internal
   container:
     env:
       ROUTER__CORS__ORIGINS: https://panel.stage.payments.example.com
@@ -35,3 +54,9 @@ scheduler:
     container:
       env:
         RUN_ENV: sandbox
+
+# Locker release (payments-locker), both regions: the cross-cluster entry of the cells (deploy.stage.cluster_domain) and the central Vault (vault.host)
+gateway:
+  clusterDomain: stage.example.internal
+  pki:
+    vaultServer: https://vault.payments.internal

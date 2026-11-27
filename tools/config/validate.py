@@ -12,7 +12,7 @@ REQUIRED = {
     "owner": ["github_org", "github_repo", "contact_email", "cost_center_prefix"],
     "naming": ["prefix"],
     "registry": ["ecr_prefix", "ecr_repo_prefix"],
-    "accounts": ["shared_services", "dev", "stage", "prod"],
+    "accounts": ["management", "log_archive", "audit", "shared_services", "dev", "stage", "prod"],
     "regions": ["working", "recovery"],
     "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url", "admin_zone"],
     "storage": ["state_bucket_prefix"],

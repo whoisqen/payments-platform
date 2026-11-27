@@ -7,4 +7,5 @@ An apply role gets its named actions on named resources, its own state prefix `<
 the permissions boundary, and a deny on roles created without that boundary. `*`, `iam:*` and wildcard resources are rejected.
 `plan_refs` accepts only `refs/heads/main`; `ecr_read_repository_arns` creates `<prefix>-<env>-glob-ecr-read` (main only, read-only images). `environment` may be shared-services.
 `dr_apply` creates `<prefix>-<env>-glob-dr-apply` (region switch): trusted only by the `dr-compute-<env>` GitHub environment, read and write `<env>/` in the state bucket and its us-east-1 replica.
+`apply_components` (from the live tree) creates `<prefix>-<env>-glob-tf-apply-<component>` trusted by `environment:<env>` jobs; it writes `<env>/*/<component>/terraform.tfstate`, reads the rest of its root and `dependency_states`, and reaches the account through `<prefix>-<env>-tf-exec` (`exec_account_ids`).
 Test: `terraform init -backend=false && terraform test`.

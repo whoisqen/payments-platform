@@ -2,83 +2,243 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["image", "database", "snapshot", "migrate", "job", "serviceAccount"],
+  "required": [
+    "image",
+    "database",
+    "snapshot",
+    "migrate",
+    "job",
+    "serviceAccount"
+  ],
   "properties": {
-    "global": { "type": "object" },
-    "platform-common": { "type": "object" },
+    "global": {
+      "type": "object"
+    },
+    "platform-common": {
+      "type": "object"
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "digest"],
+      "required": [
+        "repository",
+        "digest"
+      ],
       "properties": {
-        "repository": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
-        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
       }
     },
     "database": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["host", "port", "name", "user"],
+      "required": [
+        "host",
+        "port",
+        "name",
+        "user"
+      ],
       "properties": {
-        "host": { "type": "string", "minLength": 1, "not": { "pattern": "(?i)proxy" } },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "name": { "type": "string", "minLength": 1 },
-        "user": { "type": "string", "minLength": 1 }
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "(?i)proxy"
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "snapshot": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "command"],
+      "required": [
+        "enabled",
+        "command"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "store": { "enum": ["aurora", "dynamodb", "clickhouse", "opensearch"] },
-        "retentionDays": { "type": "integer", "minimum": 35 },
-        "waitTimeoutSeconds": { "type": "integer", "minimum": 60 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "store": {
+          "enum": [
+            "aurora",
+            "dynamodb",
+            "clickhouse",
+            "opensearch"
+          ]
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 35
+        },
+        "waitTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "resourceArn": {
+          "type": "string",
+          "pattern": "^(arn:aws:(rds|dynamodb|ec2|es):[a-z0-9-]+:[0-9]{12}:.+)?$"
+        },
+        "vault": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{2,50})?$"
+        },
+        "roleArn": {
+          "type": "string",
+          "pattern": "^(arn:aws:iam::[0-9]{12}:role/.+)?$"
+        },
+        "auroraComponent": {
+          "type": "string",
+          "pattern": "^(aurora-[a-z0-9-]+)?$"
+        }
       }
     },
     "migrate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["command", "mode"],
+      "required": [
+        "command",
+        "mode"
+      ],
       "properties": {
-        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "mode": { "const": "expand-only" },
-        "lockTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|min)$" },
-        "statementTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|min)$" }
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "mode": {
+          "const": "expand-only"
+        },
+        "lockTimeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|min)$"
+        },
+        "statementTimeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|min)$"
+        }
       }
     },
     "job": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["hookWeight", "activeDeadlineSeconds", "ttlSecondsAfterFinished", "resources"],
+      "required": [
+        "hookWeight",
+        "activeDeadlineSeconds",
+        "ttlSecondsAfterFinished",
+        "resources"
+      ],
       "properties": {
-        "hookWeight": { "type": "integer", "maximum": -5 },
-        "activeDeadlineSeconds": { "type": "integer", "minimum": 900 },
-        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 3600 },
-        "resources": { "type": "object" }
+        "hookWeight": {
+          "type": "integer",
+          "maximum": -5
+        },
+        "activeDeadlineSeconds": {
+          "type": "integer",
+          "minimum": 900
+        },
+        "ttlSecondsAfterFinished": {
+          "type": "integer",
+          "minimum": 3600
+        },
+        "resources": {
+          "type": "object"
+        }
       }
     },
     "backfill": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "command": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "batchSize": { "type": "integer", "minimum": 1, "maximum": 10000 },
-        "maxReplicaLagMs": { "type": "integer", "minimum": 1 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxReplicaLagMs": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "serviceAccount": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "const": "migrator" },
-        "annotations": { "type": "object" }
+        "name": {
+          "const": "migrator"
+        },
+        "annotations": {
+          "type": "object"
+        }
+      }
+    },
+    "rdsCaBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configMapName",
+        "mountPath"
+      ],
+      "properties": {
+        "configMapName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mountPath": {
+          "const": "/etc/ssl/rds"
+        }
       }
     }
   }

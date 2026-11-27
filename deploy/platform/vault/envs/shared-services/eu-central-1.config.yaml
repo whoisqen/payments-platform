@@ -1,0 +1,59 @@
+# shared-services eu-central-1: names Terraform creates; pod roles come from Pod Identity associations vault/vault-snapshot and vault/vault-bootstrap
+requireResolved: true
+
+snapshot:
+  image:
+    repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/vault-snapshot
+  bucket: pay-shared-services-euc1-vault-snapshots
+  region: eu-central-1
+
+bootstrap:
+  region: eu-central-1
+  initSecretId: pay/shared-services/vault/init
+  workloads:
+    # Every cluster of infra/live (tools/config/clusters.py): one jwt auth mount k8s-<name>, configured from <prefix>/argocd/clusters/<name>
+    registrationPrefix: pay/argocd/clusters/
+    environments: [dev, prod, stage]
+    clusters:
+    - {name: pay-dev-euc1-analytics, environment: dev, component: analytics, kind: analytics}
+    - {name: pay-dev-euc1-cell-0, environment: dev, component: cell-0, kind: cell}
+    - {name: pay-dev-euc1-control-center, environment: dev, component: control-center, kind: control-center}
+    - {name: pay-dev-euc1-edge, environment: dev, component: edge, kind: edge}
+    - {name: pay-dev-euc1-locker, environment: dev, component: locker, kind: locker}
+    - {name: pay-dev-euc1-spare, environment: dev, component: spare, kind: cell}
+    - {name: pay-prod-euc1-analytics, environment: prod, component: analytics, kind: analytics}
+    - {name: pay-prod-euc1-cell-0, environment: prod, component: cell-0, kind: cell}
+    - {name: pay-prod-euc1-cell-1, environment: prod, component: cell-1, kind: cell}
+    - {name: pay-prod-euc1-cell-2, environment: prod, component: cell-2, kind: cell}
+    - {name: pay-prod-euc1-cell-3, environment: prod, component: cell-3, kind: cell}
+    - {name: pay-prod-euc1-control-center, environment: prod, component: control-center, kind: control-center}
+    - {name: pay-prod-euc1-edge, environment: prod, component: edge, kind: edge}
+    - {name: pay-prod-euc1-locker, environment: prod, component: locker, kind: locker}
+    - {name: pay-prod-euc1-spare, environment: prod, component: spare, kind: cell}
+    - {name: pay-prod-use1-cell-0, environment: prod, component: cell-0, kind: cell}
+    - {name: pay-prod-use1-cell-1, environment: prod, component: cell-1, kind: cell}
+    - {name: pay-prod-use1-cell-2, environment: prod, component: cell-2, kind: cell}
+    - {name: pay-prod-use1-cell-3, environment: prod, component: cell-3, kind: cell}
+    - {name: pay-prod-use1-control-center, environment: prod, component: control-center, kind: control-center}
+    - {name: pay-prod-use1-edge, environment: prod, component: edge, kind: edge}
+    - {name: pay-prod-use1-locker, environment: prod, component: locker, kind: locker}
+    - {name: pay-prod-use1-spare, environment: prod, component: spare, kind: cell}
+    - {name: pay-stage-euc1-analytics, environment: stage, component: analytics, kind: analytics}
+    - {name: pay-stage-euc1-cell-0, environment: stage, component: cell-0, kind: cell}
+    - {name: pay-stage-euc1-cell-1, environment: stage, component: cell-1, kind: cell}
+    - {name: pay-stage-euc1-cell-2, environment: stage, component: cell-2, kind: cell}
+    - {name: pay-stage-euc1-cell-3, environment: stage, component: cell-3, kind: cell}
+    - {name: pay-stage-euc1-control-center, environment: stage, component: control-center, kind: control-center}
+    - {name: pay-stage-euc1-edge, environment: stage, component: edge, kind: edge}
+    - {name: pay-stage-euc1-locker, environment: stage, component: locker, kind: locker}
+    - {name: pay-stage-euc1-spare, environment: stage, component: spare, kind: cell}
+
+networkPolicy:
+  # The clusters of every environment reach Vault through the transit gateway
+  clientCidrs:
+    - 10.120.0.0/16
+    - 10.150.0.0/16
+    - 10.151.0.0/16
+    - 10.130.0.0/16
+  awsEndpointCidrs:
+    - 10.140.0.0/16

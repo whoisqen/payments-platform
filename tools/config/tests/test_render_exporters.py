@@ -39,8 +39,11 @@ class RenderExportersTest(unittest.TestCase):
         self.assertEqual(rd["auth"]["secret"]["name"], render_exporters.SECRETS["redis"]["name"])
         overlay = yaml.safe_load((BASE / "redis" / "values.yaml").read_text())
         self.assertEqual(overlay["redisAddressConfig"]["source"]["name"], render_exporters.SECRETS["redis"]["name"])
-        kf = yaml.safe_load((BASE / "kafka" / "values.yaml").read_text())
-        self.assertEqual(kf["tls"]["secretName"], render_exporters.SECRETS["kafka"]["name"])
+        # the kafka exporter signs in to MSK with IAM through its pod identity: no connection secret
+        self.assertNotIn("kafka", render_exporters.SECRETS)
+        kf = next(yaml.safe_load_all((src / "kafka.yaml").read_text()))
+        self.assertTrue(kf["sasl"]["awsiam"]["enabled"])
+        self.assertTrue(kf["kafkaServer"][0].endswith(":9098"))
 
     def test_network_policy_denies_by_default_with_one_data_egress_and_monitoring_ingress(self):
         for name, (scrape, store) in render_exporters.PORTS.items():

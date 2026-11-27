@@ -75,8 +75,34 @@ dependency "msk" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
+dependency "aurora" {
+  config_path = "../aurora"
+
+  mock_outputs = {
+    cluster_resource_id = "cluster-MOCK"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+}
+
+dependency "backup" {
+  config_path = "../../backup"
+
+  mock_outputs = {
+    vault_arns      = { "eu-central-1" = "arn:aws:backup:eu-central-1:000000000000:backup-vault:mock" }
+    backup_role_arn = "arn:aws:iam::000000000000:role/mock-backup"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+}
+
 inputs = {
-  cell                            = "cell-0"
+  cell             = "cell-0"
+  cell_kms_key_arn = dependency.kms.outputs.key_arns["cell-0"]
+  # The migration Job logs in to the writer as hs_migrator with an IAM token and snapshots the cell first (D3).
+  migrator = {
+    db_connect_arns  = ["arn:aws:rds-db:${include.root.locals.region}:${include.root.locals.env_cfg.account_id}:dbuser:${dependency.aurora.outputs.cluster_resource_id}/hs_migrator"]
+    backup_vault_arn = dependency.backup.outputs.vault_arns[include.root.locals.region]
+    backup_role_arn  = dependency.backup.outputs.backup_role_arn
+  }
   cluster_name                    = dependency.eks.outputs.cluster_name
   cluster_arn                     = dependency.eks.outputs.cluster_arn
   deny_recovery_writes_policy_arn = dependency.dynamodb.outputs.deny_recovery_writes_policy_arn

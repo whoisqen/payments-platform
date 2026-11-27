@@ -19,11 +19,16 @@ output "replica_kms_key_arns" {
 }
 
 output "plan_role_arn" {
-  value       = module.ci_roles.plan_role_arn
-  description = "Role for plan in pull requests."
+  value       = local.account_owner ? null : module.ci_roles[0].plan_role_arn
+  description = "Plan role of this state root; null for shared-services, whose plan role is in live/shared-services/eu-central-1/ci-oidc-roles."
 }
 
 output "apply_role_arns" {
-  value       = module.ci_roles.apply_role_arns
+  value       = local.account_owner ? {} : merge(module.ci_roles[0].apply_role_arns, module.ci_roles[0].component_apply_role_arns)
   description = "Apply roles by component."
+}
+
+output "permissions_boundary_arn" {
+  value       = local.account_owner ? module.boundary[0].policy_arn : local.boundary_arn
+  description = "workload-boundary of the shared-services account."
 }

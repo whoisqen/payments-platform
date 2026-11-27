@@ -24,9 +24,11 @@ locals {
     stateful = { taint = "stateful", expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     cde      = { taint = "cde", expire = "336h", grace = "30m", consolidation = "WhenEmpty" }
     workers  = { taint = "workers", expire = "168h", grace = "90s", consolidation = "WhenEmptyOrUnderutilized" }
+    # BuildKit pods of CI select pay.io/pool=ci-build on arm64 (.github/actions/setup-buildkit) and tolerate workload=ci-build.
+    ci-build = { taint = "ci-build", expire = "168h", grace = "15m", consolidation = "WhenEmpty", scope = "out-of-scope", arch = ["arm64"], labels = { "pay.io/pool" = "ci-build" } }
   }
-  capacity = { for name in keys(local.all_pools) : name => contains(var.spot_pools, name) ? ["spot", "on-demand"] : ["on-demand"] }
-  pools    = { for name, p in local.all_pools : name => merge({ scope = "cde", capacity = local.capacity[name] }, p) if contains(var.enabled_pools, name) }
+  capacity = { for name in keys(local.all_pools) : name => (name == "ci-build" || (contains(var.spot_pools, name) && (name != "workers" || var.workers_spot))) ? ["spot", "on-demand"] : ["on-demand"] }
+  pools    = { for name, p in local.all_pools : name => merge({ scope = "cde", capacity = local.capacity[name], arch = ["arm64", "amd64"], labels = {} }, p) if contains(var.enabled_pools, name) }
 
   ec2_node_class = {
     apiVersion = "karpenter.k8s.aws/v1"
@@ -66,7 +68,7 @@ locals {
     spec = {
       limits = { cpu = tostring(var.cpu_limits[name]) }
       template = {
-        metadata = { labels = { workload = p.taint, "platform.io/pci-scope" = p.scope } }
+        metadata = { labels = merge({ workload = p.taint, "platform.io/pci-scope" = p.scope }, p.labels) }
         spec = {
           nodeClassRef           = { group = "karpenter.k8s.aws", kind = "EC2NodeClass", name = "hardened" }
           taints                 = [{ key = "workload", value = p.taint, effect = "NoSchedule" }]
@@ -74,7 +76,7 @@ locals {
           terminationGracePeriod = p.grace
           requirements = [
             { key = "kubernetes.io/os", operator = "In", values = ["linux"] },
-            { key = "kubernetes.io/arch", operator = "In", values = ["arm64", "amd64"] },
+            { key = "kubernetes.io/arch", operator = "In", values = p.arch },
             { key = "karpenter.sh/capacity-type", operator = "In", values = p.capacity },
             { key = "karpenter.k8s.aws/instance-family", operator = "In", values = var.instance_families[name] },
             { key = "karpenter.k8s.aws/instance-size", operator = "NotIn", values = ["metal", "nano", "micro", "small"] },

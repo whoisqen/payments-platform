@@ -1,102 +1,357 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["global"],
+  "required": [
+    "global"
+  ],
   "properties": {
     "global": {
       "type": "object",
-      "required": ["cell", "environment", "region", "dataCidrs", "endpointCidrs", "registry", "hyperswitch"],
+      "required": [
+        "cell",
+        "environment",
+        "region",
+        "dataCidrs",
+        "endpointCidrs",
+        "registry",
+        "hyperswitch"
+      ],
       "properties": {
-        "registry": { "type": "string", "minLength": 1 },
-        "workingHours": { "type": "object", "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).", "required": ["timezone", "start", "end"], "additionalProperties": false, "properties": { "timezone": { "type": "string", "minLength": 1 }, "start": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" }, "end": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" } } },
-        "cell": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" },
-        "environment": { "enum": ["dev", "stage", "prod"] },
-        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
-        "dataCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 },
-        "endpointCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 },
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cell": {
+          "type": "string",
+          "pattern": "^(cell-[0-3]|spare)$"
+        },
+        "environment": {
+          "enum": [
+            "dev",
+            "stage",
+            "prod"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[a-z]+-[0-9]$"
+        },
+        "dataCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$"
+          },
+          "minItems": 1
+        },
+        "endpointCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$"
+          },
+          "minItems": 1
+        },
+        "accountId": {
+          "type": "string",
+          "pattern": "^[0-9]{12}$"
+        },
+        "egress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "serviceEntries",
+            "awsServices",
+            "podIdentityAgent",
+            "pspHosts"
+          ],
+          "properties": {
+            "serviceEntries": {
+              "type": "boolean"
+            },
+            "awsServices": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "uniqueItems": true
+            },
+            "podIdentityAgent": {
+              "type": "string",
+              "pattern": "^[0-9.]+$"
+            },
+            "pspHosts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(\\*\\.)?[a-z0-9.-]+$"
+              }
+            },
+            "sentryHosts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9.-]+$"
+              }
+            },
+            "sentryCidrs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9.]+/[0-9]+$"
+              }
+            }
+          }
+        },
+        "lockerCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$"
+          }
+        },
         "hyperswitch": {
           "type": "object",
-          "required": ["requireEndpoints"],
+          "required": [
+            "requireEndpoints"
+          ],
           "additionalProperties": false,
           "properties": {
-            "requireEndpoints": { "const": true },
-            "namePrefix": { "type": "string", "pattern": "^[a-z][a-z0-9]*$" },
-            "configFile": { "enum": ["production.toml", "sandbox.toml", "integration_test.toml"] },
-            "logLevel": { "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] },
+            "requireEndpoints": {
+              "const": true
+            },
+            "namePrefix": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*$"
+            },
+            "configFile": {
+              "enum": [
+                "production.toml",
+                "sandbox.toml",
+                "integration_test.toml"
+              ]
+            },
+            "logLevel": {
+              "enum": [
+                "TRACE",
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR"
+              ]
+            },
             "database": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "host": { "type": "string", "not": { "pattern": "\\.invalid$" } },
-                "readerHost": { "type": "string", "not": { "pattern": "\\.invalid$" } },
-                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-                "name": { "type": "string", "minLength": 1 },
-                "user": { "type": "string", "minLength": 1 },
-                "sslMode": { "const": "verify-full" },
-                "sslRootCert": { "type": "string", "pattern": "^/" },
-                "caBundleConfigMap": { "type": "string" }
+                "host": {
+                  "type": "string",
+                  "not": {
+                    "pattern": "\\.invalid$"
+                  }
+                },
+                "readerHost": {
+                  "type": "string",
+                  "not": {
+                    "pattern": "\\.invalid$"
+                  }
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "user": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sslMode": {
+                  "const": "verify-full"
+                },
+                "sslRootCert": {
+                  "type": "string",
+                  "pattern": "^/"
+                },
+                "caBundleConfigMap": {
+                  "type": "string"
+                }
               }
             },
             "redis": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "host": { "type": "string", "not": { "pattern": "\\.invalid$" } },
-                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-                "clusterEnabled": { "type": "boolean" },
-                "tls": { "const": true }
+                "host": {
+                  "type": "string",
+                  "not": {
+                    "pattern": "\\.invalid$"
+                  }
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "clusterEnabled": {
+                  "type": "boolean"
+                },
+                "tls": {
+                  "const": true
+                }
               }
             },
             "kms": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "keyAlias": { "type": "string", "pattern": "^(|alias/[A-Za-z0-9/_-]+)$" },
-                "region": { "type": "string" }
+                "keyAlias": {
+                  "type": "string",
+                  "pattern": "^(|alias/[A-Za-z0-9/_-]+)$"
+                },
+                "region": {
+                  "type": "string"
+                }
               }
             },
             "tenant": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "baseUrl": { "type": "string", "pattern": "^(|https://[a-z0-9.-]+(:[0-9]+)?(/.*)?)$" },
-                "controlCenterUrl": { "type": "string", "pattern": "^(|https://[a-z0-9.-]+(:[0-9]+)?(/.*)?)$" }
+                "baseUrl": {
+                  "type": "string",
+                  "pattern": "^(|https://[a-z0-9.-]+(:[0-9]+)?(/.*)?)$"
+                },
+                "controlCenterUrl": {
+                  "type": "string",
+                  "pattern": "^(|https://[a-z0-9.-]+(:[0-9]+)?(/.*)?)$"
+                }
               }
             },
             "locker": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "host": { "type": "string" },
-                "service": { "type": "string" },
-                "namespace": { "type": "string" },
-                "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                "host": {
+                  "type": "string",
+                  "pattern": "^(https?://[a-z0-9.-]+(:[0-9]+)?)?$"
+                },
+                "clusterDomain": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]*$"
+                },
+                "service": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                }
               }
             },
             "drainer": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "streamName": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" },
-                "numPartitions": { "type": "integer", "minimum": 1, "maximum": 255 }
+                "streamName": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                "numPartitions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 255
+                }
               }
             },
             "events": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "kafka": { "type": "boolean" },
-                "brokers": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9.-]+:[0-9]+$" } },
-                "topicPrefix": { "type": "string" }
+                "kafka": {
+                  "type": "boolean"
+                },
+                "brokers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9.-]+:[0-9]+$"
+                  }
+                },
+                "topicPrefix": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                "securityProtocol": {
+                  "enum": [
+                    "PLAINTEXT",
+                    "SSL",
+                    "SASL_SSL"
+                  ]
+                },
+                "saslMechanism": {
+                  "enum": [
+                    "OAUTHBEARER"
+                  ]
+                },
+                "oauthbearerProvider": {
+                  "enum": [
+                    "aws_msk_iam"
+                  ]
+                },
+                "awsRegion": {
+                  "type": "string",
+                  "pattern": "^([a-z]{2}-[a-z]+-[0-9])?$"
+                }
               }
+            }
+          }
+        },
+        "workingHours": {
+          "type": "object",
+          "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).",
+          "required": [
+            "timezone",
+            "start",
+            "end"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
             }
           }
         }
       }
     },
-    "router": { "type": "object" },
-    "drainer": { "type": "object" },
-    "scheduler": { "type": "object" },
-    "migrations": { "type": "object" }
+    "router": {
+      "type": "object"
+    },
+    "drainer": {
+      "type": "object"
+    },
+    "scheduler": {
+      "type": "object"
+    },
+    "migrations": {
+      "type": "object"
+    }
   }
 }

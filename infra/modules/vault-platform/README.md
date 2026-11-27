@@ -1,6 +1,6 @@
 # vault-platform
 
-AWS side of Vault on EKS: regional unseal key, three Pod Identity roles and their policies. Vault itself is a chart.
+AWS side of the one Vault of the platform (env `shared-services`, central cluster; it serves dev, stage and prod): regional unseal key, three Pod Identity roles and their policies. Vault itself is a chart.
 
 - Key `alias/<prefix>-<env>-<region-short>-vault-unseal`: single-region, rotated; the awskms seal uses the alias.
 - Roles `<prefix>-<env>-<region-short>-vault-{server,snapshot,bootstrap}` for service accounts `vault`, `vault-snapshot`, `vault-bootstrap` in namespace `vault`.

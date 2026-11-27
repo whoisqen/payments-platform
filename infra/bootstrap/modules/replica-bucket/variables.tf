@@ -10,7 +10,7 @@ variable "region" {
 
 variable "environment" {
   type        = string
-  description = "dev, stage or prod."
+  description = "State root: dev, stage, prod, management, security or shared-services."
 }
 
 variable "account_id" {

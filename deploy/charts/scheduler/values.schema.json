@@ -534,6 +534,27 @@
             "enabled": {
               "type": "boolean"
             },
+            "awsEndpoints": {
+              "type": "boolean"
+            },
+            "pspEgress": {
+              "type": "boolean"
+            },
+            "webhookEgress": {
+              "type": "boolean"
+            },
+            "lockerEgress": {
+              "type": "boolean"
+            },
+            "lockerPort": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "podIdentityAgentCidr": {
+              "type": "string",
+              "pattern": "^[0-9.]+/[0-9]+$"
+            },
             "dataPorts": {
               "type": "array",
               "items": {
@@ -1126,6 +1147,27 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "awsEndpoints": {
+              "type": "boolean"
+            },
+            "pspEgress": {
+              "type": "boolean"
+            },
+            "webhookEgress": {
+              "type": "boolean"
+            },
+            "lockerEgress": {
+              "type": "boolean"
+            },
+            "lockerPort": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "podIdentityAgentCidr": {
+              "type": "string",
+              "pattern": "^[0-9.]+/[0-9]+$"
             },
             "dataPorts": {
               "type": "array",

@@ -82,6 +82,7 @@ dependency "secrets" {
 
 inputs = {
   cell                            = "cell-0"
+  cell_kms_key_arn                = dependency.kms.outputs.key_arns["cell-0"]
   cluster_name                    = dependency.eks.outputs.cluster_name
   cluster_arn                     = dependency.eks.outputs.cluster_arn
   deny_recovery_writes_policy_arn = dependency.dynamodb.outputs.deny_recovery_writes_policy_arn

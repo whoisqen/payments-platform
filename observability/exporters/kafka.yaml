@@ -1,14 +1,22 @@
 # kafka-exporter for consumer lag, then a PodMonitor for the MSK Open Monitoring JMX endpoint.
+# MSK accepts only TLS with IAM auth on 9098 (infra/modules/msk): SASL awsiam, credentials from the Pod Identity association
+# monitoring/kafka-exporter, no client certificate
 kafkaServer:
-  - msk-bootstrap.kafka.internal:9094
+  - msk-bootstrap.kafka.internal:9098
 tls:
   enabled: true
-  caSecret: {name: msk-exporter-tls, key: ca.crt}
-  certSecret: {name: msk-exporter-tls, key: tls.crt}
-  keySecret: {name: msk-exporter-tls, key: tls.key}
+sasl:
+  enabled: true
+  awsiam:
+    enabled: true
+    mechanism: awsiam
+serviceAccount:
+  create: true
+  name: kafka-exporter
 extraArgs:
-  - --topic.filter=^(payment-events|payment-dlq|audit-events)$
-  - --group.filter=^(clickhouse-sink|s3-sink)$
+  # The router topics hyperswitch-<event>-events (deploy/platform/kafka-topics) and the consumer groups of the upstream ClickHouse Kafka tables
+  - --topic.filter=^hyperswitch-[a-z-]+-events$
+  - --group.filter=^(hyper|hyper-ckh|s3-sink)$
 serviceMonitor:
   enabled: false
 resources:

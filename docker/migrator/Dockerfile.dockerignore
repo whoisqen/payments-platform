@@ -1,0 +1,6 @@
+*
+!vendor/hyperswitch/migrations/
+!scripts/schema/pre-migration-snapshot.sh
+!docker/migrator/migrate.sh
+!docker/migrator/snapshot.sh
+!docker/migrator/backfill.sh

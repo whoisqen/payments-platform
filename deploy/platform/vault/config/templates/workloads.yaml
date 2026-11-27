@@ -8,31 +8,115 @@ metadata:
   labels:
     {{- include "vault-config.labels" . | nindent 4 }}
 data:
+  {{- range $env := $w.environments }}
+  # External Secrets of every cluster of {{ $env }} reads the secrets of {{ $env }} only
+  pay-{{ $env }}-external-secrets.hcl: |
+    path "{{ $b.kvMount }}/data/{{ $env }}/*" {
+      capabilities = ["read"]
+    }
+    path "{{ $b.kvMount }}/metadata/{{ $env }}/*" {
+      capabilities = ["read", "list"]
+    }
   {{- range $cell := $w.cells }}
   {{- range $svc, $s := $w.services }}
-  pay-{{ $cell.name }}-{{ $svc }}.hcl: |
+  pay-{{ $env }}-{{ $cell }}-{{ $svc }}.hcl: |
     {{- range $s.paths }}
-    path "{{ $b.kvMount }}/data/+/{{ $cell.name }}/{{ . }}/*" {
+    path "{{ $b.kvMount }}/data/{{ $env }}/{{ $cell }}/{{ . }}/*" {
       capabilities = ["read"]
     }
     {{- end }}
+    {{- if $w.pki.enabled }}
+    {{- range $s.pkiRoles }}
+    path "{{ $w.pki.mount }}/issue/{{ . }}" {
+      capabilities = ["update"]
+    }
+    {{- end }}
+    {{- end }}
   {{- end }}
   {{- end }}
+  {{- end }}
+  {{- if $w.pki.enabled }}
+  pay-locker-gateway.hcl: |
+    path "{{ $w.pki.mount }}/issue/locker-gateway" {
+      capabilities = ["update"]
+    }
+  {{- end }}
+  # Rights of the bootstrap on later syncs: the cluster mounts and roles, the platform policies and the mesh PKI roles; no KV, no sys/ beyond that
+  vault-workloads.hcl: |
+    path "sys/auth" {
+      capabilities = ["read"]
+    }
+    path "sys/auth/k8s-*" {
+      capabilities = ["create", "update", "sudo"]
+    }
+    path "auth/k8s-*" {
+      capabilities = ["create", "read", "update"]
+    }
+    path "sys/policies/acl/pay-*" {
+      capabilities = ["create", "read", "update"]
+    }
+    path "sys/policy/pay-*" {
+      capabilities = ["create", "read", "update"]
+    }
+    {{- if $w.pki.enabled }}
+    path "sys/mounts" {
+      capabilities = ["read"]
+    }
+    path "{{ $w.pki.mount }}/cert/ca" {
+      capabilities = ["read"]
+    }
+    path "{{ $w.pki.mount }}/roles/*" {
+      capabilities = ["create", "update"]
+    }
+    {{- end }}
   workloads.sh: |
-    # Per-service read policies and Kubernetes auth roles of the cells; idempotent. Runs from bootstrap.sh at init, later with a break-glass token.
+    # Per-environment read policies, the mesh PKI and one jwt auth mount per cluster; idempotent. Runs from bootstrap.sh at init and
+    # on every sync (a new cluster gets its mount), later also with a break-glass token.
     set -eu
     log() { printf 'vault-workloads: %s\n' "$*"; }
     dir=$(dirname "$0")
-    {{- range $cell := $w.cells }}
-    vault auth list -format=json | jq -e 'has("{{ $cell.authMount }}/")' >/dev/null || vault auth enable -path="{{ $cell.authMount }}" kubernetes
-    {{- range $svc, $s := $w.services }}
-    vault policy write "pay-{{ $cell.name }}-{{ $svc }}" "${dir}/pay-{{ $cell.name }}-{{ $svc }}.hcl" >/dev/null
-    vault write "auth/{{ $cell.authMount }}/role/{{ $cell.name }}-{{ $svc }}" \
-      bound_service_account_names="{{ join "," $s.serviceAccounts }}" \
-      bound_service_account_namespaces="{{ $w.namespace }}" \
-      policies="pay-{{ $cell.name }}-{{ $svc }}" \
-      token_ttl="{{ $w.tokenTtl }}" token_max_ttl="{{ $w.tokenTtl }}" >/dev/null
+    for f in "${dir}"/pay-*.hcl; do
+      vault policy write "$(basename "${f}" .hcl)" "${f}" >/dev/null
+    done
+    log "policies written"
+    {{- if $w.pki.enabled }}
+    {{- $p := $w.pki }}
+    {{- $lg := $p.lockerGateway }}
+    # Mesh PKI of the cross-cluster locker path: the router client certificate (URI SAN, the SPIFFE ID the locker gateway admits)
+    # and the server certificate of the locker gateway; the root key never leaves Vault
+    vault secrets list -format=json | jq -e 'has("{{ $p.mount }}/")' >/dev/null || vault secrets enable -path="{{ $p.mount }}" -max-lease-ttl="{{ $p.rootTtl }}" pki
+    if ! vault read -field=certificate "{{ $p.mount }}/cert/ca" 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
+      vault write -field=certificate "{{ $p.mount }}/root/generate/internal" common_name="{{ $p.rootCommonName }}" ttl="{{ $p.rootTtl }}" key_type=ec key_bits=256 >/dev/null
+      log "{{ $p.mount }}: root CA generated"
+    fi
+    vault write "{{ $p.mount }}/roles/router-client" allow_any_name=true enforce_hostnames=false allowed_uri_sans="{{ join "," $p.routerUriSans }}" \
+      server_flag=false client_flag=true key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
+    vault write "{{ $p.mount }}/roles/locker-gateway" allowed_domains="{{ $lg.domain }}" allow_subdomains=true allow_bare_domains=false \
+      server_flag=true client_flag=false key_type=ec key_bits=256 max_ttl="{{ $p.leafTtl }}" no_store=true >/dev/null
+    log "{{ $p.mount }}: roles router-client and locker-gateway written"
     {{- end }}
-    log "{{ $cell.name }}: policies and roles written on auth/{{ $cell.authMount }}"
+    # jwt_role <mount> <role> <policy> <subjects...>: a role that accepts the service account tokens of the listed subjects only
+    jwt_role() {
+      mount=$1 role=$2 policy=$3; shift 3
+      subs=$(printf '%s\n' "$@" | jq -R . | jq -sc '{sub: .}')
+      printf '%s' "{\"role_type\":\"jwt\",\"user_claim\":\"sub\",\"bound_audiences\":[\"{{ $w.audience }}\"],\"bound_claims_type\":\"string\",\"bound_claims\":${subs},\"token_policies\":[\"${policy}\"],\"token_ttl\":\"{{ $w.tokenTtl }}\",\"token_max_ttl\":\"{{ $w.tokenTtl }}\"}" \
+        | vault write "auth/${mount}/role/${role}" - >/dev/null
+    }
+    {{- range $c := $w.clusters }}
+    # {{ $c.name }} ({{ $c.environment }}, {{ $c.kind }}): its OIDC issuer comes from the Argo CD registration Terraform wrote
+    issuer=$(aws secretsmanager get-secret-value --region "{{ $b.region }}" --secret-id "{{ $w.registrationPrefix }}{{ $c.name }}" --query SecretString --output text | jq -er .oidcIssuer)
+    mount="k8s-{{ $c.name }}"
+    vault auth list -format=json | jq -e --arg m "${mount}/" 'has($m)' >/dev/null || vault auth enable -path="${mount}" jwt
+    vault write "auth/${mount}/config" oidc_discovery_url="${issuer}" bound_issuer="${issuer}" >/dev/null
+    jwt_role "${mount}" external-secrets "pay-{{ $c.environment }}-external-secrets" "system:serviceaccount:{{ $w.externalSecrets.namespace }}:{{ $w.externalSecrets.serviceAccount }}"
+    {{- if eq $c.kind "cell" }}
+    {{- range $svc, $s := $w.services }}
+    jwt_role "${mount}" "{{ $c.component }}-{{ $svc }}" "pay-{{ $c.environment }}-{{ $c.component }}-{{ $svc }}"{{ range $s.serviceAccounts }} "system:serviceaccount:{{ $w.namespace }}:{{ . }}"{{ end }}
+    {{- end }}
+    {{- end }}
+    {{- if and (eq $c.kind "locker") $w.pki.enabled }}
+    jwt_role "${mount}" locker-gateway pay-locker-gateway "system:serviceaccount:{{ $w.pki.lockerGateway.namespace }}:{{ $w.pki.lockerGateway.serviceAccount }}"
+    {{- end }}
+    log "{{ $c.name }}: auth/${mount} trusts ${issuer}"
     {{- end }}
 {{- end }}

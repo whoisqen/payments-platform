@@ -36,7 +36,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- include "migrations.caMount" . | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- include "migrations.caVolume" . | nindent 8 }}
 {{- end }}

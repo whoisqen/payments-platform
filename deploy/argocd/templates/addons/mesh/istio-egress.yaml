@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-istio-egress
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # The cells, where the scheduler sends the merchant webhooks
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/addons: enabled
+          matchExpressions:
+            - {key: payments-platform/component, operator: In, values: [cell-0, cell-1, cell-2, cell-3, spare]}
+  template:
+    metadata:
+      name: 'istio-egress-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: istio-egress
+      annotations:
+        # After istiod, before the cell Applications
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: istio-egress
+      sources:
+        # The upstream chart version is pinned here with the other Istio charts and bumped by Renovate
+        - repoURL: https://istio-release.storage.googleapis.com/charts
+          chart: gateway
+          targetRevision: 1.30.8
+          helm:
+            releaseName: istio-egressgateway
+            valueFiles:
+              - $values/deploy/platform/istio/values-egressgateway.yaml
+        # Gateway, CONNECT proxy, AuthorizationPolicy and NetworkPolicy of the webhook path
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/istio/egress
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

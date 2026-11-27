@@ -41,8 +41,6 @@ container:
     DRAINER__LOG__TELEMETRY__TRACES_ENABLED: "true"
     DRAINER__LOG__TELEMETRY__METRICS_ENABLED: "true"
     DRAINER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
-    # Read by the KEDA trigger below, which runs outside the pod
-    REDIS_ADDRESS: memorydb.invalid:6379
   # Error tracking: the DSN comes from an ExternalSecret when remoteKey is set (<prefix>/<env>/sentry/<service>-dsn in the environment layer)
   sentryDsn:
     envName: DRAINER__LOG__SENTRY__DSN
@@ -86,16 +84,13 @@ autoscaling:
   kind: keda
   minReplicas: 3
   maxReplicas: 6
-  triggers:
-    # The region file lists one trigger per shard stream; the first one is the default
-    - type: redis-streams
-      metadata:
-        addressFromEnv: REDIS_ADDRESS
-        passwordFromEnv: REDIS_PASSWORD
-        enableTLS: "true"
-        stream: "{shard_0}_drainer_stream"
-        consumerGroup: drainer_group
-        pendingEntriesCount: "10000"
+  # The drainer reads with XREAD and trims with XTRIM, no consumer group: the template adds one stream-length trigger per shard stream
+  # {shard_N}_<global.hyperswitch.drainer.streamName>, N < numPartitions; the MemoryDB password comes from the drainer-vault Secret
+  streams:
+    # Entries left in one shard stream per replica
+    lengthTarget: "1000"
+  # Further triggers, appended after the stream triggers
+  triggers: []
 
 pdb:
   enabled: true
@@ -103,6 +98,8 @@ pdb:
 
 networkPolicy:
   enabled: true
+  # KMS and STS through the interface endpoints (global.endpointCidrs) and the Pod Identity agent
+  awsEndpoints: true
   dataPorts: [5432, 6379]
   extraEgress:
     - to:

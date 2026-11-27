@@ -1,5 +1,14 @@
 locals {
-  name = "${var.name_prefix}-${var.environment}-glob-${var.component}"
+  name      = "${var.name_prefix}-${var.environment}-glob-${var.component}"
+  endpoints = { for r, g in var.endpoint_groups : r => distinct(concat(g.endpoint_arns, length(g.endpoint_lb_tags) == 0 ? [] : tolist(data.aws_lbs.edge[r].arns))) }
+}
+
+# The edge ingress load balancer belongs to Kubernetes, so it is found by tag in its region; a region without it yet has no endpoint.
+data "aws_lbs" "edge" {
+  for_each = { for r, g in var.endpoint_groups : r => g if length(g.endpoint_lb_tags) > 0 }
+
+  region = each.key
+  tags   = each.value.endpoint_lb_tags
 }
 
 resource "aws_globalaccelerator_accelerator" "this" {
@@ -49,7 +58,7 @@ resource "aws_globalaccelerator_endpoint_group" "this" {
   threshold_count               = 3
 
   dynamic "endpoint_configuration" {
-    for_each = each.value.endpoint_arns
+    for_each = local.endpoints[each.key]
 
     content {
       endpoint_id                    = endpoint_configuration.value

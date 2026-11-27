@@ -72,3 +72,8 @@ tests:
           path: spec.template.metadata.labels["payments-platform/gated"]
           value: "true"
         documentIndex: 1
+  - it: passes the name prefix for the Redis secret name
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: global.namePrefix, value: acme}

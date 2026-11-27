@@ -1,0 +1,46 @@
+# Mutual TLS from the scheduler sidecar ends here, so the AuthorizationPolicy sees the caller's identity; inside it is HTTP CONNECT
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: webhook-egress
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  selector:
+    {{- toYaml .Values.gatewaySelector | nindent 4 }}
+  servers:
+    - port:
+        number: {{ .Values.port }}
+        name: https-proxy
+        protocol: HTTPS
+      hosts: ["*"]
+      tls:
+        mode: ISTIO_MUTUAL
+---
+# Only the scheduler identity may open a tunnel, and only to the allowed ports
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: webhook-egress
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  selector:
+    matchLabels:
+      {{- toYaml .Values.gatewaySelector | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              {{- toYaml .Values.allowedPrincipals | nindent 14 }}
+      to:
+        - operation:
+            methods: [CONNECT]
+            ports: [{{ .Values.port | quote }}]
+      when:
+        - key: request.headers[:authority]
+          values:
+            {{- range .Values.allowedPorts }}
+            - {{ printf "*:%d" (int .) | quote }}
+            {{- end }}

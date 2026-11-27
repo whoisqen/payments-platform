@@ -4,50 +4,129 @@ templates:
   - bootstrap.yaml
 set:
   snapshot.image.repository: registry.example.test/acme/vault-snapshot
+  bootstrap.workloads.registrationPrefix: pay/argocd/clusters/
+  bootstrap.workloads.environments: [dev, prod]
+  bootstrap.workloads.clusters:
+    - {name: pay-dev-euc1-cell-0, environment: dev, component: cell-0, kind: cell}
+    - {name: pay-prod-euc1-spare, environment: prod, component: spare, kind: cell}
+    - {name: pay-prod-euc1-locker, environment: prod, component: locker, kind: locker}
+    - {name: pay-prod-euc1-edge, environment: prod, component: edge, kind: edge}
 tests:
-  - it: lets the router read only its own and the shared paths of its cell
+  - it: lets the router read only its own and the shared paths of its cell in its own environment
     template: workloads.yaml
     asserts:
       - equal:
-          path: data["pay-cell-1-router.hcl"]
+          path: data["pay-prod-cell-1-router.hcl"]
           value: |
-            path "secret/data/+/cell-1/router/*" {
+            path "secret/data/prod/cell-1/router/*" {
               capabilities = ["read"]
             }
-            path "secret/data/+/cell-1/shared/*" {
+            path "secret/data/prod/cell-1/shared/*" {
               capabilities = ["read"]
             }
-  - it: keeps the drainer away from the shared application keys
+            path "pki-mesh/issue/router-client" {
+              capabilities = ["update"]
+            }
+  - it: never lets one environment read another (one Vault serves all of them)
     template: workloads.yaml
     asserts:
       - notMatchRegex:
-          path: data["pay-cell-0-drainer.hcl"]
-          pattern: shared
-      - matchRegex:
-          path: data["pay-cell-0-drainer.hcl"]
-          pattern: 'capabilities = \["read"\]'
-  - it: binds each role to the service accounts of the payments namespace
-    template: workloads.yaml
-    asserts:
-      - matchRegex:
-          path: data["workloads.sh"]
-          pattern: 'auth/kubernetes-cell-2/role/cell-2-scheduler" \\\n\s+bound_service_account_names="scheduler-producer,scheduler-consumer" \\\n\s+bound_service_account_namespaces="payments"'
-      - matchRegex:
-          path: data["workloads.sh"]
-          pattern: 'auth/kubernetes/role/cell-0-router'
-  - it: never grants more than read
+          path: data["pay-dev-cell-0-router.hcl"]
+          pattern: 'secret/data/(\+|prod|stage)/'
+      - equal:
+          path: data["pay-dev-external-secrets.hcl"]
+          value: |
+            path "secret/data/dev/*" {
+              capabilities = ["read"]
+            }
+            path "secret/metadata/dev/*" {
+              capabilities = ["read", "list"]
+            }
+  - it: keeps the drainer away from the shared application keys and the mesh PKI
     template: workloads.yaml
     asserts:
       - notMatchRegex:
-          path: data["pay-spare-scheduler.hcl"]
+          path: data["pay-dev-cell-0-drainer.hcl"]
+          pattern: (shared|pki-mesh)
+  - it: never grants more than read on secrets
+    template: workloads.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["pay-prod-spare-scheduler.hcl"]
           pattern: (create|update|delete|list|sudo)
-  - it: runs the workload script from the bootstrap after the baseline
+  - it: gives every cluster its own jwt mount that trusts only the issuer of its registration
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'secret-id "pay/argocd/clusters/pay-prod-euc1-spare" --query SecretString --output text . jq -er .oidcIssuer.\s+mount="k8s-pay-prod-euc1-spare"'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'vault auth enable -path="\$\{mount\}" jwt'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'auth/\$\{mount\}/config" oidc_discovery_url="\$\{issuer\}" bound_issuer="\$\{issuer\}"'
+  - it: binds the cell roles to the policies of the cell's environment and the payments service accounts
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'jwt_role "\$\{mount\}" "spare-scheduler" "pay-prod-spare-scheduler" "system:serviceaccount:payments:scheduler-producer" "system:serviceaccount:payments:scheduler-consumer"'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'jwt_role "\$\{mount\}" external-secrets "pay-dev-external-secrets" "system:serviceaccount:external-secrets:external-secrets"'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'bound_audiences\\":\[\\"vault\\"\]'
+  - it: lets only the locker gateway of a locker cluster issue the server certificate
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'jwt_role "\$\{mount\}" locker-gateway pay-locker-gateway "system:serviceaccount:payments:locker-gateway-pki"'
+      - equal:
+          path: data["pay-locker-gateway.hcl"]
+          value: |
+            path "pki-mesh/issue/locker-gateway" {
+              capabilities = ["update"]
+            }
+  - it: gives the edge cluster no cell or locker role
+    template: workloads.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["workloads.sh"]
+          pattern: 'edge-(router|drainer|scheduler)'
+  - it: issues router client certificates only with the router SPIFFE ID and keeps the root key in Vault
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'roles/router-client" allow_any_name=true enforce_hostnames=false allowed_uri_sans="spiffe://payments-platform/ns/payments/sa/router"'
+      - matchRegex:
+          path: data["workloads.sh"]
+          pattern: 'root/generate/internal'
+      - notMatchRegex:
+          path: data["workloads.sh"]
+          pattern: 'root/generate/exported'
+  - it: limits the reconciling role to cluster mounts, platform policies and the mesh PKI roles
+    template: workloads.yaml
+    asserts:
+      - matchRegex:
+          path: data["vault-workloads.hcl"]
+          pattern: 'path "sys/auth/k8s-\*"'
+      - notMatchRegex:
+          path: data["vault-workloads.hcl"]
+          pattern: '(secret/|sys/policy/\*|sys/auth/\*"|root)'
+  - it: runs the workload script at init and reconciles later syncs with the narrow role, never root
     template: bootstrap.yaml
     documentIndex: 1
     asserts:
       - matchRegex:
           path: data["bootstrap.sh"]
-          pattern: sh /workloads/workloads.sh
+          pattern: 'auth/\$\{AUTH_MOUNT\}/login" role=vault-workloads'
+      - matchRegex:
+          path: data["bootstrap.sh"]
+          pattern: 'role/vault-workloads" bound_service_account_names="\$\{BOOTSTRAP_SA\}"'
   - it: mounts the workload script into the bootstrap Job
     template: bootstrap.yaml
     documentIndex: 2
@@ -64,6 +143,6 @@ tests:
   - it: rejects a cell outside cell-0 to cell-3 and spare
     template: workloads.yaml
     set:
-      bootstrap.workloads.cells: [{name: cell-9, authMount: kubernetes-cell-9}]
+      bootstrap.workloads.cells: [cell-9]
     asserts:
       - failedTemplate: {}

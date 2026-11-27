@@ -6,6 +6,10 @@ templates:
   - backfill-job.yaml
 set:
   global.registry: registry.example.test/acme
+  global.region: eu-central-1
+  global.environment: dev
+  global.cell: cell-0
+  global.accountId: "111111111111"
   image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   global.dataCidrs: ["10.0.0.0/16"]
   global.endpointCidrs: ["10.0.8.0/24"]
@@ -107,9 +111,9 @@ tests:
     asserts:
       - notExists:
           path: metadata.annotations["helm.sh/hook"]
-      - equal:
-          path: spec.template.spec.containers[0].env[5].value
-          value: "10000"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: BACKFILL_BATCH_SIZE, value: "10000"}
   - it: renders no backfill by default
     template: backfill-job.yaml
     asserts:

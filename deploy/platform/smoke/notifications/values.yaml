@@ -4,10 +4,14 @@ environments: [dev, stage]
 # The spare is the last RollingSync step and every environment has one, so its healthy sync stands for the whole environment
 dispatchCell: spare
 
+# naming.prefix of config/platform.yaml, the first segment of the Secrets Manager name; the ApplicationSet passes it
+namePrefix: pay
+
 # Secret keys are read by the notification services as $key
 secret:
   name: argocd-notifications-secret
   refreshInterval: 1h
   secretStore: aws-secrets-manager
   # JSON keys: github-dispatch-url, github-dispatch-token, alertmanager-url
-  remoteKey: pay/shared-services/argocd/notifications
+  # Under <namePrefix>/
+  remoteKey: shared-services/argocd/notifications

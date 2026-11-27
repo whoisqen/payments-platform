@@ -167,3 +167,78 @@ run "locker_cannot_be_a_producer" {
 
   expect_failures = [var.kafka_producers]
 }
+
+run "workloads_bind_in_the_payments_namespace" {
+  command = plan
+
+  assert {
+    condition     = aws_eks_pod_identity_association.this["router"].namespace == "payments" && aws_eks_pod_identity_association.this["router"].service_account == "router"
+    error_message = "the ApplicationSets deploy the cell workloads to namespace payments"
+  }
+  assert {
+    condition     = aws_eks_pod_identity_association.this["external-secrets"].namespace == "external-secrets"
+    error_message = "external-secrets keeps its own namespace"
+  }
+}
+
+run "cell_key_router_writes_others_read" {
+  command = plan
+
+  variables {
+    cell_kms_key_arn = "arn:aws:kms:eu-central-1:111111111111:key/cell-0"
+  }
+
+  assert {
+    condition     = anytrue([for s in jsondecode(aws_iam_role_policy.this["router"].policy).Statement : contains(s.Resource, var.cell_kms_key_arn) && contains(s.Action, "kms:GenerateDataKey")])
+    error_message = "router encrypts with the cell key"
+  }
+  assert {
+    condition = alltrue([for svc in ["drainer", "scheduler"] : anytrue([for s in jsondecode(aws_iam_role_policy.this[svc].policy).Statement :
+    contains(s.Resource, var.cell_kms_key_arn) && toset(s.Action) == toset(["kms:Decrypt", "kms:DescribeKey"])])])
+    error_message = "drainer and scheduler only decrypt"
+  }
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.this["locker"].policy, var.cell_kms_key_arn)
+    error_message = "the locker does not use the cell key"
+  }
+}
+
+run "migrator_logs_in_as_hs_migrator_and_starts_the_backup" {
+  command = plan
+
+  variables {
+    migrator = {
+      db_connect_arns  = ["arn:aws:rds-db:eu-central-1:111111111111:dbuser:cluster-ABC/hs_migrator"]
+      backup_vault_arn = "arn:aws:backup:eu-central-1:111111111111:backup-vault:pay-dev-euc1-backup"
+      backup_role_arn  = "arn:aws:iam::111111111111:role/pay-dev-euc1-backup"
+    }
+  }
+
+  assert {
+    condition     = aws_eks_pod_identity_association.this["migrator"].service_account == "migrator" && aws_eks_pod_identity_association.this["migrator"].namespace == "payments"
+    error_message = "the migrations chart uses service account migrator"
+  }
+  assert {
+    condition     = anytrue([for s in jsondecode(aws_iam_role_policy.migrator[0].policy).Statement : s.Action == ["iam:PassRole"] && s.Condition.StringEquals["iam:PassedToService"] == "backup.amazonaws.com"])
+    error_message = "the backup role is passed to AWS Backup only"
+  }
+}
+
+run "locker_cluster_has_only_locker_and_external_secrets" {
+  command = plan
+
+  variables {
+    cell     = "locker"
+    services = ["locker"]
+    memorydb = null
+  }
+
+  assert {
+    condition     = toset(keys(aws_iam_role.this)) == toset(["locker", "external-secrets"])
+    error_message = "the locker cluster gets the locker and external-secrets roles"
+  }
+  assert {
+    condition     = aws_iam_role.this["locker"].name == "pay-dev-euc1-locker-locker"
+    error_message = "role names follow <prefix>-<env>-<region-short>-<cluster>-<service>"
+  }
+}

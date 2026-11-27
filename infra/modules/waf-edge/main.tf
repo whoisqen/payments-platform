@@ -47,6 +47,16 @@ resource "aws_wafv2_web_acl" "this" {
         managed_rule_group_statement {
           name        = rule.value.name
           vendor_name = "AWS"
+
+          dynamic "rule_action_override" {
+            for_each = toset(lookup(var.count_overrides, rule.key, []))
+            content {
+              name = rule_action_override.value
+              action_to_use {
+                count {}
+              }
+            }
+          }
         }
       }
 
@@ -80,6 +90,16 @@ resource "aws_wafv2_web_acl" "this" {
         managed_rule_group_statement {
           name        = "AWSManagedRulesBotControlRuleSet"
           vendor_name = "AWS"
+
+          dynamic "rule_action_override" {
+            for_each = toset(lookup(var.count_overrides, "bot-control", []))
+            content {
+              name = rule_action_override.value
+              action_to_use {
+                count {}
+              }
+            }
+          }
 
           managed_rule_group_configs {
             aws_managed_rules_bot_control_rule_set {
@@ -120,6 +140,16 @@ resource "aws_wafv2_web_acl" "this" {
         managed_rule_group_statement {
           name        = "AWSManagedRulesATPRuleSet"
           vendor_name = "AWS"
+
+          dynamic "rule_action_override" {
+            for_each = toset(lookup(var.count_overrides, "atp", []))
+            content {
+              name = rule_action_override.value
+              action_to_use {
+                count {}
+              }
+            }
+          }
 
           managed_rule_group_configs {
             aws_managed_rules_atp_rule_set {

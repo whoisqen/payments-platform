@@ -1,0 +1,164 @@
+{{- /* The cross-cluster entry of the locker: internal NLB (infra/modules/locker-endpoint) -> this Gateway, mutual TLS with Vault mesh PKI certificates -> locker */ -}}
+{{- $gw := .Values.gateway -}}
+{{- /* A locker layer without a cluster domain (a standby region before its layer names it) has no cross-cluster entry yet */ -}}
+{{- if and $gw.enabled $gw.clusterDomain }}
+{{- $domain := $gw.clusterDomain }}
+{{- $host := printf "locker.payments.svc.locker.%s" $domain }}
+{{- $labels := dict "app.kubernetes.io/part-of" "payments-platform" "app.kubernetes.io/managed-by" .Release.Service "app.kubernetes.io/component" "locker-gateway" }}
+{{- $sgs := (index .Values "locker").securityGroupPolicy.securityGroupIds }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: locker
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  annotations:
+    # The NLB comes from Terraform and reaches the pods through the TargetGroupBinding below, so no load balancer from this Service
+    networking.istio.io/service-type: ClusterIP
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: locker
+      hostname: {{ $host }}
+      port: {{ $gw.port }}
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $gw.secretName }}
+        options:
+          # Clients must present a certificate of the mesh PKI (ca.crt of the same Secret)
+          gateway.istio.io/tls-terminate-mode: MUTUAL
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: locker
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  parentRefs:
+    - name: locker
+  hostnames:
+    - {{ $host }}
+  rules:
+    - backendRefs:
+        - name: locker
+          port: {{ $gw.port }}
+---
+# Only the router client certificate (URI SAN spiffe://<principal>) passes; the listener host and SNI scope the traffic
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: locker-gateway
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: locker
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              {{- toYaml $gw.clientPrincipals | nindent 14 }}
+---
+# The Terraform target group of the NLB registers the gateway pod IPs
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: locker-gateway
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  serviceRef:
+    name: locker-istio
+    port: {{ $gw.port }}
+  targetGroupARN: {{ required "gateway.targetGroupArn is required" $gw.targetGroupArn | quote }}
+  targetType: ip
+---
+# The pod security group the NLB security group sends to (Terraform output locker_pod_security_group_id)
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: locker-gateway
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: locker
+  securityGroups:
+    groupIds:
+      {{- toYaml $sgs | nindent 6 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $gw.pki.serviceAccount }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Server certificate of the gateway and the mesh root that checks client certificates, from the Vault mesh PKI (role locker-gateway)
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: VaultDynamicSecret
+metadata:
+  name: locker-gateway-certificate
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  method: POST
+  path: {{ printf "%s/issue/locker-gateway" $gw.pki.mount | quote }}
+  parameters:
+    common_name: {{ $host | quote }}
+    ttl: {{ $gw.pki.ttl | quote }}
+  resultType: Data
+  provider:
+    server: {{ required "gateway.pki.vaultServer is required" $gw.pki.vaultServer | quote }}
+    {{- with $gw.pki.caBundle }}
+    # the AWS Private CA root that signs the internal gateway in front of the central Vault
+    caBundle: {{ . | quote }}
+    {{- end }}
+    auth:
+      kubernetes:
+        # the jwt mount of the locker cluster in the central Vault
+        {{- $g := $.Values.global }}
+        {{- $rs := regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" ($g.region | default "eu-central-1") "${1}${2}${3}" }}
+        mountPath: {{ $gw.pki.authMount | default (printf "k8s-%s-%s-%s-locker" ((($g.hyperswitch | default dict).namePrefix) | default "pay") ($g.environment | default "dev") $rs) | quote }}
+        role: locker-gateway
+        serviceAccountRef:
+          name: {{ $gw.pki.serviceAccount }}
+          audiences: [vault]
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $gw.secretName }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  refreshInterval: {{ $gw.pki.refreshInterval }}
+  target:
+    name: {{ $gw.secretName }}
+    creationPolicy: Owner
+    template:
+      # A TLS Secret with ca.crt, the format both the sidecar SDS and the Gateway read
+      type: kubernetes.io/tls
+      engineVersion: v2
+      data:
+        tls.crt: '{{`{{ .certificate }}`}}'
+        tls.key: '{{`{{ .private_key }}`}}'
+        ca.crt: '{{`{{ .issuing_ca }}`}}'
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: VaultDynamicSecret
+          name: locker-gateway-certificate
+{{- end }}

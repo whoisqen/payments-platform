@@ -3,6 +3,8 @@ global:
   registry: ""
   environment: ""
   cell: ""
+  # naming.prefix of config/platform.yaml; the ApplicationSet passes it
+  namePrefix: pay
 
 # CI writes images.smoke to deploy/envs/<env>/images.yaml. Without a real digest (missing, malformed or all-zero) the chart renders no object, so no PostSync hook exists
 images: {}
@@ -28,10 +30,10 @@ smoke:
     limits:
       memory: 256Mi
 
-# Dummy connector credentials, never real card data. JSON keys of the Secrets Manager secret pay/<env>/smoke/dummy-connector
+# Dummy connector credentials, never real card data. JSON keys of the Secrets Manager secret <namePrefix>/<env>/smoke/dummy-connector
 credentials:
   secretName: smoke-credentials
-  remoteKeyPattern: pay/%s/smoke/dummy-connector
+  remoteKeyPattern: "%s/%s/smoke/dummy-connector"
   refreshInterval: 1h
   secretStore: aws-secrets-manager
   properties: [api_key, merchant_id, profile_id, connector, payment_method_token]

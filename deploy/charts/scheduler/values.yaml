@@ -95,6 +95,8 @@ producer:
     maxUnavailable: 10%
   networkPolicy:
     enabled: true
+    # KMS and STS through the interface endpoints (global.endpointCidrs) and the Pod Identity agent
+    awsEndpoints: true
     dataPorts: [5432, 6379]
     extraEgress:
       - to:
@@ -142,6 +144,11 @@ consumer:
       ROUTER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
       # Read by the KEDA trigger below, which runs outside the pod
       REDIS_ADDRESS: memorydb.invalid:6379
+      # Merchant webhooks go to arbitrary hosts: HTTP CONNECT through the egress gateway (deploy/platform/istio/egress), the only
+      # path to an unregistered host; PSPs (dns.psp_domains), AWS and the cluster names stay direct
+      ROUTER__PROXY__HTTPS_URL: http://istio-egressgateway.istio-egress.svc.cluster.local:8080
+      ROUTER__PROXY__HTTP_URL: http://istio-egressgateway.istio-egress.svc.cluster.local:8080
+      ROUTER__PROXY__BYPASS_PROXY_HOSTS: "localhost, cluster.local, internal, amazonaws.com, psp-sandbox.example.com"
     # Error tracking: the DSN comes from an ExternalSecret when remoteKey is set (<prefix>/<env>/sentry/<service>-dsn in the environment layer)
     sentryDsn:
       envName: ROUTER__LOG__SENTRY__DSN
@@ -194,6 +201,12 @@ consumer:
     maxUnavailable: 10%
   networkPolicy:
     enabled: true
+    # KMS and STS through the interface endpoints (global.endpointCidrs) and the Pod Identity agent
+    awsEndpoints: true
+    # PSP sync and the outgoing calls of the workflows, through the egress firewall
+    pspEgress: true
+    # Merchant webhooks through the egress gateway
+    webhookEgress: true
     dataPorts: [5432, 6379]
     extraEgress:
       - to:

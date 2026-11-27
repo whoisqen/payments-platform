@@ -26,10 +26,11 @@ MONITOR_KINDS = ("ServiceMonitor", "PodMonitor", "Probe")
 SECRETS = {
     "postgres": {"name": "postgres-exporter-dsn", "keys": ["dsn"]},
     "redis": {"name": "memorydb-exporter-auth", "keys": ["password", "address"]},
-    "kafka": {"name": "msk-exporter-tls", "keys": ["ca.crt", "tls.crt", "tls.key"]},
 }
+# Exporters that authenticate with their pod identity (MSK IAM on 9098) and need no connection secret, only a network policy
+POLICY_ONLY = ("kafka",)
 # Pod port that Prometheus scrapes and the data store port the exporter connects to
-PORTS = {"postgres": (9187, 5432), "redis": (9121, 6379), "kafka": (9308, 9094), "blackbox": (9115, None)}
+PORTS = {"postgres": (9187, 5432), "redis": (9121, 6379), "kafka": (9308, 9098), "blackbox": (9115, None)}
 # The chart names the kafka-exporter service port exporter-port, not the name written in the source
 PORT_FIXES = {"kafka": {"kafka-exporter": "exporter-port"}}
 
@@ -102,9 +103,10 @@ def render(cfg):
     files[OUT / "blackbox" / "common" / "networkpolicy.yaml"] = header("blackbox-exporter: DNS and HTTPS probes only") + dump([policy("blackbox", [])])
     for env, regions in render_vault.environments(cfg).items():
         for region in regions:
-            for name in SECRETS:
+            for name in (*SECRETS, *POLICY_ONLY):
                 base = OUT / name / "envs" / env / region
-                files[base / "externalsecret.yaml"] = header(f"{name} exporter connection secret from AWS Secrets Manager") + dump([external_secret(prefix, env, name)])
+                if name in SECRETS:
+                    files[base / "externalsecret.yaml"] = header(f"{name} exporter connection secret from AWS Secrets Manager") + dump([external_secret(prefix, env, name)])
                 files[base / "networkpolicy.yaml"] = header(f"{name} exporter default deny, egress to the data subnets of {env} {region}") + dump([policy(name, data_cidrs(cfg, env, region))])
     return files
 

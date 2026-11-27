@@ -57,3 +57,28 @@ run "two_active_groups_rejected" {
 
   expect_failures = [var.endpoint_groups]
 }
+
+run "edge_load_balancers_are_found_by_tag" {
+  command = plan
+
+  override_data {
+    target = data.aws_lbs.edge["eu-central-1"]
+    values = { arns = ["arn:aws:elasticloadbalancing:eu-central-1:111111111111:loadbalancer/net/k8s-edge/abc"] }
+  }
+
+  variables {
+    endpoint_groups = {
+      "eu-central-1" = { active = true, endpoint_lb_tags = { "elbv2.k8s.aws/cluster" = "pay-prod-euc1-eks-edge", "pay.io/edge-entry" = "true" } }
+      "us-east-1"    = { active = false }
+    }
+  }
+
+  assert {
+    condition     = [for e in aws_globalaccelerator_endpoint_group.this["eu-central-1"].endpoint_configuration : e.endpoint_id] == ["arn:aws:elasticloadbalancing:eu-central-1:111111111111:loadbalancer/net/k8s-edge/abc"]
+    error_message = "the tagged edge load balancer is the endpoint"
+  }
+  assert {
+    condition     = aws_globalaccelerator_endpoint_group.this["eu-central-1"].health_check_path == "/health/ready"
+    error_message = "the accelerator checks the readiness path the router serves"
+  }
+}

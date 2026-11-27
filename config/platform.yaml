@@ -18,6 +18,10 @@ registry:
   ecr_repo_prefix: payments
 
 accounts:
+  # Organization accounts: management (AWS Organizations, Identity Center, org trail), log archive (immutable logs) and audit (security tooling).
+  management: "555555555555"
+  log_archive: "666666666666"
+  audit: "777777777777"
   shared_services: "222222222222"
   dev: "111111111111"
   stage: "333333333333"
@@ -47,8 +51,14 @@ dns:
 storage:
   # S3 bucket for Terraform state of every environment: <prefix>-<env>-euc1-tf-state-<shared_services account>
   state_bucket_prefix: pay
-  # Output state_kms_key_arn of infra/bootstrap
-  state_kms_key_arn: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000000
+  # Output state_kms_key_arn of each infra/bootstrap run, one per state root (fill after the bootstrap of that root)
+  state_kms_key_arns:
+    management: arn:aws:kms:eu-central-1:555555555555:key/mrk-00000000000000000000000000000001
+    security: arn:aws:kms:eu-central-1:666666666666:key/mrk-00000000000000000000000000000002
+    shared-services: arn:aws:kms:eu-central-1:222222222222:key/mrk-00000000000000000000000000000003
+    dev: arn:aws:kms:eu-central-1:111111111111:key/mrk-00000000000000000000000000000004
+    stage: arn:aws:kms:eu-central-1:333333333333:key/mrk-00000000000000000000000000000005
+    prod: arn:aws:kms:eu-central-1:444444444444:key/mrk-00000000000000000000000000000006
 
 access:
   # Okta organization that signs the administrators in to every admin tool (host name, no https://)
@@ -157,8 +167,12 @@ central:
   dedup_interval: 30s
 
 vault:
-  # Cell whose cluster runs Vault in every region; External Secrets of the other clusters reach it at vault.<zone of the environment>.
-  cell: cell-0
+  # One Vault (3 nodes, Raft, KMS auto-unseal) on the central cluster of shared-services serves every environment;
+  # External Secrets and the Vault agents of every cluster reach it at this host through the transit gateway.
+  host: vault.payments.internal
+  # base64 of the PEM root certificate of the AWS Private CA (shared-services, aws-privateca-issuer) that signs the internal admin
+  # gateway: every cluster trusts the Vault endpoint through it. Fill after the private CA exists (aws acm-pca get-certificate-authority-certificate).
+  ca_bundle: ""
 
 runners:
   # GitHub Actions runner installed on the CI instances; sha256 is the checksum of the linux arm64 archive of that release (replace the zeros).
@@ -168,7 +182,7 @@ runners:
 ai:
   # IAM role that the AI review workflow assumes by OIDC (repository variable AI_REVIEW_ROLE_ARN holds its ARN); account shared_services.
   review_role_name: pay-shared-gha-ai-review
-  # Accounts of the cardholder data environment: the admin AI agent role is denied their log groups and metrics (placeholder, set the real id)
-  cde_account_ids: ["555555555555"]
+  # Accounts that hold cardholder data (prod): the admin AI agent role is denied their log groups and metrics
+  cde_account_ids: ["444444444444"]
   # Recipients of the monthly budget notifications of the Bedrock use (placeholder, set real addresses)
   budget_subscriber_emails: ["owner@example.com"]

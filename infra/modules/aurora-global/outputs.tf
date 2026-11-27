@@ -42,3 +42,8 @@ output "proxy_auth_secret_arns" {
   description = "Secrets of the extra proxy logins keyed by name; the value is set out of band and mirrored in Vault."
   value       = local.proxy_enabled ? local.proxy_auth_secret_arns : {}
 }
+
+output "cluster_resource_id" {
+  description = "Resource id of the writer cluster (cluster-...), the rds-db:connect ARN segment of IAM logins such as hs_migrator; null in a recovery role."
+  value       = one(aws_rds_cluster.primary[*].cluster_resource_id)
+}

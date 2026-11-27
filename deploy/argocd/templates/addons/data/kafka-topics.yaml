@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-kafka-topics
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # The cluster next to the MSK cluster of the environment, as the kafka exporter
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/kafka: enabled
+  template:
+    metadata:
+      name: 'kafka-topics-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: kafka-topics
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: kafka-topics
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/kafka-topics
+          helm:
+            # A region without MSK has no file and renders nothing; images.yaml (written by CI) carries the kafka-admin digest
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/deploy/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/images.yaml
+              - $values/deploy/platform/kafka-topics/envs/{{`{{ index .metadata.labels "payments-platform/environment" }}`}}/{{`{{ index .metadata.labels "payments-platform/region" }}`}}.yaml
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

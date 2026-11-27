@@ -40,6 +40,7 @@ jobs:
       any_image: ${{ steps.paths.outputs.any_image }}
       area_rust_hyperswitch: ${{ steps.paths.outputs.area_rust_hyperswitch }}
       area_rust_card_vault: ${{ steps.paths.outputs.area_rust_card_vault }}
+      area_rust_cell_lookup: ${{ steps.paths.outputs.area_rust_cell_lookup }}
       area_terraform: ${{ steps.paths.outputs.area_terraform }}
       area_helm: ${{ steps.paths.outputs.area_helm }}
       area_policy: ${{ steps.paths.outputs.area_policy }}
@@ -163,7 +164,7 @@ jobs:
     with:
       base_sha: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       head_sha: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-      rust: ${{ needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true' }}
+      rust: ${{ needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true' || needs.changes.outputs.area_rust_cell_lookup == 'true' }}
       python: ${{ needs.changes.outputs.area_python == 'true' }}
       node: ${{ needs.changes.outputs.area_node == 'true' }}
       terraform: ${{ needs.changes.outputs.area_terraform == 'true' }}
@@ -191,7 +192,7 @@ jobs:
 
   rust:
     needs: [changes]
-    if: needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true'
+    if: needs.changes.outputs.area_rust_hyperswitch == 'true' || needs.changes.outputs.area_rust_card_vault == 'true' || needs.changes.outputs.area_rust_cell_lookup == 'true'
     runs-on: ${{ vars.RUNNER_PR || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
@@ -208,6 +209,10 @@ jobs:
           - dir: vendor/card-vault
             toolchain: 1.92.0
             area: area_rust_card_vault
+            clippy_blocking: true
+          - dir: services/cell-lookup
+            toolchain: 1.94.1
+            area: area_rust_cell_lookup
             clippy_blocking: true
     # Each entry runs only when its own workspace changed; the others finish at once
     steps:

@@ -173,3 +173,9 @@ variable "locker_pod_endpoint_security_group_id" {
   type        = string
   default     = null
 }
+
+variable "argocd_cluster_name" {
+  type        = string
+  default     = null
+  description = "Cluster name Argo CD and the ApplicationSets use (<prefix>-<env>-<region-short>-<cell, locker, edge or control-center>); null drops the eks- prefix of component."
+}

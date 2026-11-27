@@ -1,10 +1,6 @@
 # Trivy waivers; every entry needs a statement (the reason) and should carry expired_at (YYYY-MM-DD).
 vulnerabilities: []
 misconfigurations:
-  - id: DS-0031
-    paths:
-      - docker/vault-snapshot/Dockerfile
-    statement: AWS_SHARED_CREDENTIALS_FILE and AWS_CONFIG_FILE hold file paths under /tmp, not credentials; the pod gets IRSA tokens.
   - id: GIT-0003
     paths:
       - infra/github/modules/repository/main.tf

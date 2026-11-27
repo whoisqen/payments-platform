@@ -1,0 +1,24 @@
+suite: the edge registers every cell router it routes to (Istio REGISTRY_ONLY)
+templates:
+  - serviceentries.yaml
+values:
+  - ../../../envs/dev/eu-central-1/edge/values.yaml
+tests:
+  - it: lists the router host of every cell of the edge layer
+    asserts:
+      - equal:
+          path: spec.hosts
+          value:
+            - router.payments.svc.cell-0.dev.example.internal
+            - router.payments.svc.spare.dev.example.internal
+      - equal:
+          path: spec.ports
+          value: [{number: 8080, name: http-router-8080, protocol: HTTP}]
+  - it: derives the router host of a cell without one from the cluster domain
+    set:
+      routing.clusterDomain: dev.example.internal
+      routing.cells: [{name: cell-0}]
+    asserts:
+      - equal:
+          path: spec.hosts
+          value: [router.payments.svc.cell-0.dev.example.internal]

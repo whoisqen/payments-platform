@@ -35,7 +35,7 @@
       "Condition": {
         "ArnNotLike": {
           "aws:PrincipalArn": [
-            "arn:aws:iam::000000000003:role/pay-security-glob-tf-apply-*"
+            "arn:aws:iam::777777777777:role/pay-security-glob-tf-apply-*"
           ]
         }
       }
@@ -60,7 +60,7 @@
       "Condition": {
         "ArnNotLike": {
           "aws:PrincipalArn": [
-            "arn:aws:iam::000000000003:role/pay-security-glob-tf-apply-*"
+            "arn:aws:iam::777777777777:role/pay-security-glob-tf-apply-*"
           ]
         }
       }
@@ -134,7 +134,7 @@
             "arn:aws:iam::111111111111:role/pay-dev-glob-tf-apply-*",
             "arn:aws:iam::333333333333:role/pay-stage-glob-tf-apply-*",
             "arn:aws:iam::444444444444:role/pay-prod-glob-tf-apply-*",
-            "arn:aws:iam::000000000002:role/pay-security-glob-tf-apply-*"
+            "arn:aws:iam::666666666666:role/pay-security-glob-tf-apply-*"
           ]
         }
       }

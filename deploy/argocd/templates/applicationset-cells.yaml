@@ -85,6 +85,8 @@ spec:
             parameters:
               - name: global.cell
                 value: '{{`{{ .path.basename }}`}}'
+              - name: global.namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
       syncPolicy:
         automated:
           prune: true

@@ -18,6 +18,19 @@ snapshot:
   store: aurora
   retentionDays: 35
   waitTimeoutSeconds: 1200
+  # Empty derives the names Terraform gives them: arn:aws:rds:<region>:<global.accountId>:cluster:<prefix>-<env>-<region short>-<auroraComponent>
+  # (aurora-<global.cell> unless set) and the AWS Backup vault <prefix>-<env>-<region short>-backup; roleArn is optional
+  resourceArn: ""
+  vault: ""
+  roleArn: ""
+  auroraComponent: ""
+
+
+# Amazon RDS CA bundle (https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem, files/rds-global-bundle.pem), mounted where
+# the image's PGSSLROOTCERT points; a pre-install hook ConfigMap, so it exists before the migration hook
+rdsCaBundle:
+  configMapName: rds-ca-bundle
+  mountPath: /etc/ssl/rds
 
 migrate:
   command: ["/opt/migrator/migrate.sh"]

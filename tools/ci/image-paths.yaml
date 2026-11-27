@@ -25,3 +25,15 @@ images:
   smoke:
     - docker/smoke/
     - tests/smoke/
+  # the migration Job image: diesel and the vendored up.sql files, plus the D3 snapshot script
+  migrator:
+    - docker/migrator/
+    - vendor/hyperswitch/migrations/
+    - scripts/schema/pre-migration-snapshot.sh
+  # the Kafka CLI with the MSK IAM auth jar, for the kafka-topics Job
+  kafka-admin:
+    - docker/kafka-admin/
+  # the cell-copy Lambda function of infra/modules/cell-migration
+  cell-copy:
+    - docker/cell-copy/
+    - services/cell-copy/

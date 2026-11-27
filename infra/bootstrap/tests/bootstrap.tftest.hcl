@@ -16,10 +16,9 @@ override_resource {
 }
 
 variables {
-  name_prefix              = "pay"
-  account_id               = "555555555555"
-  github_repository        = "example-org/payments-platform"
-  permissions_boundary_arn = "arn:aws:iam::555555555555:policy/workload-boundary"
+  name_prefix       = "pay"
+  account_id        = "555555555555"
+  github_repository = "example-org/payments-platform"
   tags = {
     environment = "prod", team = "platform", owner = "platform@example.com", cost-center = "cc-100", cell = "shared"
     component   = "tf-state", pci-scope = "connected", data-class = "internal", backup-tier = "gold", managed-by = "terraform", repo = "infra/bootstrap"
@@ -114,5 +113,84 @@ run "replication_role_name" {
   assert {
     condition     = aws_iam_role.replication.name == "pay-prod-euc1-tf-state-replication"
     error_message = "replication role follows the naming rule"
+  }
+}
+
+run "prod_root_gets_ci_roles_but_no_account_singletons" {
+  command = plan
+
+  assert {
+    condition     = length(module.ci_roles) == 1 && length(module.boundary) == 0 && length(aws_iam_openid_connect_provider.github) == 0
+    error_message = "a workload root reuses the provider and boundary of the shared-services run"
+  }
+}
+
+run "shared_services_root_owns_boundary_and_oidc_provider" {
+  command = plan
+
+  variables {
+    environment = "shared-services"
+  }
+
+  assert {
+    condition     = aws_s3_bucket.state.bucket == "pay-shared-services-euc1-tf-state-555555555555" && module.state_key.alias_name == "alias/pay-shared-services-euc1-tf-state"
+    error_message = "bucket and key of the shared-services root"
+  }
+  assert {
+    condition     = length(module.boundary) == 1 && length(aws_iam_openid_connect_provider.github) == 1 && length(module.ci_roles) == 0
+    error_message = "the shared-services run creates the boundary and the provider, the live ci-oidc-roles stack its plan role"
+  }
+}
+
+run "management_root" {
+  command = plan
+
+  variables {
+    environment = "management"
+  }
+
+  assert {
+    condition     = aws_s3_bucket.state.bucket == "pay-management-euc1-tf-state-555555555555" && module.state_key.alias_name == "alias/pay-management-euc1-tf-state" && module.state_key_use1.alias_name == "alias/pay-management-use1-tf-state"
+    error_message = "bucket and keys of the management root"
+  }
+  assert {
+    condition     = aws_iam_role.replication.name == "pay-management-euc1-tf-state-replication" && length(module.ci_roles) == 1
+    error_message = "replication role and CI roles of the management root"
+  }
+}
+
+run "security_root" {
+  command = plan
+
+  variables {
+    environment = "security"
+  }
+
+  assert {
+    condition     = aws_s3_bucket.state.bucket == "pay-security-euc1-tf-state-555555555555" && module.state_key_use2.alias_name == "alias/pay-security-use2-tf-state"
+    error_message = "bucket and replica of the security root"
+  }
+}
+
+run "unknown_root_is_rejected" {
+  command = plan
+
+  variables {
+    environment = "audit"
+  }
+
+  expect_failures = [var.environment]
+}
+
+run "apply_roles_cover_every_component_of_the_root" {
+  command = plan
+
+  assert {
+    condition     = contains(local.components, "eks") && contains(local.components, "argocd-registration") && contains(local.components, "vpc")
+    error_message = "the component list comes from infra/live/prod"
+  }
+  assert {
+    condition     = length(module.ci_roles[0].component_apply_role_arns) == length(local.components)
+    error_message = "one apply role per component"
   }
 }

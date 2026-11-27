@@ -1,0 +1,20 @@
+suite: scheduler webhooks through the egress gateway
+templates:
+  - consumer/webhook-egress.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  global.endpointCidrs: [10.120.255.0/24]
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: sends webhooks to the egress gateway over mutual TLS
+    template: consumer/webhook-egress.yaml
+    asserts:
+      - equal:
+          path: spec.host
+          value: istio-egressgateway.istio-egress.svc.cluster.local
+      - equal:
+          path: spec.trafficPolicy.tls.mode
+          value: ISTIO_MUTUAL

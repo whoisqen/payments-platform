@@ -1,0 +1,9 @@
+brokers: [b-1.msk.example.test:9098, b-2.msk.example.test:9098]
+region: eu-central-1
+image:
+  repository: registry.example.test/acme/kafka-admin
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+networkPolicy:
+  enabled: true
+  brokerCidrs: [10.120.96.0/22]
+  podIdentityAgentCidr: 169.254.170.23/32

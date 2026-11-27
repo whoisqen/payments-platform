@@ -1,0 +1,32 @@
+suite: the webhook egress gateway runs in the cells
+templates:
+  - addons/mesh/istio-egress.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+tests:
+  - it: selects the cell clusters only
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchExpressions[0]
+          value: {key: payments-platform/component, operator: In, values: [cell-0, cell-1, cell-2, cell-3, spare]}
+  - it: installs the egress gateway with the Istio version of the mesh and the webhook path
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 1.30.8
+      - equal:
+          path: spec.template.spec.sources[0].helm.releaseName
+          value: istio-egressgateway
+      - equal:
+          path: spec.template.spec.sources[1].path
+          value: deploy/platform/istio/egress

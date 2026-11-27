@@ -125,6 +125,12 @@ pdb:
 
 networkPolicy:
   enabled: true
+  # KMS and STS through the interface endpoints (global.endpointCidrs) and the Pod Identity agent
+  awsEndpoints: true
+  # PSP calls, through the egress firewall
+  pspEgress: true
+  # The locker cluster (global.lockerCidrs)
+  lockerEgress: true
   dataPorts: [5432, 6379]
   extraIngress: []
   extraEgress:
@@ -158,3 +164,16 @@ istio:
       - cluster.local/ns/istio-system/sa/istio-ingressgateway
       # PostSync smoke Job of the cell (deploy/platform/smoke)
       - cluster.local/ns/payments/sa/smoke
+
+# Client certificate of the cross-cluster locker path (deploy/charts/payments-locker README): Vault mesh PKI, role router-client
+lockerClient:
+  secretName: locker-client-tls
+  # https://vault.<zone>:8200, set by the environment layer
+  vaultServer: ""
+  # Empty: kubernetes for cell-0 (the cluster Vault runs in), kubernetes-<cell> otherwise, as deploy/platform/vault/config
+  authMount: ""
+  pkiMount: pki-mesh
+  uriSan: spiffe://payments-platform/ns/payments/sa/router
+  ttl: 72h
+  refreshInterval: 24h
+

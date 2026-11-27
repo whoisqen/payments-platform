@@ -148,7 +148,7 @@ def parse_args(argv):
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--name-prefix", required=True, help="naming prefix of the platform, naming.prefix in config/platform.yaml")
     ap.add_argument("--region", required=True)
-    ap.add_argument("--routing-table", help="default: <prefix>-prod-<region short>-merchant-routing")
+    ap.add_argument("--routing-table", help="default: <prefix>-prod-euc1-merchant-cell-map (infra/modules/dynamodb-global)")
     ap.add_argument("--route-cache-ttl-s", type=int, default=60)
     ap.add_argument("--max-freeze-s", type=int, default=120)
     ap.add_argument("--max-drain-lag-s", type=float, default=0.5)
@@ -158,8 +158,8 @@ def parse_args(argv):
     ap.add_argument("--dry-run", action="store_true")
     ns = ap.parse_args(argv)
     if not ns.routing_table:
-        a, b, c = ns.region.split("-")
-        ns.routing_table = f"{ns.name_prefix}-prod-{a}{b[0]}{c}-merchant-routing"
+        # a global table keeps the name of the region that created it (euc1) in every replica region
+        ns.routing_table = f"{ns.name_prefix}-prod-euc1-merchant-cell-map"
     if ns.max_freeze_s <= ns.route_cache_ttl_s:
         ap.error("--max-freeze-s must exceed --route-cache-ttl-s, or the freeze ends before the gateways see it")
     return ns

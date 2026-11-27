@@ -1,0 +1,10 @@
+# naming.prefix of config/platform.yaml, the first segment of the Secrets Manager name; the ApplicationSet passes it
+namePrefix: pay
+
+# Name of the Secret the workload mounts; the ApplicationSet of each add-on sets it
+secretName: ""
+namespace: monitoring
+secretStore: aws-secrets-manager
+refreshInterval: 1h
+# Under <namePrefix>/; one client identity shared by the collector and Prometheus
+remoteKey: shared-services/otel-collector/tls

@@ -2,15 +2,14 @@ locals {
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   prefix       = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.cell}"
 
-  services = {
-    router             = "router"
-    locker             = "locker"
-    drainer            = "drainer"
-    scheduler          = "scheduler"
-    "external-secrets" = "external-secrets"
-  }
+  # Service -> namespace of its service account.
+  services = merge(
+    { for s in var.services : s => var.workload_namespace },
+    { "external-secrets" = "external-secrets" },
+    var.migrator == null ? {} : { migrator = var.workload_namespace },
+  )
 
-  memorydb_statement = { for svc, user in var.memorydb.users : svc => [{
+  memorydb_statement = var.memorydb == null ? {} : { for svc, user in var.memorydb.users : svc => [{
     Effect   = "Allow"
     Action   = ["memorydb:Connect"]
     Resource = [var.memorydb.cluster_arn, "arn:aws:memorydb:${var.region}:${var.account_id}:user/${user}"]
@@ -22,18 +21,44 @@ locals {
     Resource = arns
   }] if length(arns) > 0 }
 
-  merchant_map_statement = [{
+  merchant_map_statement = var.dynamodb_table_arn == null ? [] : [{
     Effect   = "Allow"
     Action   = ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query"]
     Resource = [var.dynamodb_table_arn]
   }]
 
   # Only the locker reaches its key; the locker holds the only place where card data is decrypted.
-  locker_key_statement = [{
+  locker_key_statement = var.locker_kms_key_arn == null ? [] : [{
     Effect   = "Allow"
     Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
     Resource = [var.locker_kms_key_arn]
   }]
+
+  # Router writes encrypted merchant data with the cell key; drainer and scheduler only read what it wrote.
+  cell_key_actions = {
+    router    = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+    drainer   = ["kms:Decrypt", "kms:DescribeKey"]
+    scheduler = ["kms:Decrypt", "kms:DescribeKey"]
+  }
+  cell_key_statement = var.cell_kms_key_arn == null ? {} : { for svc, actions in local.cell_key_actions : svc => [{
+    Effect   = "Allow"
+    Action   = actions
+    Resource = [var.cell_kms_key_arn]
+  }] }
+
+  migrator_statements = var.migrator == null ? null : [
+    { Sid = "LoginAsMigrator", Effect = "Allow", Action = ["rds-db:connect"], Resource = var.migrator.db_connect_arns },
+    { Sid = "PreMigrationBackup", Effect = "Allow", Action = ["backup:StartBackupJob"], Resource = [var.migrator.backup_vault_arn] },
+    { Sid = "ReadRecoveryPoint", Effect = "Allow", Action = ["backup:DescribeRecoveryPoint"], Resource = ["arn:aws:rds:${var.region}:${var.account_id}:cluster-snapshot:awsbackup:*"] },
+    { Sid = "ReadBackupJob", Effect = "Allow", Action = ["backup:DescribeBackupJob"], Resource = ["*"] },
+    {
+      Sid       = "PassBackupRole"
+      Effect    = "Allow"
+      Action    = ["iam:PassRole"]
+      Resource  = [var.migrator.backup_role_arn]
+      Condition = { StringEquals = { "iam:PassedToService" = "backup.amazonaws.com" } }
+    },
+  ]
 
   secrets_statements = [for s in [
     {
@@ -49,13 +74,14 @@ locals {
     },
   ] : s if length(var.secret_arns) > 0]
 
-  statements = {
-    router             = concat(lookup(local.memorydb_statement, "router", []), lookup(local.database_statement, "router", []), local.merchant_map_statement)
-    locker             = concat(lookup(local.database_statement, "locker", []), local.locker_key_statement)
-    drainer            = concat(lookup(local.memorydb_statement, "drainer", []), lookup(local.database_statement, "drainer", []))
-    scheduler          = concat(lookup(local.memorydb_statement, "scheduler", []), lookup(local.database_statement, "scheduler", []), local.merchant_map_statement)
+  all_statements = {
+    router             = concat(try(local.memorydb_statement["router"], []), try(local.database_statement["router"], []), local.merchant_map_statement, try(local.cell_key_statement["router"], []))
+    locker             = concat(try(local.database_statement["locker"], []), local.locker_key_statement)
+    drainer            = concat(try(local.memorydb_statement["drainer"], []), try(local.database_statement["drainer"], []), try(local.cell_key_statement["drainer"], []))
+    scheduler          = concat(try(local.memorydb_statement["scheduler"], []), try(local.database_statement["scheduler"], []), local.merchant_map_statement, try(local.cell_key_statement["scheduler"], []))
     "external-secrets" = local.secrets_statements
   }
+  statements = { for svc, s in local.all_statements : svc => s if contains(keys(local.services), svc) }
 }
 
 resource "aws_iam_role" "this" {
@@ -101,14 +127,14 @@ resource "aws_eks_pod_identity_association" "this" {
 
   cluster_name    = var.cluster_name
   namespace       = each.value
-  service_account = each.value
+  service_account = each.key
   role_arn        = aws_iam_role.this[each.key].arn
   tags            = var.tags
 }
 
 # Event producers get the MSK producer policy (IAM auth, write only) of the analytics cluster.
 resource "aws_iam_role_policy_attachment" "kafka_producer" {
-  for_each = var.kafka_producer_policy_arn == null ? toset([]) : toset(var.kafka_producers)
+  for_each = var.kafka_producer_policy_arn == null ? toset([]) : toset([for p in var.kafka_producers : p if contains(var.services, p)])
 
   role       = aws_iam_role.this[each.key].name
   policy_arn = var.kafka_producer_policy_arn
@@ -159,4 +185,13 @@ resource "aws_eks_pod_identity_association" "yace" {
   service_account = var.yace.service_account
   role_arn        = aws_iam_role.yace[0].arn
   tags            = var.tags
+}
+
+# Separate from the other policies: DescribeBackupJob has no resource-level scoping and recovery point names are generated by AWS Backup.
+resource "aws_iam_role_policy" "migrator" {
+  count = var.migrator == null ? 0 : 1
+
+  name   = "migrate-and-snapshot"
+  role   = aws_iam_role.this["migrator"].id
+  policy = jsonencode({ Version = "2012-10-17", Statement = local.migrator_statements })
 }

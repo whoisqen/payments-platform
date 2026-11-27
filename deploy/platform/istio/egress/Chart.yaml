@@ -1,0 +1,6 @@
+apiVersion: v2
+name: istio-egress
+description: The webhook egress path - scheduler -> egress gateway (HTTP CONNECT, mutual TLS, scheduler identity only) -> Network Firewall
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

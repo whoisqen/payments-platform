@@ -148,3 +148,30 @@ run "a_plain_http_redirect_is_rejected" {
 
   expect_failures = [var.apps]
 }
+
+run "rotation_replaces_only_the_named_application" {
+  command = plan
+
+  variables {
+    client_secret_rotation = { grafana = "2026-11-27" }
+  }
+
+  assert {
+    condition     = terraform_data.client_secret_rotation["grafana"].input == "2026-11-27"
+    error_message = "the rotation id of grafana drives its replacement"
+  }
+  assert {
+    condition     = alltrue([for k, r in terraform_data.client_secret_rotation : k == "grafana" || r.input == "initial"])
+    error_message = "other applications keep their client"
+  }
+}
+
+run "rotation_of_an_unknown_application_is_rejected" {
+  command = plan
+
+  variables {
+    client_secret_rotation = { unknown = "1" }
+  }
+
+  expect_failures = [var.client_secret_rotation]
+}

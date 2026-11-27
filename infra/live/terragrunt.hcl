@@ -16,6 +16,12 @@ locals {
   state_region_short = { "eu-central-1" = "euc1", "us-east-1" = "use1" }[local.state_region]
   # The replica of a multi-Region key keeps the key id, so only the region part of the ARN changes.
   state_kms_key_arn = replace(local.env_cfg.state_kms_key_arn, ":${local.cfg.regions.working}:", ":${local.state_region}:")
+  # CI holds a shared-services role (state bucket) and reaches the account through <prefix>-<env>-tf-exec; PAY_TF_DIRECT=true
+  # (first apply of a tf-exec unit, break-glass) is for a human with shared-services administrator credentials.
+  direct = get_env("PAY_TF_DIRECT", "false") == "true"
+  # Direct mode keeps the shared-services credentials for the state and enters the account through its administration role.
+  direct_role = get_env("PAY_TF_DIRECT_ROLE", "OrganizationAccountAccessRole")
+  exec_role   = local.direct ? (local.env_cfg.account_id == local.env_cfg.shared_services_account_id ? "" : local.direct_role) : "${local.cfg.naming.prefix}-${local.env}-tf-exec"
 }
 
 remote_state {
@@ -41,10 +47,18 @@ remote_state {
 generate "provider" {
   path      = "provider.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<-EOT
+  # These units write elsewhere (shared-services, us-west-2) and generate their own provider.
+  disable  = contains(["argocd-registration", "edge-accelerator"], local.component)
+  contents = <<-EOT
     provider "aws" {
       region              = "${local.region}"
       allowed_account_ids = ["${local.env_cfg.account_id}"]
+%{if local.exec_role != ""}
+      assume_role {
+        role_arn     = "arn:aws:iam::${local.env_cfg.account_id}:role/${local.exec_role}"
+        session_name = "terragrunt-${local.env}-${local.component}"
+      }
+%{endif}
 
       default_tags {
         tags = {

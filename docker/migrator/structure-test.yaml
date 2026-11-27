@@ -1,0 +1,56 @@
+schemaVersion: 2.0.0
+metadataTest:
+  user: "10001:10001"
+  workdir: /tmp
+  entrypoint: ["/opt/migrator/migrate.sh"]
+fileExistenceTests:
+  # the chart runs these three commands (deploy/charts/migrations/values.yaml)
+  - name: migrate
+    path: /opt/migrator/migrate.sh
+    shouldExist: true
+    permissions: "-r-xr-xr-x"
+  - name: snapshot
+    path: /opt/migrator/snapshot.sh
+    shouldExist: true
+    permissions: "-r-xr-xr-x"
+  - name: backfill
+    path: /opt/migrator/backfill.sh
+    shouldExist: true
+    permissions: "-r-xr-xr-x"
+  - name: first vendored migration
+    path: /opt/migrator/migrations/00000000000000_diesel_initial_setup/up.sql
+    shouldExist: true
+  # bash for the entrypoints, but no /bin/sh, no package manager: only the programs the scripts call
+  - name: bash
+    path: /usr/bin/bash
+    shouldExist: true
+  - name: no sh
+    path: /bin/sh
+    shouldExist: false
+  - name: no package manager
+    path: /usr/bin/apt
+    shouldExist: false
+  - name: no compiler
+    path: /usr/bin/gcc
+    shouldExist: false
+commandTests:
+  - name: diesel runs
+    command: /usr/bin/diesel
+    args: ["--version"]
+    expectedOutput: ["diesel 2\\."]
+  - name: psql runs
+    command: /usr/bin/psql
+    args: ["--version"]
+    expectedOutput: ["psql \\(PostgreSQL\\) 15\\."]
+  - name: aws runs
+    command: /usr/local/aws-cli/v2/current/bin/aws
+    args: ["--version"]
+    expectedOutput: ["aws-cli/2\\."]
+  - name: migrate dry run
+    command: /opt/migrator/migrate.sh
+    args: ["--dry-run"]
+    envVars:
+      - {key: PGHOST, value: writer.invalid}
+      - {key: PGDATABASE, value: hyperswitch}
+      - {key: PGUSER, value: hs_migrator}
+    expectedOutput: ["would-run"]

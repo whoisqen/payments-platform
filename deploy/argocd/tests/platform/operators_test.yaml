@@ -1,0 +1,43 @@
+suite: operators the service charts need on every cluster (KEDA, Argo Rollouts)
+templates:
+  - addons/scaling/keda.yaml
+  - addons/delivery/argo-rollouts.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 30s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+tests:
+  - it: installs both operators on every add-on cluster
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels
+          value: {payments-platform/addons: enabled}
+  - it: pins the Argo Rollouts chart and keeps its CRDs ahead of the canaries
+    template: addons/delivery/argo-rollouts.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].chart
+          value: argo-rollouts
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 2.43.12
+      - equal:
+          path: spec.template.metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-3"
+      - equal:
+          path: spec.template.spec.sources[0].helm.valueFiles[0]
+          value: $values/deploy/platform/argo-rollouts/values.yaml
+  - it: pins the KEDA chart
+    template: addons/scaling/keda.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].targetRevision
+          value: 2.21.1

@@ -1,0 +1,16 @@
+# Pods of the istio gateway chart release istio-egressgateway (values-egressgateway.yaml)
+gatewaySelector:
+  istio: egressgateway
+port: 8080
+# Mesh identities allowed to open a tunnel; webhooks are sent by the scheduler consumer only
+allowedPrincipals:
+  - cluster.local/ns/payments/sa/scheduler-consumer
+# Namespace and pods of those callers, for the NetworkPolicy
+callers:
+  namespace: payments
+  podLabels:
+    app.kubernetes.io/name: scheduler
+    app.kubernetes.io/component: consumer
+# Tunnels only to 443 (HTTPS webhooks), on public addresses; the Network Firewall decides what leaves the VPC
+allowedPorts: [443]
+dnsLookupFamily: V4_ONLY

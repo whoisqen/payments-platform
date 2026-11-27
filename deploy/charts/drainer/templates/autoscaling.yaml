@@ -1,1 +1,25 @@
-{{- include "platform-common.autoscaling" (dict "root" . "cfg" .Values "name" "drainer" "component" "drainer") }}
+{{- $cfg := deepCopy .Values }}
+{{- $a := $cfg.autoscaling }}
+{{- if and $a.enabled (eq $a.kind "keda") $a.streams }}
+{{- $hs := include "platform-common.hyperswitch.config" (dict "root" .) | fromYaml }}
+{{- $triggers := list }}
+{{- range $i := until (int $hs.drainer.numPartitions) }}
+{{- $md := dict "addressesFromEnv" "DRAINER__REDIS__CLUSTER_URLS" "usernameFromEnv" "DRAINER__REDIS__USERNAME" "enableTLS" (toString $hs.redis.tls) "stream" (printf "{shard_%d}_%s" $i $hs.drainer.streamName) "streamLength" (toString $a.streams.lengthTarget) }}
+{{- $triggers = append $triggers (dict "type" "redis-cluster-streams" "metadata" $md "authenticationRef" (dict "name" "drainer-redis")) }}
+{{- end }}
+{{- $_ := set $a "triggers" (concat $triggers ($a.triggers | default list)) }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: drainer-redis
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" $cfg "name" "drainer" "component" "drainer") | nindent 4 }}
+spec:
+  # The MemoryDB password of the drainer user, from the Secret the Vault ExternalSecret writes
+  secretTargetRef:
+    - parameter: password
+      name: drainer-vault
+      key: DRAINER__REDIS__PRIMARY_PASSWORD
+---
+{{- end }}
+{{ include "platform-common.autoscaling" (dict "root" . "cfg" $cfg "name" "drainer" "component" "drainer") }}

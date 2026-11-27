@@ -143,6 +143,14 @@ tests:
       - lengthEqual:
           path: spec.data
           count: 5
+  - it: takes the first segment of the secret name from the name prefix
+    template: externalsecret.yaml
+    set:
+      global.namePrefix: acme
+    asserts:
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: acme/dev/smoke/dummy-connector
       - notContains:
           path: spec.data
           content:

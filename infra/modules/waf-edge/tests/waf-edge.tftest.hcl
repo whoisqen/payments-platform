@@ -113,3 +113,18 @@ run "mode_is_validated" {
 
   expect_failures = [var.mode]
 }
+
+run "block_mode_keeps_listed_rules_in_count" {
+  command = plan
+
+  variables {
+    mode            = "block"
+    count_overrides = { common = ["SizeRestrictions_BODY"] }
+  }
+
+  assert {
+    condition = alltrue([for a in aws_wafv2_web_acl.this : anytrue([for r in a.rule : r.name == "managed-common" &&
+    [for o in r.statement[0].managed_rule_group_statement[0].rule_action_override : o.name] == ["SizeRestrictions_BODY"]])])
+    error_message = "the listed rule of the common group stays in count"
+  }
+}
