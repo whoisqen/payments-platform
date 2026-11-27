@@ -3,8 +3,8 @@ title = "payments-platform gitleaks"
 [extend]
 useDefault = true
 
-# ACM key algorithm identifier, not a credential; the generic rule matches the attribute line
+# Not credentials: the ACM key algorithm identifier, and the sequential 0123456789abcdef sample value of local-run examples
 [allowlist]
-description = "ACM key algorithm identifier"
+description = "ACM key algorithm identifier and sequential sample values"
 regexTarget = "line"
-regexes = ['''key_algorithm\s*=\s*"EC_prime256v1"''']
+regexes = ['''key_algorithm\s*=\s*"EC_prime256v1"''', '''=(0123456789abcdef){4}\b''']
