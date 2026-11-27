@@ -39,4 +39,4 @@ spec:
         cidr: 10.120.8.0/22
     ports:
     - protocol: TCP
-      port: 9094
+      port: 9098

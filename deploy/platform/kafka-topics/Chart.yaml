@@ -1,0 +1,10 @@
+apiVersion: v2
+name: kafka-topics
+description: Creates the router event topics on MSK (TLS with IAM auth) with an idempotent Job; topic auto-creation is off on the cluster
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../../charts/platform-common

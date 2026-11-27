@@ -1,0 +1,15 @@
+# dev eu-central-1: the MSK cluster of infra/live/dev/eu-central-1/analytics/msk; the brokers are placeholders until it exports bootstrap_brokers_sasl_iam
+brokers:
+  - b-1.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+  - b-2.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+  - b-3.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+region: eu-central-1
+networkPolicy:
+  enabled: true
+  # The MSK client subnets: the data subnets cidrsubnet(10.120.0.0/16, 8, 96..98) of the vpc stack
+  brokerCidrs:
+    - 10.120.96.0/22
+  podIdentityAgentCidr: 169.254.170.23/32
+image:
+  # the kafka-admin image of docker/kafka-admin in the platform ECR; its digest comes from deploy/envs/dev/images.yaml
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/payments/kafka-admin

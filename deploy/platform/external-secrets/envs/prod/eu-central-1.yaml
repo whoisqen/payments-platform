@@ -5,10 +5,11 @@ awsSecretsManager:
   region: eu-central-1
 
 vault:
-  server: https://vault.pay.example.com:8200
+  # The one Vault in shared-services; the auth mount is k8s-<cluster name>, set per cluster by the add-on
+  server: https://vault.payments.internal:443
 
 networkPolicy:
   awsEndpointCidrs:
     - 10.150.255.0/24
   vaultCidrs:
-    - 10.150.0.0/16
+    - 10.140.0.0/16

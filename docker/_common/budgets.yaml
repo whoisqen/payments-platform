@@ -7,3 +7,6 @@ budgets_mib:
   control-center: 900
   vault-snapshot: 400
   smoke: 80
+  migrator: 400
+  kafka-admin: 700
+  cell-copy: 700

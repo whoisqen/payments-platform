@@ -1,0 +1,101 @@
+name: infra-apply
+
+# Applies infra/live after a merge, one environment after the other: dev at once, stage and prod after their
+# GitHub Environment approval of the plan. cde-*, management, security and shared-services are applied elsewhere.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/live/**"
+      - "infra/modules/**"
+      - "config/**"
+      - "policy/config/**"
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: one stack, infra/live/<env>/<region>/[<cell>/]<component> (dev, stage or prod)
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  route:
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      envs: ${{ steps.route.outputs.envs }}
+      stack: ${{ steps.route.outputs.stack }}
+    steps:
+      - id: route
+        env:
+          EVENT: ${{ github.event_name }}
+          STACK: ${{ inputs.stack }}
+        run: |
+          # the apply roles trust main only; a run from another ref would fail late, so it stops here
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::infra-apply runs from main only"; exit 1; }
+          if [ "$EVENT" = workflow_dispatch ]; then
+            if ! [[ $STACK =~ ^infra/live/(dev|stage|prod)(/[a-z0-9-]+){2,3}$ ]]; then
+              echo "::error::not a dev, stage or prod stack path"; exit 1
+            fi
+            env=$(cut -d/ -f3 <<<"$STACK")
+            echo "envs=,${env}," >>"$GITHUB_OUTPUT"
+            echo "stack=${STACK}" >>"$GITHUB_OUTPUT"
+          else
+            echo "envs=,dev,stage,prod," >>"$GITHUB_OUTPUT"
+            echo "stack=" >>"$GITHUB_OUTPUT"
+          fi
+
+  dev:
+    needs: route
+    if: contains(needs.route.outputs.envs, ',dev,')
+    concurrency:
+      group: infra-apply-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    uses: ./.github/workflows/infra-env.yml
+    with:
+      environment: dev
+      gated: false
+      stack: ${{ needs.route.outputs.stack }}
+
+  stage:
+    needs: [route, dev]
+    # a push reaches stage only after dev converged; a dispatch for one stage stack skips dev
+    if: >-
+      always() && needs.route.result == 'success' && contains(needs.route.outputs.envs, ',stage,') &&
+      (needs.dev.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.dev.result == 'skipped'))
+    concurrency:
+      group: infra-apply-stage
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    uses: ./.github/workflows/infra-env.yml
+    with:
+      environment: stage
+      gated: true
+      stack: ${{ needs.route.outputs.stack }}
+
+  prod:
+    needs: [route, stage]
+    if: >-
+      always() && needs.route.result == 'success' && contains(needs.route.outputs.envs, ',prod,') &&
+      (needs.stage.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.stage.result == 'skipped'))
+    concurrency:
+      group: infra-apply-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    uses: ./.github/workflows/infra-env.yml
+    with:
+      environment: prod
+      gated: true
+      stack: ${{ needs.route.outputs.stack }}

@@ -3,3 +3,7 @@ image:
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 global:
   registry: registry.example.test/acme
+  region: eu-central-1
+  environment: dev
+  cell: cell-0
+  accountId: "111111111111"

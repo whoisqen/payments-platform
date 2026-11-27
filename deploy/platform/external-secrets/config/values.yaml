@@ -20,8 +20,11 @@ vault:
   server: http://vault-active.vault.svc:8200
   path: secret
   version: v2
+  # The add-on sets k8s-<Argo CD cluster name>, the jwt mount the central Vault keeps for this cluster; kubernetes on the central cluster
   authMount: kubernetes
   authRole: external-secrets
+  # Audience of the service account token; the cluster mounts of the central Vault accept only this one
+  audiences: [vault]
   namespaceSelector: {}
 
 networkPolicy:

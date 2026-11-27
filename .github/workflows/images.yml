@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$REQUESTED" ]; then
-            services=$(jq -c --argjson all '["router","drainer","scheduler","locker","control-center","vault-snapshot","smoke"]' '[.[] | select(. as $s | $all | index($s))]' <<<"$REQUESTED")
+            services=$(jq -c --argjson all '["router","drainer","scheduler","locker","control-center","vault-snapshot","smoke","migrator","kafka-admin","cell-copy"]' '[.[] | select(. as $s | $all | index($s))]' <<<"$REQUESTED")
           else
             # the concurrency group can drop a pending run, so the base is the last green run and not the previous push
             base=$(gh run list --repo "$REPO" --workflow images.yml --branch "$BRANCH" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')

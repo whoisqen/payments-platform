@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.rdsCaBundle.configMapName }}
+  labels:
+    {{- include "migrations.labels" . | nindent 4 }}
+  annotations:
+    # Before the migration hook, which mounts it; kept between syncs for the backfill Job
+    {{- include "migrations.hook" (dict "weight" (sub (int .Values.job.hookWeight) 1)) | nindent 4 }}
+data:
+  global-bundle.pem: |
+    {{- .Files.Get "files/rds-global-bundle.pem" | trim | nindent 4 }}

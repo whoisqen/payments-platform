@@ -1,0 +1,61 @@
+{{- /* outboundTrafficPolicy REGISTRY_ONLY drops every host the mesh does not know: the locker's own Aurora proxy, KMS and the Pod Identity agent */ -}}
+{{- $g := .Values.global -}}
+{{- $e := .Values.egress -}}
+{{- if $e.serviceEntries }}
+{{- $region := required "global.region is required" $g.region }}
+{{- $db := (index .Values "locker").config.database }}
+{{- $labels := dict "app.kubernetes.io/part-of" "payments-platform" "app.kubernetes.io/managed-by" .Release.Service "app.kubernetes.io/component" "locker" }}
+---
+# The locker Aurora through RDS Proxy: PostgreSQL negotiates TLS inside the protocol, so plain TCP
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-locker-aurora
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    - {{ $db.host }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: {{ $db.port }}, name: tcp-postgres, protocol: TCP}
+---
+# KMS (the locker key) and STS through the interface endpoints; TLS from the SDK, routed by SNI
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-aws-apis
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- range $e.awsServices }}
+    - {{ printf "%s.%s.amazonaws.com" . $region }}
+    {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: 443, name: tls-aws, protocol: TLS}
+---
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-pod-identity-agent
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    - eks-pod-identity-agent.local
+  addresses:
+    - {{ $e.podIdentityAgent }}/32
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  endpoints:
+    - address: {{ $e.podIdentityAgent }}
+  ports:
+    - {number: 80, name: http-pod-identity, protocol: HTTP}
+{{- end }}

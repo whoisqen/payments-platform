@@ -56,3 +56,11 @@ tests:
           value: enabled
       - notExists:
           path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
+  - it: gives Karpenter the EKS name from the cluster annotation, falling back to the Argo CD name
+    template: addons/scaling/karpenter.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: settings.clusterName
+            value: '{{ or (index .metadata.annotations "payments-platform/eks-cluster-name") .name }}'

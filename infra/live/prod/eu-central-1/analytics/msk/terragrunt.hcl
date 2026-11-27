@@ -54,12 +54,23 @@ dependency "event_archive" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
+# The kafka-topics Job and the kafka-exporter run on the analytics cluster and get their MSK roles through Pod Identity there
+dependency "analytics_eks" {
+  config_path = "../eks"
+
+  mock_outputs = {
+    cluster_name = "pay-prod-euc1-eks-analytics"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
+}
+
 # The archive bucket policy keeps its own statements: the sink role writes there by its IAM policy in the same account.
 inputs = {
-  kms_key_arn        = dependency.kms.outputs.key_arns["shared"]
-  logs_kms_key_arn   = dependency.kms.outputs.key_arns["logs"]
-  client_subnets     = dependency.vpc.outputs.subnet_ids["data"]
-  security_group_ids = [dependency.access.outputs.security_group_ids["msk"]]
-  sink_bucket_arn    = dependency.event_archive.outputs.bucket_arns["eu-central-1"]
-  sink_kms_key_arn   = dependency.kms.outputs.key_arns["shared"]
+  kms_key_arn         = dependency.kms.outputs.key_arns["shared"]
+  logs_kms_key_arn    = dependency.kms.outputs.key_arns["logs"]
+  client_subnets      = dependency.vpc.outputs.subnet_ids["data"]
+  security_group_ids  = [dependency.access.outputs.security_group_ids["msk"]]
+  sink_bucket_arn     = dependency.event_archive.outputs.bucket_arns["eu-central-1"]
+  sink_kms_key_arn    = dependency.kms.outputs.key_arns["shared"]
+  client_cluster_name = dependency.analytics_eks.outputs.cluster_name
 }

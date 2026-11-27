@@ -22,8 +22,8 @@ run "environments" {
   command = plan
 
   assert {
-    condition     = length(github_repository_environment.this) == 4 && contains(keys(github_repository_environment.this), "cde-prod")
-    error_message = "dev, stage, prod and cde-prod exist"
+    condition     = toset(keys(github_repository_environment.this)) == toset(["dev", "stage", "prod", "cde-prod", "management", "security", "shared-services", "runbook-dev", "runbook-stage", "runbook-prod"])
+    error_message = "the workload environments, the organization state roots and the runbook approvals exist"
   }
   assert {
     condition     = length(local.environments["cde-prod"]) == 2 && length(local.environments["prod"]) == 1 && length(local.environments["dev"]) == 0

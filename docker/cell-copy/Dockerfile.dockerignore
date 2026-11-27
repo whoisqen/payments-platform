@@ -1,0 +1,3 @@
+*
+!docker/cell-copy/requirements.txt
+!services/cell-copy/app.py

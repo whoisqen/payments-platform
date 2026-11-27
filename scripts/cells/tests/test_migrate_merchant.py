@@ -144,6 +144,14 @@ class MigrateMerchantTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             mm.parse_args(ARGS + ["--max-freeze-s", "30"])
 
+    def test_default_routing_table_is_the_terraform_global_table(self):
+        tf = Path(__file__).resolve().parents[3] / "infra/modules/dynamodb-global/variables.tf"
+        self.assertIn('default     = "merchant-cell-map"', tf.read_text(encoding="utf-8"))
+        for region in ("eu-central-1", "us-east-1"):
+            args = [a if a != "eu-central-1" else region for a in ARGS]
+            self.assertEqual(mm.parse_args(args).routing_table, "pay-prod-euc1-merchant-cell-map")
+        self.assertEqual(mm.parse_args(ARGS + ["--routing-table", "t"]).routing_table, "t")
+
     def test_client_token_is_a_stable_uuid(self):
         import uuid
         t = mm.client_token("mig-7", "copy")

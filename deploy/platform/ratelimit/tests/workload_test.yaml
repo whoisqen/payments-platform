@@ -10,6 +10,7 @@ templates:
   - servicemonitor.yaml
   - service.yaml
   - configmap.yaml
+  - istio/serviceentry.yaml
 set:
   global.registry: registry.example.test/acme
   global.environment: stage
@@ -79,6 +80,14 @@ tests:
       - equal:
           path: spec.data[0].remoteRef.key
           value: pay/stage/ratelimit/redis
+  - it: takes the first segment of the secret name from the name prefix
+    template: externalsecret.yaml
+    set:
+      global.namePrefix: acme
+    asserts:
+      - equal:
+          path: spec.data[0].remoteRef.key
+          value: acme/stage/ratelimit/redis
   - it: admits only the edge gateway and Prometheus
     template: networkpolicy.yaml
     asserts:
@@ -155,6 +164,27 @@ tests:
     template: istio/authorizationpolicy.yaml
     set:
       istio.authorizationPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: registers the Redis endpoint for the mesh and keeps cluster node addresses
+    template: istio/serviceentry.yaml
+    set:
+      redis.egressCidrs: [10.120.96.0/22]
+    asserts:
+      - equal:
+          path: spec.hosts
+          value: [rl.example.test]
+      - equal:
+          path: spec.resolution
+          value: NONE
+      - equal:
+          path: spec.ports[0]
+          value: {number: 6379, name: tcp-redis, protocol: TCP}
+  - it: registers no host while the endpoint is a placeholder
+    template: istio/serviceentry.yaml
+    set:
+      redis.endpoint: REPLACE_REDIS_ENDPOINT
     asserts:
       - hasDocuments:
           count: 0

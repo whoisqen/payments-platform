@@ -5,11 +5,12 @@
   "properties": {
     "global": {
       "type": "object",
-      "required": ["registry", "environment", "cell"],
+      "required": ["registry", "environment", "cell", "namePrefix"],
       "properties": {
         "registry": {"type": "string"},
         "environment": {"type": "string", "pattern": "^[a-z0-9-]*$"},
-        "cell": {"type": "string", "pattern": "^[a-z0-9-]*$"}
+        "cell": {"type": "string", "pattern": "^[a-z0-9-]*$"},
+        "namePrefix": {"type": "string", "pattern": "^[a-z][a-z0-9]*$"}
       }
     },
     "images": {"type": "object", "properties": {"smoke": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}}},
@@ -51,7 +52,7 @@
       "required": ["secretName", "remoteKeyPattern", "refreshInterval", "secretStore", "properties"],
       "properties": {
         "secretName": {"type": "string", "minLength": 1},
-        "remoteKeyPattern": {"type": "string", "pattern": "^pay/%s/smoke/[a-z0-9-]+$"},
+        "remoteKeyPattern": {"type": "string", "pattern": "^%s/%s/smoke/[a-z0-9-]+$"},
         "refreshInterval": {"type": "string"},
         "secretStore": {"type": "string", "minLength": 1},
         "properties": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z_]+$"}}

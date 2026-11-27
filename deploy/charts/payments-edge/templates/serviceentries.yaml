@@ -1,0 +1,23 @@
+{{- /* The Hostname backends of the HTTPRoutes must be in the mesh registry (outboundTrafficPolicy REGISTRY_ONLY): one entry per cell router */ -}}
+{{- with .Values.routing.cells }}
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: cell-routers
+  labels:
+    {{- include "payments-edge.labels" $ | nindent 4 }}
+spec:
+  hosts:
+    {{- range . }}
+    - {{ include "payments-edge.cellHost" (dict "cell" . "root" $) }}
+    {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    {{- $ports := list }}
+    {{- range . }}{{ $ports = append $ports (.port | default 8080 | int) }}{{ end }}
+    {{- range ($ports | uniq) }}
+    - {number: {{ . }}, name: http-router-{{ . }}, protocol: HTTP}
+    {{- end }}
+{{- end }}

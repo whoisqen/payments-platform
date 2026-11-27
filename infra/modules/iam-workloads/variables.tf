@@ -18,10 +18,10 @@ variable "environment" {
 
 variable "cell" {
   type        = string
-  description = "Cell whose cluster the roles serve, for example cell-0 or spare; part of every role name."
+  description = "Cluster the roles serve: a cell (cell-0 to cell-3, spare) or a shared cluster (locker, edge, control-center); part of every role name."
   validation {
-    condition     = can(regex("^(cell-[0-3]|spare)$", var.cell))
-    error_message = "cell must be cell-0 to cell-3 or spare."
+    condition     = can(regex("^(cell-[0-3]|spare|locker|edge|control-center)$", var.cell))
+    error_message = "cell must be cell-0 to cell-3, spare, locker, edge or control-center."
   }
 }
 
@@ -59,6 +59,7 @@ variable "memorydb" {
     cluster_arn = string
     users       = map(string)
   })
+  default     = null
   description = "MemoryDB cluster of the cell and the ACL user of each service (key = service name); a service without a user gets no MemoryDB access."
 }
 
@@ -70,7 +71,40 @@ variable "rds_db_connect_arns" {
 
 variable "locker_kms_key_arn" {
   type        = string
-  description = "Key of the locker; only the locker role may use it."
+  default     = null
+  description = "Key of the locker; only the locker role may use it. Required when services lists locker."
+}
+
+variable "cell_kms_key_arn" {
+  type        = string
+  default     = null
+  description = "Key of the cell (kms key_arns[<cell>]): router encrypts and decrypts with it, drainer and scheduler decrypt only. null grants nothing."
+}
+
+variable "services" {
+  type        = list(string)
+  default     = ["router", "locker", "drainer", "scheduler"]
+  description = "Workloads of this cluster that get a role (service account = name, namespace = workload_namespace); external-secrets always does."
+  validation {
+    condition     = alltrue([for s in var.services : contains(["router", "locker", "drainer", "scheduler"], s)])
+    error_message = "services may list router, locker, drainer and scheduler."
+  }
+}
+
+variable "workload_namespace" {
+  type        = string
+  default     = "payments"
+  description = "Namespace the ApplicationSets deploy the workloads to (payments for cells and the locker)."
+}
+
+variable "migrator" {
+  type = object({
+    db_connect_arns  = list(string)
+    backup_vault_arn = string
+    backup_role_arn  = string
+  })
+  default     = null
+  description = "Role of the migration Job (service account migrator): IAM login as hs_migrator on the writer (db_connect_arns), and the pre-migration AWS Backup job (start in backup_vault_arn, pass backup_role_arn). null creates no role."
 }
 
 variable "secrets_kms_key_arn" {
@@ -86,6 +120,7 @@ variable "secret_arns" {
 
 variable "dynamodb_table_arn" {
   type        = string
+  default     = null
   description = "Merchant-to-cell table; router and scheduler read it, nobody writes from a cell."
 }
 

@@ -15,7 +15,7 @@ import changed_images as ci  # noqa: E402
 CFG = ci.parse_paths((CI / "image-paths.yaml").read_text(encoding="utf-8"))
 AREAS = ci.parse_paths((CI / "areas.yaml").read_text(encoding="utf-8"))
 ROOT = CI.parents[1]
-RUST = {"rust_hyperswitch", "rust_card_vault"}
+RUST = {"rust_hyperswitch", "rust_card_vault", "rust_cell_lookup"}
 
 
 def areas(files, **kw):
@@ -142,7 +142,7 @@ class ChangedImagesTest(unittest.TestCase):
         files = Path(self.tmp) / "files"
         files.write_text("mise.toml\n", encoding="utf-8")
         out = self.run_main(["--files-from", str(files), "--mise-diff", str(diff)])
-        self.assertTrue(out["area_rust_hyperswitch"] and out["area_rust_card_vault"] and out["rust_all"])
+        self.assertTrue(out["area_rust_hyperswitch"] and out["area_rust_card_vault"] and out["area_rust_cell_lookup"] and out["rust_all"])
 
     def test_full_label_runs_every_area_and_every_crate(self):
         self.assertEqual(areas(["docs/a.md"], labels=["hotfix", "ci:full"]), ({k: True for k in AREAS["areas"]}, True))

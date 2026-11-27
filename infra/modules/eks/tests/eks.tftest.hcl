@@ -1,9 +1,10 @@
 mock_provider "aws" {
   mock_resource "aws_eks_cluster" {
     defaults = {
-      arn      = "arn:aws:eks:eu-central-1:111111111111:cluster/pay-dev-euc1-eks-cell-0"
-      endpoint = "https://ABC.gr7.eu-central-1.eks.amazonaws.com"
-      identity = [{ oidc = [{ issuer = "https://oidc.eks.eu-central-1.amazonaws.com/id/ABC" }] }]
+      arn                   = "arn:aws:eks:eu-central-1:111111111111:cluster/pay-dev-euc1-eks-cell-0"
+      endpoint              = "https://ABC.gr7.eu-central-1.eks.amazonaws.com"
+      certificate_authority = [{ data = "Q0EtREFUQQ==" }]
+      identity              = [{ oidc = [{ issuer = "https://oidc.eks.eu-central-1.amazonaws.com/id/ABC" }] }]
       vpc_config = [{
         cluster_security_group_id = "sg-0cluster"
         subnet_ids                = []
@@ -313,4 +314,27 @@ run "log_archive_is_validated" {
   }
 
   expect_failures = [var.log_archive]
+}
+
+run "argocd_name_drops_the_eks_prefix" {
+  command = plan
+
+  assert {
+    condition     = output.argocd_cluster_name == "pay-dev-euc1-cell-0"
+    error_message = "the Argo CD name drops the eks- prefix"
+  }
+}
+
+run "explicit_argocd_name" {
+  command = plan
+
+  variables {
+    component           = "eks-locker"
+    argocd_cluster_name = "pay-dev-euc1-locker"
+  }
+
+  assert {
+    condition     = output.argocd_cluster_name == "pay-dev-euc1-locker"
+    error_message = "explicit name wins"
+  }
 }

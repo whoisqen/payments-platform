@@ -94,6 +94,13 @@ resource "aws_iam_role_policy" "external_secrets" {
         Resource  = [var.kms_key_arn]
         Condition = { StringEquals = { "kms:ViaService" = "secretsmanager.${var.region}.amazonaws.com" } }
       },
+      # Vault runs in shared-services: its init secret holds the recovery keys and is read only by the audited break-glass role.
+      {
+        Sid      = "NeverReadVaultSecrets"
+        Effect   = "Deny"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = ["arn:aws:secretsmanager:${var.region}:${var.account_id}:secret:${var.name_prefix}/shared-services/vault/*"]
+      },
       {
         Sid    = "NeverWriteSecrets"
         Effect = "Deny"

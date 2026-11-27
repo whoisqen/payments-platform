@@ -11,11 +11,11 @@ variable "account_id" {
 variable "environment" {
   type        = string
   default     = "prod"
-  description = "Environment whose state this bucket holds; state keys start with it."
+  description = "State root (directory under infra/live) whose bucket and key this run creates; state keys start with it. Run shared-services first."
 
   validation {
-    condition     = contains(["dev", "stage", "prod"], var.environment)
-    error_message = "environment must be dev, stage or prod."
+    condition     = contains(["dev", "stage", "prod", "management", "security", "shared-services"], var.environment)
+    error_message = "environment must be dev, stage, prod, management, security or shared-services."
   }
 }
 
@@ -26,7 +26,8 @@ variable "github_repository" {
 
 variable "permissions_boundary_arn" {
   type        = string
-  description = "Boundary policy for the CI roles; it must exist before the first apply (created by the iam-baseline stack or by hand)."
+  default     = null
+  description = "Boundary of the CI roles; null uses workload-boundary of account_id, which the shared-services run creates."
 }
 
 variable "apply_roles" {

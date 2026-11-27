@@ -23,36 +23,23 @@ dependency "vpc" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
-dependency "eks_cell_0" {
-  config_path = "../../cell-0/eks"
+# The locker runs in its own cluster; its locker pod security group is the only client of the card-vault proxy.
+dependency "eks" {
+  config_path = "../eks"
 
   mock_outputs = {
-    cluster_name                 = "pay-mock-euc1-eks"
-    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
-    locker_pod_security_group_id = "sg-00000000"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
-}
-
-dependency "eks_spare" {
-  config_path = "../../spare/eks"
-
-  mock_outputs = {
-    cluster_name                 = "pay-mock-euc1-eks"
-    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks"
+    cluster_name                 = "pay-mock-euc1-eks-locker"
+    cluster_arn                  = "arn:aws:eks:eu-central-1:000000000000:cluster/pay-mock-euc1-eks-locker"
     locker_pod_security_group_id = "sg-00000000"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan"]
 }
 
 inputs = {
-  component       = "data-locker"
-  vpc_id          = dependency.vpc.outputs.vpc_id
-  data_subnet_ids = dependency.vpc.outputs.subnet_ids["data"]
-  client_security_group_ids = [
-    dependency.eks_cell_0.outputs.locker_pod_security_group_id,
-    dependency.eks_spare.outputs.locker_pod_security_group_id,
-  ]
+  component                 = "data-locker"
+  vpc_id                    = dependency.vpc.outputs.vpc_id
+  data_subnet_ids           = dependency.vpc.outputs.subnet_ids["data"]
+  client_security_group_ids = [dependency.eks.outputs.locker_pod_security_group_id]
   stores = {
     aurora = { port = 5432, clients = "aurora-proxy" }
     # Clients are the locker pod security groups only (PCI DSS 1.4); no cell-wide node group is listed.

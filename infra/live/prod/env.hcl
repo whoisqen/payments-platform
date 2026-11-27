@@ -8,7 +8,7 @@ locals {
   owner                      = local.cfg.owner.contact_email
   cost_center                = "${local.cfg.owner.cost_center_prefix}-prod"
 
-  state_kms_key_arn        = local.cfg.storage.state_kms_key_arn
+  state_kms_key_arn        = local.cfg.storage.state_kms_key_arns[local.environment]
   permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/workload-boundary"
   # Region switch role from ci-oidc-roles (vars.AWS_ROLE_DR_APPLY); the standby Argo CD install uses it as the installer.
   dr_apply_role_arn    = "arn:aws:iam::${local.account_id}:role/${local.cfg.naming.prefix}-prod-glob-dr-apply"
@@ -53,17 +53,18 @@ locals {
     scheduler = "on ~* &* +@all -@admin -@dangerous"
   }
 
-  # People get view only; ArgoCD is limited to the platform namespaces and never cluster-admin.
+  # People get view only; ArgoCD is limited to the namespaces it deploys to and never cluster-admin.
+  argocd_namespaces = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/argocd-namespaces.hcl").locals
   access_entries = {
     sre-view = {
       principal_arn = "arn:aws:iam::${local.account_id}:role/aws-reserved/sso.amazonaws.com/${local.cfg.access.sre_view_permission_set}"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
     }
     argocd = {
-      principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.storage.state_bucket_prefix}-prod-argocd-controller"
+      principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.naming.prefix}-prod-argocd-controller"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
       scope         = "namespace"
-      namespaces    = ["router", "locker", "drainer", "scheduler", "external-secrets", "karpenter", "istio-system", "kyverno"]
+      namespaces    = local.argocd_namespaces.workload
     }
   }
 
@@ -115,6 +116,6 @@ locals {
 
   # Argo CD of the analytics cluster reaches only its own namespaces.
   analytics_access_entries = merge(local.access_entries, {
-    argocd = merge(local.access_entries.argocd, { namespaces = ["clickhouse", "monitoring", "karpenter", "external-secrets"] })
+    argocd = merge(local.access_entries.argocd, { namespaces = local.argocd_namespaces.analytics })
   })
 }

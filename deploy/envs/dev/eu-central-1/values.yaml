@@ -5,3 +5,24 @@ global:
     - 10.120.8.0/22
   endpointCidrs:
     - 10.120.255.0/24
+  hyperswitch:
+    # Analytics events to the MSK cluster of the region (TLS with IAM auth); the brokers are placeholders until
+    # infra/live/dev/eu-central-1/analytics/msk exports bootstrap_brokers_sasl_iam
+    events:
+      kafka: true
+      brokers:
+        - b-1.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+        - b-2.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+        - b-3.pay-dev-euc1-msk.example.c1.kafka.eu-central-1.amazonaws.com:9098
+
+# The MSK brokers sit in the data subnets, like Aurora and MemoryDB
+router:
+  networkPolicy:
+    dataPorts: [5432, 6379, 9098]
+scheduler:
+  producer:
+    networkPolicy:
+      dataPorts: [5432, 6379, 9098]
+  consumer:
+    networkPolicy:
+      dataPorts: [5432, 6379, 9098]

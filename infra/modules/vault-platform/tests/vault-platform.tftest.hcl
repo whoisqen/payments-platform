@@ -99,7 +99,7 @@ run "bootstrap_policy_scoped_to_vault_secrets" {
   }
 
   assert {
-    condition     = jsondecode(aws_iam_role_policy.bootstrap.policy).Statement[1].Resource == ["arn:aws:kms:eu-central-1:111111111111:key/mrk-secrets"]
+    condition     = one([for st in jsondecode(aws_iam_role_policy.bootstrap.policy).Statement : st.Resource if st.Sid == "SecretsKey"]) == ["arn:aws:kms:eu-central-1:111111111111:key/mrk-secrets"]
     error_message = "secrets key only"
   }
 }

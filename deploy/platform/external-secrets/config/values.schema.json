@@ -79,6 +79,17 @@
         },
         "namespaceSelector": {
           "type": "object"
+        },
+        "audiences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "caBundle": {
+          "type": "string",
+          "description": "base64 PEM of the CA that signs the Vault endpoint"
         }
       }
     },

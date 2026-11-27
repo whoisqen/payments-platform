@@ -112,8 +112,8 @@ run "apply_state_prefix_is_its_own" {
   command = plan
 
   assert {
-    condition     = length([for s in jsondecode(aws_iam_role_policy.apply["network"].policy).Statement : s if s.Sid == "StateOfThisComponent" && endswith(s.Resource, "/prod/network/*")]) == 1
-    error_message = "state access limited to <env>/<component>/"
+    condition     = length([for s in jsondecode(aws_iam_role_policy.apply["network"].policy).Statement : s if s.Sid == "StateOfThisComponent" && contains(s.Resource, "arn:aws:s3:::pay-prod-euc1-tf-state-444444444444/prod/*/network/terraform.tfstate")]) == 1
+    error_message = "state access limited to the keys of its component"
   }
   assert {
     condition     = length([for s in jsondecode(aws_iam_role_policy.apply["network"].policy).Statement : s if s.Sid == "RolesNeedTheBoundary"]) == 1
@@ -291,4 +291,44 @@ run "dr_apply_from_another_environment_rejected" {
   }
 
   expect_failures = [var.dr_apply]
+}
+
+run "component_roles_follow_the_live_tree_and_the_real_state_keys" {
+  command = plan
+
+  variables {
+    apply_components = ["eks", "vpc"]
+    exec_account_ids = ["444444444444"]
+  }
+
+  assert {
+    condition     = aws_iam_role.component_apply["eks"].name == "pay-prod-glob-tf-apply-eks"
+    error_message = "role name pay-<env>-glob-tf-apply-<component>"
+  }
+  assert {
+    condition = anytrue([for s in jsondecode(aws_iam_role_policy.component_apply["eks"].policy).Statement : s.Sid == "StateOfThisComponent" &&
+    contains(s.Resource, "arn:aws:s3:::pay-prod-euc1-tf-state-444444444444/prod/*/eks/terraform.tfstate")])
+    error_message = "state of <env>/<region>/[<cell>/]<component>/terraform.tfstate"
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role.component_apply["eks"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:example-org/payments-platform:environment:prod"
+    error_message = "subject environment:<env>"
+  }
+  assert {
+    condition     = anytrue([for s in jsondecode(aws_iam_role_policy.component_apply["eks"].policy).Statement : s.Sid == "AssumeExecRole" && s.Resource == ["arn:aws:iam::444444444444:role/pay-prod-tf-exec"]])
+    error_message = "the apply role reaches the account through pay-<env>-tf-exec"
+  }
+}
+
+run "plan_reaches_the_account_through_the_exec_role" {
+  command = plan
+
+  variables {
+    exec_account_ids = ["444444444444"]
+  }
+
+  assert {
+    condition     = anytrue([for s in jsondecode(aws_iam_role_policy.plan.policy).Statement : s.Sid == "AssumeExecRole"])
+    error_message = "plan assumes the exec role"
+  }
 }

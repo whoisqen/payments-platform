@@ -111,6 +111,13 @@ resource "aws_iam_role_policy" "bootstrap" {
         Resource = [local.secret_arn_pattern]
       },
       {
+        # The Argo CD registrations of every cluster name its OIDC issuer: the bootstrap configures one jwt auth mount per cluster
+        Sid      = "ReadClusterRegistrations"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+        Resource = ["arn:aws:secretsmanager:${var.region}:${var.account_id}:secret:${var.name_prefix}/argocd/clusters/*"]
+      },
+      {
         Sid       = "SecretsKey"
         Effect    = "Allow"
         Action    = ["kms:GenerateDataKey", "kms:Decrypt"]

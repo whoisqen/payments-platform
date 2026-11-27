@@ -53,7 +53,12 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.sources[4].path
-          value: deploy/platform/kube-prometheus/manifests
+          value: deploy/platform/central-tls
+      - contains:
+          path: spec.template.spec.sources[4].helm.parameters
+          content:
+            name: secretName
+            value: prometheus-central-tls
   - it: switches deduplication on in the query and storage nodes with the configured interval
     template: addons/central/victoria-metrics.yaml
     asserts:

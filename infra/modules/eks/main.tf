@@ -19,6 +19,7 @@ locals {
 
   region_short = join("", [split("-", var.region)[0], substr(split("-", var.region)[1], 0, 1), split("-", var.region)[2]])
   name         = "${var.name_prefix}-${var.environment}-${local.region_short}-${var.component}"
+  argocd_name  = coalesce(var.argocd_cluster_name, "${var.name_prefix}-${var.environment}-${local.region_short}-${trimprefix(var.component, "eks-")}")
 
   pods_trust = jsonencode({
     Version = "2012-10-17"
@@ -447,3 +448,4 @@ resource "aws_eks_addon" "after_compute" {
 
   depends_on = [aws_eks_node_group.bootstrap]
 }
+

@@ -1,64 +1,160 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "seconds": { "type": "string", "pattern": "^[0-9]+s$" },
-    "fraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "seconds": {
+      "type": "string",
+      "pattern": "^[0-9]+s$"
+    },
+    "fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
     "bucket": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["maxTokens", "tokensPerFill", "fillInterval"],
+      "required": [
+        "maxTokens",
+        "tokensPerFill",
+        "fillInterval"
+      ],
       "properties": {
-        "maxTokens": { "type": "integer", "minimum": 1 },
-        "tokensPerFill": { "type": "integer", "minimum": 1 },
-        "fillInterval": { "$ref": "#/$defs/seconds" }
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tokensPerFill": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fillInterval": {
+          "$ref": "#/$defs/seconds"
+        }
       }
     },
     "prefixes": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "pattern": "^/[A-Za-z0-9/_.-]*$" }
+      "items": {
+        "type": "string",
+        "pattern": "^/[A-Za-z0-9/_.-]*$"
+      }
     },
     "thresholds": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["disableKeepalive", "stopAcceptingRequests", "stopAcceptingConnections"],
+      "required": [
+        "disableKeepalive",
+        "stopAcceptingRequests",
+        "stopAcceptingConnections"
+      ],
       "properties": {
-        "disableKeepalive": { "$ref": "#/$defs/fraction" },
-        "stopAcceptingRequests": { "$ref": "#/$defs/fraction" },
-        "stopAcceptingConnections": { "$ref": "#/$defs/fraction" }
+        "disableKeepalive": {
+          "$ref": "#/$defs/fraction"
+        },
+        "stopAcceptingRequests": {
+          "$ref": "#/$defs/fraction"
+        },
+        "stopAcceptingConnections": {
+          "$ref": "#/$defs/fraction"
+        }
       }
     }
   },
   "type": "object",
   "additionalProperties": false,
-  "required": ["global", "gateway", "certificate", "routing", "classes", "rateLimit", "overload"],
+  "required": [
+    "global",
+    "gateway",
+    "certificate",
+    "routing",
+    "classes",
+    "rateLimit",
+    "overload"
+  ],
   "properties": {
     "global": {
       "type": "object",
-      "required": ["environment", "region"],
+      "required": [
+        "environment",
+        "region"
+      ],
       "properties": {
-        "environment": { "enum": ["dev", "stage", "prod"] },
-        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" }
+        "environment": {
+          "enum": [
+            "dev",
+            "stage",
+            "prod"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[a-z]+-[0-9]$"
+        }
       }
     },
     "gateway": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["className", "hosts", "tlsCredentialName", "minTlsVersion", "serviceAnnotations", "autoscaling"],
+      "required": [
+        "className",
+        "hosts",
+        "tlsCredentialName",
+        "minTlsVersion",
+        "serviceAnnotations",
+        "autoscaling"
+      ],
       "properties": {
-        "className": { "type": "string", "minLength": 1 },
-        "hosts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
-        "tlsCredentialName": { "type": "string", "minLength": 1 },
-        "minTlsVersion": { "enum": ["TLSv1_2", "TLSv1_3"] },
-        "serviceAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "className": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "tlsCredentialName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minTlsVersion": {
+          "enum": [
+            "TLSv1_2",
+            "TLSv1_3"
+          ]
+        },
+        "serviceAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "autoscaling": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"],
+          "required": [
+            "minReplicas",
+            "maxReplicas",
+            "targetCPUUtilizationPercentage"
+          ],
           "properties": {
-            "minReplicas": { "type": "integer", "minimum": 2 },
-            "maxReplicas": { "type": "integer", "minimum": 2 },
-            "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 20, "maximum": 90 }
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 90
+            }
           }
         }
       }
@@ -66,59 +162,143 @@
     "certificate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["issuerName", "issuerKind", "duration", "renewBefore"],
+      "required": [
+        "issuerName",
+        "issuerKind",
+        "duration",
+        "renewBefore"
+      ],
       "properties": {
-        "issuerName": { "type": "string", "minLength": 1 },
-        "issuerKind": { "enum": ["Issuer", "ClusterIssuer"] },
-        "duration": { "type": "string", "pattern": "^[0-9]+h$" },
-        "renewBefore": { "type": "string", "pattern": "^[0-9]+h$" }
+        "issuerName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerKind": {
+          "enum": [
+            "Issuer",
+            "ClusterIssuer"
+          ]
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^[0-9]+h$"
+        },
+        "renewBefore": {
+          "type": "string",
+          "pattern": "^[0-9]+h$"
+        }
       }
     },
     "routing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cellHeader", "rateKeyHeader", "apiKeyHeader", "authHeader", "timeout", "cells"],
+      "required": [
+        "cellHeader",
+        "rateKeyHeader",
+        "apiKeyHeader",
+        "authHeader",
+        "timeout",
+        "cells"
+      ],
       "properties": {
-        "cellHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "rateKeyHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "apiKeyHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "authHeader": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "timeout": { "$ref": "#/$defs/seconds" },
+        "cellHeader": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "rateKeyHeader": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "apiKeyHeader": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "authHeader": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "timeout": {
+          "$ref": "#/$defs/seconds"
+        },
         "cells": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "host"],
+            "required": [
+              "name"
+            ],
             "properties": {
-              "name": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" },
-              "host": { "type": "string", "minLength": 1 },
-              "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              "name": {
+                "type": "string",
+                "pattern": "^(cell-[0-3]|spare)$"
+              },
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-z0-9.-]+$"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
             }
           }
+        },
+        "clusterDomain": {
+          "type": "string",
+          "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]*$"
         }
       }
     },
     "classes": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["header", "list", "read"],
+      "required": [
+        "header",
+        "list",
+        "read"
+      ],
       "properties": {
-        "header": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "header": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
         "list": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["prefixes"],
-          "properties": { "prefixes": { "$ref": "#/$defs/prefixes" } }
+          "required": [
+            "prefixes"
+          ],
+          "properties": {
+            "prefixes": {
+              "$ref": "#/$defs/prefixes"
+            }
+          }
         },
         "read": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["methods", "prefixes"],
+          "required": [
+            "methods",
+            "prefixes"
+          ],
           "properties": {
-            "methods": { "type": "array", "minItems": 1, "items": { "enum": ["GET", "HEAD"] } },
-            "prefixes": { "$ref": "#/$defs/prefixes" }
+            "methods": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  "GET",
+                  "HEAD"
+                ]
+              }
+            },
+            "prefixes": {
+              "$ref": "#/$defs/prefixes"
+            }
           }
         }
       }
@@ -126,43 +306,110 @@
     "rateLimit": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["retryAfterSeconds", "local", "global"],
+      "required": [
+        "retryAfterSeconds",
+        "local",
+        "global"
+      ],
       "properties": {
-        "retryAfterSeconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "retryAfterSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
         "local": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["maxTokens", "tokensPerFill", "fillInterval", "classes", "enabledKey", "enforcedKey"],
+          "required": [
+            "maxTokens",
+            "tokensPerFill",
+            "fillInterval",
+            "classes",
+            "enabledKey",
+            "enforcedKey"
+          ],
           "properties": {
-            "maxTokens": { "type": "integer", "minimum": 1 },
-            "tokensPerFill": { "type": "integer", "minimum": 1 },
-            "fillInterval": { "$ref": "#/$defs/seconds" },
+            "maxTokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tokensPerFill": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "fillInterval": {
+              "$ref": "#/$defs/seconds"
+            },
             "classes": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["list", "read", "payments"],
+              "required": [
+                "list",
+                "read",
+                "payments"
+              ],
               "properties": {
-                "list": { "$ref": "#/$defs/bucket" },
-                "read": { "$ref": "#/$defs/bucket" },
-                "payments": { "$ref": "#/$defs/bucket" }
+                "list": {
+                  "$ref": "#/$defs/bucket"
+                },
+                "read": {
+                  "$ref": "#/$defs/bucket"
+                },
+                "payments": {
+                  "$ref": "#/$defs/bucket"
+                }
               }
             },
-            "enabledKey": { "type": "string", "pattern": "^[a-z0-9_.]+$" },
-            "enforcedKey": { "type": "string", "pattern": "^[a-z0-9_.]+$" }
+            "enabledKey": {
+              "type": "string",
+              "pattern": "^[a-z0-9_.]+$"
+            },
+            "enforcedKey": {
+              "type": "string",
+              "pattern": "^[a-z0-9_.]+$"
+            }
           }
         },
         "global": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "domain", "cluster", "address", "port", "timeout", "failureModeDeny"],
+          "required": [
+            "enabled",
+            "domain",
+            "cluster",
+            "address",
+            "port",
+            "timeout",
+            "failureModeDeny"
+          ],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "domain": { "type": "string", "minLength": 1 },
-            "cluster": { "type": "string", "minLength": 1 },
-            "address": { "type": "string", "minLength": 1 },
-            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-            "timeout": { "type": "string", "pattern": "^[0-9]+ms$" },
-            "failureModeDeny": { "const": false }
+            "enabled": {
+              "type": "boolean"
+            },
+            "domain": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cluster": {
+              "type": "string",
+              "minLength": 1
+            },
+            "address": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+ms$"
+            },
+            "failureModeDeny": {
+              "const": false
+            }
           }
         }
       }
@@ -170,14 +417,36 @@
     "overload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "refreshInterval", "maxHeapBytes", "maxDownstreamConnections", "heap", "connections"],
+      "required": [
+        "enabled",
+        "refreshInterval",
+        "maxHeapBytes",
+        "maxDownstreamConnections",
+        "heap",
+        "connections"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "refreshInterval": { "type": "string", "pattern": "^[0-9.]+s$" },
-        "maxHeapBytes": { "type": "integer", "minimum": 67108864 },
-        "maxDownstreamConnections": { "type": "integer", "minimum": 1 },
-        "heap": { "$ref": "#/$defs/thresholds" },
-        "connections": { "$ref": "#/$defs/thresholds" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9.]+s$"
+        },
+        "maxHeapBytes": {
+          "type": "integer",
+          "minimum": 67108864
+        },
+        "maxDownstreamConnections": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "heap": {
+          "$ref": "#/$defs/thresholds"
+        },
+        "connections": {
+          "$ref": "#/$defs/thresholds"
+        }
       }
     }
   }

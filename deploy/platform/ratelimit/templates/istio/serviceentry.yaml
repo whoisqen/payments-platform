@@ -1,0 +1,25 @@
+{{- /* outboundTrafficPolicy REGISTRY_ONLY: the rate limit Redis is outside the mesh. Cluster mode follows node addresses, so the
+original destination inside redis.egressCidrs is kept (resolution NONE, TCP) */ -}}
+{{- $ep := .Values.redis.endpoint }}
+{{- if and $ep (not (hasPrefix "REPLACE_" $ep)) }}
+{{- $host := regexReplaceAll ":[0-9]+$" $ep "" }}
+{{- $port := regexFind "[0-9]+$" $ep | default "6379" }}
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: ratelimit-redis
+  labels:
+    {{- include "platform-common.labels" (dict "root" . "cfg" .Values "name" "ratelimit" "component" "ratelimit") | nindent 4 }}
+spec:
+  hosts:
+    - {{ $host }}
+  {{- with .Values.redis.egressCidrs }}
+  addresses:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: {{ ternary "NONE" "DNS" (and (eq .Values.redis.type "cluster") (not (empty .Values.redis.egressCidrs))) }}
+  ports:
+    - {number: {{ $port }}, name: tcp-redis, protocol: TCP}
+{{- end }}

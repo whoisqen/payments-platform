@@ -65,7 +65,7 @@
 {{- $_ := set $e "ROUTER__MULTITENANCY__GLOBAL_TENANT__SCHEMA" "public" -}}
 {{- $_ := set $e "ROUTER__MULTITENANCY__GLOBAL_TENANT__REDIS_KEY_PREFIX" "" -}}
 {{- $_ := set $e "ROUTER__MULTITENANCY__GLOBAL_TENANT__CLICKHOUSE_DATABASE" "default" -}}
-{{- $_ := set $e "ROUTER__LOCKER__HOST" ($l.host | default (printf "http://%s.%s.svc.cluster.local:%v" $l.service $l.namespace $l.port)) -}}
+{{- $_ := set $e "ROUTER__LOCKER__HOST" (include "platform-common.hyperswitch.lockerUrl" $c) -}}
 {{- $_ := set $e "ROUTER__LOCKER__MOCK_LOCKER" "false" -}}
 {{- $_ := set $e "ROUTER__LOCKER__LOCKER_ENABLED" "true" -}}
 {{- $_ := set $e "ROUTER__KEY_MANAGER__ENABLED" "false" -}}
@@ -73,7 +73,13 @@
 {{- if $c.events.kafka }}
 {{- $_ := set $e "ROUTER__EVENTS__SOURCE" "kafka" -}}
 {{- $_ := set $e "ROUTER__EVENTS__KAFKA__BROKERS" (join "," (required "global.hyperswitch.events.brokers is required when events.kafka is true" $c.events.brokers)) -}}
-{{- $topics := dict "INTENT_ANALYTICS" "payment-intent" "ATTEMPT_ANALYTICS" "payment-attempt" "REFUND_ANALYTICS" "refund" "API_LOGS" "api-log" "CONNECTOR_LOGS" "outgoing-connector" "OUTGOING_WEBHOOK_LOGS" "outgoing-webhook" "DISPUTE_ANALYTICS" "dispute" "AUDIT_EVENTS" "audit" "PAYOUT_ANALYTICS" "payout" "CONSOLIDATED_EVENTS" "consolidated" "AUTHENTICATION_ANALYTICS" "authentication" "FRAUD_CHECK_ANALYTICS" "fraud-check" "ROUTING_LOGS" "routing-api" "REVENUE_RECOVERY" "revenue-recovery" "EXTERNAL_SERVICE_CALL" "external-service-call" "ACCOUNT_UPDATER" "account-updater" -}}
+{{- $_ := set $e "ROUTER__EVENTS__KAFKA__SECURITY_PROTOCOL" $c.events.securityProtocol -}}
+{{- if eq $c.events.securityProtocol "SASL_SSL" }}
+{{- $_ := set $e "ROUTER__EVENTS__KAFKA__SASL_MECHANISM" $c.events.saslMechanism -}}
+{{- $_ := set $e "ROUTER__EVENTS__KAFKA__SASL_OAUTHBEARER_PROVIDER" $c.events.oauthbearerProvider -}}
+{{- $_ := set $e "ROUTER__EVENTS__KAFKA__AWS_REGION" ($c.events.awsRegion | default $g.region | default "eu-central-1") -}}
+{{- end -}}
+{{- $topics := include "platform-common.hyperswitch.topics" (dict) | fromYaml -}}
 {{- range $k, $v := $topics }}
 {{- $_ := set $e (printf "ROUTER__EVENTS__KAFKA__%s_TOPIC" $k) (printf "%s-%s-events" $c.events.topicPrefix $v) -}}
 {{- end -}}
@@ -97,4 +103,18 @@
 {{- fail (printf "%s: %s looks like a secret; map it under secrets so it comes from Vault" $.name $k) -}}
 {{- end -}}
 {{- end -}}
+{{- end }}
+
+{{/* Locker URL of the router and scheduler: the explicit host, the cross-cluster name, or the in-cluster Service */}}
+{{- define "platform-common.hyperswitch.lockerUrl" -}}
+{{- $l := .locker -}}
+{{- if $l.host -}}{{ $l.host }}
+{{- else if $l.clusterDomain -}}{{ printf "http://%s.%s.svc.locker.%s:%v" $l.service $l.namespace $l.clusterDomain $l.port }}
+{{- else -}}{{ printf "http://%s.%s.svc.cluster.local:%v" $l.service $l.namespace $l.port }}
+{{- end -}}
+{{- end }}
+
+{{/* The router event settings and their topics, <topicPrefix>-<event>-events; the kafka-topics add-on creates the same list */}}
+{{- define "platform-common.hyperswitch.topics" -}}
+{{- toYaml (dict "INTENT_ANALYTICS" "payment-intent" "ATTEMPT_ANALYTICS" "payment-attempt" "REFUND_ANALYTICS" "refund" "API_LOGS" "api-log" "CONNECTOR_LOGS" "outgoing-connector" "OUTGOING_WEBHOOK_LOGS" "outgoing-webhook" "DISPUTE_ANALYTICS" "dispute" "AUDIT_EVENTS" "audit" "PAYOUT_ANALYTICS" "payout" "CONSOLIDATED_EVENTS" "consolidated" "AUTHENTICATION_ANALYTICS" "authentication" "FRAUD_CHECK_ANALYTICS" "fraud-check" "ROUTING_LOGS" "routing-api" "REVENUE_RECOVERY" "revenue-recovery" "EXTERNAL_SERVICE_CALL" "external-service-call" "ACCOUNT_UPDATER" "account-updater") -}}
 {{- end }}

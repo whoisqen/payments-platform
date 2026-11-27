@@ -5,6 +5,8 @@ global:
   # Own ECR prefix (restrict-registries rejects Docker Hub); the environment layer sets it
   registry: REPLACE_REGISTRY
   environment: REPLACE_ENVIRONMENT
+  # naming.prefix of config/platform.yaml; the Argo CD ApplicationSet passes it
+  namePrefix: pay
 
 # Mirror of docker.io/envoyproxy/ratelimit copied with the index preserved, so the digest matches upstream
 image:
@@ -55,7 +57,7 @@ redis:
   type: cluster
   tls: true
   poolSize: 10
-  # ExternalSecret from store aws-secrets-manager, key pay/<environment>/ratelimit/redis, JSON key auth
+  # ExternalSecret from store aws-secrets-manager, key <namePrefix>/<environment>/ratelimit/redis, JSON key auth
   secret:
     name: ratelimit-redis
     store: aws-secrets-manager

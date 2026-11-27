@@ -15,6 +15,11 @@ terraform {
   source = "${get_repo_root()}/infra/modules//eks"
 }
 
+# The argocd access entry names <prefix>-<env>-argocd-controller, which argocd-access of the environment creates.
+dependencies {
+  paths = ["${dirname(find_in_parent_folders("env.hcl"))}/eu-central-1/argocd-access"]
+}
+
 # Analytics cluster pay-<env>-<region-short>-eks-analytics: ClickHouse and its Keeper, outside the CDE, so never inside a cell cluster.
 inputs = {
   component                = "eks-analytics"

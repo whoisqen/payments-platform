@@ -144,3 +144,13 @@ run "webhook_urls_cannot_be_generated" {
 
   expect_failures = [var.generated_secrets]
 }
+
+run "vault_recovery_keys_stay_out_of_reach" {
+  command = apply
+
+  assert {
+    condition = anytrue([for s in jsondecode(aws_iam_role_policy.external_secrets.policy).Statement :
+    s.Effect == "Deny" && contains(s.Action, "secretsmanager:GetSecretValue") && s.Resource == ["arn:aws:secretsmanager:eu-central-1:222222222222:secret:pay/shared-services/vault/*"]])
+    error_message = "External Secrets never reads pay/shared-services/vault/*"
+  }
+}

@@ -88,3 +88,11 @@ tests:
       - lengthEqual:
           path: spec.template.spec.sources
           count: 3
+  - it: signs the MSK IAM auth of the kafka exporter for the region of its cluster
+    template: addons/exporters/kafka.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: sasl.awsiam.awsRegion
+            value: '{{ index .metadata.labels "payments-platform/region" }}'

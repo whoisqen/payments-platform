@@ -7,6 +7,7 @@ templates:
 set:
   global.registry: registry.example.test/acme
   global.cell: cell-1
+  global.accountId: "111111111111"
   global.environment: dev
   global.region: eu-central-1
   global.dataCidrs: ["10.120.0.0/16"]
@@ -66,3 +67,9 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: maxReplicas must not be lower than minReplicas
+  - it: derives the snapshot target of the cell from the naming convention
+    template: charts/migrations/templates/job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: SNAPSHOT_VAULT, value: pay-dev-euc1-backup}

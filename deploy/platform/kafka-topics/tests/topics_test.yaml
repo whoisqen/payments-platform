@@ -1,0 +1,63 @@
+suite: kafka-topics creates the router event topics on MSK
+templates:
+  - configmap.yaml
+  - job.yaml
+  - networkpolicy.yaml
+values:
+  - ../ci/lint-values.yaml
+tests:
+  - it: lists every topic the router produces to, named hyperswitch-<event>-events
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["topics.txt"]
+          pattern: "(?m)^hyperswitch-payment-attempt-events$"
+      - matchRegex:
+          path: data["topics.txt"]
+          pattern: "(?m)^hyperswitch-api-log-events$"
+      - notMatchRegex:
+          path: data["topics.txt"]
+          pattern: "(?m)^payment-events$"
+  - it: connects with TLS and IAM auth
+    template: configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["client.properties"]
+          pattern: "sasl.mechanism=AWS_MSK_IAM"
+      - matchRegex:
+          path: data["create-topics.sh"]
+          pattern: "--if-not-exists"
+  - it: runs once per topic list with the brokers and region
+    template: job.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^kafka-topics-[0-9a-f]{8}$
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: BOOTSTRAP, value: "b-1.msk.example.test:9098,b-2.msk.example.test:9098"}
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/kafka-admin@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - it: opens only the broker port and the Pod Identity agent
+    template: networkpolicy.yaml
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 10.120.96.0/22}}]
+            ports: [{port: 9098, protocol: TCP}]
+  - it: renders nothing with the placeholder image
+    template: job.yaml
+    set:
+      image.digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: renders nothing without brokers (a region without MSK)
+    template: job.yaml
+    set:
+      brokers: []
+    asserts:
+      - hasDocuments:
+          count: 0

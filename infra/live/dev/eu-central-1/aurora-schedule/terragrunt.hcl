@@ -4,6 +4,6 @@ include "root" {
 }
 
 include "envcommon" {
-  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/data/aurora-schedule.hcl"
+  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/operations/aurora-schedule.hcl"
   expose = true
 }

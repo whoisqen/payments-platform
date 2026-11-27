@@ -4,6 +4,7 @@ global:
   cell: cell-0
   environment: dev
   region: eu-central-1
+  accountId: "111111111111"
   dataCidrs: ["10.120.0.0/16"]
   endpointCidrs: ["10.120.255.0/24"]
   hyperswitch:

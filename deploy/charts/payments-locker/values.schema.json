@@ -1,21 +1,189 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["global"],
+  "required": [
+    "global"
+  ],
   "properties": {
     "global": {
       "type": "object",
-      "required": ["environment", "region", "dataCidrs", "endpointCidrs", "registry"],
+      "required": [
+        "environment",
+        "region",
+        "dataCidrs",
+        "endpointCidrs",
+        "registry"
+      ],
       "properties": {
-        "registry": { "type": "string", "minLength": 1 },
-        "workingHours": { "type": "object", "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).", "required": ["timezone", "start", "end"], "additionalProperties": false, "properties": { "timezone": { "type": "string", "minLength": 1 }, "start": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" }, "end": { "type": "string", "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$" } } },
-        "environment": { "enum": ["dev", "stage", "prod"] },
-        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
-        "dataCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 },
-        "endpointCidrs": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$" }, "minItems": 1 }
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment": {
+          "enum": [
+            "dev",
+            "stage",
+            "prod"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[a-z]+-[0-9]$"
+        },
+        "dataCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$"
+          },
+          "minItems": 1
+        },
+        "endpointCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$"
+          },
+          "minItems": 1
+        },
+        "workingHours": {
+          "type": "object",
+          "description": "Working window of dev and stage: workloads hold their floor inside it and scale to zero outside it (KEDA cron).",
+          "required": [
+            "timezone",
+            "start",
+            "end"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+            }
+          }
+        }
       }
     },
-    "locker": { "type": "object" },
-    "locker-migrations": { "type": "object" }
+    "locker": {
+      "type": "object"
+    },
+    "locker-migrations": {
+      "type": "object"
+    },
+    "egress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceEntries",
+        "awsServices",
+        "podIdentityAgent"
+      ],
+      "properties": {
+        "serviceEntries": {
+          "type": "boolean"
+        },
+        "awsServices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          }
+        },
+        "podIdentityAgent": {
+          "type": "string",
+          "pattern": "^[0-9.]+$"
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "clusterDomain",
+        "port",
+        "secretName",
+        "targetGroupArn",
+        "clientPrincipals",
+        "pki"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clusterDomain": {
+          "type": "string",
+          "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]*$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetGroupArn": {
+          "type": "string",
+          "pattern": "^(arn:aws:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/.+|REPLACE_[A-Z_]+)$"
+        },
+        "clientPrincipals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+/ns/[a-z0-9-]+/sa/[a-z0-9-]+$"
+          }
+        },
+        "pki": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mount",
+            "vaultServer",
+            "authMount",
+            "serviceAccount",
+            "ttl",
+            "refreshInterval"
+          ],
+          "properties": {
+            "mount": {
+              "type": "string"
+            },
+            "vaultServer": {
+              "type": "string",
+              "pattern": "^(https://[a-z0-9.-]+(:[0-9]+)?)?$"
+            },
+            "authMount": {
+              "type": "string"
+            },
+            "serviceAccount": {
+              "type": "string"
+            },
+            "ttl": {
+              "type": "string",
+              "pattern": "^[0-9]+h$"
+            },
+            "refreshInterval": {
+              "type": "string",
+              "pattern": "^[0-9]+h$"
+            },
+            "caBundle": {
+              "type": "string",
+              "description": "base64 PEM of the CA that signs the Vault endpoint (vault.ca_bundle of config/platform.yaml)"
+            }
+          }
+        }
+      }
+    }
   }
 }

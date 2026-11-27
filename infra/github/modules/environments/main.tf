@@ -4,6 +4,14 @@ locals {
     stage    = []
     prod     = var.reviewers ? [var.teams.sre] : []
     cde-prod = var.reviewers ? [var.teams.sre, var.teams.security] : []
+    # State roots of the organization accounts: their apply roles trust environment:<root>.
+    management        = var.reviewers ? [var.teams.sre, var.teams.security] : []
+    security          = var.reviewers ? [var.teams.sre, var.teams.security] : []
+    "shared-services" = var.reviewers ? [var.teams.sre] : []
+    # runbook-actions.yml runs the write steps of a runbook after the approval of runbook-<env>.
+    runbook-dev   = []
+    runbook-stage = var.reviewers ? [var.teams.sre] : []
+    runbook-prod  = var.reviewers ? [var.teams.sre] : []
   }
 }
 

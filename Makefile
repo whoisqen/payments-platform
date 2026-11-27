@@ -5,7 +5,7 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard services/cell-copy/tests tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ci/infra/tests tools/ci/runbook/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 # New linters start in report mode; LINT_STRICT=1 (CI: repository variable LINT_STRICT=true) makes their findings block.
@@ -14,7 +14,7 @@ export LINT_STRICT
 REPORT := tools/ci/lint/report.sh
 TF_ROOTS := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/main.tf infra/github/modules/*/main.tf)))
 
-.PHONY: help bootstrap lint test plan image-amd64 lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
+.PHONY: help bootstrap lint test plan render image-amd64 lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
 	lint-report lint-ruff lint-yaml lint-tflint lint-kube test-python test-terraform test-helm test-policy test-alerts test-node \
 	component integration
 
@@ -32,20 +32,13 @@ lint-repo:
 	tools/lint/spec-lint
 	tools/lint/structure
 	python3 tools/config/validate.py
-	python3 tools/config/render_standby.py --check
 	python3 observability/lib/build.py --check
 	python3 observability/lib/gen_resilience.py --check
 	python3 observability/slo/generate.py --check
-	python3 tools/config/render_central.py --check
-	python3 tools/config/render_victoria.py --check
-	python3 tools/config/render/render_vmalert.py --check
-	python3 tools/config/render_vault.py --check
-	python3 tools/config/render_sentry.py --check
-	python3 tools/config/render_grafana.py --check
-	python3 tools/config/render_exporters.py --check
-	python3 tools/config/render_otel.py --check
-	python3 tools/config/render/render_admin_gateway.py --check
-	python3 tools/config/render/render_admin_sso.py --check
+	python3 tools/config/render --check
+
+render: ## rewrite every file generated from config/platform.yaml (tools/config generators)
+	python3 tools/config/render
 
 lint-workflows:
 	actionlint $(WORKFLOWS)
@@ -56,7 +49,7 @@ lint-migrations: ## migrations added or changed against origin/main
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
 	python3 tools/ci/buildkit/buildkit_pin_check.py
-	shellcheck docker/_common/collect-libs.sh scripts/*/*.sh
+	shellcheck docker/_common/collect-libs.sh docker/migrator/*.sh scripts/*/*.sh tools/ci/runbook/*.sh
 	@if command -v hadolint >/dev/null; then hadolint --failure-threshold warning --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi
 

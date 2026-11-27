@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Write the per-environment values of the Vault and External Secrets add-ons from config/platform.yaml.
 
-Files per environment and region (selected by the cluster labels payments-platform/environment and /region):
-  deploy/platform/vault/envs/<env>/<region>.yaml          values of the upstream vault chart
-  deploy/platform/vault/envs/<env>/<region>.config.yaml   values of the vault-config chart
+One Vault serves every environment from the central cluster of shared-services:
+  deploy/platform/vault/envs/shared-services/<region>.yaml          values of the upstream vault chart
+  deploy/platform/vault/envs/shared-services/<region>.config.yaml   values of the vault-config chart, with the cluster list
+Per environment and region of the clusters (selected by the cluster labels payments-platform/environment and /region):
   deploy/platform/external-secrets/envs/<env>/<region>.yaml  values of the external-secrets-config chart
 Names follow <prefix>-<env>-<region short>-<component>; roles come from EKS Pod Identity associations (Terraform), so no role ARN is written.
 The one value left to CI is the snapshot image digest (deploy/envs/<env>/images.yaml, key vault-snapshot).
@@ -15,8 +16,11 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "render"))
+import clusters  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
-VAULT_PORT = 8200
+VAULT_PORT = 443  # the internal admin gateway of shared-services terminates TLS for vault.<admin zone>
 
 
 def short(region):
@@ -25,18 +29,14 @@ def short(region):
 
 
 def environments(cfg):
-    """Environment -> regions: the working region, plus the standby region where the environment has one."""
-    work, recovery = cfg["regions"]["working"], cfg["regions"]["recovery"]
+    """Environment -> regions of the clusters that read Vault: the working region, plus us-east-1 where the environment has its standby."""
     out = {}
-    for env in ("dev", "stage", "prod"):
-        # prod appears only once config/platform.yaml carries its account and zone
-        if env not in cfg["accounts"] or f"{env}_zone" not in cfg["dns"]:
-            continue
-        standby = list((cfg.get("deploy", {}).get(env, {}).get("standby") or {}))
-        if env == "prod" and not standby:
-            standby = recovery[:1]
-        out[env] = [work] + standby
-    return out
+    for c in clusters.clusters(cfg):
+        if c["environment"] in ("dev", "stage", "prod"):
+            out.setdefault(c["environment"], [])
+            if c["region"] not in out[c["environment"]]:
+                out[c["environment"]].append(c["region"])
+    return {e: sorted(r, key=lambda x: x != cfg["regions"]["working"]) for e, r in out.items()}
 
 
 def cidrs(items, indent):
@@ -50,51 +50,54 @@ def endpoint_cidrs(cfg, env, region):
     return d["standby"][region]["endpoint_cidrs"]
 
 
-def cells(cfg, env):
-    """Cells of the environment: the working-region cell directories of deploy/envs, the same list the ApplicationSets deploy."""
-    base = ROOT / "deploy" / "envs" / env / cfg["regions"]["working"]
-    names = sorted(d.name for d in base.iterdir() if d.is_dir() and (d.name.startswith("cell-") or d.name == "spare"))
-    # cell-0 runs Vault, so its mount is the local one
-    return "".join(f"      - {{name: {c}, authMount: {'kubernetes' if c == 'cell-0' else 'kubernetes-' + c}}}\n" for c in names)
-
-
 def render(cfg):
+    """One Vault in shared-services (central cluster) serves every environment; every other cluster reads it through its own jwt mount."""
     p, reg = cfg["naming"]["prefix"], cfg["registry"]
     repo = f"{reg['ecr_prefix']}/{reg['ecr_repo_prefix']}/vault-snapshot"
+    working = cfg["regions"]["working"]
+    ss_vpc = cfg["network"]["shared_services"][working]
+    host = cfg["vault"]["host"]
+    name = f"{p}-shared-services-{short(working)}"
+    envs = environments(cfg)
+    client_vpcs = [cfg["network"][e][r] for e, regions in envs.items() for r in regions]
+    remote = [c for c in clusters.clusters(cfg) if c["environment"] != "shared-services"]
     files = {}
-    for env, regions in environments(cfg).items():
-        zone = cfg["dns"][f"{env}_zone"]
-        for region in regions:
-            name = f"{p}-{env}-{short(region)}"
-            ep = cidrs(endpoint_cidrs(cfg, env, region), 4)
-            vpc = cfg["network"][env][region]
-            files[f"vault/envs/{env}/{region}.yaml"] = f"""# {env} {region}: unseal key and region of the Vault servers; the pod role comes from the Pod Identity association vault/vault
+    files[f"vault/envs/shared-services/{working}.yaml"] = f"""# shared-services {working}: the one Vault of the platform (central cluster); unseal key and region of the servers, the pod role comes from the Pod Identity association vault/vault
 server:
   extraEnvironmentVars:
-    AWS_REGION: {region}
+    AWS_REGION: {working}
     VAULT_AWSKMS_SEAL_KEY_ID: alias/{name}-vault-unseal
 """
-            files[f"vault/envs/{env}/{region}.config.yaml"] = f"""# {env} {region}: names Terraform creates; pod roles come from Pod Identity associations vault/vault-snapshot and vault/vault-bootstrap
+    cl = "".join(f"    - {{name: {c['name']}, environment: {c['environment']}, component: {c['component']}, kind: {clusters.kind(c['component'])}}}\n" for c in remote)
+    files[f"vault/envs/shared-services/{working}.config.yaml"] = f"""# shared-services {working}: names Terraform creates; pod roles come from Pod Identity associations vault/vault-snapshot and vault/vault-bootstrap
 requireResolved: true
 
 snapshot:
   image:
     repository: {repo}
   bucket: {name}-vault-snapshots
-  region: {region}
+  region: {working}
 
 bootstrap:
-  region: {region}
-  initSecretId: {p}/{env}/vault/init
+  region: {working}
+  initSecretId: {p}/shared-services/vault/init
   workloads:
-    cells:
-{cells(cfg, env)}
+    # Every cluster of infra/live (tools/config/clusters.py): one jwt auth mount k8s-<name>, configured from <prefix>/argocd/clusters/<name>
+    registrationPrefix: {p}/argocd/clusters/
+    environments: [{", ".join(envs)}]
+    clusters:
+{cl}
 networkPolicy:
-  # Other clusters of the VPC call Vault through its load balancer
+  # The clusters of every environment reach Vault through the transit gateway
   clientCidrs:
-    - {vpc}
-  awsEndpointCidrs:
-{ep}"""
+{cidrs(client_vpcs, 4)}  awsEndpointCidrs:
+    - {ss_vpc}
+"""
+    bundle = (cfg.get("vault") or {}).get("ca_bundle")
+    ca = f"  caBundle: {bundle}\n" if bundle else ""
+    for env, regions in envs.items():
+        for region in regions:
+            ep = cidrs(endpoint_cidrs(cfg, env, region), 4)
             files[f"external-secrets/envs/{env}/{region}.yaml"] = f"""# {env} {region}: the pod role comes from the Pod Identity association external-secrets/external-secrets
 requireResolved: true
 
@@ -102,12 +105,13 @@ awsSecretsManager:
   region: {region}
 
 vault:
-  server: https://vault.{zone}:{VAULT_PORT}
-
+  # The one Vault in shared-services; the auth mount is k8s-<cluster name>, set per cluster by the add-on
+  server: https://{host}:{VAULT_PORT}
+{ca}
 networkPolicy:
   awsEndpointCidrs:
 {ep}  vaultCidrs:
-    - {vpc}
+    - {ss_vpc}
 """
     return {ROOT / "deploy" / "platform" / k: v for k, v in files.items()}
 

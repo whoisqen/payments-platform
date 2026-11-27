@@ -96,3 +96,14 @@ variable "tags" {
     error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
   }
 }
+
+variable "client_secret_rotation" {
+  type        = map(string)
+  default     = {}
+  description = "Rotation id per application (for example the date of the rotation); a new id replaces the Okta application, which issues a new client id and secret into <prefix>/shared-services/<app>/oidc. The ExternalSecret refresh then restarts nothing by itself: roll the tool after the sync."
+
+  validation {
+    condition     = alltrue([for k in keys(var.client_secret_rotation) : contains(keys(var.apps), k)])
+    error_message = "client_secret_rotation may name only applications of apps."
+  }
+}

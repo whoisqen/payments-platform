@@ -85,3 +85,13 @@ tests:
       - equal:
           path: spec.template.spec.sources[1].ref
           value: values
+  - it: passes the name prefix to the smoke chart and the notifications chart
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[2].helm.parameters
+          content: {name: global.namePrefix, value: acme}
+        template: applicationset-cells.yaml
+      - contains:
+          path: spec.template.spec.sources[2].helm.parameters
+          content: {name: namePrefix, value: acme}
+        template: addons/argocd.yaml

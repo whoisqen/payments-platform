@@ -56,22 +56,40 @@ bootstrap:
     authRole: external-secrets
     serviceAccountName: external-secrets
     namespace: external-secrets
-  # Read-only policy and Kubernetes auth role per cell service; KV paths <kvMount>/<env>/<cell>/<path>/<name> (one Vault per environment, so env is +)
+  # One Vault serves every environment: read policies are per environment (KV paths <kvMount>/<env>/<cell>/<path>/<name>), and every
+  # cluster of the platform gets its own jwt auth mount k8s-<cluster name> that trusts only that cluster's OIDC issuer
   workloads:
     enabled: true
     namespace: payments
     tokenTtl: 15m
-    # One auth mount per cell cluster; cell-0 runs Vault, so its mount is the local one
-    cells:
-      - {name: cell-0, authMount: kubernetes}
-      - {name: cell-1, authMount: kubernetes-cell-1}
-      - {name: cell-2, authMount: kubernetes-cell-2}
-      - {name: cell-3, authMount: kubernetes-cell-3}
-      - {name: spare, authMount: kubernetes-spare}
+    # Audience the clients request on their service account tokens (External Secrets, cert-manager, the locker gateway)
+    audience: vault
+    # Argo CD registrations in Secrets Manager (Terraform argocd-registration): {name, environment, region, oidcIssuer, ...}
+    registrationPrefix: REPLACE_REGISTRATION_PREFIX
+    environments: []
+    cells: [cell-0, cell-1, cell-2, cell-3, spare]
+    # Written by tools/config/render_vault.py from the eks units of infra/live: {name, environment, component, kind}
+    clusters: []
+    externalSecrets:
+      namespace: external-secrets
+      serviceAccount: external-secrets
     services:
-      router: {serviceAccounts: [router], paths: [router, shared]}
+      router: {serviceAccounts: [router], paths: [router, shared], pkiRoles: [router-client]}
       drainer: {serviceAccounts: [drainer], paths: [drainer]}
       scheduler: {serviceAccounts: [scheduler-producer, scheduler-consumer], paths: [scheduler, shared]}
+    # Mesh PKI of the cross-cluster locker path (deploy/charts/payments-locker README)
+    pki:
+      enabled: true
+      mount: pki-mesh
+      rootCommonName: payments-platform mesh root
+      rootTtl: 87600h
+      leafTtl: 72h
+      routerUriSans: [spiffe://payments-platform/ns/payments/sa/router]
+      lockerGateway:
+        # Logs in on the jwt mount of its locker cluster; the env layer may override the domain
+        namespace: payments
+        serviceAccount: locker-gateway-pki
+        domain: example.internal
   autopilot:
     cleanupDeadServers: true
     deadServerLastContactThreshold: 24h

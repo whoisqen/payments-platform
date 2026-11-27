@@ -1,5 +1,6 @@
 # Offline lint and chart-testing only; real values come from deploy/envs/ and images.yaml
 global:
+  accountId: "111111111111"
   registry: registry.example.test/acme
   environment: dev
   region: eu-central-1
@@ -11,3 +12,8 @@ locker:
 locker-migrations:
   image:
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+gateway:
+  clusterDomain: dev.example.internal
+  targetGroupArn: arn:aws:elasticloadbalancing:eu-central-1:111111111111:targetgroup/pay-dev-euc1-locker/0123456789abcdef
+  pki:
+    vaultServer: https://vault.dev.example.test:8200

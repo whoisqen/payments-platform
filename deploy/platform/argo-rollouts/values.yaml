@@ -1,0 +1,20 @@
+# The canaries of router, scheduler and locker (Rollout objects with Istio traffic routing and AnalysisTemplates)
+controller:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  # Off the nodes Karpenter provisions, like the other controllers
+  nodeSelector:
+    karpenter.sh/nodepool: system
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# No UI in the clusters; the rollouts are watched in Argo CD and Grafana
+dashboard:
+  enabled: false
+
+# The CRDs stay when the add-on is removed: deleting them would delete every Rollout
+keepCRDs: true

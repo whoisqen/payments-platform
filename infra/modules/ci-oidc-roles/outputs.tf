@@ -22,3 +22,8 @@ output "dr_apply_role_arn" {
   value       = one(aws_iam_role.dr_apply[*].arn)
   description = "Role of the region switch (vars.AWS_ROLE_DR_APPLY of the dr-compute-<env> environment; bootstrap dr_apply_role_arns); null without dr_apply."
 }
+
+output "component_apply_role_arns" {
+  value       = { for k, r in aws_iam_role.component_apply : k => r.arn }
+  description = "Apply roles of the live components, <prefix>-<env>-glob-tf-apply-<component>."
+}

@@ -20,8 +20,10 @@ dependency "kms" {
 
 # CLOUDFRONT scope exists only in us-east-1; every unit sits under <env>/us-east-1.
 inputs = {
-  scope              = "CLOUDFRONT"
-  mode               = try(local.waf.mode[local.env_cfg.environment], "count")
+  scope = "CLOUDFRONT"
+  # Managed groups block in stage and prod; a rule that misfires stays in count through waf.count_overrides of config/platform.yaml.
+  mode               = try(local.waf.mode[local.env_cfg.environment], local.env_cfg.environment == "dev" ? "count" : "block")
+  count_overrides    = try(local.waf.count_overrides, {})
   rate_limit_ip      = try(local.waf.rate_limit_ip, 2000)
   rate_limit_api_key = try(local.waf.rate_limit_api_key, 1000)
   rate_limit_auth    = try(local.waf.rate_limit_auth, 100)

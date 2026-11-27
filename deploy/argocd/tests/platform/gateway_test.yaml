@@ -1,0 +1,65 @@
+suite: Gateway API CRDs and the load balancer controller run on every cluster that serves a Gateway
+templates:
+  - addons/gateway/gateway-api-crds.yaml
+  - addons/gateway/aws-load-balancer-controller.yaml
+set:
+  repo.url: https://git.example.test/acme/platform
+  repo.revision: main
+  cluster.namePrefix: acme
+  cluster.region: eu-central-1
+  cluster.regionShort: euc1
+  observability.grafanaUrl: https://grafana.example.test
+  central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
+  central.alertmanagerHost: alertmanager.example.test
+  central.sentryUrl: https://sentry.example.test
+  central.dedupInterval: 45s
+  central.logsOtlpEndpoint: https://logs.example.test:4318
+  central.tracesOtlpEndpoint: tempo.example.test:4317
+tests:
+  - it: selects the clusters labelled as Gateway clusters
+    asserts:
+      - equal:
+          path: spec.generators[0].clusters.selector.matchLabels
+          value: {payments-platform/gateway: enabled}
+  - it: gives the controller the EKS name from the cluster annotation, falling back to the Argo CD name
+    template: addons/gateway/aws-load-balancer-controller.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: clusterName
+            value: '{{ or (index .metadata.annotations "payments-platform/eks-cluster-name") .name }}'
+  - it: applies the Gateway API CRDs from the vendored directory with server-side apply and never prunes them
+    template: addons/gateway/gateway-api-crds.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.source.path
+          value: deploy/platform/gateway-api-crds
+      - contains:
+          path: spec.template.spec.syncPolicy.syncOptions
+          content: ServerSideApply=true
+      - equal:
+          path: spec.template.spec.syncPolicy.automated.prune
+          value: false
+  - it: orders the CRDs before the controller
+    template: addons/gateway/gateway-api-crds.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+  - it: gives the load balancer controller the cluster, region and VPC without an IRSA annotation
+    template: addons/gateway/aws-load-balancer-controller.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: region
+            value: eu-central-1
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: vpcId
+            value: '{{ index .metadata.labels "payments-platform/vpc-id" }}'
+      - contains:
+          path: spec.generators[0].clusters.selector.matchExpressions
+          content: {key: payments-platform/vpc-id, operator: Exists}

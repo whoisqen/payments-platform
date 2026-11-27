@@ -258,7 +258,11 @@
             "enabled",
             "namespace",
             "tokenTtl",
+            "audience",
+            "registrationPrefix",
+            "environments",
             "cells",
+            "clusters",
             "services"
           ],
           "properties": {
@@ -277,22 +281,8 @@
               "type": "array",
               "minItems": 1,
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name",
-                  "authMount"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^(cell-[0-3]|spare)$"
-                  },
-                  "authMount": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9][a-z0-9-]*$"
-                  }
-                }
+                "type": "string",
+                "pattern": "^(cell-[0-3]|spare)$"
               }
             },
             "services": {
@@ -324,7 +314,147 @@
                       "type": "string",
                       "pattern": "^[a-z0-9][a-z0-9-]*$"
                     }
+                  },
+                  "pkiRoles": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "router-client"
+                      ]
+                    }
                   }
+                }
+              }
+            },
+            "pki": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "mount",
+                "rootCommonName",
+                "rootTtl",
+                "leafTtl",
+                "routerUriSans",
+                "lockerGateway"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "mount": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                "rootCommonName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rootTtl": {
+                  "type": "string",
+                  "pattern": "^[0-9]+h$"
+                },
+                "leafTtl": {
+                  "type": "string",
+                  "pattern": "^[0-9]+h$"
+                },
+                "routerUriSans": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^spiffe://[a-z0-9.-]+/ns/[a-z0-9-]+/sa/[a-z0-9-]+$"
+                  }
+                },
+                "lockerGateway": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "namespace",
+                    "serviceAccount",
+                    "domain"
+                  ],
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "serviceAccount": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9.-]+$"
+                    }
+                  }
+                }
+              }
+            },
+            "audience": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registrationPrefix": {
+              "type": "string",
+              "pattern": "^[a-z0-9_-]+/argocd/clusters/$|^REPLACE_"
+            },
+            "environments": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "dev",
+                  "stage",
+                  "prod"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "clusters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "environment",
+                  "component",
+                  "kind"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  },
+                  "environment": {
+                    "enum": [
+                      "dev",
+                      "stage",
+                      "prod"
+                    ]
+                  },
+                  "component": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  }
+                }
+              }
+            },
+            "externalSecrets": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "namespace",
+                "serviceAccount"
+              ],
+              "properties": {
+                "namespace": {
+                  "type": "string"
+                },
+                "serviceAccount": {
+                  "type": "string"
                 }
               }
             }

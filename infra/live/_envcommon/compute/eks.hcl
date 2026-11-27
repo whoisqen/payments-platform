@@ -15,6 +15,11 @@ terraform {
   source = "${get_repo_root()}/infra/modules//eks"
 }
 
+# The argocd access entry names <prefix>-<env>-argocd-controller, which argocd-access of the environment creates.
+dependencies {
+  paths = ["${dirname(find_in_parent_folders("env.hcl"))}/eu-central-1/argocd-access"]
+}
+
 inputs = {
   kubernetes_version       = local.env_cfg.kubernetes_version
   permissions_boundary_arn = local.env_cfg.permissions_boundary_arn

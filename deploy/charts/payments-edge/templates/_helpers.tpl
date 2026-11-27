@@ -100,3 +100,10 @@ function envoy_on_response(handle)
   end
 end
 {{- end -}}
+
+{{/* Router host of one cell: the explicit host, or the default name under routing.clusterDomain */}}
+{{- define "payments-edge.cellHost" -}}
+{{- if .cell.host -}}{{ .cell.host }}
+{{- else -}}{{ printf "router.payments.svc.%s.%s" .cell.name (required "routing.clusterDomain is required for a cell without host" .root.Values.routing.clusterDomain) }}
+{{- end -}}
+{{- end }}

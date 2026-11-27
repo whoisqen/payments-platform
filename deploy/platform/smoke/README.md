@@ -5,8 +5,8 @@
 
 ## Secrets
 
-- `pay/<env>/smoke/dummy-connector` (per cell cluster), JSON keys: `api_key`, `merchant_id`, `profile_id`, `connector` (the dummy connector), `payment_method_token`. Never real card data.
-- `pay/shared-services/argocd/notifications` (Argo CD cluster), JSON keys: `github-dispatch-url` (`https://api.github.com/repos/<owner>/<repo>/dispatches`), `github-dispatch-token`, `alertmanager-url` (`https://<alertmanager>/api/v2/alerts`).
+- `<prefix>/<env>/smoke/dummy-connector` (per cell cluster), JSON keys: `api_key`, `merchant_id`, `profile_id`, `connector` (the dummy connector), `payment_method_token`. Never real card data.
+- `<prefix>/shared-services/argocd/notifications` (Argo CD cluster), JSON keys: `github-dispatch-url` (`https://api.github.com/repos/<owner>/<repo>/dispatches`), `github-dispatch-token`, `alertmanager-url` (`https://<alertmanager>/api/v2/alerts`).
 - The token is a fine-grained personal access token limited to this one repository with `Contents: Read and write` (the permission `repository_dispatch` needs; `Metadata: Read` is implied). A GitHub App installation token expires after an hour and does not fit a static header.
 
 ## Behaviour

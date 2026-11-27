@@ -24,11 +24,12 @@ variable "endpoint_groups" {
   type = map(object({
     active                = bool
     endpoint_arns         = optional(list(string), [])
+    endpoint_lb_tags      = optional(map(string), {})
     health_check_protocol = optional(string, "HTTPS")
     health_check_port     = optional(number, 443)
-    health_check_path     = optional(string, "/health/deep")
+    health_check_path     = optional(string, "/health/ready")
   }))
-  description = "Endpoint group per region; only the writing region is active, recovery groups have weight 0 and dial 0 and usually no endpoints."
+  description = "Endpoint group per region; only the writing region is active, recovery groups have weight 0 and dial 0. Endpoints are endpoint_arns plus every load balancer of that region carrying all endpoint_lb_tags (the edge ingress, created by the load balancer controller), none until it exists."
 
   validation {
     condition     = alltrue([for r in keys(var.endpoint_groups) : can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]$", r))])

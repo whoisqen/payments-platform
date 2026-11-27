@@ -6,49 +6,43 @@ import yaml
 
 CONFIG = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CONFIG))
+sys.path.insert(0, str(CONFIG / "render"))
+import clusters  # noqa: E402
 import render_vault as rv  # noqa: E402
 
-CFG = {
-    "naming": {"prefix": "acme"},
-    "registry": {"ecr_prefix": "1.dkr.ecr.eu-central-1.amazonaws.com", "ecr_repo_prefix": "pay"},
-    "accounts": {"dev": "111111111111", "stage": "333333333333"},
-    "regions": {"working": "eu-central-1", "recovery": ["us-east-1"]},
-    "network": {"dev": {"eu-central-1": "10.1.0.0/16"},
-                "stage": {"eu-central-1": "10.2.0.0/16", "us-east-1": "10.3.0.0/16"}},
-    "dns": {"dev_zone": "dev.example.com", "stage_zone": "stage.example.com"},
-    "deploy": {"dev": {"endpoint_cidrs": ["10.1.255.0/24"]},
-               "stage": {"endpoint_cidrs": ["10.2.255.0/24"],
-                         "standby": {"us-east-1": {"endpoint_cidrs": ["10.3.0.0/18"]}}}},
-}
+CFG = yaml.safe_load((rv.ROOT / "config" / "platform.yaml").read_text(encoding="utf-8"))
 
 
 class RenderVaultTest(unittest.TestCase):
     def setUp(self):
         self.files = {k.relative_to(rv.ROOT / "deploy" / "platform").as_posix(): v for k, v in rv.render(CFG).items()}
+        self.vault = yaml.safe_load(self.files["vault/envs/shared-services/eu-central-1.config.yaml"])
 
-    def test_regions_per_environment(self):
-        self.assertEqual(rv.environments(CFG), {"dev": ["eu-central-1"], "stage": ["eu-central-1", "us-east-1"]})
-        self.assertEqual(len(self.files), 9)
+    def test_one_vault_in_shared_services_serves_every_environment(self):
+        self.assertEqual([k for k in self.files if k.startswith("vault/")],
+                         ["vault/envs/shared-services/eu-central-1.yaml", "vault/envs/shared-services/eu-central-1.config.yaml"])
+        server = yaml.safe_load(self.files["vault/envs/shared-services/eu-central-1.yaml"])["server"]["extraEnvironmentVars"]
+        self.assertEqual(server["VAULT_AWSKMS_SEAL_KEY_ID"], f"alias/{CFG['naming']['prefix']}-shared-services-euc1-vault-unseal")
+        self.assertEqual(sorted(self.vault["bootstrap"]["workloads"]["environments"]), ["dev", "prod", "stage"])
 
-    def test_names_follow_the_contract(self):
-        server = yaml.safe_load(self.files["vault/envs/stage/us-east-1.yaml"])["server"]["extraEnvironmentVars"]
-        self.assertEqual(server["VAULT_AWSKMS_SEAL_KEY_ID"], "alias/acme-stage-use1-vault-unseal")
-        cfg = yaml.safe_load(self.files["vault/envs/stage/us-east-1.config.yaml"])
-        self.assertEqual(cfg["snapshot"]["bucket"], "acme-stage-use1-vault-snapshots")
-        self.assertEqual(cfg["snapshot"]["image"]["repository"], "1.dkr.ecr.eu-central-1.amazonaws.com/pay/vault-snapshot")
-        self.assertEqual(cfg["bootstrap"]["initSecretId"], "acme/stage/vault/init")
-        self.assertEqual(cfg["networkPolicy"]["awsEndpointCidrs"], ["10.3.0.0/18"])
-        eso = yaml.safe_load(self.files["external-secrets/envs/stage/eu-central-1.yaml"])
-        self.assertEqual(eso["vault"]["server"], "https://vault.stage.example.com:8200")
+    def test_only_prod_reads_vault_from_the_standby_region(self):
+        envs = rv.environments(CFG)
+        self.assertEqual(envs["dev"], ["eu-central-1"])
+        self.assertEqual(envs["stage"], ["eu-central-1"])
+        self.assertEqual(envs["prod"], ["eu-central-1", "us-east-1"])
 
-    def test_vault_roles_follow_the_cells_of_each_environment(self):
+    def test_every_cluster_of_the_live_tree_gets_a_mount_except_the_central_one(self):
+        names = [c["name"] for c in self.vault["bootstrap"]["workloads"]["clusters"]]
+        want = [c["name"] for c in clusters.clusters(CFG) if c["environment"] != "shared-services"]
+        self.assertEqual(names, want)
+        self.assertTrue(all(c["kind"] == "cell" for c in self.vault["bootstrap"]["workloads"]["clusters"] if c["component"] in clusters.CELLS))
+
+    def test_external_secrets_reach_the_central_vault_through_the_internal_gateway(self):
         for env, regions in rv.environments(CFG).items():
-            work = rv.ROOT / "deploy" / "envs" / env / CFG["regions"]["working"]
-            expected = sorted(d.name for d in work.iterdir() if d.name.startswith("cell-") or d.name == "spare")
             for region in regions:
-                got = yaml.safe_load(self.files[f"vault/envs/{env}/{region}.config.yaml"])["bootstrap"]["workloads"]["cells"]
-                self.assertEqual([c["name"] for c in got], expected)
-                self.assertEqual(got[0], {"name": "cell-0", "authMount": "kubernetes"})
+                eso = yaml.safe_load(self.files[f"external-secrets/envs/{env}/{region}.yaml"])
+                self.assertEqual(eso["vault"]["server"], f"https://{CFG['vault']['host']}:443")
+                self.assertEqual(eso["networkPolicy"]["vaultCidrs"], [CFG["network"]["shared_services"]["eu-central-1"]])
 
     def test_no_placeholder_is_written(self):
         for text in self.files.values():

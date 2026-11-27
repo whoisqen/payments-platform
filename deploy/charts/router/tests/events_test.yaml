@@ -1,0 +1,47 @@
+suite: router analytics events to MSK
+templates:
+  - workload.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  global.hyperswitch.events.kafka: true
+  global.hyperswitch.events.brokers: [b-1.msk.example.test:9098, b-2.msk.example.test:9098]
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: produces to the brokers over TLS with IAM auth
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__SOURCE, value: kafka}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__BROKERS, value: "b-1.msk.example.test:9098,b-2.msk.example.test:9098"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__SECURITY_PROTOCOL, value: SASL_SSL}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__SASL_OAUTHBEARER_PROVIDER, value: aws_msk_iam}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__AWS_REGION, value: eu-central-1}
+  - it: names the topics as the upstream ClickHouse tables consume them
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__ATTEMPT_ANALYTICS_TOPIC, value: hyperswitch-payment-attempt-events}
+  - it: writes the events to the log without Kafka
+    documentIndex: 0
+    set:
+      global.hyperswitch.events.kafka: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__SOURCE, value: logs}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__EVENTS__KAFKA__SECURITY_PROTOCOL, value: SASL_SSL}

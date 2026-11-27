@@ -135,3 +135,33 @@ run "tag_schema_is_enforced" {
 
   expect_failures = [var.tags]
 }
+
+run "client_roles_only_with_a_client_cluster" {
+  command = plan
+
+  assert {
+    condition     = length(aws_iam_role.client) == 0 && length(aws_eks_pod_identity_association.client) == 0
+    error_message = "no client roles without a client cluster"
+  }
+}
+
+run "clients_create_topics_or_read_lag_but_never_touch_data" {
+  command = plan
+
+  variables {
+    client_cluster_name = "pay-prod-euc1-eks-analytics"
+  }
+
+  assert {
+    condition     = aws_eks_pod_identity_association.client["topics"].namespace == "kafka-topics" && aws_eks_pod_identity_association.client["exporter"].service_account == "kafka-exporter"
+    error_message = "the Job and the exporter get their roles through Pod Identity on their own service accounts"
+  }
+  assert {
+    condition     = alltrue([for k, p in aws_iam_role_policy.client : !strcontains(p.policy, "ReadData") && !strcontains(p.policy, "WriteData") && !strcontains(p.policy, "AlterGroup")])
+    error_message = "neither client reads or writes events"
+  }
+  assert {
+    condition     = strcontains(aws_iam_role_policy.client["topics"].policy, "kafka-cluster:CreateTopic") && !strcontains(aws_iam_role_policy.client["exporter"].policy, "CreateTopic")
+    error_message = "only the topics Job may create topics"
+  }
+}

@@ -35,6 +35,9 @@ spec:
             # A missing environment layer or an unfilled endpoint must fail the render, not deploy placeholders
             valueFiles:
               - $values/deploy/platform/ratelimit/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}.yaml
+            parameters:
+              - name: global.namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
@@ -83,6 +86,9 @@ spec:
           helm:
             valueFiles:
               - $values/deploy/platform/ratelimit/envs/{{`{{ index .path.segments 2 }}`}}/{{`{{ index .path.segments 3 }}`}}.yaml
+            parameters:
+              - name: global.namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ $rev }}
           ref: values

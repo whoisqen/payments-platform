@@ -52,6 +52,13 @@ resource "okta_app_signon_policy_rule" "members" {
   groups_included             = [for r in local.member_roles : okta_group.this[r].id]
 }
 
+# Changing client_secret_rotation[<app>] replaces the application: Okta issues a new client id and secret and the same secret below carries them.
+resource "terraform_data" "client_secret_rotation" {
+  for_each = var.apps
+
+  input = lookup(var.client_secret_rotation, each.key, "initial")
+}
+
 resource "okta_app_oauth" "this" {
   for_each = var.apps
 
@@ -72,6 +79,11 @@ resource "okta_app_oauth" "this" {
     filter_type = "REGEX"
     name        = "groups"
     value       = "^(${join("|", [for g in values(var.groups) : replace(g, ".", "\\.")])})$"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+    replace_triggered_by  = [terraform_data.client_secret_rotation[each.key]]
   }
 }
 

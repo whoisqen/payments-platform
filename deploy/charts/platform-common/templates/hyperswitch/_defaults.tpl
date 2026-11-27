@@ -29,8 +29,10 @@ tenant:
   baseUrl: https://api.invalid
   controlCenterUrl: https://panel.invalid
 locker:
-  # Empty: the in-cluster name of the locker Service; Istio mTLS STRICT protects the hop, JWE/JWS protects the payload
+  # Full URL override; empty: built from clusterDomain, or the in-cluster Service when clusterDomain is empty too
   host: ""
+  # The locker runs in its own cluster per environment and region: <service>.<namespace>.svc.locker.<clusterDomain>, as the edge names the cells
+  clusterDomain: ""
   service: locker
   namespace: payments
   port: 3001
@@ -38,10 +40,16 @@ drainer:
   streamName: DRAINER_STREAM
   numPartitions: 64
 events:
-  # The upstream Kafka client sets only bootstrap.servers (no TLS, no IAM), so MSK cannot be used until it is patched
+  # On where the region has MSK; the patched producer (vendor/UPSTREAM.md) speaks TLS with IAM auth on port 9098
   kafka: false
   brokers: []
+  # <topicPrefix>-<event>-events, the names the ClickHouse Kafka tables of upstream consume
   topicPrefix: hyperswitch
+  securityProtocol: SASL_SSL
+  saslMechanism: OAUTHBEARER
+  oauthbearerProvider: aws_msk_iam
+  # Empty: global.region
+  awsRegion: ""
 {{- end }}
 
 {{- define "platform-common.hyperswitch.config" -}}

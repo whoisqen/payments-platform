@@ -10,11 +10,11 @@ variable "account_id" {
 
 variable "environment" {
   type        = string
-  description = "dev, stage, prod or shared-services (the CI account); also the state key prefix."
+  description = "State root: dev, stage, prod, shared-services (the CI account), management or security; also the state key prefix."
 
   validation {
-    condition     = contains(["dev", "stage", "prod", "shared-services"], var.environment)
-    error_message = "environment must be dev, stage, prod or shared-services."
+    condition     = contains(["dev", "stage", "prod", "shared-services", "management", "security"], var.environment)
+    error_message = "environment must be dev, stage, prod, shared-services, management or security."
   }
 }
 
@@ -188,4 +188,49 @@ variable "dr_apply" {
     condition     = var.dr_apply == null || (startswith(var.dr_apply.state_replica_bucket_arn, "arn:aws:s3:::") && startswith(var.dr_apply.state_replica_kms_key_arn, "arn:aws:kms:"))
     error_message = "state_replica_bucket_arn must be an S3 bucket ARN and state_replica_kms_key_arn a KMS key ARN."
   }
+}
+
+variable "apply_components" {
+  type        = list(string)
+  default     = []
+  description = "Components of infra/live/<environment> (last path segment of each unit): one role <prefix>-<env>-glob-tf-apply-<component> each; bootstrap derives the list from the live tree."
+
+  validation {
+    condition     = alltrue([for c in var.apply_components : can(regex("^[a-z][a-z0-9-]{1,40}$", c))])
+    error_message = "components are lower-case kebab-case names."
+  }
+}
+
+variable "apply_github_environment" {
+  type        = string
+  default     = null
+  description = "GitHub Environment whose jobs may assume the component apply roles (subject repo:<repo>:environment:<name>); null uses environment. The environment's deployment branch policy limits it to main."
+}
+
+variable "exec_account_ids" {
+  type        = list(string)
+  default     = []
+  description = "Accounts of the state root where <prefix>-<env>-tf-exec lives (security has two); plan and apply roles may assume it there. Empty allows nothing."
+}
+
+variable "dependency_states" {
+  type = list(object({
+    bucket_arn = string
+    prefix     = string
+    kms_alias  = string
+  }))
+  default     = []
+  description = "State of other roots that units of this root read through dependency blocks (bucket, key prefix, alias of its state key); read-only."
+}
+
+variable "plan_assumable_role_arns" {
+  type        = list(string)
+  default     = []
+  description = "Roles the plan role may assume besides the exec role, for units whose provider runs elsewhere (the argocd-registration writer)."
+}
+
+variable "extra_assumable_role_arns" {
+  type        = map(list(string))
+  default     = {}
+  description = "Component -> roles its apply role may assume besides the exec role, for units whose provider runs elsewhere (argocd-registration writes into shared-services)."
 }

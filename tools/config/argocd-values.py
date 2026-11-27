@@ -6,6 +6,9 @@ from urllib.parse import urlparse
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "render"))
+import clusters  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -43,6 +46,8 @@ def values(cfg):
             "tracesOtlpEndpoint": cfg["central"]["traces_otlp_endpoint"],
         },
         "pilotLight": pilot_light(cfg),
+        # One Argo CD cluster Secret per eks unit of infra/live (tools/config/clusters.py)
+        "clusters": [{k: v for k, v in c.items() if k != "name"} for c in clusters.clusters(cfg)],
     }
 
 

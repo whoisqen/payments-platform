@@ -56,7 +56,7 @@ resource "aws_iam_role_policy" "plan" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       { Sid = "ReadInfrastructure", Effect = "Allow", Action = var.plan_read_actions, Resource = "*" },
       { Sid = "ReadState", Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion"], Resource = "${var.state_bucket_arn}/${var.environment}/*" },
       {
@@ -68,8 +68,9 @@ resource "aws_iam_role_policy" "plan" {
       },
       { Sid = "StateLockOnly", Effect = "Allow", Action = ["s3:PutObject", "s3:DeleteObject"], Resource = "${var.state_bucket_arn}/${var.environment}/*.tflock" },
       local.state_kms_statement,
+      # The plan session itself never reads values; refresh reads them through the exec role of the environment account.
       { Sid = "NoSecretValues", Effect = "Deny", Action = ["secretsmanager:GetSecretValue", "ssm:GetParameter*"], Resource = "*" },
-    ]
+    ], local.plan_exec_statements)
   })
 }
 
@@ -94,13 +95,15 @@ resource "aws_iam_role_policy" "apply" {
     Statement = concat(
       [
         { Sid = "ComponentActions", Effect = "Allow", Action = each.value.actions, Resource = each.value.resource_arns },
-        { Sid = "StateOfThisComponent", Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"], Resource = "${var.state_bucket_arn}/${var.environment}/${each.key}/*" },
+        # State keys are <env>/<region>/[<cell>/]<component>/terraform.tfstate (infra/live/terragrunt.hcl).
+        { Sid = "StateOfThisComponent", Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"], Resource = ["${var.state_bucket_arn}/${var.environment}/*/${each.key}/terraform.tfstate", "${var.state_bucket_arn}/${var.environment}/*/${each.key}/terraform.tfstate.tflock"] },
+        { Sid = "ReadDependencyState", Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion"], Resource = "${var.state_bucket_arn}/${var.environment}/*" },
         {
           Sid       = "ListStatePrefix"
           Effect    = "Allow"
           Action    = "s3:ListBucket"
           Resource  = var.state_bucket_arn
-          Condition = { StringLike = { "s3:prefix" = ["${var.environment}/${each.key}/*"] } }
+          Condition = { StringLike = { "s3:prefix" = ["${var.environment}/*"] } }
         },
         local.state_kms_statement,
         { Sid = "NoIdentityAdministration", Effect = "Deny", Action = ["iam:CreateUser", "iam:CreateAccessKey", "iam:CreateLoginProfile", "organizations:*"], Resource = "*" },

@@ -1,0 +1,142 @@
+{{- /* outboundTrafficPolicy REGISTRY_ONLY drops every host the mesh does not know: one ServiceEntry per external dependency of router, drainer and scheduler */ -}}
+{{- $g := .Values.global -}}
+{{- $e := $g.egress -}}
+{{- if $e.serviceEntries }}
+{{- $c := include "platform-common.hyperswitch.config" (dict "root" .) | fromYaml }}
+{{- $region := required "global.region is required" $g.region }}
+{{- $labels := dict "app.kubernetes.io/part-of" "payments-platform" "app.kubernetes.io/managed-by" .Release.Service "payments-platform/cell" $g.cell }}
+{{- $db := list $c.database.host }}
+{{- if and $c.database.readerHost (ne $c.database.readerHost $c.database.host) }}{{ $db = append $db $c.database.readerHost }}{{ end }}
+---
+# Aurora through RDS Proxy: PostgreSQL negotiates TLS inside the protocol, so plain TCP
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-aurora
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml $db | nindent 4 }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: {{ $c.database.port }}, name: tcp-postgres, protocol: TCP}
+---
+# MemoryDB in cluster mode: the client follows the node addresses CLUSTER SLOTS returns, so the original destination
+# inside the data subnets is kept (resolution NONE) instead of resolving the configuration endpoint again
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-memorydb
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    - {{ $c.redis.host }}
+  {{- with $g.dataCidrs }}
+  addresses:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: NONE
+  ports:
+    # TCP, not TLS: node connections carry node names or no SNI, so the match is on the destination range
+    - {number: {{ $c.redis.port }}, name: tcp-redis, protocol: TCP}
+---
+# AWS APIs through the interface endpoints (private DNS) and the S3 gateway endpoint; TLS from the SDK, routed by SNI
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-aws-apis
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- range $e.awsServices }}
+    - {{ printf "%s.%s.amazonaws.com" . $region }}
+    {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: 443, name: tls-aws, protocol: TLS}
+---
+# Credentials of EKS Pod Identity: the node-local agent the AWS SDK calls on a link-local address
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-pod-identity-agent
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    - eks-pod-identity-agent.local
+  addresses:
+    - {{ $e.podIdentityAgent }}/32
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  endpoints:
+    - address: {{ $e.podIdentityAgent }}
+  ports:
+    - {number: 80, name: http-pod-identity, protocol: HTTP}
+{{- if $c.events.kafka }}
+---
+# MSK brokers, TLS with IAM auth; the bootstrap list names every broker the metadata returns
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-msk
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- range $c.events.brokers }}
+    - {{ regexReplaceAll ":[0-9]+$" . "" }}
+    {{- end }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: 9098, name: tls-msk, protocol: TLS}
+{{- end }}
+{{- with $e.sentryHosts }}
+---
+# The central Sentry (shared-services) the services send errors to; the DSN host comes from the secret, the name from config
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-sentry
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml . | nindent 4 }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: 443, name: tls-sentry, protocol: TLS}
+{{- end }}
+{{- with $e.pspHosts }}
+---
+# PSP APIs, through the egress firewall that allows the same domains; wildcard hosts keep the original destination
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: egress-psp
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml . | nindent 4 }}
+  exportTo: ["."]
+  location: MESH_EXTERNAL
+  resolution: NONE
+  ports:
+    - {number: 443, name: tls-psp, protocol: TLS}
+{{- end }}
+{{- end }}

@@ -517,6 +517,24 @@
         "enabled": {
           "type": "boolean"
         },
+        "awsEndpoints": {
+          "type": "boolean"
+        },
+        "pspEgress": {
+          "type": "boolean"
+        },
+        "lockerEgress": {
+          "type": "boolean"
+        },
+        "lockerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "podIdentityAgentCidr": {
+          "type": "string",
+          "pattern": "^[0-9.]+/[0-9]+$"
+        },
         "dataPorts": {
           "type": "array",
           "items": {
@@ -670,6 +688,53 @@
           "property"
         ],
         "additionalProperties": false
+      }
+    },
+    "lockerClient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secretName",
+        "vaultServer",
+        "authMount",
+        "pkiMount",
+        "uriSan",
+        "ttl",
+        "refreshInterval"
+      ],
+      "properties": {
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vaultServer": {
+          "type": "string",
+          "pattern": "^(https://[a-z0-9.-]+(:[0-9]+)?)?$"
+        },
+        "authMount": {
+          "type": "string",
+          "pattern": "^([a-z0-9-]+)?$"
+        },
+        "pkiMount": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "uriSan": {
+          "type": "string",
+          "pattern": "^spiffe://[a-z0-9.-]+/ns/[a-z0-9-]+/sa/[a-z0-9-]+$"
+        },
+        "ttl": {
+          "type": "string",
+          "pattern": "^[0-9]+h$"
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+h$"
+        },
+        "caBundle": {
+          "type": "string",
+          "description": "base64 PEM of the CA that signs the Vault endpoint (vault.ca_bundle of config/platform.yaml)"
+        }
       }
     }
   },

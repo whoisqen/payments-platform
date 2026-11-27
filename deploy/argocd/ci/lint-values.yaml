@@ -17,5 +17,8 @@ central:
 gated:
   revision: v1.0.0
 pilotLight:
-  - {environment: stage, region: us-east-1}
   - {environment: prod, region: us-east-1}
+clusters:
+  - {environment: shared-services, region: eu-central-1, component: central, eksName: acme-shared-services-euc1-central, inCluster: true, labels: {payments-platform/central: enabled, payments-platform/argocd: enabled, payments-platform/vpc-id: vpc-0123456789abcdef0}}
+  - {environment: dev, region: eu-central-1, component: cell-0}
+  - {environment: prod, region: us-east-1, component: spare, labels: {payments-platform/vault: enabled}}

@@ -10,4 +10,4 @@ AWS WAFv2 web ACLs for the public browser entries (control-center panel, payment
 
 Tags: `tags` must carry team, owner, pci-scope, data-class and backup-tier.
 
-Test: `terraform init -backend=false && terraform test` (mock providers).
+`count_overrides` keeps single rules of a blocking managed group in count (group key -> rule names). Test: `terraform init -backend=false && terraform test` (mock providers).

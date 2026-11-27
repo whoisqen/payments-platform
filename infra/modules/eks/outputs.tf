@@ -37,3 +37,13 @@ output "locker_pod_security_group_id" {
   value       = aws_security_group.locker_pod.id
   description = "Pod security group of the locker pods; the only client the card-vault Aurora proxy admits."
 }
+
+output "argocd_cluster_name" {
+  value       = local.argocd_name
+  description = "Name of the cluster in Argo CD, the destination name of the ApplicationSets."
+}
+
+output "certificate_authority_data" {
+  value       = aws_eks_cluster.this.certificate_authority[0].data
+  description = "Base64 CA of the API server; the Argo CD registration carries it."
+}

@@ -91,3 +91,14 @@ tests:
           content:
             name: env.VM_URL
             value: http://vm-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus
+  - it: gives the collector the central client certificate under the name prefix
+    template: addons/otel-collector.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[3].path
+          value: deploy/platform/central-tls
+      - equal:
+          path: spec.template.spec.sources[3].helm.parameters
+          value:
+            - {name: namePrefix, value: acme}
+            - {name: secretName, value: otel-collector-tls}

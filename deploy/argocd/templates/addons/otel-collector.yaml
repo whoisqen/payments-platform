@@ -53,13 +53,23 @@ spec:
                 value: CENTRAL_METRICS_REMOTE_WRITE_URL
               - name: extraEnvs[4].value
                 value: {{ .Values.central.metricsRemoteWriteUrl | quote }}
-        # The client certificate Secret and the NetworkPolicy of the node-local receiver
+        # The NetworkPolicy of the node-local receiver
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           path: deploy/platform/otel-collector/manifests
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
+        # The client certificate Secret of the mutual TLS to the central stack
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/central-tls
+          helm:
+            parameters:
+              - name: namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
+              - name: secretName
+                value: otel-collector-tls
       syncPolicy:
         automated:
           prune: true

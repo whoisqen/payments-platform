@@ -1,0 +1,79 @@
+# HTTP CONNECT termination with the dynamic forward proxy: the tunnel goes to the host the scheduler names, resolved at the gateway
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: webhook-egress-connect
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  workloadSelector:
+    labels:
+      {{- toYaml .Values.gatewaySelector | nindent 6 }}
+  configPatches:
+    # The DNS cache of the gateway and the filter that fills it
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          portNumber: {{ .Values.port }}
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.dynamic_forward_proxy
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+            dns_cache_config:
+              name: webhook_egress_dns_cache
+              dns_lookup_family: {{ .Values.dnsLookupFamily }}
+    # CONNECT is answered by the gateway itself and tunnelled upstream
+    - applyTo: NETWORK_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          portNumber: {{ .Values.port }}
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            upgrade_configs:
+              - upgrade_type: CONNECT
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: GATEWAY
+        routeConfiguration:
+          portNumber: {{ .Values.port }}
+      patch:
+        operation: MERGE
+        value:
+          routes:
+            - match:
+                connect_matcher: {}
+              route:
+                cluster: webhook_egress_dynamic_forward_proxy
+                upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config: {}
+    - applyTo: CLUSTER
+      match:
+        context: GATEWAY
+      patch:
+        operation: ADD
+        value:
+          name: webhook_egress_dynamic_forward_proxy
+          lb_policy: CLUSTER_PROVIDED
+          cluster_type:
+            name: envoy.clusters.dynamic_forward_proxy
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+              dns_cache_config:
+                name: webhook_egress_dns_cache
+                dns_lookup_family: {{ .Values.dnsLookupFamily }}

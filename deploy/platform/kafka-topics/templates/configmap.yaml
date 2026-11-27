@@ -1,0 +1,33 @@
+{{- if include "kafka-topics.enabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topics
+  labels:
+    {{- include "kafka-topics.labels" . | nindent 4 }}
+data:
+  # TLS with IAM auth on port 9098, the only listener MSK opens (infra/modules/msk)
+  client.properties: |
+    security.protocol=SASL_SSL
+    sasl.mechanism=AWS_MSK_IAM
+    sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+    sasl.client.callback.handler.class=software.amazon.msk.auth.iam.IAMClientCallbackHandler
+  topics.txt: |
+    {{- range include "kafka-topics.names" . | fromYamlArray }}
+    {{ . }}
+    {{- end }}
+  create-topics.sh: |
+    # Creates every listed topic that does not exist; an existing topic is left as it is. Safe to repeat
+    set -eu
+    configs=""
+    {{- range $k, $v := .Values.topics.config }}
+    configs="${configs} --config {{ $k }}={{ $v }}"
+    {{- end }}
+    while read -r topic; do
+      [ -n "${topic}" ] || continue
+      kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --command-config /config/client.properties \
+        --create --if-not-exists --topic "${topic}" \
+        --partitions {{ .Values.topics.partitions }} --replication-factor {{ .Values.topics.replicationFactor }} ${configs}
+      echo "kafka-topics: ${topic} present"
+    done < /config/topics.txt
+{{- end }}

@@ -1,0 +1,42 @@
+suite: scheduler egress to the AWS interface endpoints
+templates:
+  - producer/networkpolicy.yaml
+  - consumer/networkpolicy.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  global.endpointCidrs: [10.120.255.0/24]
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: reaches KMS and STS through the interface endpoints on 443
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 10.120.255.0/24}}]
+            ports: [{port: 443, protocol: TCP}]
+  - it: reaches the Pod Identity agent for its credentials
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{ipBlock: {cidr: 169.254.170.23/32}}]
+            ports: [{port: 80, protocol: TCP}]
+  - it: opens the egress gateway port to the consumer only
+    template: consumer/networkpolicy.yaml
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: istio-egress}}, podSelector: {matchLabels: {istio: egressgateway}}}]
+            ports: [{port: 8080, protocol: TCP}]
+  - it: keeps the producer away from the egress gateway
+    template: producer/networkpolicy.yaml
+    asserts:
+      - notContains:
+          path: spec.egress
+          content:
+            to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: istio-egress}}, podSelector: {matchLabels: {istio: egressgateway}}}]
+            ports: [{port: 8080, protocol: TCP}]

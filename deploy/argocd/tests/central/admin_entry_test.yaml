@@ -1,7 +1,5 @@
 suite: the admin entry add-ons run in the central cluster only
 templates:
-  - addons/central/admin/gateway-api-crds.yaml
-  - addons/central/admin/aws-load-balancer-controller.yaml
   - addons/central/admin/aws-privateca-issuer.yaml
   - addons/central/admin/admin-gateway.yaml
 set:
@@ -23,40 +21,6 @@ tests:
       - equal:
           path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
           value: enabled
-  - it: applies the Gateway API CRDs from the vendored directory with server-side apply and never prunes them
-    template: addons/central/admin/gateway-api-crds.yaml
-    asserts:
-      - equal:
-          path: spec.template.spec.source.path
-          value: deploy/platform/gateway-api-crds
-      - contains:
-          path: spec.template.spec.syncPolicy.syncOptions
-          content: ServerSideApply=true
-      - equal:
-          path: spec.template.spec.syncPolicy.automated.prune
-          value: false
-  - it: orders the CRDs before the controller
-    template: addons/central/admin/gateway-api-crds.yaml
-    asserts:
-      - equal:
-          path: spec.template.metadata.annotations["argocd.argoproj.io/sync-wave"]
-          value: "-5"
-  - it: gives the load balancer controller the cluster, region and VPC without an IRSA annotation
-    template: addons/central/admin/aws-load-balancer-controller.yaml
-    asserts:
-      - contains:
-          path: spec.template.spec.sources[0].helm.parameters
-          content:
-            name: region
-            value: eu-central-1
-      - contains:
-          path: spec.template.spec.sources[0].helm.parameters
-          content:
-            name: vpcId
-            value: '{{ index .metadata.labels "payments-platform/vpc-id" }}'
-      - contains:
-          path: spec.generators[0].clusters.selector.matchExpressions
-          content: {key: payments-platform/vpc-id, operator: Exists}
   - it: installs the private CA issuer chart with the generated ClusterIssuer
     template: addons/central/admin/aws-privateca-issuer.yaml
     asserts:

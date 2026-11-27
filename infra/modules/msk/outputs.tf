@@ -52,3 +52,8 @@ output "client_settings" {
     sasl_mechanism    = "OAUTHBEARER"
   }
 }
+
+output "client_role_arns" {
+  description = "Pod Identity roles of the kafka-topics Job (topics) and the kafka-exporter (exporter)."
+  value       = { for k, r in aws_iam_role.client : k => r.arn }
+}

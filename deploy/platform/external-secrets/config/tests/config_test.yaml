@@ -95,7 +95,7 @@ tests:
               - ipBlock:
                   cidr: 10.0.0.0/16
             ports:
-              - port: 8200
+              - port: 443
                 protocol: TCP
   - it: gives the central cluster only the aws-secrets-manager store, limited to the namespaces that use it
     template: clustersecretstores.yaml

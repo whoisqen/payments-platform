@@ -9,7 +9,7 @@ locals {
   owner                      = local.cfg.owner.contact_email
   cost_center                = "${local.cfg.owner.cost_center_prefix}-shared-services"
 
-  state_kms_key_arn        = local.cfg.storage.state_kms_key_arn
+  state_kms_key_arn        = local.cfg.storage.state_kms_key_arns[local.environment]
   permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/workload-boundary"
   flow_logs_bucket_arn     = "arn:aws:s3:::${local.cfg.storage.state_bucket_prefix}-shared-services-log-archive-flow-logs"
   autoscaling_slr_arn      = "arn:aws:iam::${local.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
@@ -63,20 +63,16 @@ locals {
   kubernetes_version     = "1.36"
   bottlerocket_version   = "v1.70.0"
   eks_log_retention_days = 90
-  central_cpu_limits     = { workers = 200, stateful = 200 }
-  central_enabled_pools  = ["workers", "stateful"]
-  # The karpenter module always lets the workers pool use Spot (preferred, on-demand fallback); the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
+  central_cpu_limits     = { workers = 200, stateful = 200, "ci-build" = 64 }
+  # ci-build: BuildKit pods of the image builds (Spot, arm64, label pay.io/pool=ci-build, taint workload=ci-build).
+  central_enabled_pools = ["workers", "stateful", "ci-build"]
+  # Spot only for ci-build (central_spot_pools lists none); the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
   central_spot_pools = []
+  # Argo CD manages its own cluster in-cluster through its service accounts, so the central cluster has no argocd entry (argocd-access depends on this cluster).
   access_entries = {
     sre-view = {
       principal_arn = "arn:aws:iam::${local.account_id}:role/aws-reserved/sso.amazonaws.com/${local.cfg.access.sre_view_permission_set}"
       policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-    }
-    argocd = {
-      principal_arn = "arn:aws:iam::${local.account_id}:role/${local.cfg.storage.state_bucket_prefix}-shared-services-argocd-controller"
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
-      scope         = "namespace"
-      namespaces    = ["monitoring", "karpenter", "external-secrets"]
     }
   }
 

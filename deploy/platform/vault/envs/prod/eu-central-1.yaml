@@ -1,5 +1,0 @@
-# prod eu-central-1: unseal key and region of the Vault servers; the pod role comes from the Pod Identity association vault/vault
-server:
-  extraEnvironmentVars:
-    AWS_REGION: eu-central-1
-    VAULT_AWSKMS_SEAL_KEY_ID: alias/pay-prod-euc1-vault-unseal
