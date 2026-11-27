@@ -33,6 +33,6 @@ COPY --from=vault --chmod=0555 /bin/vault /usr/local/bin/vault
 COPY --from=fetch --chmod=a=rX /out/aws-cli/ /usr/local/aws-cli/
 COPY --from=fetch --chmod=0555 /out/bin/jq /usr/local/bin/jq
 # no writes outside /tmp: the Jobs mount an emptyDir there and set the root filesystem read-only
-ENV HOME=/tmp AWS_CONFIG_FILE=/tmp/.aws/config AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
+ENV HOME=/tmp \
     AWS_PAGER="" PATH=/usr/local/aws-cli/v2/current/bin:/usr/local/bin:/usr/bin:/bin
 USER 10001:10001

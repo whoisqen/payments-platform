@@ -122,10 +122,14 @@ resource "aws_vpc_security_group_ingress_rule" "proxy_from_function" {
   description                  = "Merchant copy function"
 }
 
-# Secrets Manager is reached through the interface endpoint of the VPC on 443.
+data "aws_vpc" "this" {
+  id = var.vpc_id
+}
+
+# Secrets Manager is reached through the interface endpoint of the VPC on 443; nothing outside the VPC.
 resource "aws_vpc_security_group_egress_rule" "https" {
   security_group_id = aws_security_group.function.id
-  cidr_ipv4         = "0.0.0.0/0"
+  cidr_ipv4         = data.aws_vpc.this.cidr_block
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443

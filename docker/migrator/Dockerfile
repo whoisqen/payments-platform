@@ -62,7 +62,7 @@ COPY --chmod=0555 scripts/schema/pre-migration-snapshot.sh /opt/migrator/pre-mig
 COPY --chmod=0555 docker/migrator/migrate.sh docker/migrator/snapshot.sh docker/migrator/backfill.sh /opt/migrator/
 # no writes outside /tmp: the Job mounts an emptyDir there and sets the root filesystem read-only.
 # verify-full needs the Amazon RDS CA bundle at PGSSLROOTCERT; the Job that runs the image provides that file.
-ENV HOME=/tmp AWS_CONFIG_FILE=/tmp/.aws/config AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials AWS_PAGER="" \
+ENV HOME=/tmp AWS_PAGER="" \
     PGSSLROOTCERT=/etc/ssl/rds/global-bundle.pem \
     PATH=/usr/local/aws-cli/v2/current/bin:/usr/bin
 WORKDIR /tmp

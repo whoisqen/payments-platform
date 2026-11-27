@@ -1,4 +1,7 @@
 mock_provider "aws" {
+  mock_data "aws_vpc" {
+    defaults = { cidr_block = "10.150.0.0/16" }
+  }
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::111111111111:role/pay-dev-euc1-cell-copy-automation" }
   }
@@ -59,4 +62,13 @@ run "image_must_be_pinned" {
   }
 
   expect_failures = [var.image_uri]
+}
+
+run "copy_function_egress_stays_inside_the_vpc" {
+  command = plan
+
+  assert {
+    condition     = aws_vpc_security_group_egress_rule.https.cidr_ipv4 == "10.150.0.0/16"
+    error_message = "the function reaches Secrets Manager through the VPC endpoint only, never the internet"
+  }
 }
