@@ -16,5 +16,7 @@ LABEL org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.created="${CREATED}"
 COPY --from=deps --chmod=a=rX /out/ ${LAMBDA_TASK_ROOT}/
 COPY --chmod=0444 services/cell-copy/app.py ${LAMBDA_TASK_ROOT}/app.py
+# a Lambda function: the Lambda service checks it, so the image carries no Docker health check
+HEALTHCHECK NONE
 USER 10001:10001
 CMD ["app.handler"]

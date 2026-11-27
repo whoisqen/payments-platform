@@ -66,5 +66,7 @@ ENV HOME=/tmp AWS_PAGER="" \
     PGSSLROOTCERT=/etc/ssl/rds/global-bundle.pem \
     PATH=/usr/local/aws-cli/v2/current/bin:/usr/bin
 WORKDIR /tmp
+# a run-to-completion Job: Kubernetes tracks it, so the image carries no Docker health check
+HEALTHCHECK NONE
 USER 10001:10001
 ENTRYPOINT ["/opt/migrator/migrate.sh"]

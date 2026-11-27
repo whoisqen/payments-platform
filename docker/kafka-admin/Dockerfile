@@ -32,5 +32,7 @@ COPY --from=fetch --chmod=a=rX /out/kafka/ /opt/kafka/
 # no writes outside /tmp: the Job mounts an emptyDir there and sets the root filesystem read-only
 ENV PATH=/opt/kafka/bin:/opt/java/openjdk/bin:/usr/bin:/bin HOME=/tmp LOG_DIR=/tmp/kafka-logs \
     KAFKA_HEAP_OPTS="-Xms64m -Xmx256m"
+# a run-to-completion Job: Kubernetes tracks it, so the image carries no Docker health check
+HEALTHCHECK NONE
 USER 10001:10001
 ENTRYPOINT ["kafka-topics.sh"]
