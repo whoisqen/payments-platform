@@ -21,11 +21,13 @@ agents:
                                    "docs/runbooks/**"] }
   ci-engineer:            { owns: [".github/**", "docker/**", "scripts/**",
                                    "tools/**", "Makefile", "mise.toml", "SECURITY.md", "renovate.json5",
-                                   ".pre-commit-config.yaml", "commitlint.config.js"] }
+                                   ".pre-commit-config.yaml", "commitlint.config.js", "CODEOWNERS",
+                                   ".squawk.toml"] }
   perf-engineer:          { owns: ["tests/load/**", "tests/chaos/**",
                                    "docs/capacity/**", "docs/chaos/**"] }
   test-engineer:          { owns: ["tests/smoke/**", "tests/e2e/**", "tests/nodes/**",
-                                   "tests/alerts/**", "tests/contracts/**", "tests/README.md"] }
+                                   "tests/alerts/**", "tests/contracts/**", "tests/integration/**",
+                                   "tests/component/**", "tests/README.md"] }
   docs-writer:            { owns: ["docs/architecture/**", "docs/adr/**",
                                    "docs/security/**", "docs/dr/**", "docs/postmortems/**",
                                    "docs/glossary.md", "docs/README.md", "docs/requirements/**"], not: ["docs/postmortems/drafts/**", "docs/adr/drafts/**"] }
@@ -34,7 +36,8 @@ agents:
 
 humans_only: [".claude/**", "CLAUDE.md", "AGENTS.md", "manifests/**", ".mcp.json", "specs/_templates/**", "README.md", "LICENSE*",
               ".gitignore", "vendor/README.md", "vendor/*/LICENSE*", "vendor/*/NOTICE*",
-              "tools/scripts/claude-hooks/**", "tools/lint/**", "policy/cde-paths.yaml"]
+              "tools/scripts/claude-hooks/**", "tools/lint/**", "policy/cde-paths.yaml",
+              "config/**"]
 handoffs: { path: "specs/*/handoffs/{agent}-*.md", writers: all }
 ci_only: ["deploy/envs/*/images.yaml"]
 integrator_only: ["observability/coverage/report/**"]
