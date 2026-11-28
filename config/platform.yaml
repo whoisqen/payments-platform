@@ -154,15 +154,18 @@ deploy:
         endpoint_cidrs: [10.151.0.0/18, 10.151.64.0/19]
 
 central:
-  # The central observability stack outside the CDE (account shared_services): clusters push metrics to it and send their alerts to it.
-  # Replace the example host names with the real ones.
-  metrics_remote_write_url: https://metrics.observability.pay.example.com/insert/0/prometheus/api/v1/write
-  alertmanager_url: https://alertmanager.observability.pay.example.com
+  # The central observability stack outside the CDE (account shared_services): clusters push metrics to it and send their alerts to it
+  # through the ingest Gateway of the central cluster (mutual TLS, write paths only, open to the environment VPCs).
+  metrics_remote_write_url: https://metrics-ingest.payments.internal/insert/0/prometheus/api/v1/write
+  alertmanager_url: https://alertmanager-ingest.payments.internal
+  # CA certificate (PEM, public) that signs the client identity in Secrets Manager <prefix>/shared-services/otel-collector/tls;
+  # the ingest Gateway admits only clients with a certificate from it
+  ingest_client_ca: REPLACE_INGEST_CLIENT_CA_PEM
   # Sentry (error tracking, self-hosted, no card data); applications send events to the DSN host under this URL
   sentry_url: https://sentry.payments.internal
   # HTTP input of the central Logstash (shared-services): the node collectors send OTLP/HTTP as JSON, Logstash flattens, masks and
   # writes to the central OpenSearch with AWS IAM, with a persistent queue and a dead letter queue
-  logs_otlp_endpoint: https://logs.observability.pay.example.com:8443
+  logs_otlp_endpoint: https://logs-ingest.payments.internal:8443
   # The one OpenSearch of the platform (shared-services): application logs of every environment and the audit trail
   opensearch:
     domain_name: pay-shared-euc1-logs
@@ -176,7 +179,7 @@ central:
   # (Settings > Integrations > Slack in Sentry, after the one-time OAuth install)
   sentry_organization: payments
   sentry_slack_workspace_id: REPLACE_SENTRY_SLACK_WORKSPACE_ID
-  traces_otlp_endpoint: tempo.observability.pay.example.com:4317
+  traces_otlp_endpoint: tempo-ingest.payments.internal:4317
   # Samples of the two Prometheus replicas that differ by less than this interval are one sample; it equals the scrape interval.
   dedup_interval: 30s
 

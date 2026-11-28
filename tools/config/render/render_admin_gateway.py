@@ -54,6 +54,23 @@ LOAD_BALANCER = {
     "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
 }
 NS_LABEL = "kubernetes.io/metadata.name"
+# Ingest entry of the environment clusters (through the transit gateway): its own internal NLB, open only to the environment VPCs,
+# mutual TLS against the CA of the central client identity (deploy/platform/central-tls), and only the write paths.
+# Logs do not pass here: Logstash has its own TLS passthrough Gateway (deploy/platform/logstash).
+INGEST = "ingest"
+INGEST_CA = "ingest-client-ca"
+INGEST_ROUTES = {
+    "metrics-ingest": {"kind": "HTTPRoute", "port": 443, "protocol": "HTTPS", "ns": "victoria-metrics",
+                       "service": "vm-victoria-metrics-cluster-vminsert", "service_port": 8480,
+                       "match": {"path": {"type": "Exact", "value": "/insert/0/prometheus/api/v1/write"}, "method": "POST"}},
+    "alertmanager-ingest": {"kind": "HTTPRoute", "port": 443, "protocol": "HTTPS", "ns": "monitoring",
+                            "service": "admin-alertmanager", "service_port": 9093,
+                            "match": {"path": {"type": "Exact", "value": "/api/v2/alerts"}, "method": "POST"}},
+    "tempo-ingest": {"kind": "GRPCRoute", "port": 4317, "protocol": "HTTPS", "ns": "monitoring",
+                     "service": "tempo-distributor", "service_port": 4317,
+                     "match": {"method": {"type": "Exact", "service": "opentelemetry.proto.collector.trace.v1.TraceService",
+                                          "method": "Export"}}},
+}
 
 
 def dump(docs, head):
@@ -102,6 +119,49 @@ def gateway(zone):
     ]
 
 
+def environment_cidrs(cfg):
+    """VPC ranges of every environment and region that sends to the central stack, and the central VPC itself."""
+    cidrs = []
+    for env in ("dev", "stage", "prod", "shared_services"):
+        cidrs += [cidr for region, cidr in cfg["network"][env].items() if not region.startswith("egress")]
+    return sorted(set(cidrs))
+
+
+def ingest_gateway(cfg):
+    zone = cfg["dns"]["admin_zone"]
+    annotations = {**LOAD_BALANCER, "service.beta.kubernetes.io/load-balancer-source-ranges": ",".join(environment_cidrs(cfg))}
+    listeners = [{
+        "name": host, "port": spec["port"], "protocol": spec["protocol"], "hostname": f"{host}.{zone}",
+        "tls": {"mode": "Terminate", "certificateRefs": [{"kind": "Secret", "name": CERT_SECRET}]},
+        "allowedRoutes": {"kinds": [{"group": "gateway.networking.k8s.io", "kind": spec["kind"]}],
+                          "namespaces": {"from": "Same"}},
+    } for host, spec in INGEST_ROUTES.items()]
+    pem = cfg["central"]["ingest_client_ca"]
+    return [
+        {"apiVersion": "gateway.networking.k8s.io/v1", "kind": "Gateway", "metadata": meta(INGEST, GATEWAY_NS),
+         "spec": {
+             "gatewayClassName": "istio",
+             "infrastructure": {"annotations": annotations},
+             # Every listener asks for a client certificate signed by the CA of the central client identity
+             "tls": {"frontend": {"default": {"validation": {"caCertificateRefs": [
+                 {"group": "", "kind": "ConfigMap", "name": INGEST_CA}]}}}},
+             "listeners": listeners}},
+        {"apiVersion": "v1", "kind": "ConfigMap", "metadata": meta(INGEST_CA, GATEWAY_NS), "data": {"ca.crt": pem}},
+    ]
+
+
+def ingest_routes(zone):
+    docs = []
+    for host, spec in INGEST_ROUTES.items():
+        docs.append({
+            "apiVersion": "gateway.networking.k8s.io/v1", "kind": spec["kind"], "metadata": meta(host, GATEWAY_NS),
+            "spec": {"parentRefs": [{"name": INGEST, "sectionName": host}], "hostnames": [f"{host}.{zone}"],
+                     # Only the write call matches; any other path or method gets 404 (gRPC: UNIMPLEMENTED)
+                     "rules": [{"matches": [spec["match"]],
+                                "backendRefs": [{"name": spec["service"], "namespace": spec["ns"], "port": spec["service_port"]}]}]}})
+    return docs
+
+
 def routes(zone):
     docs = []
     for tool in (*DIRECT, *PROXIED):
@@ -123,11 +183,17 @@ def reference_grants():
     wanted = {}
     for tool in (*DIRECT, *PROXIED):
         ns, service, _ = backend(tool)
-        wanted.setdefault(ns, []).append(service)
-    return [{
-        "apiVersion": "gateway.networking.k8s.io/v1beta1", "kind": "ReferenceGrant", "metadata": meta("admin-gateway-routes", ns),
-        "spec": {"from": [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "namespace": GATEWAY_NS}],
-                 "to": [{"group": "", "kind": "Service", "name": s} for s in sorted(wanted[ns])]}} for ns in sorted(wanted)]
+        wanted.setdefault(ns, {}).setdefault("HTTPRoute", set()).add(service)
+    for spec in INGEST_ROUTES.values():
+        wanted.setdefault(spec["ns"], {}).setdefault(spec["kind"], set()).add(spec["service"])
+    docs = []
+    for ns in sorted(wanted):
+        services = sorted(set().union(*wanted[ns].values()))
+        docs.append({
+            "apiVersion": "gateway.networking.k8s.io/v1beta1", "kind": "ReferenceGrant", "metadata": meta("admin-gateway-routes", ns),
+            "spec": {"from": [{"group": "gateway.networking.k8s.io", "kind": kind, "namespace": GATEWAY_NS} for kind in sorted(wanted[ns])],
+                     "to": [{"group": "", "kind": "Service", "name": s} for s in services]}})
+    return docs
 
 
 def tool_services():
@@ -237,6 +303,8 @@ def render(cfg):
         ADMIN / "namespaces.yaml": namespaces(),
         ADMIN / "gateway.yaml": gateway(zone),
         ADMIN / "routes.yaml": routes(zone),
+        ADMIN / "ingest-gateway.yaml": ingest_gateway(cfg),
+        ADMIN / "ingest-routes.yaml": ingest_routes(zone),
         ADMIN / "referencegrants.yaml": reference_grants(),
         ADMIN / "tool-services.yaml": tool_services(),
         ADMIN / "oauth2-proxy-secret.yaml": external_secrets(prefix),

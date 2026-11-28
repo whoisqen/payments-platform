@@ -110,8 +110,7 @@ Tests assert names, tags, policies and the validations that reject unsafe input 
 
 | Check | Where | What it runs |
 |---|---|---|
-| Format and tests | `.github/workflows/ci.yml`, job `terraform` | `terraform fmt -check -recursive infra`, `make test-terraform` |
-| Validate | `ci.yml`, job `terraform-validate` | `make lint-terraform` (`terraform init -backend=false` and `terraform validate` per module) |
+| Format, validate and test | `ci.yml`, job `terraform` (6 parallel shards) | `terraform fmt -check -recursive infra` (first shard), `make check-terraform TF_SHARD=i/6`: one `terraform init -backend=false` per module, then `terraform validate` and `terraform test`, with a shared provider cache |
 | Lint | `ci.yml`, job `lint-report` | `tflint` with the pinned AWS ruleset |
 | Drift | `.github/workflows/nightly.yml`, job `drift` | `terragrunt run -- plan -detailed-exitcode -lock=false` for every unit outside `cde-*`, with the plan role; exit code 2 fails the job and opens a drift alert |
 

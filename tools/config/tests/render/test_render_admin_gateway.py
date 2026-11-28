@@ -35,6 +35,30 @@ class RenderAdminGatewayTest(unittest.TestCase):
         self.assertEqual(cert["spec"]["dnsNames"], [f"*.{ZONE}"])
         self.assertEqual(cert["spec"]["issuerRef"]["kind"], "AWSPCAClusterIssuer")
 
+    def test_ingest_gateway_needs_client_certificates_and_admits_only_environment_vpcs(self):
+        gw, ca = docs(r.ADMIN / "ingest-gateway.yaml")
+        refs = gw["spec"]["tls"]["frontend"]["default"]["validation"]["caCertificateRefs"]
+        self.assertEqual(refs, [{"group": "", "kind": "ConfigMap", "name": ca["metadata"]["name"]}])
+        self.assertIn("ca.crt", ca["data"])
+        ranges = gw["spec"]["infrastructure"]["annotations"]["service.beta.kubernetes.io/load-balancer-source-ranges"].split(",")
+        self.assertIn(CFG["network"]["prod"]["us-east-1"], ranges)
+        self.assertNotIn(CFG["network"]["dev"]["egress"], ranges)
+        self.assertTrue(all(l["tls"]["mode"] == "Terminate" for l in gw["spec"]["listeners"]))
+
+    def test_ingest_routes_match_only_the_write_calls(self):
+        listeners = {l["name"] for l in docs(r.ADMIN / "ingest-gateway.yaml")[0]["spec"]["listeners"]}
+        for route in docs(r.ADMIN / "ingest-routes.yaml"):
+            (rule,) = route["spec"]["rules"]
+            (match,) = rule["matches"]
+            self.assertIn(route["spec"]["parentRefs"][0]["sectionName"], listeners)
+            if route["kind"] == "HTTPRoute":
+                self.assertEqual((match["method"], match["path"]["type"]), ("POST", "Exact"))
+            else:
+                self.assertEqual(match["method"]["method"], "Export")
+        hosts = {route["spec"]["hostnames"][0] for route in docs(r.ADMIN / "ingest-routes.yaml")}
+        self.assertIn(CFG["central"]["metrics_remote_write_url"].split("/")[2], hosts)
+        self.assertIn(CFG["central"]["traces_otlp_endpoint"].split(":")[0], hosts)
+
     def test_issuer_matches_the_certificate_reference(self):
         (issuer,) = docs(r.ISSUER / "clusterissuer.yaml")
         cert = docs(r.ADMIN / "gateway.yaml")[1]

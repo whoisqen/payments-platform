@@ -7,4 +7,6 @@ useDefault = true
 [allowlist]
 description = "ACM key algorithm identifier and sequential sample values"
 regexTarget = "line"
+# Upstream code keeps its own test fixtures; the sanitizer tests feed synthetic secrets on purpose to prove they are masked
+paths = ['''^vendor/''', '''^tools/ai/tests/test_sanitize\.py$''']
 regexes = ['''key_algorithm\s*=\s*"EC_prime256v1"''', '''=(0123456789abcdef){4}\b''']

@@ -24,7 +24,8 @@ for chart in "$root"/deploy/charts/*/; do
   else
     # dependencies are file:// charts of this repo; the build is skipped when charts/ already matches Chart.lock
     helm dependency build --skip-refresh "$chart" >/dev/null
-    helm template "$name" "$chart" "${values[@]}" >"$out/${name}.yaml"
+    # Argo CD installs every chart into its own namespace; rendering into one keeps the scanners from reading "default"
+    helm template "$name" "$chart" --namespace "$name" "${values[@]}" >"$out/${name}.yaml"
   fi
   count=$((count + 1))
 done

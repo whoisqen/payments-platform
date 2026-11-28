@@ -44,12 +44,21 @@ metadata:
 spec:
   from:
   - group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    namespace: istio-ingress-admin
+  - group: gateway.networking.k8s.io
     kind: HTTPRoute
     namespace: istio-ingress-admin
   to:
   - group: ''
     kind: Service
+    name: admin-alertmanager
+  - group: ''
+    kind: Service
     name: grafana
+  - group: ''
+    kind: Service
+    name: tempo-distributor
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
@@ -80,3 +89,18 @@ spec:
   - group: ''
     kind: Service
     name: admin-vault
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: admin-gateway-routes
+  namespace: victoria-metrics
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: istio-ingress-admin
+  to:
+  - group: ''
+    kind: Service
+    name: vm-victoria-metrics-cluster-vminsert

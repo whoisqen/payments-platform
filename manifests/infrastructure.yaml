@@ -24,6 +24,8 @@ modules:
   sentry-alerts: {purpose: Sentry issue alert rules that post high and critical issues to the Slack channel, out: []}
   cell-migration: {purpose: SSM documents and the cell-copy function that move a merchant between cells, out: []}
   cell-endpoint: {purpose: internal NLB and private zone of the mutual-TLS router gateway of a cell for the edge, out: [host, target_group_arn]}
+  transit-gateway-hub: {purpose: shared-services side of the hub and spoke, one peering and route table per environment, no route between environments, out: [peering_attachment_ids]}
+  transit-gateway-spoke: {purpose: environment side of the hub and spoke, accepts the peering, routes only the central private tier, joins the admin DNS zone, out: []}
   secrets-replica: {purpose: Secrets Manager multi-Region replicas, out: [secret_arns]}
 stacks:
   bootstrap: infra/bootstrap (state bucket, lockfile, KMS, CI roles; apply with local state first)
