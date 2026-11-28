@@ -342,3 +342,42 @@ run "explicit_argocd_name" {
     error_message = "explicit name wins"
   }
 }
+
+run "no_central_rules_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.cluster_from_central) == 0 && length(aws_vpc_security_group_egress_rule.node_central) == 0
+    error_message = "the endpoint admits nothing outside the VPC unless asked"
+  }
+}
+
+run "central_cluster_reaches_the_endpoint_and_nodes_reach_telemetry" {
+  command = plan
+
+  variables {
+    api_ingress_cidrs = ["10.140.0.0/19", "10.140.32.0/19", "10.140.64.0/19"]
+    central_egress    = { cidrs = ["10.140.0.0/19", "10.140.32.0/19", "10.140.64.0/19"], ports = [4317, 8443] }
+  }
+
+  assert {
+    condition = length(aws_vpc_security_group_ingress_rule.cluster_from_central) == 3 && alltrue([
+      for r in values(aws_vpc_security_group_ingress_rule.cluster_from_central) : r.from_port == 443 && r.to_port == 443 && contains(var.api_ingress_cidrs, r.cidr_ipv4)
+    ])
+    error_message = "443 into the cluster security group from the central CIDRs only"
+  }
+  assert {
+    condition     = length(aws_vpc_security_group_egress_rule.node_central) == 6 && alltrue([for r in values(aws_vpc_security_group_egress_rule.node_central) : contains([4317, 8443], r.from_port) && r.from_port == r.to_port])
+    error_message = "node egress to the hub on the telemetry ports only"
+  }
+}
+
+run "open_api_ingress_rejected" {
+  command = plan
+
+  variables {
+    api_ingress_cidrs = ["0.0.0.0/0"]
+  }
+
+  expect_failures = [var.api_ingress_cidrs]
+}

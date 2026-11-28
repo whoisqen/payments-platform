@@ -27,3 +27,8 @@ output "role_arns" {
   description = "Pod Identity role ARN by controller (load-balancer-controller, privateca-issuer)."
   value       = { for k, r in aws_iam_role.this : k => r.arn }
 }
+
+output "nlb_security_group_id" {
+  description = "Security group of the internal NLBs (annotation service.beta.kubernetes.io/aws-load-balancer-security-groups); null when not created."
+  value       = one(aws_security_group.nlb[*].id)
+}

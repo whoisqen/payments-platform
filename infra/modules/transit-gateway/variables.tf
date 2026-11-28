@@ -10,11 +10,11 @@ variable "region" {
 
 variable "environment" {
   type        = string
-  description = "dev, stage or prod."
+  description = "dev, stage, prod or shared-services (the hub)."
 
   validation {
-    condition     = contains(["dev", "stage", "prod"], var.environment)
-    error_message = "environment must be dev, stage or prod."
+    condition     = contains(["dev", "stage", "prod", "shared-services"], var.environment)
+    error_message = "environment must be dev, stage, prod or shared-services."
   }
 }
 

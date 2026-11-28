@@ -238,6 +238,28 @@ resource "aws_vpc_security_group_ingress_rule" "cluster_from_node" {
   description                  = "Nodes to the private endpoint"
 }
 
+resource "aws_vpc_security_group_ingress_rule" "cluster_from_central" {
+  for_each = toset(var.api_ingress_cidrs)
+
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+  cidr_ipv4         = each.key
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "Central cluster (Argo CD, Vault) to the private endpoint"
+}
+
+resource "aws_vpc_security_group_egress_rule" "node_central" {
+  for_each = { for pair in setproduct(var.central_egress.cidrs, var.central_egress.ports) : "${pair[0]}/${pair[1]}" => { cidr = pair[0], port = pair[1] } }
+
+  security_group_id = aws_security_group.node.id
+  cidr_ipv4         = each.value.cidr
+  ip_protocol       = "tcp"
+  from_port         = each.value.port
+  to_port           = each.value.port
+  description       = "Telemetry to shared-services"
+}
+
 resource "aws_vpc_security_group_egress_rule" "node_vpc" {
   security_group_id = aws_security_group.node.id
   cidr_ipv4         = var.vpc_cidr_block

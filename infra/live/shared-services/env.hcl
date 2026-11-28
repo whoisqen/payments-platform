@@ -33,6 +33,9 @@ locals {
   # Set after the first apply of tgw: the vpc stack needs the attachment before it may route through it (two-step by design).
   transit_gateway_id = null
 
+  # Spokes (<env>-<region-short>) whose account accepted the peering (tgw-spoke applied); tgw-hub then associates and routes them.
+  hub_peering_accepted = []
+
   # No PSP traffic leaves shared-services: its firewall passes only the CI allowlist of the untrusted runner tier.
   psp_domains = []
 

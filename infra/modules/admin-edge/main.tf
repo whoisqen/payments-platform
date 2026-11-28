@@ -22,14 +22,75 @@ resource "aws_route53_zone" "admin" {
   name    = var.zone_name
   comment = "Admin tools, reached only through the internal gateway"
 
-  dynamic "vpc" {
-    for_each = toset(var.vpc_ids)
-    content {
-      vpc_id = vpc.value
-    }
+  vpc {
+    vpc_id = var.vpc_ids[0]
   }
 
   tags = var.tags
+
+  # Spoke accounts associate their VPCs themselves; inline blocks would remove those associations.
+  lifecycle {
+    ignore_changes = [vpc]
+  }
+}
+
+resource "aws_route53_zone_association" "extra" {
+  for_each = toset(slice(var.vpc_ids, 1, length(var.vpc_ids)))
+
+  zone_id = aws_route53_zone.admin.zone_id
+  vpc_id  = each.key
+}
+
+# Lets each environment account associate its VPC (transit-gateway-spoke), so its clusters resolve Vault and the admin hosts.
+resource "aws_route53_vpc_association_authorization" "spoke" {
+  for_each = var.spoke_vpcs
+
+  zone_id    = aws_route53_zone.admin.zone_id
+  vpc_id     = each.value.vpc_id
+  vpc_region = each.value.region
+}
+
+# ---------------------------------------------------------------------------
+# Security group of the internal NLBs (admin gateway, telemetry intake), attached by the load balancer controller
+# ---------------------------------------------------------------------------
+
+locals {
+  nlb_rules = var.nlb_security_group == null ? {} : merge(
+    { for pair in setproduct(var.nlb_security_group.spoke_cidrs, var.nlb_security_group.spoke_ports) : "${pair[0]}/${pair[1]}" => { cidr = pair[0], port = pair[1] } },
+    { for c in var.nlb_security_group.local_cidrs : "${c}/443" => { cidr = c, port = 443 } },
+  )
+}
+
+resource "aws_security_group" "nlb" {
+  count = var.nlb_security_group == null ? 0 : 1
+
+  name        = "${local.name}-internal-nlb"
+  description = "Internal NLBs of shared-services: environment VPCs on the listed ports only."
+  vpc_id      = var.nlb_security_group.vpc_id
+  tags        = merge(var.tags, { Name = "${local.name}-internal-nlb" })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "nlb" {
+  for_each = local.nlb_rules
+
+  security_group_id = aws_security_group.nlb[0].id
+  cidr_ipv4         = each.value.cidr
+  ip_protocol       = "tcp"
+  from_port         = each.value.port
+  to_port           = each.value.port
+  description       = "Listener ${each.value.port} from ${each.value.cidr}"
+}
+
+# The targets (gateway and intake pods) are in this VPC; the controller adds the matching rules on the node group.
+resource "aws_vpc_security_group_egress_rule" "nlb" {
+  for_each = var.nlb_security_group == null ? toset([]) : toset(var.nlb_security_group.local_cidrs)
+
+  security_group_id = aws_security_group.nlb[0].id
+  cidr_ipv4         = each.key
+  ip_protocol       = "tcp"
+  from_port         = 1
+  to_port           = 65535
+  description       = "To the targets inside the VPC"
 }
 
 # The NLB belongs to the load balancer controller, which builds it from the Gateway; it exists only after the first apply and the sync of the Gateway.
@@ -58,6 +119,30 @@ resource "aws_route53_record" "wildcard" {
   alias {
     name                   = data.aws_lb.gateway[0].dns_name
     zone_id                = data.aws_lb.gateway[0].zone_id
+    evaluate_target_health = true
+  }
+}
+
+# Hosts that the environment clusters send to: each points to its own internal NLB (the ingest Gateway, the logs Gateway) and wins
+# over the wildcard of the admin tools.
+data "aws_lb" "ingest" {
+  for_each = var.nlb_lookup_enabled ? toset(values(var.ingest_records)) : toset([])
+
+  tags = {
+    "service.k8s.aws/stack" = each.value
+  }
+}
+
+resource "aws_route53_record" "ingest" {
+  for_each = var.nlb_lookup_enabled ? var.ingest_records : {}
+
+  zone_id = aws_route53_zone.admin.zone_id
+  name    = "${each.key}.${var.zone_name}"
+  type    = "A"
+
+  alias {
+    name                   = data.aws_lb.ingest[each.value].dns_name
+    zone_id                = data.aws_lb.ingest[each.value].zone_id
     evaluate_target_health = true
   }
 }

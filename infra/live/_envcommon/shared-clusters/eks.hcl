@@ -1,5 +1,6 @@
 locals {
-  p = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/shared-clusters/profile.hcl").locals
+  p   = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/shared-clusters/profile.hcl").locals
+  hub = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/hub-network.hcl").locals
 }
 
 terraform {
@@ -18,6 +19,9 @@ inputs = {
   permissions_boundary_arn = local.p.env_cfg.permissions_boundary_arn
   access_entries           = local.p.env_cfg.access_entries
   log_retention_days       = local.p.env_cfg.eks_log_retention_days
+  # Argo CD and Vault of the central cluster reach the private endpoint; nodes send traces and logs to shared-services.
+  api_ingress_cidrs = local.hub.central_cidrs
+  central_egress    = { cidrs = local.hub.central_cidrs, ports = local.hub.telemetry_ports }
   tags = {
     team        = local.p.profile.team
     owner       = local.p.env_cfg.owner
