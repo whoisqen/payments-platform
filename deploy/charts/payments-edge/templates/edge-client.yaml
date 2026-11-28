@@ -1,0 +1,91 @@
+{{- /* Mutual TLS from the edge proxy to the router gateway of every cell (infra/modules/cell-endpoint, payments-cell routerGateway) */ -}}
+{{- $ec := .Values.edgeClient -}}
+{{- $g := .Values.global | default dict -}}
+{{- if and $ec.enabled .Values.routing.cells }}
+{{- $rs := regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" ($g.region | default "eu-central-1") "${1}${2}${3}" }}
+{{- range .Values.routing.cells }}
+{{- $host := include "payments-edge.cellHost" (dict "cell" . "root" $) }}
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: cell-{{ .name }}
+  labels:
+    {{- include "payments-edge.labels" $ | nindent 4 }}
+spec:
+  host: {{ $host }}
+  exportTo: ["."]
+  # The edge gateway proxy is the only client; it reads the client certificate from the Secret in its namespace
+  workloadSelector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: payments-edge
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      credentialName: {{ $ec.secretName }}
+      sni: {{ $host }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $ec.pki.serviceAccount }}
+  labels:
+    {{- include "payments-edge.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Client certificate of the edge with its SPIFFE ID (URI SAN), from the Vault mesh PKI (role edge-client)
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: VaultDynamicSecret
+metadata:
+  name: edge-client-certificate
+  labels:
+    {{- include "payments-edge.labels" . | nindent 4 }}
+spec:
+  method: POST
+  path: {{ printf "%s/issue/edge-client" $ec.pki.mount | quote }}
+  parameters:
+    common_name: edge.payments-edge
+    uri_sans: {{ $ec.pki.uriSan | quote }}
+    ttl: {{ $ec.pki.ttl | quote }}
+  resultType: Data
+  provider:
+    server: {{ required "edgeClient.pki.vaultServer is required" $ec.pki.vaultServer | quote }}
+    {{- with $ec.pki.caBundle }}
+    caBundle: {{ . | quote }}
+    {{- end }}
+    auth:
+      kubernetes:
+        # the jwt mount of the edge cluster in the central Vault
+        mountPath: {{ $ec.pki.authMount | default (printf "k8s-%s-%s-%s-edge" ((($g.hyperswitch | default dict).namePrefix) | default "pay") ($g.environment | default "dev") $rs) | quote }}
+        role: edge-client
+        serviceAccountRef:
+          name: {{ $ec.pki.serviceAccount }}
+          audiences: [vault]
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $ec.secretName }}
+  labels:
+    {{- include "payments-edge.labels" . | nindent 4 }}
+spec:
+  refreshInterval: {{ $ec.pki.refreshInterval }}
+  target:
+    name: {{ $ec.secretName }}
+    creationPolicy: Owner
+    template:
+      # tls.crt, tls.key and ca.crt: the format Istio reads for a client credential (credentialName)
+      type: kubernetes.io/tls
+      engineVersion: v2
+      data:
+        tls.crt: '{{`{{ .certificate }}`}}'
+        tls.key: '{{`{{ .private_key }}`}}'
+        ca.crt: '{{`{{ .issuing_ca }}`}}'
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: VaultDynamicSecret
+          name: edge-client-certificate
+{{- end }}

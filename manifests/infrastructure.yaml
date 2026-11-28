@@ -17,6 +17,7 @@ modules:
   s3-backup: {purpose: locked backup buckets, RTC replication, lifecycle tiers, out: [bucket_arns]}
   backup: {purpose: AWS Backup vaults, plans by backup-tier tag, copy actions, restore testing, out: [vault_arns, plan_ids]}
   opensearch: {purpose: log search, out: [endpoint]}
+  cell-endpoint: {purpose: internal NLB and private zone of the mutual-TLS router gateway of a cell for the edge, out: [host, target_group_arn]}
   secrets-replica: {purpose: Secrets Manager multi-Region replicas, out: [secret_arns]}
 stacks:
   bootstrap: infra/bootstrap (state bucket, lockfile, KMS, CI roles; apply with local state first)

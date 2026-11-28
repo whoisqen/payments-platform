@@ -26,7 +26,7 @@ spec:
         - group: networking.istio.io
           kind: Hostname
           name: {{ include "payments-edge.cellHost" (dict "cell" . "root" $) }}
-          port: {{ .port | default 8080 }}
+          port: {{ .port | default $.Values.routing.cellPort }}
       # Longer than the 15 s PSP call; no retry stanza, a charge is not repeated automatically
       timeouts:
         request: {{ $.Values.routing.timeout }}

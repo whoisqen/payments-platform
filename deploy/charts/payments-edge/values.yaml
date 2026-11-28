@@ -33,7 +33,26 @@ routing:
   timeout: 20s
   # A cell without host: router.payments.svc.<name>.<clusterDomain>, the name the cell endpoint publishes (infra outputs the real one)
   clusterDomain: ""
+  # Port of the mutual-TLS router gateway of every cell (payments-cell routerGateway.port)
+  cellPort: 8443
   cells: []
+
+# Client side of the cross-cluster edge-to-cell path: the edge proxy presents a certificate of the Vault mesh PKI (role edge-client)
+# to the router gateway of each cell, which admits only that SPIFFE ID
+edgeClient:
+  enabled: true
+  secretName: edge-client-tls
+  pki:
+    mount: pki-mesh
+    # the central Vault (vault.host of config/platform.yaml)
+    vaultServer: ""
+    caBundle: ""
+    # empty: k8s-<prefix>-<env>-<region short>-edge, the jwt mount of the edge cluster
+    authMount: ""
+    serviceAccount: edge-gateway-pki
+    uriSan: spiffe://payments-platform/ns/payments-edge/sa/edge
+    ttl: 72h
+    refreshInterval: 24h
 
 # Request classes are assigned by path in this order; anything unmatched is payments, shed last
 classes:

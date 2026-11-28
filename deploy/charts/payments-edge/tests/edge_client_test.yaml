@@ -1,0 +1,24 @@
+suite: the edge reaches the router gateway of every cell with mutual TLS
+templates:
+  - edge-client.yaml
+values:
+  - ../../../envs/dev/eu-central-1/edge/values.yaml
+tests:
+  - it: originates mutual TLS to every cell from the edge proxy with the edge client certificate
+    documentSelector: {path: metadata.name, value: cell-spare}
+    asserts:
+      - equal:
+          path: spec.trafficPolicy.tls
+          value: {mode: MUTUAL, credentialName: edge-client-tls, sni: router.payments.svc.spare.dev.example.internal}
+      - equal:
+          path: spec.workloadSelector.matchLabels
+          value: {gateway.networking.k8s.io/gateway-name: payments-edge}
+  - it: issues the edge client certificate with the edge SPIFFE ID on the jwt mount of the edge cluster
+    documentSelector: {path: kind, value: VaultDynamicSecret}
+    asserts:
+      - equal:
+          path: spec.parameters.uri_sans
+          value: spiffe://payments-platform/ns/payments-edge/sa/edge
+      - equal:
+          path: spec.provider.auth.kubernetes
+          value: {mountPath: k8s-pay-dev-euc1-edge, role: edge-client, serviceAccountRef: {name: edge-gateway-pki, audiences: [vault]}}
