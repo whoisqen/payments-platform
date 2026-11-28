@@ -1,0 +1,55 @@
+suite: OpenSearch Dashboards behind the admin gateway
+templates:
+  - route.yaml
+  - backend.yaml
+values:
+  - ../ci/lint-values.yaml
+tests:
+  - it: routes only the Dashboards path of the configured host through the admin listener
+    template: route.yaml
+    asserts:
+      - equal:
+          path: spec.hostnames
+          value: [logs.example.test]
+      - equal:
+          path: spec.parentRefs[0]
+          value: {name: admin, namespace: istio-ingress-admin, sectionName: https}
+      - equal:
+          path: spec.rules[0].matches[0].path
+          value: {type: PathPrefix, value: /_dashboards}
+      - equal:
+          path: spec.rules[1].filters[0].requestRedirect.path.replaceFullPath
+          value: /_dashboards/
+  - it: points the backend at the VPC endpoint of the domain
+    template: backend.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.externalName
+          value: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com
+  - it: checks the domain certificate against the custom endpoint and the private CA
+    template: backend.yaml
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: BackendTLSPolicy
+      - equal:
+          path: spec.validation.hostname
+          value: logs.example.test
+      - equal:
+          path: spec.validation.caCertificateRefs[0].name
+          value: opensearch-dashboards-ca
+  - it: decodes the CA bundle into the ConfigMap
+    template: backend.yaml
+    documentIndex: 2
+    asserts:
+      - matchRegex:
+          path: data["ca.crt"]
+          pattern: ^-----BEGIN CERTIFICATE-----
+  - it: fails without the VPC endpoint
+    template: backend.yaml
+    set:
+      endpoint: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: endpoint is required (VPC endpoint host of the domain)

@@ -78,7 +78,15 @@ New to card payments? Read [Payments in 10 minutes](architecture/domain/README.m
 | request class | `payments`, `read` or `list`, set at the edge by path and method; decides the order of load shedding ([primer](architecture/domain/platform-concepts.md#the-edge-and-request-classes)) | |
 | load shedding | Refusing requests under overload, lists first, reads next, payments last ([primer](architecture/domain/platform-concepts.md#load-shedding)) | |
 | admin entry | The internal Gateway on the private zone that serves the admin tools after Okta sign-in | |
-| central cluster | The EKS cluster in shared-services that runs metrics, logs, traces, Grafana, Alertmanager and Sentry outside the CDE | |
+| central cluster | The EKS cluster in shared-services that runs metrics, traces, Logstash, Grafana, Alertmanager and Sentry outside the CDE | |
+| central log domain | The OpenSearch domain `pay-shared-euc1-logs` in shared-services that holds the application logs of every environment and the audit trail ([logging](architecture/runtime/logging.md)) | log cluster |
+| data stream | An append-only OpenSearch index name (`logs-app-<env>`, `logs-audit`) backed by daily or size-based backing indices `.ds-<stream>-NNNNNN` | |
+| ISM | Index State Management: the OpenSearch policy that rolls a data stream over, moves backing indices to UltraWarm and deletes them | |
+| UltraWarm | The OpenSearch warm tier on S3-backed nodes: read-only indices, no replica, cheaper per GB than hot nodes | |
+| Logstash | The central log pipeline in shared-services: receives OTLP/JSON from the node collectors, masks PANs again and writes `logs-app-<env>` | |
+| persistent queue | The on-disk buffer of each Logstash pod that keeps events while OpenSearch is unreachable | |
+| DLQ | Dead letter queue: the Logstash store of records OpenSearch rejected or that lack a service name | |
+| OpenSearch Ingestion | The managed pipelines that read CloudTrail and EKS audit objects from the log archive into `logs-audit` | |
 | size window | The `size_window` of `infra/live/stage/env.hcl`: `scheduled` runs stage at the dev sizes, `prod-size` is a booked test window at the prod sizes | |
 | slow request | A request over the threshold of its type (status 50 ms; create, confirm, capture, refund 1,150 ms total; others 300 ms) | |
 | generator | A script in `tools/config/` or `observability/` that writes files from config; its `--check` mode fails on hand edits | |

@@ -16,7 +16,13 @@ modules:
   msk: {purpose: event stream and S3 sink, out: [bootstrap_brokers_sasl_iam, sink_bucket_policy_statements]}
   s3-backup: {purpose: locked backup buckets, RTC replication, lifecycle tiers, out: [bucket_arns]}
   backup: {purpose: AWS Backup vaults, plans by backup-tier tag, copy actions, restore testing, out: [vault_arns, plan_ids]}
-  opensearch: {purpose: log search, out: [endpoint]}
+  opensearch: {purpose: the one central OpenSearch of shared-services for application and audit logs (Logstash writes, Dashboards with Okta SAML), out: [endpoint, domain_arn]}
+  opensearch-indices: {purpose: data stream templates, shards, ISM rotation and FGAC roles of the central OpenSearch, out: []}
+  opensearch-endpoint: {purpose: OpenSearch-managed VPC endpoint of the central domain in an environment VPC (admin agent reads), out: [endpoint]}
+  log-ingestion: {purpose: OpenSearch Ingestion pipelines from the log archive (CloudTrail, EKS audit) into logs-audit, out: [pipeline_names]}
+  admin-agent-env: {purpose: read-only role of the admin AI agent in an environment (OpenSearch search on its own stream, named log groups, namespace-scoped kubectl view), out: [role_arn]}
+  sentry-alerts: {purpose: Sentry issue alert rules that post high and critical issues to the Slack channel, out: []}
+  cell-migration: {purpose: SSM documents and the cell-copy function that move a merchant between cells, out: []}
   secrets-replica: {purpose: Secrets Manager multi-Region replicas, out: [secret_arns]}
 stacks:
   bootstrap: infra/bootstrap (state bucket, lockfile, KMS, CI roles; apply with local state first)

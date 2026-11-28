@@ -28,7 +28,7 @@ flowchart LR
 5. The router calls the PSP through the egress path: transit gateway, Network Firewall that admits only PSP domains, NAT with static Elastic IPs that the PSPs allowlist.
 6. A PSP timeout puts the payment in the unknown state; the scheduler settles it by sync. A charge is never repeated automatically.
 7. The drainer reads the stream and writes rows to the cell Aurora in batches. The time this takes is the drain lag (SLO p99 under 5 s).
-8. Payment events go to MSK and from there to ClickHouse and OpenSearch, so analytics never reads the payment databases.
+8. Payment events go to MSK and from there to ClickHouse, so analytics never reads the payment databases.
 
 ## Building blocks
 
@@ -38,10 +38,11 @@ flowchart LR
 | Locker | The card vault, shared by all cells because a card token belongs to the customer, not to the merchant. Own Aurora cluster, own KMS key, reachable only from the router. | [Services](runtime/services-secrets.md) |
 | Edge | Gateway API `Gateway` served by Istio, local and global rate limits, overload manager. | [Edge](runtime/edge.md), [Rate limiting](runtime/rate-limiting.md) |
 | Data | MemoryDB (hot state), Aurora PostgreSQL (cells and locker), DynamoDB (cell map), S3 (backups and event archive). | [Data and backups](foundation/data-backups.md) |
-| Analytics | MSK, ClickHouse and OpenSearch on their own cluster outside the CDE. | [Data and backups](foundation/data-backups.md) |
+| Analytics | MSK and ClickHouse on their own cluster outside the CDE. | [Data and backups](foundation/data-backups.md) |
 | Control center | The merchant dashboard and the browser payment SDK, behind CloudFront and AWS WAF. | [Edge](runtime/edge.md) |
-| Admin entry | Argo CD, Vault, Grafana, Alertmanager, VictoriaMetrics, Prometheus and Sentry behind one internal Gateway, a private DNS zone and Okta sign-in. | [Edge](runtime/edge.md) |
+| Admin entry | Argo CD, Vault, Grafana, Alertmanager, VictoriaMetrics, Prometheus, Sentry and OpenSearch Dashboards behind one internal Gateway, a private DNS zone and Okta sign-in. | [Edge](runtime/edge.md) |
 | Central observability | Metrics, logs, traces, alerts and error tracking in the shared-services account. | [Observability](runtime/observability.md) |
+| Logging | One OpenSearch domain for the application logs of every environment and the audit trail, fed by Logstash and OpenSearch Ingestion. | [Logging](runtime/logging.md) |
 
 ## Regions
 

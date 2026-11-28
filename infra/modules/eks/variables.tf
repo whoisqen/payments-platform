@@ -179,3 +179,25 @@ variable "argocd_cluster_name" {
   default     = null
   description = "Cluster name Argo CD and the ApplicationSets use (<prefix>-<env>-<region-short>-<cell, locker, edge or control-center>); null drops the eks- prefix of component."
 }
+
+variable "container_log_max_size" {
+  type        = string
+  default     = "50Mi"
+  description = "Size at which kubelet rotates a container log (Bottlerocket settings.kubernetes.container-log-max-size)."
+
+  validation {
+    condition     = can(regex("^[0-9]+(Ki|Mi|Gi)$", var.container_log_max_size))
+    error_message = "container_log_max_size must look like 50Mi."
+  }
+}
+
+variable "container_log_max_files" {
+  type        = number
+  default     = 5
+  description = "Rotated container log files kubelet keeps per container (settings.kubernetes.container-log-max-files)."
+
+  validation {
+    condition     = var.container_log_max_files >= 2
+    error_message = "container_log_max_files must be at least 2."
+  }
+}

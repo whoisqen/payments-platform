@@ -24,42 +24,48 @@ environments:
   # Allowed environments only. Every AWS client, kubectl included, uses the session assumed from role_arn; GetCallerIdentity must return account_id.
   # Namespaces are an ALLOW list; CDE workloads must not run in them (they are also excluded by name in cde_scope).
   dev:
-    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
-    kube_context: payments-dev
-    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000001:cluster/payments-dev
-    role_arn: arn:aws:iam::000000000001:role/CONFIRM-admin-agent-dev
-    account_id: "000000000001"
+    # The read-only role of admin-agent-env in this account; kubectl view is limited to these namespaces of this cluster
+    kube_context: pay-dev-euc1-eks-cell-0
+    kube_cluster_arn: arn:aws:eks:eu-central-1:111111111111:cluster/pay-dev-euc1-eks-cell-0
+    role_arn: arn:aws:iam::111111111111:role/pay-dev-admin-agent
+    account_id: "111111111111"
     tenant_id: payments-dev
-    namespaces: [payments, observability]
-    loki_url: https://loki-gateway.observability.svc:443
-    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
-    alertmanager_url: https://alertmanager.observability.svc:9093
+    namespaces: [payments, monitoring]
+    # The central VictoriaMetrics and Alertmanager of shared-services (central.* of config/platform.yaml)
+    victoria_url: https://metrics.observability.pay.example.com/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.pay.example.com
+    # The managed VPC endpoint of the central OpenSearch in this environment (output endpoint of infra/live/dev/eu-central-1/logs-endpoint)
+    opensearch_url: https://vpce-pay-dev-logs.eu-central-1.es.amazonaws.com
     log_groups: [/payments/dev/application]
     ssm_region: eu-central-1
   stage:
-    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
-    kube_context: payments-stage
-    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000002:cluster/payments-stage
-    role_arn: arn:aws:iam::000000000002:role/CONFIRM-admin-agent-stage
-    account_id: "000000000002"
+    # The read-only role of admin-agent-env in this account; kubectl view is limited to these namespaces of this cluster
+    kube_context: pay-stage-euc1-eks-cell-0
+    kube_cluster_arn: arn:aws:eks:eu-central-1:333333333333:cluster/pay-stage-euc1-eks-cell-0
+    role_arn: arn:aws:iam::333333333333:role/pay-stage-admin-agent
+    account_id: "333333333333"
     tenant_id: payments-stage
-    namespaces: [payments, observability]
-    loki_url: https://loki-gateway.observability.svc:443
-    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
-    alertmanager_url: https://alertmanager.observability.svc:9093
+    namespaces: [payments, monitoring]
+    # The central VictoriaMetrics and Alertmanager of shared-services (central.* of config/platform.yaml)
+    victoria_url: https://metrics.observability.pay.example.com/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.pay.example.com
+    # The managed VPC endpoint of the central OpenSearch in this environment (output endpoint of infra/live/stage/eu-central-1/logs-endpoint)
+    opensearch_url: https://vpce-pay-stage-logs.eu-central-1.es.amazonaws.com
     log_groups: [/payments/stage/application]
     ssm_region: eu-central-1
   prod:
-    # CONFIRM: real cluster ARN, account id and role of this environment; the placeholders fail the run-time account check on purpose.
-    kube_context: payments-prod
-    kube_cluster_arn: arn:aws:eks:eu-central-1:000000000003:cluster/payments-prod
-    role_arn: arn:aws:iam::000000000003:role/CONFIRM-admin-agent-prod
-    account_id: "000000000003"
+    # The read-only role of admin-agent-env in this account; kubectl view is limited to these namespaces of this cluster (no CDE cluster)
+    kube_context: pay-prod-euc1-eks-control-center
+    kube_cluster_arn: arn:aws:eks:eu-central-1:444444444444:cluster/pay-prod-euc1-eks-control-center
+    role_arn: arn:aws:iam::444444444444:role/pay-prod-admin-agent
+    account_id: "444444444444"
     tenant_id: payments-prod
-    namespaces: [payments, observability]
-    loki_url: https://loki-gateway.observability.svc:443
-    victoria_url: https://vmselect.observability.svc:8481/select/0/prometheus
-    alertmanager_url: https://alertmanager.observability.svc:9093
+    namespaces: [control-center, monitoring]
+    # The central VictoriaMetrics and Alertmanager of shared-services (central.* of config/platform.yaml)
+    victoria_url: https://metrics.observability.pay.example.com/select/0/prometheus
+    alertmanager_url: https://alertmanager.observability.pay.example.com
+    # The managed VPC endpoint of the central OpenSearch in this environment (output endpoint of infra/live/prod/eu-central-1/logs-endpoint)
+    opensearch_url: https://vpce-pay-prod-logs.eu-central-1.es.amazonaws.com
     log_groups: [/payments/prod/application]
     ssm_region: eu-central-1
 
@@ -67,20 +73,40 @@ environments:
 prod_in_cde_scope: true
 # Environments where a confirmation also needs the environment name typed again (and --no-dry-run).
 require_env_retype: [prod]
-# CONFIRM: account ids of the CDE accounts; the agent refuses credentials of these accounts and configs that list them.
+# Accounts the agent must never enter. The prod account holds the CDE; it is listed under environments only so that prod_in_cde_scope
+# can refuse it explicitly, so it stays out of this list (the validator rejects an environment in a listed account).
 cde_account_ids: []
 
-# Hosts the agent may call over https (Loki, VictoriaMetrics, Alertmanager).
+# The central OpenSearch of shared-services: query_logs runs a SigV4-signed _search on <index_prefix><environment>, signed with the
+# environment role. Its fine-grained access control maps each environment role to read-only access on its own index.
+opensearch:
+  # The domain endpoint in shared-services (central.opensearch.endpoint of config/platform.yaml); each environment overrides it with
+  # opensearch_url, its own managed VPC endpoint
+  url: https://vpc-pay-shared-euc1-logs-example.eu-central-1.es.amazonaws.com
+  region: eu-central-1
+  index_prefix: logs-app-
+  # Document fields written by the central logs gateway (OpenTelemetry SS4O layout). namespace and app must be keyword fields: the
+  # filters and the CDE exclusion (a regexp) run on them, and the agent drops every hit whose namespace or app does not pass.
+  fields:
+    timestamp: "@timestamp"
+    namespace: resource.k8s.namespace.name
+    app: resource.service.name
+    level: severity.text
+    message: body
+
+# Hosts the agent may call over https (OpenSearch, VictoriaMetrics, Alertmanager).
 allowed_hosts:
-  - loki-gateway.observability.svc
-  - vmselect.observability.svc
-  - alertmanager.observability.svc
+  - vpc-pay-shared-euc1-logs-example.eu-central-1.es.amazonaws.com
+  - vpce-pay-dev-logs.eu-central-1.es.amazonaws.com
+  - vpce-pay-stage-logs.eu-central-1.es.amazonaws.com
+  - vpce-pay-prod-logs.eu-central-1.es.amazonaws.com
+  - metrics.observability.pay.example.com
+  - alertmanager.observability.pay.example.com
 
 # Structured queries: the model supplies values, never selectors. Names of labels and the metrics allowed (counter is wrapped in rate()).
 queries:
   namespace_label: namespace
   app_label: app
-  level_label: level
   metrics:
     container_cpu_usage_seconds_total: counter
     kube_pod_container_status_restarts_total: counter

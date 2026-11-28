@@ -1,8 +1,10 @@
-suite: the central cluster stores logs and traces and shows them in Grafana
+suite: the central cluster ships logs to OpenSearch, stores traces and shows both in Grafana
 templates:
-  - addons/central/loki.yaml
+  - addons/central/logstash.yaml
   - addons/central/tempo.yaml
   - addons/central/grafana.yaml
+  - addons/central/admin/opensearch-dashboards.yaml
+  - addons/central/opensearch-exporter.yaml
 set:
   repo.url: https://git.example.test/acme/platform
   repo.revision: main
@@ -10,33 +12,71 @@ set:
   cluster.region: eu-central-1
   cluster.regionShort: euc1
   observability.grafanaUrl: https://grafana.example.test
+  imageRegistry: registry.example.test/acme
   central.metricsRemoteWriteUrl: https://metrics.example.test/insert/0/prometheus/api/v1/write
   central.alertmanagerHost: alertmanager.example.test
   central.dedupInterval: 30s
   central.sentryUrl: https://sentry.example.test
-  central.logsOtlpEndpoint: https://logs.example.test:4318/otlp
+  central.logsOtlpEndpoint: https://logs.example.test:4318
   central.tracesOtlpEndpoint: tempo.example.test:4317
+  central.opensearch.endpoint: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com
+  central.opensearch.dashboardsHost: logs.example.internal
+  central.opensearch.caBundle: Q0E=
+  central.opensearch.logstashRoleArn: arn:aws:iam::222222222222:role/acme-shared-services-euc1-logstash
+  central.opensearch.awsCidrs: [10.140.0.0/16, 10.140.255.0/24]
 tests:
-  - it: runs Loki, Tempo and Grafana only in the central cluster
+  - it: runs Logstash, Tempo, Grafana and the Dashboards route only in the central cluster
     asserts:
       - equal:
           path: spec.generators[0].clusters.selector.matchLabels["payments-platform/central"]
           value: enabled
-  - it: pins the upstream charts and fixes the release names
-    template: addons/central/loki.yaml
+  - it: deploys Logstash in monitoring with the TLS secret of the collector CA
+    template: addons/central/logstash.yaml
     asserts:
       - equal:
-          path: spec.template.spec.sources[0].targetRevision
-          value: 7.7.0
+          path: spec.template.spec.destination.namespace
+          value: monitoring
       - equal:
-          path: spec.template.spec.sources[0].helm.releaseName
-          value: loki
-  - it: gives Loki the generated storage values
-    template: addons/central/loki.yaml
+          path: spec.template.spec.sources[0].path
+          value: deploy/platform/logstash
+      - contains:
+          path: spec.template.spec.sources[1].helm.parameters
+          content: {name: remoteKey, value: shared-services/logstash/tls}
+      - contains:
+          path: spec.template.spec.sources[1].helm.parameters
+          content: {name: secretName, value: logstash-tls}
+  - it: derives the Gateway host and port from the logs endpoint
+    template: addons/central/logstash.yaml
     asserts:
-      - equal:
-          path: spec.template.spec.sources[0].helm.valueFiles[1]
-          value: $values/deploy/platform/loki/storage.yaml
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: gateway.hostname, value: logs.example.test}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: gateway.port, value: "4318"}
+  - it: falls back to 443 when the logs endpoint has no port
+    template: addons/central/logstash.yaml
+    set:
+      central.logsOtlpEndpoint: https://logs.example.test
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: gateway.port, value: "443"}
+  - it: passes the domain, the region, the IRSA role and the AWS CIDRs to Logstash
+    template: addons/central/logstash.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: opensearch.endpoint, value: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: opensearch.region, value: eu-central-1}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: serviceAccount.roleArn, value: arn:aws:iam::222222222222:role/acme-shared-services-euc1-logstash}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: "networkPolicy.awsCidrs[1]", value: 10.140.255.0/24}
   - it: writes the span metrics of Tempo to vminsert
     template: addons/central/tempo.yaml
     asserts:
@@ -57,3 +97,36 @@ tests:
       - equal:
           path: spec.template.spec.sources[1].path
           value: deploy/platform/grafana/manifests
+  - it: points the OpenSearch data source of Grafana at the domain and the region
+    template: addons/central/grafana.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: env.OPENSEARCH_URL, value: https://vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: env.AWS_REGION, value: eu-central-1}
+  - it: routes the Dashboards host to the domain through the admin gateway
+    template: addons/central/admin/opensearch-dashboards.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.destination.namespace
+          value: istio-ingress-admin
+      - equal:
+          path: spec.template.spec.source.helm.parameters
+          value:
+            - {name: host, value: logs.example.internal}
+            - {name: endpoint, value: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com}
+            - {name: caBundle, value: Q0E=}
+  - it: scrapes index and shard statistics of the domain with SigV4
+    template: addons/central/opensearch-exporter.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.sources[0].chart
+          value: prometheus-elasticsearch-exporter
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: es.uri, value: "https://vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com:443"}
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: "extraArgs[0]", value: --aws.region=eu-central-1}

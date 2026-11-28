@@ -15,6 +15,15 @@ central:
   dedupInterval: 30s
   logsOtlpEndpoint: ""
   tracesOtlpEndpoint: ""
+  # The central OpenSearch: infra outputs and central.opensearch of config/platform.yaml; the logs add-ons fail their render while empty
+  opensearch:
+    endpoint: ""
+    dashboardsHost: ""
+    caBundle: ""
+    logstashRoleArn: ""
+    awsCidrs: []
+# ECR host and repository prefix of the images copied from upstream (registry.ecr_prefix/ecr_repo_prefix)
+imageRegistry: ""
 # Environments that are never synced from main: pinned to the release tag in gated.revision, no automated sync.
 # Without a revision they get no Application at all.
 gatedEnvironments:

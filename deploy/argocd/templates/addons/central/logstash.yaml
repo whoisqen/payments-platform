@@ -1,0 +1,71 @@
+{{- $logs := urlParse .Values.central.logsOtlpEndpoint }}
+{{- $os := .Values.central.opensearch | default dict }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-logstash
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central observability cluster outside the CDE: the one log pipeline of every environment
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'logstash-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: logstash
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/logstash
+          helm:
+            releaseName: logstash
+            # Empty infra outputs fail the render (required in the chart) instead of deploying a pipeline that drops logs
+            parameters:
+              - name: global.registry
+                value: {{ .Values.imageRegistry | default "" | quote }}
+              - name: opensearch.endpoint
+                value: {{ $os.endpoint | default "" | quote }}
+              - name: opensearch.region
+                value: {{ .Values.cluster.region | quote }}
+              - name: serviceAccount.roleArn
+                value: {{ $os.logstashRoleArn | default "" | quote }}
+              # Host and port of central.logs_otlp_endpoint: the node collectors reach the Gateway there
+              - name: gateway.hostname
+                value: {{ regexReplaceAll ":[0-9]+$" $logs.host "" | quote }}
+              - name: gateway.port
+                value: {{ (regexFind "[0-9]+$" (regexFind ":[0-9]+$" $logs.host)) | default "443" | quote }}
+              {{- range $i, $c := $os.awsCidrs }}
+              - name: networkPolicy.awsCidrs[{{ $i }}]
+                value: {{ $c | quote }}
+              {{- end }}
+        # The server certificate, key and the CA of the collector client certificates
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          path: deploy/platform/central-tls
+          helm:
+            parameters:
+              - name: namePrefix
+                value: {{ .Values.cluster.namePrefix | quote }}
+              - name: secretName
+                value: logstash-tls
+              - name: remoteKey
+                value: shared-services/logstash/tls
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          # The Gateway API kinds may arrive in the same sync as their CRDs
+          - SkipDryRunOnMissingResource=true

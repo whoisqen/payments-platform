@@ -8,11 +8,11 @@ Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-
 - The us-east-1 Aurora unit prices are derived from the Price List rates of the same family: `db.r7g` scales linearly with size, and Standard is the I/O-Optimized rate divided by 1.3, as the eu-central-1 rows show.
 - Logs and security lines in eu-central-1 count the clusters, nodes and Aurora vCPU of both regions.
 - Compute is the target capacity: router at 60 RPS per pod, so the HPA floor of 20 pods per cell holds the daily peak of 480 TPS.
-- Analytics: MSK 3 x `kafka.m7g.large`, OpenSearch 3 data nodes, ClickHouse 2 shards x 2 replicas.
+- Analytics: MSK 3 x `kafka.m7g.large`, ClickHouse 2 shards x 2 replicas. Logs go to the central log domain in shared-services ([central-observability.md](central-observability.md)); prod pays only its VPC endpoint to that domain.
 - EKS control-plane logs stay 365 days in CloudWatch and stream through Firehose into the log archive.
-- Committed column: Database Savings Plan 1 year no upfront for Aurora, OpenSearch and DynamoDB; MemoryDB reserved 1 year no upfront; Compute Savings Plan 1 year no upfront on 80% of EC2.
+- Committed column: Database Savings Plan 1 year no upfront for Aurora and DynamoDB; MemoryDB reserved 1 year no upfront; Compute Savings Plan 1 year no upfront on 80% of EC2.
 
-Total: **149,044 USD/month on demand**, **121,242 USD/month committed**.
+Total: **146,889 USD/month on demand**, **119,346 USD/month committed**.
 
 ## By group
 
@@ -21,15 +21,15 @@ Total: **149,044 USD/month on demand**, **121,242 USD/month committed**.
 | Aurora | 84,819.30 | 70,050.20 |
 | MemoryDB | 28,010.18 | 19,456.04 |
 | EKS nodes | 21,976.78 | 17,758.19 |
-| Network | 3,688.29 | 3,688.29 |
+| Network | 3,714.57 | 3,714.57 |
 | Logs and security | 3,514.26 | 3,514.26 |
-| Analytics | 3,073.44 | 2,814.58 |
 | Data transfer | 2,358.00 | 2,358.00 |
+| Analytics | 892.46 | 892.46 |
 | EKS | 803.00 | 803.00 |
 | Backup and S3 | 764.37 | 764.37 |
 | Edge | 28.75 | 28.75 |
 | Data services | 7.77 | 6.37 |
-| **Total** | **149,044.14** | **121,242.05** |
+| **Total** | **146,889.44** | **119,346.21** |
 
 ## Line items
 
@@ -99,14 +99,10 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | EKS nodes | us-east-1 | Amazon EBS | node volumes (4 GiB OS + 80 GiB data) | gp3, 36 nodes x 84 GB | 3,024 |  | GB-month | 0.08 | 241.92 | on-demand | 241.92 |
 | Analytics | eu-central-1 | Amazon MSK | brokers | kafka.m7g.large, 3 AZ | 3 | 730 | broker-hour | 0.2445 | 535.46 | on-demand | 535.46 |
 | Analytics | eu-central-1 | Amazon MSK | broker storage | 3 x 1,000 GB | 3,000 |  | GB-month | 0.119 | 357.00 | on-demand | 357.00 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data nodes | r7g.xlarge.search, 3 AZ | 3 | 730 | instance-hour | 0.429 | 939.51 | Database SP 1yr no upfront | 751.61 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | dedicated masters | m7g.large.search | 3 | 730 | instance-hour | 0.162 | 354.78 | Database SP 1yr no upfront | 283.82 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | UltraWarm nodes | ultrawarm1.medium.search | 2 | 730 | instance-hour | 0.284 | 414.64 | on-demand | 414.64 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data node storage | gp3, 3 x 1,024 GB | 3,072 |  | GB-month | 0.1452 | 446.05 | on-demand | 446.05 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | UltraWarm managed storage | indices older than 30 days | 1,000 |  | GB-month | 0.026 | 26.00 | on-demand | 26.00 |
 | Network | eu-central-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.012 | 236.52 | on-demand | 236.52 |
 | Network | us-east-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.01 | 197.10 | on-demand | 197.10 |
 | Network | eu-central-1 | Amazon VPC | interface endpoint data processed | AWS API traffic kept off NAT | 2,000 |  | GB | 0.01 | 20.00 | on-demand | 20.00 |
+| Network | eu-central-1 | Amazon VPC | VPC endpoint of the central log domain | OpenSearch-managed endpoint, 3 AZ | 3 | 730 | endpoint-hour | 0.012 | 26.28 | on-demand | 26.28 |
 | Network | eu-central-1 | AWS Network Firewall | firewall endpoints, egress VPC | 3 AZ | 3 | 730 | endpoint-hour | 0.395 | 865.05 | on-demand | 865.05 |
 | Network | eu-central-1 | Amazon VPC | NAT gateways behind the firewall | 3 AZ; hours and GB waived by the firewall endpoints | 3 | 730 | gateway-hour | 0 | 0.00 | on-demand | 0.00 |
 | Network | eu-central-1 | Amazon VPC | public IPv4 of the NAT gateways | 3 addresses | 3 | 730 | address-hour | 0.005 | 10.95 | on-demand | 10.95 |
@@ -157,4 +153,4 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | Logs and security | eu-central-1 | AWS Config | configuration items | node and ENI churn | 50,000 |  | item | 0.003 | 150.00 | on-demand | 150.00 |
 | Logs and security | eu-central-1 | AWS Config | conformance pack evaluations |  | 100,000 |  | evaluation | 0.001 | 100.00 | on-demand | 100.00 |
 | Logs and security | eu-central-1 | Amazon Inspector | EC2 scanning | nodes | 84 | 730 | instance-hour | 0.0021 | 128.77 | on-demand | 128.77 |
-| **Total** | | | | | | | | | **149,044.14** | | **121,242.05** |
+| **Total** | | | | | | | | | **146,889.44** | | **119,346.21** |

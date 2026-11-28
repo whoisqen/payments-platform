@@ -5,7 +5,7 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard services/cell-copy/tests tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ci/infra/tests tools/ci/runbook/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard infra/tests/log-retention services/cell-copy/tests tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ci/infra/tests tools/ci/runbook/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 # New linters start in report mode; LINT_STRICT=1 (CI: repository variable LINT_STRICT=true) makes their findings block.

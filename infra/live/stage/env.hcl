@@ -98,7 +98,7 @@ locals {
   standby_enabled         = false
   ingress_endpoints       = local.cfg.deploy.stage.ingress_endpoints
 
-  # Analytics outside the CDE: MSK, OpenSearch and ClickHouse on its own cluster; config/environments/stage.yaml may set msk, opensearch and
+  # Analytics outside the CDE: MSK and ClickHouse on its own cluster (logs go to the central OpenSearch of shared-services); config/environments/stage.yaml may set msk and
   # analytics_eks, otherwise these follow the size window. MSK keeps 3 brokers and one volume size in both windows (volumes never shrink).
   analytics = {
     msk = {
@@ -106,14 +106,6 @@ locals {
       instance_type       = try(local.sizing.msk.instance_type, "kafka.m7g.large")
       volume_size_gb      = try(local.sizing.msk.volume_size_gb, 500)
       enhanced_monitoring = try(local.sizing.msk.enhanced_monitoring, local.prod_size ? "PER_TOPIC_PER_PARTITION" : "DEFAULT")
-    }
-    opensearch = {
-      availability_zone_count = try(local.sizing.opensearch.availability_zone_count, local.prod_size ? 3 : 1)
-      data_node_count         = try(local.sizing.opensearch.data_node_count, local.prod_size ? 3 : 1)
-      data_instance_type      = try(local.sizing.opensearch.data_instance_type, local.prod_size ? "r7g.xlarge.search" : "m7g.medium.search")
-      dedicated_master_count  = try(local.sizing.opensearch.dedicated_master_count, local.prod_size ? 3 : 0)
-      warm_node_count         = try(local.sizing.opensearch.warm_node_count, local.prod_size ? 2 : 0)
-      volume_size_gb          = try(local.sizing.opensearch.volume_size_gb, local.prod_size ? 1024 : 20)
     }
     # ClickHouse (prod: 2 shards x 2 replicas on r7g.2xlarge plus 3 Keeper nodes) runs in the stateful pool; Spot only where the cells allow it.
     cpu_limits = try(local.sizing.analytics_eks.cpu_limits, local.prod_size ? { stateful = 48, workers = 32 } : { stateful = 16, workers = 8 })

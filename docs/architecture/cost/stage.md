@@ -4,7 +4,7 @@ Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-
 
 - Sizing: `size_window = "scheduled"` in `infra/live/stage/env.hcl` merges the Aurora, MemoryDB and node pool caps of `config/environments/dev.yaml` over `config/environments/prod.yaml`. `config/environments/stage.yaml` sets the Spot pools.
 - Stage keeps the prod topology at those sizes: 4 cells, the spare and the locker with `db.r7g.large` writers and no readers, MemoryDB `db.t4g.small` with 1 shard. The spare and the locker use Standard storage.
-- The cell payments pools are priced at the dev cap (32 vCPU per working cell), and the spare keeps 3 pods of each workload. KEDA scales the cell and locker workloads to zero outside the working window (`global.workingHours`, 60 of 168 hours), so the payments and cde nodes run 260.71 hours a month. Analytics: MSK 3 x `kafka.m7g.large` with 500 GB, one `m7g.medium.search` node, ClickHouse within a 16 vCPU stateful cap.
+- The cell payments pools are priced at the dev cap (32 vCPU per working cell), and the spare keeps 3 pods of each workload. KEDA scales the cell and locker workloads to zero outside the working window (`global.workingHours`, 60 of 168 hours), so the payments and cde nodes run 260.71 hours a month. Analytics: MSK 3 x `kafka.m7g.large` with 500 GB, ClickHouse within a 16 vCPU stateful cap. Logs go to the central log domain; stage pays only its VPC endpoint to it.
 - A `size_window = "prod-size"` test window raises stage to the prod sizes for its booked hours. Those hours are not in this total.
 - Payments and stateful node pools run on Spot; managed data stores run on demand.
 - Traffic lines use test volumes, not the prod load.
@@ -12,7 +12,7 @@ Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-
 - Every other line runs 730 hours. `aurora-schedule` runs only in dev today.
 - Commitments: none (non-prod is not reserved); the committed column applies the Spot planning rate only.
 
-Total: **12,747 USD/month on demand**, **11,254 USD/month committed**.
+Total: **12,711 USD/month on demand**, **11,218 USD/month committed**.
 
 ## By group
 
@@ -20,16 +20,16 @@ Total: **12,747 USD/month on demand**, **11,254 USD/month committed**.
 |---|---:|---:|
 | EKS nodes | 6,132.54 | 4,639.93 |
 | Aurora | 2,155.22 | 2,155.22 |
-| Network | 1,275.84 | 1,275.84 |
+| Network | 1,302.12 | 1,302.12 |
 | Logs and security | 1,228.22 | 1,228.22 |
-| Analytics | 775.99 | 775.99 |
+| Analytics | 713.96 | 713.96 |
 | MemoryDB | 631.30 | 631.30 |
 | EKS | 438.00 | 438.00 |
 | Data transfer | 56.00 | 56.00 |
 | Backup and S3 | 34.60 | 34.60 |
 | Edge | 18.15 | 18.15 |
 | Data services | 0.77 | 0.77 |
-| **Total** | **12,746.63** | **11,254.02** |
+| **Total** | **12,710.88** | **11,218.27** |
 
 ## Line items
 
@@ -69,10 +69,9 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | EKS nodes | eu-central-1 | Amazon EBS | node volumes (4 GiB OS + 80 GiB data) | gp3, 38 nodes x 84 GB | 3,192 |  | GB-month | 0.0952 | 303.88 | on-demand | 303.88 |
 | Analytics | eu-central-1 | Amazon MSK | brokers | kafka.m7g.large, 3 AZ | 3 | 730 | broker-hour | 0.2445 | 535.46 | on-demand | 535.46 |
 | Analytics | eu-central-1 | Amazon MSK | broker storage | 3 x 500 GB | 1,500 |  | GB-month | 0.119 | 178.50 | on-demand | 178.50 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data nodes | m7g.medium.search, 1 AZ | 1 | 730 | instance-hour | 0.081 | 59.13 | on-demand | 59.13 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data node storage | gp3, 20 GB | 20 |  | GB-month | 0.1452 | 2.90 | on-demand | 2.90 |
 | Network | eu-central-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.012 | 236.52 | on-demand | 236.52 |
 | Network | eu-central-1 | Amazon VPC | interface endpoint data processed | AWS API traffic kept off NAT | 500 |  | GB | 0.01 | 5.00 | on-demand | 5.00 |
+| Network | eu-central-1 | Amazon VPC | VPC endpoint of the central log domain | OpenSearch-managed endpoint, 3 AZ | 3 | 730 | endpoint-hour | 0.012 | 26.28 | on-demand | 26.28 |
 | Network | eu-central-1 | AWS Network Firewall | firewall endpoints, egress VPC | 3 AZ | 3 | 730 | endpoint-hour | 0.395 | 865.05 | on-demand | 865.05 |
 | Network | eu-central-1 | Amazon VPC | NAT gateways behind the firewall | 3 AZ; hours and GB waived by the firewall endpoints | 3 | 730 | gateway-hour | 0 | 0.00 | on-demand | 0.00 |
 | Network | eu-central-1 | Amazon VPC | public IPv4 of the NAT gateways | 3 addresses | 3 | 730 | address-hour | 0.005 | 10.95 | on-demand | 10.95 |
@@ -112,4 +111,4 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | Logs and security | eu-central-1 | AWS Config | configuration items | node and ENI churn | 40,000 |  | item | 0.003 | 120.00 | on-demand | 120.00 |
 | Logs and security | eu-central-1 | AWS Config | conformance pack evaluations |  | 100,000 |  | evaluation | 0.001 | 100.00 | on-demand | 100.00 |
 | Logs and security | eu-central-1 | Amazon Inspector | EC2 scanning | nodes | 38 | 730 | instance-hour | 0.0021 | 58.25 | on-demand | 58.25 |
-| **Total** | | | | | | | | | **12,746.63** | | **11,254.02** |
+| **Total** | | | | | | | | | **12,710.88** | | **11,218.27** |

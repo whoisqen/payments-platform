@@ -1,0 +1,47 @@
+{{- $os := .Values.central.opensearch | default dict }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-opensearch-dashboards
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'opensearch-dashboards-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: opensearch-dashboards
+      annotations:
+        # After the admin Gateway it attaches to
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: istio-ingress-admin
+      source:
+        repoURL: {{ .Values.repo.url }}
+        targetRevision: {{ .Values.repo.revision }}
+        path: deploy/platform/opensearch-dashboards
+        helm:
+          releaseName: opensearch-dashboards
+          parameters:
+            - name: host
+              value: {{ $os.dashboardsHost | default "" | quote }}
+            - name: endpoint
+              value: {{ $os.endpoint | default "" | quote }}
+            - name: caBundle
+              value: {{ $os.caBundle | default "" | quote }}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true

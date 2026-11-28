@@ -1,0 +1,45 @@
+# Index, shard and node statistics of the central OpenSearch (elasticsearch_exporter), next to the CloudWatch metrics of YACE.
+# Set by the add-on central/opensearch-exporter: es.uri (VPC endpoint of the domain), the AWS region and image.registry.
+fullnameOverride: opensearch-exporter
+
+image:
+  repository: prometheuscommunity/elasticsearch-exporter
+  # The chart has no digest field; the tag carries it. Copy index-preserving into the platform ECR; Renovate bumps both
+  tag: v1.11.0@sha256:a056739b095df4baaa076f0b31321394233da9a240eeada2623d1b028b7ee7a6
+
+# The read-only monitor role (Pod Identity association monitoring/opensearch-exporter, mapped in opensearch-indices)
+serviceAccount:
+  create: true
+  name: opensearch-exporter
+  automountServiceAccountToken: false
+
+log:
+  format: json
+  level: info
+
+es:
+  uri: ""
+  all: true
+  indices: true
+  # Settings and mappings add a series per index and field without an alert that reads them
+  indices_settings: false
+  indices_mappings: false
+  shards: true
+  # Snapshots of the managed domain are reported by CloudWatch (AutomatedSnapshotFailure)
+  snapshots: false
+  timeout: 30s
+
+resources:
+  requests: {cpu: 20m, memory: 64Mi}
+  limits: {memory: 256Mi}
+
+serviceMonitor:
+  enabled: true
+  # Index and shard stats are expensive on the domain; once a minute is enough for the alerts
+  interval: 60s
+  scrapeTimeout: 45s
+  metricRelabelings:
+    # The backing indices of the data streams: the label names the data stream, not the generation
+    - sourceLabels: [index]
+      regex: \.ds-(.+)-[0-9]{6}
+      targetLabel: data_stream

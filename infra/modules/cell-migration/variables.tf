@@ -92,3 +92,14 @@ variable "tags" {
     error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
   }
 }
+
+variable "log_retention_days" {
+  type        = number
+  default     = 365
+  description = "Days the copy function logs stay in CloudWatch."
+
+  validation {
+    condition     = var.log_retention_days >= 1
+    error_message = "log_retention_days must be at least 1."
+  }
+}

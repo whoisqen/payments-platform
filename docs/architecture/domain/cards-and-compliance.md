@@ -52,7 +52,7 @@ The **CDE** (cardholder data environment) is every system that stores, processes
 Isolation keeps the CDE small, and a small CDE is both safer and cheaper to audit:
 
 - **Fewer places to steal from.** A PAN exists only in the locker; the rest of the CDE sees tokens.
-- **Fewer systems in the audit.** The control center, analytics (MSK, ClickHouse, OpenSearch), CI and monitoring run outside the CDE, so they are not held to every CDE rule. This works only because nothing card-related flows to them.
+- **Fewer systems in the audit.** The control center, analytics (MSK, ClickHouse), CI, monitoring and the central log domain run outside the CDE, so they are not held to every CDE rule. This works only because nothing card-related flows to them.
 - **Hard walls.** CDE workloads run on their own tainted node pool, network policies deny all traffic unless allowed, Istio requires mutual TLS, and outbound calls leave only through a firewall that admits PSP domains. People get CDE access just in time, for at most an hour, after a second engineer approves it.
 
 ## What may and may not be logged
@@ -68,7 +68,7 @@ Logs, metrics and traces leave the CDE for the central observability cluster, so
 
 **Masking** means replacing the middle digits of a PAN with `*` so a person can recognise a card ("the Visa ending in 1111") without being able to use it. PCI DSS allows showing at most the BIN and the last four digits.
 
-Several layers enforce this, so one mistake is not enough to leak a PAN: `Secret<T>` wrappers in the Rust code hide values from debug output, the Semgrep rule `no-pan-logging` blocks code that logs card fields, the OpenTelemetry collector in each cluster deletes card fields and high-cardinality ids from telemetry before it leaves, Sentry scrubs events, and Macie scans the CDE's S3 buckets daily. A PAN found in logs raises a security alert with its own runbook.
+Several layers enforce this, so one mistake is not enough to leak a PAN: `Secret<T>` wrappers in the Rust code hide values from debug output, the Semgrep rule `no-pan-logging` blocks code that logs card fields, the OpenTelemetry collector in each cluster deletes card fields and high-cardinality ids from telemetry before it leaves, the central Logstash masks PAN-like numbers again before they reach OpenSearch, Sentry scrubs events, and Macie scans the CDE's S3 buckets daily. A PAN found in logs raises a security alert with its own runbook.
 
 ## SAQ and RoC
 

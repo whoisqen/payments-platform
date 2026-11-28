@@ -1,0 +1,10 @@
+apiVersion: v2
+name: opensearch-dashboards
+description: Route of OpenSearch Dashboards through the internal admin gateway to the VPC endpoint of the central OpenSearch domain
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../../charts/platform-common

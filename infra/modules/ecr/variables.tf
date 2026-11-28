@@ -122,9 +122,15 @@ variable "pull_through_cache" {
   type = map(object({
     upstream_registry_url = string
     credential_arn        = optional(string)
+    credentials           = optional(bool, false)
   }))
   default     = {}
-  description = "Pull-through cache rules by repository prefix; registries that need credentials give a Secrets Manager credential_arn. Registry-wide, so set in one stack per account and region."
+  description = "Pull-through cache rules by repository prefix; registries that need credentials give a Secrets Manager credential_arn, or credentials = true for a secret ecr-pullthroughcache/<prefix> of this module. Registry-wide, so set in one stack per account and region."
+
+  validation {
+    condition     = alltrue([for r in values(var.pull_through_cache) : !(r.credentials && r.credential_arn != null)])
+    error_message = "set either credential_arn or credentials, not both."
+  }
 }
 
 variable "tags" {

@@ -72,6 +72,31 @@ variable "reader_principal_arns" {
   default     = []
 }
 
+variable "ingest_reader_principal_arns" {
+  description = "Roles of the central log ingestion (shared-services) that read the cloudtrail and eks prefixes and decrypt through S3."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for a in var.ingest_reader_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", a))])
+    error_message = "ingest_reader_principal_arns must be IAM role ARNs."
+  }
+}
+
+variable "ingest_notifications" {
+  description = "SQS queue (shared-services, log-ingestion output queue_arns) notified of new objects under each key prefix."
+  type = map(object({
+    prefix    = string
+    queue_arn = string
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for n in values(var.ingest_notifications) : can(regex("^arn:aws:sqs:[a-z0-9-]+:[0-9]{12}:.+$", n.queue_arn))])
+    error_message = "ingest_notifications queue_arn must be an SQS queue ARN."
+  }
+}
+
 variable "prefixes" {
   description = "Key prefix of each log source in the bucket."
   type = object({

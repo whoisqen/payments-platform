@@ -47,6 +47,10 @@ run "nodeclass_is_hardened" {
     condition     = alltrue([for k in ["team", "owner", "pci-scope", "data-class", "backup-tier"] : contains(keys(yamldecode(output.manifests["ec2nodeclass-hardened.yaml"]).spec.tags), k)])
     error_message = "nodes and volumes carry the required tags"
   }
+  assert {
+    condition     = strcontains(yamldecode(output.manifests["ec2nodeclass-hardened.yaml"]).spec.userData, "container-log-max-size = \"50Mi\"") && strcontains(yamldecode(output.manifests["ec2nodeclass-hardened.yaml"]).spec.userData, "container-log-max-files = 5")
+    error_message = "kubelet rotates container logs at 50Mi and keeps 5 files"
+  }
 }
 
 run "payment_pools_never_use_spot_and_are_tainted" {

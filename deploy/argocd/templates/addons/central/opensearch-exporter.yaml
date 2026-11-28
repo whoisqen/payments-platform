@@ -1,0 +1,51 @@
+{{- $os := .Values.central.opensearch | default dict }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addon-opensearch-exporter
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Runs once, in the central cluster that reaches the domain
+    - clusters:
+        selector:
+          matchLabels:
+            payments-platform/central: enabled
+  template:
+    metadata:
+      name: 'opensearch-exporter-{{`{{ .name }}`}}'
+      labels:
+        payments-platform/addon: opensearch-exporter
+    spec:
+      project: platform
+      destination:
+        server: '{{`{{ .server }}`}}'
+        namespace: monitoring
+      sources:
+        # The upstream chart version is pinned here and bumped by Renovate
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: prometheus-elasticsearch-exporter
+          targetRevision: 8.2.0
+          helm:
+            releaseName: opensearch-exporter
+            valueFiles:
+              - $values/deploy/platform/exporters/opensearch/values.yaml
+            parameters:
+              - name: es.uri
+                value: {{ printf "https://%s:443" ($os.endpoint | default "") | quote }}
+              - name: image.registry
+                value: {{ .Values.imageRegistry | default "" | quote }}
+              # SigV4 (service es) with the default AWS credential chain, the Pod Identity of the service account
+              - name: extraArgs[0]
+                value: {{ printf "--aws.region=%s" .Values.cluster.region | quote }}
+        - repoURL: {{ .Values.repo.url }}
+          targetRevision: {{ .Values.repo.revision }}
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

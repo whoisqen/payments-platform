@@ -160,8 +160,22 @@ central:
   alertmanager_url: https://alertmanager.observability.pay.example.com
   # Sentry (error tracking, self-hosted, no card data); applications send events to the DSN host under this URL
   sentry_url: https://sentry.payments.internal
-  # the OTLP/HTTP exporter appends /v1/logs, and Loki serves it under /otlp
-  logs_otlp_endpoint: https://logs.observability.pay.example.com:4318/otlp
+  # HTTP input of the central Logstash (shared-services): the node collectors send OTLP/HTTP as JSON, Logstash flattens, masks and
+  # writes to the central OpenSearch with AWS IAM, with a persistent queue and a dead letter queue
+  logs_otlp_endpoint: https://logs.observability.pay.example.com:8443
+  # The one OpenSearch of the platform (shared-services): application logs of every environment and the audit trail
+  opensearch:
+    domain_name: pay-shared-euc1-logs
+    # Output endpoint of infra/live/shared-services/eu-central-1/logs/opensearch (the VPC endpoint host); fill after its first apply
+    endpoint: vpc-pay-shared-euc1-logs-example.eu-central-1.es.amazonaws.com
+    # OpenSearch Dashboards behind the internal admin gateway, sign-in through Okta (SAML)
+    dashboards_host: logs.payments.internal
+  # Slack channel of the high and critical Sentry issues (the Slack integration of Sentry posts there)
+  sentry_slack_channel: "#payments-sentry-critical"
+  # Organization of the self-hosted Sentry and the id of the Slack workspace its Slack integration is installed in
+  # (Settings > Integrations > Slack in Sentry, after the one-time OAuth install)
+  sentry_organization: payments
+  sentry_slack_workspace_id: REPLACE_SENTRY_SLACK_WORKSPACE_ID
   traces_otlp_endpoint: tempo.observability.pay.example.com:4317
   # Samples of the two Prometheus replicas that differ by less than this interval are one sample; it equals the scrape interval.
   dedup_interval: 30s

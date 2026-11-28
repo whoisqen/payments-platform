@@ -1,19 +1,20 @@
 mock_provider "aws" {}
 
 variables {
-  name_prefix           = "pay"
-  env                   = "prod"
-  region_short          = "euc1"
-  region_name           = "eu-central-1"
-  account_id            = "111111111111"
-  kms_key_arn           = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0007"
-  subnet_ids            = ["subnet-1", "subnet-2", "subnet-3"]
-  security_group_ids    = ["sg-0001"]
-  master_user_arn       = "arn:aws:iam::111111111111:role/opensearch-admin"
-  access_principal_arns = ["arn:aws:iam::111111111111:role/fluent-bit"]
-  logs_kms_key_arn      = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0005"
-  snapshot_bucket_arn   = "arn:aws:s3:::pay-prod-euc1-backup"
-  snapshot_kms_key_arn  = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0004"
+  name_prefix               = "pay"
+  env                       = "prod"
+  region_short              = "euc1"
+  region_name               = "eu-central-1"
+  account_id                = "111111111111"
+  kms_key_arn               = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0007"
+  subnet_ids                = ["subnet-1", "subnet-2", "subnet-3"]
+  vpc_id                    = "vpc-0001"
+  client_security_group_ids = ["sg-0001"]
+  master_user_arn           = "arn:aws:iam::111111111111:role/opensearch-admin"
+  access_principal_arns     = ["*"]
+  logs_kms_key_arn          = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0005"
+  snapshot_bucket_arn       = "arn:aws:s3:::pay-prod-euc1-backup"
+  snapshot_kms_key_arn      = "arn:aws:kms:eu-central-1:111111111111:key/mrk-0004"
 
   tags = {
     team          = "platform"
@@ -121,4 +122,67 @@ run "tag_schema_is_enforced" {
   }
 
   expect_failures = [var.tags]
+}
+
+run "central_domain_takes_its_configured_name_saml_and_three_log_types" {
+  command = plan
+
+  variables {
+    env         = "shared-services"
+    domain_name = "pay-shared-euc1-logs"
+    saml = {
+      entity_id           = "http://www.okta.com/exk000000000"
+      metadata_content    = "<EntityDescriptor/>"
+      master_backend_role = "pay-grafana-admins"
+    }
+    snapshot_bucket_arn  = null
+    snapshot_kms_key_arn = null
+    client_cidr_blocks   = ["10.120.0.0/16", "10.150.0.0/16"]
+    endpoint_account_ids = ["111111111111", "444444444444"]
+    custom_endpoint      = { host = "logs.payments.internal", certificate_authority_arn = "arn:aws:acm-pca:eu-central-1:222222222222:certificate-authority/ca-1" }
+  }
+
+  assert {
+    condition = (
+      aws_opensearch_domain.this.domain_endpoint_options[0].custom_endpoint_enabled &&
+      aws_opensearch_domain.this.domain_endpoint_options[0].custom_endpoint == "logs.payments.internal" &&
+      aws_acm_certificate.custom[0].certificate_authority_arn == "arn:aws:acm-pca:eu-central-1:222222222222:certificate-authority/ca-1"
+    )
+    error_message = "Dashboards answer on the admin host with a private certificate"
+  }
+
+  assert {
+    condition = (
+      aws_opensearch_domain.this.domain_name == "pay-shared-euc1-logs" &&
+      aws_opensearch_domain_saml_options.this[0].saml_options[0].roles_key == "groups" &&
+      length(aws_iam_role.snapshot) == 0
+    )
+    error_message = "configured name, SAML with the groups attribute, no snapshot role"
+  }
+
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.clients) == 2
+    error_message = "the client group and the external client are admitted"
+  }
+
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.cidrs) == 2
+    error_message = "the environment VPCs are admitted on 443"
+  }
+
+  assert {
+    condition     = toset(keys(aws_opensearch_authorize_vpc_endpoint_access.this)) == toset(["111111111111", "444444444444"])
+    error_message = "the environment accounts may create a VPC endpoint of the domain"
+  }
+}
+
+run "configured_name_over_28_characters_is_rejected" {
+  command = plan
+
+  variables {
+    env         = "shared-services"
+    domain_name = "pay-shared-services-euc1-logs"
+  }
+
+  expect_failures = [aws_opensearch_domain.this]
 }

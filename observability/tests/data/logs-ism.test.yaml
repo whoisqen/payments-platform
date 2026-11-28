@@ -1,0 +1,61 @@
+rule_files:
+- ../../alerts/data/logs.yaml
+evaluation_interval: 1h
+tests:
+- interval: 1h
+  external_labels: &id001
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: elasticsearch_indices_docs_primary{index=".ds-logs-app-prod-000001"}
+    values: 1x100
+  alert_rule_test:
+  - eval_time: 80h
+    alertname: LogsOpenSearchIsmFailing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-ism-failing
+        stream: logs-app-prod
+      exp_annotations:
+        summary: 'ISM of the central OpenSearch is stuck on logs-app-prod: no rollover for 2 days or a backing index outlived the 30-day delete'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-ism-failing
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1h
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_indices_docs_primary{index=".ds-logs-app-prod-000001"}
+    values: 1x100
+  - series: elasticsearch_indices_docs_primary{index=".ds-logs-app-prod-000002"}
+    values: _x60 1x40
+  alert_rule_test:
+  - eval_time: 80h
+    alertname: LogsOpenSearchIsmFailing
+    exp_alerts: []
+- interval: 1h
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_indices_docs_primary{index=".ds-logs-app-prod-000001"}
+    values: 1x840
+  - series: elasticsearch_indices_docs_primary{index=".ds-logs-app-prod-000035"}
+    values: _x816 1x24
+  alert_rule_test:
+  - eval_time: 828h
+    alertname: LogsOpenSearchIsmFailing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-ism-failing
+        stream: logs-app-prod
+      exp_annotations:
+        summary: 'ISM of the central OpenSearch is stuck on logs-app-prod: no rollover for 2 days or a backing index outlived the 30-day delete'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-ism-failing
+        dashboard_url: https://grafana.example.test/d/logs

@@ -405,3 +405,26 @@ run "budget_needs_a_recipient" {
 
   expect_failures = [var.budget_subscriber_emails]
 }
+
+run "admin_role_assumes_only_the_environment_read_roles" {
+  command = plan
+
+  variables {
+    environment_role_arns = ["arn:aws:iam::111111111111:role/pay-dev-admin-agent", "arn:aws:iam::444444444444:role/pay-prod-admin-agent"]
+  }
+
+  assert {
+    condition     = anytrue([for s in jsondecode(aws_iam_role_policy.admin[0].policy).Statement : s.Sid == "AssumeEnvironmentReadRoles" && toset(s.Resource) == toset(var.environment_role_arns) && s.Action == ["sts:AssumeRole"]])
+    error_message = "sts:AssumeRole only on the environment read roles"
+  }
+}
+
+run "admin_role_assume_target_must_be_an_admin_agent_role" {
+  command = plan
+
+  variables {
+    environment_role_arns = ["arn:aws:iam::444444444444:role/OrganizationAccountAccessRole"]
+  }
+
+  expect_failures = [var.environment_role_arns]
+}

@@ -16,7 +16,7 @@ The redaction processor or Macie found a PAN pattern in logs, traces or metrics.
 ## Actions
 
 1. Roll back or patch the emitting code; keep the masking rule on.
-2. Purge the affected log streams in Loki and the S3 archive with the security document step `purge-logs` (needs two approvals).
+2. Purge the affected documents from the `logs-app-<env>` data stream of the central OpenSearch (delete by query) and from the S3 log archive with the security document step `purge-logs` (needs two approvals).
 
 Every action runs through GitHub Actions `runbook-actions` (`workflow_dispatch`, input `document=pay-runbook-pan-detected-in-logs`), which is audited.
 

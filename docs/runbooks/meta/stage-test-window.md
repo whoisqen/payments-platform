@@ -4,7 +4,7 @@ Layer compute (a procedure that no alert points to), service stage environment, 
 
 ## Symptom
 
-A load, stress, spike or soak test needs stage at the prod size. By default stage runs `size_window = "scheduled"` in `infra/live/stage/env.hcl`: dev sizes for Aurora (`db.r7g.large`, no readers), MemoryDB (`db.t4g.small`, 1 shard) and the node pool caps. Analytics is small too (3 MSK brokers, one OpenSearch node). The cells and the spare have the same layout as in prod; stage has no standby region.
+A load, stress, spike or soak test needs stage at the prod size. By default stage runs `size_window = "scheduled"` in `infra/live/stage/env.hcl`: dev sizes for Aurora (`db.r7g.large`, no readers), MemoryDB (`db.t4g.small`, 1 shard) and the node pool caps. Analytics is small too (3 MSK brokers); logs go to the central OpenSearch of shared-services. The cells and the spare have the same layout as in prod; stage has no standby region.
 
 ## Diagnostics
 
