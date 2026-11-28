@@ -103,6 +103,22 @@ test: test-python test-terraform test-helm test-policy test-alerts test-node ## 
 test-python:
 	@for d in $(PY_TESTS); do python3 -m unittest discover -s $$d; done
 
+# CI shards the modules: TF_SHARD=i/n takes every n-th module starting at i (1-based); 1/1 is the whole set
+TF_SHARD ?= 1/1
+TF_SHARD_MODULES = $(shell echo $(TF_MODULES) | tr ' ' '\n' | awk -v i=$(word 1,$(subst /, ,$(TF_SHARD))) -v n=$(word 2,$(subst /, ,$(TF_SHARD))) 'NF && (NR-1)%n==i-1')
+# One provider download per job instead of one per module
+export TF_PLUGIN_CACHE_DIR ?= $(HOME)/.terraform.d/plugin-cache
+
+# validate and test each module of the shard after one init
+check-terraform:
+	@mkdir -p $(TF_PLUGIN_CACHE_DIR)
+	@set -e; for d in $(TF_SHARD_MODULES); do \
+		echo "== $$d"; \
+		terraform -chdir=$$d init -backend=false -input=false >/dev/null; \
+		terraform -chdir=$$d validate -no-color >/dev/null; \
+		if [ -d $$d/tests ]; then terraform -chdir=$$d test -no-color; fi; \
+	done
+
 test-terraform:
 	@for d in $(TF_MODULES); do [ -d $$d/tests ] || continue; terraform -chdir=$$d init -backend=false -input=false >/dev/null && terraform -chdir=$$d test; done
 
