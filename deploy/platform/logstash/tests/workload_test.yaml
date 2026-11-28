@@ -1,0 +1,150 @@
+suite: logstash workload
+templates:
+  - statefulset.yaml
+  - configmap.yaml
+  - serviceaccount.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - gateway.yaml
+  - servicemonitor.yaml
+values:
+  - ../ci/lint-values.yaml
+tests:
+  - it: runs three fixed replicas spread over hosts and zones, without an HPA
+    template: statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: kubernetes.io/hostname
+  - it: pins both images by digest from the platform registry
+    template: statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/acme/opensearchproject/logstash-oss-with-opensearch-output-plugin@sha256:43b0cdaf26edca812a9eafb684ae6101d8f2fd27165345737c39c04a6c7430eb
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: registry.example.test/acme/kuskoman/logstash-exporter@sha256:c5b4e2061392de5afa08477408eac482cfcf61382667e2160db1350f351c9809
+  - it: runs non-root with a read-only root filesystem and a capped scratch volume
+    template: statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: tmp, emptyDir: {sizeLimit: 512Mi}}
+  - it: keeps the persistent queue and the dead letter queue on a gp3 volume per pod
+    template: statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: gp3-encrypted
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: data, mountPath: /usr/share/logstash/data}
+  - it: enables the persistent queue and the dead letter queue
+    template: configmap.yaml
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["logstash.yml"]
+          pattern: (?m)^queue.type. persisted$
+      - matchRegex:
+          path: data["logstash.yml"]
+          pattern: (?m)^dead_letter_queue.enable. true$
+  - it: requires the client certificate on the input and writes with SigV4 into the data stream
+    template: configmap.yaml
+    documentIndex: 1
+    asserts:
+      - matchRegex:
+          path: data["otlp-logs.conf"]
+          pattern: ssl_client_authentication => "required"
+      - matchRegex:
+          path: data["otlp-logs.conf"]
+          pattern: type => "aws_iam"\s+region => "eu-central-1"\s+service_name => "es"
+      - matchRegex:
+          path: data["otlp-logs.conf"]
+          pattern: action => "create"
+      - matchRegex:
+          path: data["otlp-logs.conf"]
+          pattern: '"drop_debug_environments" => \["prod", "cde-prod"\]'
+  - it: sends records without resource.service.name to the dead letter queue
+    template: configmap.yaml
+    documentIndex: 1
+    asserts:
+      - matchRegex:
+          path: data["otlp-logs.conf"]
+          pattern: if !\[resource\]\[service.name\] \{\s+ruby \{\s+id => "dlq_without_service"
+  - it: binds the IRSA role to the service account
+    template: serviceaccount.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["eks.amazonaws.com/role-arn"]
+          value: arn:aws:iam::222222222222:role/acme-shared-services-euc1-logstash
+      - equal:
+          path: metadata.name
+          value: logstash
+  - it: lets one pod go at a time
+    template: pdb.yaml
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+  - it: admits only the logs Gateway on the input and allows AWS only on 443
+    template: networkpolicy.yaml
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["gateway.networking.k8s.io/gateway-name"]
+          value: logs
+      - equal:
+          path: spec.egress[1].to[0].ipBlock.cidr
+          value: 10.140.0.0/16
+  - it: passes TLS through on the host and port of the logs endpoint
+    template: gateway.yaml
+    asserts:
+      - equal:
+          path: spec.listeners[0]
+          value:
+            name: otlp
+            port: 4318
+            protocol: TLS
+            hostname: logs.example.test
+            tls: {mode: Passthrough}
+            allowedRoutes:
+              kinds: [{group: gateway.networking.k8s.io, kind: TLSRoute}]
+              namespaces: {from: Same}
+        documentIndex: 0
+      - equal:
+          path: spec.rules[0].backendRefs[0]
+          value: {name: logstash, port: 8443}
+        documentIndex: 1
+  - it: scrapes the exporter sidecar
+    template: servicemonitor.yaml
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+  - it: fails without the domain endpoint
+    template: statefulset.yaml
+    set:
+      opensearch.endpoint: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: opensearch.endpoint is required (VPC endpoint host of the domain)
+  - it: fails without the IRSA role
+    template: statefulset.yaml
+    set:
+      serviceAccount.roleArn: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: serviceAccount.roleArn is required (IRSA role of infra/modules/log-ingestion)

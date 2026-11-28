@@ -1,5 +1,5 @@
 output "bucket_names" {
-  description = "Bucket name by component (loki, tempo, sentry)."
+  description = "Bucket name by component (tempo, sentry, vmbackup)."
   value       = { for k, b in aws_s3_bucket.this : k => b.bucket }
 }
 

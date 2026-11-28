@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "logstash.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: otlp-https
+      port: {{ .Values.input.port }}
+      targetPort: otlp-https
+      appProtocol: tls
+    - name: metrics
+      port: 9198
+      targetPort: metrics
+---
+# Governing Service of the StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash-headless
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "logstash.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: api
+      port: 9600
+      targetPort: api

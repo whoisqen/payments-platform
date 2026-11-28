@@ -180,7 +180,19 @@ resource "aws_ecr_pull_through_cache_rule" "this" {
 
   ecr_repository_prefix = each.key
   upstream_registry_url = each.value.upstream_registry_url
-  credential_arn        = each.value.credential_arn
+  credential_arn        = each.value.credentials ? aws_secretsmanager_secret.pull_through[each.key].arn : each.value.credential_arn
+}
+
+# Registries that need a login (Docker Hub): ECR reads the secret by its required name prefix; the owner enters username and accessToken.
+resource "aws_secretsmanager_secret" "pull_through" {
+  # checkov:skip=CKV_AWS_149: ECR pull-through cache reads only secrets under the AWS managed key
+  # checkov:skip=CKV2_AWS_57: an upstream access token is rotated at the upstream registry, then entered here
+  for_each = { for k, v in var.pull_through_cache : k => v if v.credentials }
+
+  name        = "ecr-pullthroughcache/${each.key}"
+  description = "Upstream credentials of the ${each.key} pull-through cache: JSON username and accessToken"
+
+  tags = var.tags
 }
 
 # Repositories created by a pull-through pull get the same disposable lifecycle.

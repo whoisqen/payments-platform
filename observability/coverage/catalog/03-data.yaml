@@ -136,24 +136,6 @@ modes:
   signal: metric
   detect_within: 13m
 - layer: data
-  id: data-open-search-cluster-red
-  component: opensearch
-  failure: OpenSearch red
-  impact: audit logs are not searchable or not ingested; PCI DSS 10.5.1 needs 3 months online
-  severity: critical
-  alert: OpenSearchClusterRed
-  signal: metric
-  detect_within: 8m
-- layer: data
-  id: data-open-search-disk-low
-  component: opensearch
-  failure: OpenSearch storage low
-  impact: shards may become read-only
-  severity: warning
-  alert: OpenSearchDiskLow
-  signal: metric
-  detect_within: 13m
-- layer: data
   id: data-kafka-consumer-lag-high
   component: msk
   failure: consumer lag
@@ -190,11 +172,200 @@ modes:
   signal: metric
   reason: metric `redis_replication_lag` is not scraped yet
 - layer: data
-  id: data-opensearch-jvm-pressure
+  id: data-logs-open-search-cluster-red
   component: opensearch
-  failure: OpenSearch JVM memory pressure
-  impact: slow audit search and node restarts
-  severity: warning
-  alert: null
+  failure: central OpenSearch red
+  impact: logs of the affected indices are not searchable and writes to them fail; Logstash queues on disk, the audit trail stays in the S3 log archive
+  severity: critical
+  alert: LogsOpenSearchClusterRed
   signal: metric
-  reason: YACE job for the domain JVM metric is not configured yet
+  detect_within: 8m
+- layer: data
+  id: data-logs-open-search-cluster-yellow
+  component: opensearch
+  failure: central OpenSearch yellow
+  impact: replicas are missing; one more node loss makes the cluster red
+  severity: warning
+  alert: LogsOpenSearchClusterYellow
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-open-search-unassigned-shards
+  component: opensearch
+  failure: unassigned shards
+  impact: data without a replica or not searchable; allocation is blocked by disk, shard limit or a lost node
+  severity: warning
+  alert: LogsOpenSearchUnassignedShards
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-open-search-shards-per-node-high
+  component: opensearch
+  failure: shards per data node near the 1000 limit
+  impact: new backing indices cannot be created at rollover, so ingestion stops
+  severity: warning
+  alert: LogsOpenSearchShardsPerNodeHigh
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-open-search-jvm-pressure-high
+  component: opensearch
+  failure: JVM memory pressure high
+  impact: slow search and indexing, long garbage collection pauses
+  severity: warning
+  alert: LogsOpenSearchJvmPressureHigh
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-open-search-jvm-pressure-critical
+  component: opensearch
+  failure: JVM memory pressure critical
+  impact: at 92% the service blocks writes and nodes may fail with out of memory
+  severity: critical
+  alert: LogsOpenSearchJvmPressureCritical
+  signal: metric
+  detect_within: 8m
+- layer: data
+  id: data-logs-open-search-cpu-high
+  component: opensearch
+  failure: CPU saturated
+  impact: indexing falls behind, Logstash queues grow, searches time out
+  severity: warning
+  alert: LogsOpenSearchCpuHigh
+  signal: metric
+  detect_within: 33m
+- layer: data
+  id: data-logs-open-search-storage-low
+  component: opensearch
+  failure: free storage low
+  impact: below the flood stage the indices become read-only and log ingestion stops
+  severity: warning
+  alert: LogsOpenSearchStorageLow
+  signal: metric
+  detect_within: 13m
+- layer: data
+  id: data-logs-open-search-ism-failing
+  component: opensearch
+  failure: Index State Management failing
+  impact: rollover, warm migration or deletion stops; shards grow too large and storage fills
+  severity: warning
+  alert: LogsOpenSearchIsmFailing
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-open-search-index-writes-blocked
+  component: opensearch
+  failure: index writes blocked
+  impact: no log document is written; Logstash and the audit pipelines retry and buffer
+  severity: critical
+  alert: LogsOpenSearchIndexWritesBlocked
+  signal: metric
+  detect_within: 8m
+- layer: data
+  id: data-logs-open-search-server-errors
+  component: opensearch
+  failure: 5xx responses
+  impact: Logstash and the audit pipelines retry; searches in OpenSearch Dashboards fail
+  severity: warning
+  alert: LogsOpenSearchServerErrors
+  signal: metric
+  detect_within: 13m
+- layer: data
+  id: data-logs-open-search-throttled
+  component: opensearch
+  failure: write rejections or EBS throttling
+  impact: indexing slows down and writers retry; queues grow upstream
+  severity: warning
+  alert: LogsOpenSearchThrottled
+  signal: metric
+  detect_within: 13m
+- layer: data
+  id: data-logs-open-search-snapshot-failing
+  component: opensearch
+  failure: snapshot failing
+  impact: a lost domain cannot be restored to the last day; the S3 log archive keeps the raw logs
+  severity: warning
+  alert: LogsOpenSearchSnapshotFailing
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logs-audit-ingestion-errors
+  component: opensearch-ingestion
+  failure: audit ingestion pipeline errors
+  impact: CloudTrail or EKS audit events are missing from logs-audit; the S3 log archive keeps them
+  severity: warning
+  alert: LogsAuditIngestionErrors
+  signal: metric
+  detect_within: 13m
+- layer: data
+  id: data-logs-ingestion-stopped
+  component: opensearch
+  failure: application log ingestion stopped
+  impact: application logs of an environment are not searchable; incidents are diagnosed blind
+  severity: critical
+  alert: LogsIngestionStopped
+  signal: metric
+  detect_within: 15m
+- layer: data
+  id: data-logstash-pipeline-stalled
+  component: logstash
+  failure: Logstash pipeline stalled
+  impact: events pile up in the persistent queue and no log reaches OpenSearch
+  severity: critical
+  alert: LogstashPipelineStalled
+  signal: metric
+  detect_within: 8m
+- layer: data
+  id: data-logstash-queue-backlog-high
+  component: logstash
+  failure: persistent queue backlog
+  impact: logs reach OpenSearch late; a full queue blocks the collectors
+  severity: warning
+  alert: LogstashQueueBacklogHigh
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logstash-queue-nearly-full
+  component: logstash
+  failure: persistent queue nearly full
+  impact: inputs are blocked next and the collectors drop logs once their buffers fill
+  severity: critical
+  alert: LogstashQueueNearlyFull
+  signal: metric
+  detect_within: 8m
+- layer: data
+  id: data-logstash-dead-letter-queue-entries
+  component: logstash
+  failure: events in the dead letter queue
+  impact: the rejected events are not searchable until they are fixed and replayed
+  severity: warning
+  alert: LogstashDeadLetterQueueEntries
+  signal: metric
+  detect_within: 8m
+- layer: data
+  id: data-logstash-output-errors
+  component: logstash
+  failure: OpenSearch output errors or retries
+  impact: logs reach OpenSearch late or end in the dead letter queue
+  severity: warning
+  alert: LogstashOutputErrors
+  signal: metric
+  detect_within: 13m
+- layer: data
+  id: data-logstash-jvm-heap-high
+  component: logstash
+  failure: Logstash JVM heap high
+  impact: long garbage collection pauses slow the pipeline; out of memory restarts the pod
+  severity: warning
+  alert: LogstashJvmHeapHigh
+  signal: metric
+  detect_within: 18m
+- layer: data
+  id: data-logstash-pod-down
+  component: logstash
+  failure: Logstash pod down
+  impact: less ingest capacity; events in the queue of that pod wait until it returns
+  severity: warning
+  alert: LogstashPodDown
+  signal: metric
+  detect_within: 8m

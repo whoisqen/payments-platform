@@ -1,0 +1,161 @@
+# One cell (cell-0) on the real payments-cell umbrella; only the switches a cluster without AWS needs differ from dev
+{{- $v := .Values }}
+{{- $migrator := or $v.images.migrator.digest $v.images.migrator.tag }}
+{{- /* One registry per release: the directory part of the image repositories, which must agree */}}
+{{- $registry := "" }}
+{{- range $svc := list "router" "drainer" "scheduler" "migrator" }}
+{{- $d := dir (index $v.images $svc).repository }}
+{{- $d = ternary $v.registry $d (eq $d ".") }}
+{{- if and $registry (ne $registry $d) (or (ne $svc "migrator") $migrator) }}{{ fail (printf "images.%s.repository is under %s, the other cell images under %s" $svc $d $registry) }}{{ end }}
+{{- if not $registry }}{{ $registry = $d }}{{ end }}
+{{- end }}
+global:
+  localCluster: true
+  registry: {{ $registry }}
+  environment: dev
+  region: eu-central-1
+  cell: cell-0
+  # kind pod and service ranges (scripts/kind/cluster.yaml): PostgreSQL and Redis run as pods
+  dataCidrs: [10.244.0.0/16]
+  endpointCidrs: [10.96.0.0/16]
+  hyperswitch:
+    configFile: sandbox.toml
+    logLevel: INFO
+    database:
+      host: postgres.payments-data.svc.cluster.local
+      sslMode: disable
+    redis:
+      host: redis.payments-data.svc.cluster.local
+      clusterEnabled: false
+      tls: false
+    kms:
+      enabled: false
+    tenant:
+      baseUrl: https://{{ $v.hosts.api }}:{{ $v.ports.edge }}
+      controlCenterUrl: https://{{ $v.hosts.panel }}:{{ $v.ports.panel }}
+
+{{- range $svc := list "router" "drainer" }}
+{{- $p := upper $svc }}
+{{ $svc }}:
+  image:
+    repository: {{ base (index $v.images $svc).repository }}
+    {{- if (index $v.images $svc).digest }}
+    digest: {{ (index $v.images $svc).digest }}
+    {{- else }}
+    tag: {{ (index $v.images $svc).tag | quote }}
+    {{- end }}
+  workload:
+    kind: Deployment
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+  container:
+    env:
+      RUN_ENV: development
+      # No OpenTelemetry collector in kind; the services keep logging to stdout
+      {{ $p }}__LOG__TELEMETRY__TRACES_ENABLED: "false"
+      {{ $p }}__LOG__TELEMETRY__METRICS_ENABLED: "false"
+      {{- if eq $svc "router" }}
+      ROUTER__CORS__ORIGINS: https://{{ $v.hosts.panel }}:{{ $v.ports.panel }}
+      {{- else }}
+      REDIS_ADDRESS: redis.payments-data.svc.cluster.local:6379
+      {{- end }}
+    resources:
+      {{- if eq $svc "router" }}
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 768Mi}
+      {{- else }}
+      requests: {cpu: 50m, memory: 96Mi}
+      limits: {memory: 256Mi}
+      {{- end }}
+  scheduling:
+    nodePool: ""
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
+  serviceMonitor:
+    enabled: {{ $v.monitoring.enabled }}
+  networkPolicy:
+    extraEgress:
+      # PostgreSQL and Redis pods of local-data
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: payments-data
+        ports:
+          - {protocol: TCP, port: 5432}
+          - {protocol: TCP, port: 6379}
+    {{- if eq $svc "router" }}
+    # Gateway API proxies of payments-edge; in the cloud they reach the router through the cell entry
+    extraIngress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: payments-edge
+        ports:
+          - {protocol: TCP, port: http}
+    {{- end }}
+{{- end }}
+
+scheduler:
+  image:
+    repository: {{ base $v.images.scheduler.repository }}
+    {{- if $v.images.scheduler.digest }}
+    digest: {{ $v.images.scheduler.digest }}
+    {{- else }}
+    tag: {{ $v.images.scheduler.tag | quote }}
+    {{- end }}
+{{- range $flow := list "producer" "consumer" }}
+  {{ $flow }}:
+    workload:
+      replicas: 1
+    container:
+      env:
+        RUN_ENV: development
+        ROUTER__LOG__TELEMETRY__TRACES_ENABLED: "false"
+        ROUTER__LOG__TELEMETRY__METRICS_ENABLED: "false"
+        {{- if eq $flow "consumer" }}
+        REDIS_ADDRESS: redis.payments-data.svc.cluster.local:6379
+        {{- end }}
+      resources:
+        requests: {cpu: 50m, memory: 128Mi}
+        limits: {memory: 384Mi}
+    scheduling:
+      nodePool: ""
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: false
+    serviceMonitor:
+      enabled: {{ $v.monitoring.enabled }}
+    networkPolicy:
+      extraEgress:
+        # PostgreSQL and Redis pods of local-data
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: payments-data
+          ports:
+            - {protocol: TCP, port: 5432}
+            - {protocol: TCP, port: 6379}
+{{- end }}
+
+# The chart Job runs only with a migrator image; otherwise the schema Job of local-data applies the same migrations
+migrations:
+  enabled: {{ ternary "true" "false" (ne $migrator "") }}
+  {{- if $migrator }}
+  image:
+    repository: {{ base $v.images.migrator.repository }}
+    {{- if $v.images.migrator.digest }}
+    digest: {{ $v.images.migrator.digest }}
+    {{- else }}
+    tag: {{ $v.images.migrator.tag | quote }}
+    {{- end }}
+  database:
+    host: postgres.payments-data.svc.cluster.local
+    sslMode: disable
+    passwordSecret: {name: migrator-db, key: password}
+  snapshot:
+    enabled: false
+  {{- end }}

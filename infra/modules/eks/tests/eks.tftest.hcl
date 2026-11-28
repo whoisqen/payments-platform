@@ -101,6 +101,10 @@ run "bootstrap_nodes_are_hardened" {
     condition     = aws_eks_node_group.bootstrap.capacity_type == "ON_DEMAND" && aws_eks_node_group.bootstrap.ami_type == "BOTTLEROCKET_ARM_64"
     error_message = "bootstrap nodes are On-Demand Bottlerocket"
   }
+  assert {
+    condition     = strcontains(base64decode(aws_launch_template.bootstrap.user_data), "container-log-max-size = \"50Mi\"") && strcontains(base64decode(aws_launch_template.bootstrap.user_data), "container-log-max-files = 5")
+    error_message = "kubelet rotates container logs at 50Mi and keeps 5 files"
+  }
 }
 
 run "addons_are_managed" {

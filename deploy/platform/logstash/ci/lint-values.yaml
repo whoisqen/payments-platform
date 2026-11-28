@@ -1,0 +1,17 @@
+# Offline lint only; the add-on central/logstash passes the real values
+global:
+  registry: registry.example.test/acme
+serviceAccount:
+  name: logstash
+  roleArn: arn:aws:iam::222222222222:role/acme-shared-services-euc1-logstash
+opensearch:
+  endpoint: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com
+  region: eu-central-1
+gateway:
+  enabled: true
+  name: logs
+  hostname: logs.example.test
+  port: 4318
+networkPolicy:
+  enabled: true
+  awsCidrs: [10.140.0.0/16]

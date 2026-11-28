@@ -1,0 +1,11 @@
+# The add-on central/admin/opensearch-dashboards passes every value; Dashboards signs people in itself (SAML, Okta), so no oauth2-proxy
+# Custom endpoint of the domain (central.opensearch.dashboards_host): the admin listener matches it, SNI and Host carry it to the domain
+host: ""
+# VPC endpoint host of the domain, where the custom endpoint is served
+endpoint: ""
+# base64 PEM of the CA that signs the custom endpoint certificate (the admin private CA)
+caBundle: ""
+gateway:
+  name: admin
+  namespace: istio-ingress-admin
+  sectionName: https

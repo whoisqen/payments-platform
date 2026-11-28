@@ -4,20 +4,21 @@ Monthly cost at the target load, from the AWS Price List (eu-central-1, us-east-
 
 - Sizing: `config/environments/dev.yaml` over `config/environments/prod.yaml`, stacks in `infra/live/dev/`.
 - The stacks create cell-0 and the spare (`infra/live/dev/eu-central-1/cell-0`, `spare`), each with Aurora `db.r7g.large` (no readers), MemoryDB `db.t4g.small` (1 shard x 3 nodes) and its own EKS cluster. The spare and the locker use Standard storage.
+- Logs go to the central log domain in shared-services; dev pays only its VPC endpoint to it.
 - dev runs in eu-central-1 alone. Its us-east-1 holds only `panel-edge`, `waf-edge` and `kms`. The egress firewall uses one endpoint.
 - Payments and stateful node pools run on Spot; the cde and workers pools run on demand.
 - `aurora-schedule` stops the Aurora clusters outside the working window (60 of 168 hours: 08:00-20:00 Europe/Berlin on weekdays), so their instance lines run 260.71 hours. KEDA scales the workloads to zero on the same window (`global.workingHours`), so the payments and cde nodes run 260.71 hours too. `env-up` keeps dev up outside the window. Every other line runs 730 hours.
 - Commitments: none; the committed column applies the Spot planning rate only.
 
-Total: **4,238 USD/month on demand**, **4,003 USD/month committed**.
+Total: **4,203 USD/month on demand**, **3,967 USD/month committed**.
 
 ## By group
 
 | Group | On-demand (USD/month) | Committed (USD/month) |
 |---|---:|---:|
 | EKS nodes | 1,651.65 | 1,416.14 |
-| Network | 673.76 | 673.76 |
-| Analytics | 633.19 | 633.19 |
+| Network | 700.04 | 700.04 |
+| Analytics | 571.16 | 571.16 |
 | Logs and security | 410.53 | 410.53 |
 | Aurora | 375.49 | 375.49 |
 | MemoryDB | 240.52 | 240.52 |
@@ -26,7 +27,7 @@ Total: **4,238 USD/month on demand**, **4,003 USD/month committed**.
 | Data transfer | 13.00 | 13.00 |
 | Backup and S3 | 4.37 | 4.37 |
 | Data services | 0.16 | 0.16 |
-| **Total** | **4,238.50** | **4,002.99** |
+| **Total** | **4,202.75** | **3,967.24** |
 
 ## Line items
 
@@ -54,10 +55,9 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | EKS nodes | eu-central-1 | Amazon EBS | node volumes (4 GiB OS + 80 GiB data) | gp3, 16 nodes x 84 GB | 1,344 |  | GB-month | 0.0952 | 127.95 | on-demand | 127.95 |
 | Analytics | eu-central-1 | Amazon MSK | brokers | kafka.m7g.large, 3 AZ | 3 | 730 | broker-hour | 0.2445 | 535.46 | on-demand | 535.46 |
 | Analytics | eu-central-1 | Amazon MSK | broker storage | 3 x 100 GB | 300 |  | GB-month | 0.119 | 35.70 | on-demand | 35.70 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data node | m7g.medium.search, 1 AZ | 1 | 730 | instance-hour | 0.081 | 59.13 | on-demand | 59.13 |
-| Analytics | eu-central-1 | Amazon OpenSearch Service | data node storage | gp3, 20 GB | 20 |  | GB-month | 0.1452 | 2.90 | on-demand | 2.90 |
 | Network | eu-central-1 | Amazon VPC | interface endpoints, workload VPC | 9 services x 3 AZ | 27 | 730 | endpoint-hour | 0.012 | 236.52 | on-demand | 236.52 |
 | Network | eu-central-1 | Amazon VPC | interface endpoint data processed | AWS API traffic kept off NAT | 200 |  | GB | 0.01 | 2.00 | on-demand | 2.00 |
+| Network | eu-central-1 | Amazon VPC | VPC endpoint of the central log domain | OpenSearch-managed endpoint, 3 AZ | 3 | 730 | endpoint-hour | 0.012 | 26.28 | on-demand | 26.28 |
 | Network | eu-central-1 | AWS Network Firewall | firewall endpoints, egress VPC | 1 AZ | 1 | 730 | endpoint-hour | 0.395 | 288.35 | on-demand | 288.35 |
 | Network | eu-central-1 | Amazon VPC | NAT gateways behind the firewall | 3 AZ; hours and GB waived by the firewall endpoints | 3 | 730 | gateway-hour | 0 | 0.00 | on-demand | 0.00 |
 | Network | eu-central-1 | Amazon VPC | public IPv4 of the NAT gateways | 3 addresses | 3 | 730 | address-hour | 0.005 | 10.95 | on-demand | 10.95 |
@@ -97,4 +97,4 @@ Hours are per month (730 for 24/7). Usage lines have no hours: quantity times un
 | Logs and security | eu-central-1 | AWS Config | configuration items | node and ENI churn | 20,000 |  | item | 0.003 | 60.00 | on-demand | 60.00 |
 | Logs and security | eu-central-1 | AWS Config | conformance pack evaluations |  | 50,000 |  | evaluation | 0.001 | 50.00 | on-demand | 50.00 |
 | Logs and security | eu-central-1 | Amazon Inspector | EC2 scanning | nodes | 16 | 730 | instance-hour | 0.0021 | 24.53 | on-demand | 24.53 |
-| **Total** | | | | | | | | | **4,238.50** | | **4,002.99** |
+| **Total** | | | | | | | | | **4,202.75** | | **3,967.24** |

@@ -1,0 +1,9 @@
+-Xms{{ .Values.heap }}
+-Xmx{{ .Values.heap }}
+-XX:+UseG1GC
+-Djava.awt.headless=true
+-Dfile.encoding=UTF-8
+-Djruby.compile.invokedynamic=true
+-Djava.io.tmpdir=/tmp
+-Djava.security.egd=file:/dev/urandom
+-Dlog4j2.isThreadContextMapInheritable=true

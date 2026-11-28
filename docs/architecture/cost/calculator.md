@@ -14,12 +14,12 @@ Quantities come from the environment files; this page names the calculator servi
 
 | Estimate | Expected monthly total (USD) | Shareable link |
 |---|---:|---|
-| pay-prod (on demand) | 149,044 | paste after saving |
-| pay-prod-committed | 121,242 | paste after saving |
-| pay-stage | 11,254 with Spot pools (12,747 all on demand) | paste after saving |
-| pay-dev | 4,003 with Spot pools (4,238 all on demand) | paste after saving |
+| pay-prod (on demand) | 146,889 | paste after saving |
+| pay-prod-committed | 119,346 | paste after saving |
+| pay-stage | 11,218 with Spot pools (12,711 all on demand) | paste after saving |
+| pay-dev | 3,967 with Spot pools (4,203 all on demand) | paste after saving |
 | pay-shared-services | 808 with Spot runners (1,325 all on demand) | paste after saving |
-| pay-central-observability | 2,171 with the Spot workers pool (2,887 all on demand) | paste after saving |
+| pay-central-observability | 6,858 with the Spot workers pool and the Database Savings Plan (8,021 all on demand) | paste after saving |
 | pay-organization | 421 | paste after saving |
 
 The calculator applies its own historical Spot discount instead of the 40% planning rate, so Spot lines differ a little. It also does not apply the NAT waiver behind Network Firewall, so NAT gateways are left out of the entry.
@@ -34,8 +34,7 @@ The calculator applies its own historical Spot discount instead of the 40% plann
 | EKS | Amazon EKS | Number of clusters 6, standard support. |
 | EKS nodes | Amazon EC2 | One row per line of [prod.md](prod.md) "EKS nodes": OS Linux, tenancy Shared, workload Constant usage. Instances: m7g.large x 21, m7g.4xlarge x 12, m7g.2xlarge x 8, m7g.xlarge x 3, r7g.2xlarge x 4. Pricing strategy: On-Demand (committed: Compute Savings Plans, 1 year, No upfront, then reduce coverage to 80%). EBS: General Purpose SSD (gp3), 48 nodes x 84 GB plus 4,000 GB for ClickHouse, default IOPS and throughput. |
 | Analytics | Amazon MSK | Provisioned. Broker `kafka.m7g.large`, 3 brokers, storage 1,000 GB per broker. |
-| Analytics | Amazon OpenSearch Service | Data nodes `r7g.xlarge.search` x 3, gp3 1,024 GB per node. Dedicated master `m7g.large.search` x 3. UltraWarm `ultrawarm1.medium.search` x 2, managed storage 1,000 GB. Pricing: OnDemand (committed: Database Savings Plans, 1 year, No Upfront for data and master nodes). |
-| Network | Amazon VPC | Interface endpoints: 9 endpoints x 3 AZ (27 ENIs), 2,000 GB processed. Public IPv4: 3 in-use addresses. Transit Gateway: 2 VPC attachments, 20,740 GB processed. |
+| Network | Amazon VPC | Interface endpoints: 9 endpoints x 3 AZ (27 ENIs) plus the log domain endpoint x 3 AZ (3 ENIs), 2,000 GB processed. Public IPv4: 3 in-use addresses. Transit Gateway: 2 VPC attachments, 20,740 GB processed. |
 | Network | AWS Network Firewall | Firewall endpoints 3, data processed 10,370 GB. |
 | Network | Elastic Load Balancing | Network Load Balancer x 1, 10 LCU on average (enter as processed bytes of 10 GB per hour, or new connections that produce 10 LCU). |
 | Data transfer | AWS Data Transfer | Outbound to the internet: 19,080 GB. Inter-region outbound to us-east-1: 6,200 (Aurora) + 6,500 (S3) + 6,200 (Backup) GB. Intra-region (cross-AZ): 15,350 GB. |
@@ -75,8 +74,8 @@ Enter from [stage.md](stage.md), with `size_window = "scheduled"`:
 - Aurora (eu-central-1): I/O-Optimized `db.r7g.large` x 4 (cell writers, no readers), storage 800 GB; Standard `db.r7g.large` x 2 (spare, locker), storage 100 GB; RDS Proxy 12 vCPU; backup 900 GB. No standby region: stage runs in eu-central-1 alone.
 - MemoryDB: `db.t4g.small`, 5 clusters x 1 shard x 3 nodes (15 nodes); data written 200 GB.
 - EKS: 6 clusters. EC2 On-Demand, 730 hours: m7g.large x 18, m7g.2xlarge x 6 (5 cell workers pools, 1 analytics workers pool). EC2 On-Demand, 260.71 hours (working window): m7g.xlarge x 3 (cde). EC2 Spot: m7g.4xlarge x 8 and m7g.2xlarge x 1 (payments, 260.71 hours), r7g.2xlarge x 2 (730 hours). gp3 38 x 84 GB plus 2,000 GB.
-- MSK: `kafka.m7g.large` x 3, 500 GB each. OpenSearch: `m7g.medium.search` x 1, 20 GB gp3, no masters, no UltraWarm.
-- Network: 27 endpoint ENIs, 3 firewall endpoints, 3 public IPv4 and 2 Transit Gateway attachments in eu-central-1; 1 NLB; 1 accelerator. us-east-1 holds only the panel edge.
+- MSK: `kafka.m7g.large` x 3, 500 GB each.
+- Network: 30 endpoint ENIs (27 interface endpoints, 3 of the log domain endpoint), 3 firewall endpoints, 3 public IPv4 and 2 Transit Gateway attachments in eu-central-1; 1 NLB; 1 accelerator. us-east-1 holds only the panel edge.
 - Traffic: internet out 400 GB, firewall 200 GB, Transit Gateway 400 GB, cross-AZ 1,000 GB, endpoint data 500 GB, NLB 2 LCU.
 - S3 Standard 100 GB, Glacier IR 100 GB, Glacier Flexible 300 GB, Deep Archive 300 GB, no cross-region replication; Backup 1,300 GB in eu-central-1.
 - CloudWatch Logs: 180 GB ingested, 2,190 GB stored; vended 150 GB. Firehose: 180 GB.
@@ -89,8 +88,8 @@ Enter from [dev.md](dev.md):
 - Aurora (eu-central-1): I/O-Optimized `db.r7g.large` x 1 (cell-0), storage 20 GB; Standard `db.r7g.large` x 2 (spare, locker), storage 40 GB; 260.71 instance hours a month (`aurora-schedule`); RDS Proxy 6 vCPU. No recovery regions.
 - MemoryDB: `db.t4g.small`, 2 clusters x 1 shard x 3 nodes (6 nodes).
 - EKS: 3 clusters. EC2 On-Demand: m7g.large x 9 and m7g.xlarge x 3 for 730 hours, and m7g.xlarge x 1 (cde) for 260.71 hours. EC2 Spot: m7g.2xlarge x 2 (payments) for 260.71 hours and r7g.xlarge x 1 for 730 hours. gp3 16 x 84 GB plus 100 GB.
-- MSK: `kafka.m7g.large` x 3, 100 GB each. OpenSearch: `m7g.medium.search` x 1, 20 GB gp3, no masters.
-- Network: 27 endpoint ENIs in eu-central-1; 1 firewall endpoint, 3 public IPv4 and 2 Transit Gateway attachments; 1 NLB; 1 accelerator.
+- MSK: `kafka.m7g.large` x 3, 100 GB each.
+- Network: 30 endpoint ENIs in eu-central-1 (27 interface endpoints, 3 of the log domain endpoint); 1 firewall endpoint, 3 public IPv4 and 2 Transit Gateway attachments; 1 NLB; 1 accelerator.
 - CloudWatch Logs: 30 GB ingested, 30-day retention. Firehose: 30 GB.
 
 ## Shared services, central observability, organization
@@ -100,8 +99,9 @@ Enter from [dev.md](dev.md):
 | pay-shared-services | Amazon EC2 | Spot, 260 hours a month: c7gd.4xlarge x 2, m7g.2xlarge x 2, m7g.large x 2, c7g.2xlarge x 2; gp3 100 GB. |
 | pay-shared-services | Amazon ECR, Amazon S3, Amazon VPC | ECR 1,300 GB; S3 Standard 1,000 GB; 27 interface endpoint ENIs. |
 | pay-shared-services | AWS Private CA, AWS Secrets Manager, AWS KMS, Amazon Route 53 | 1 CA in short-lived certificate mode; 15 secrets; 6 keys; 1 hosted zone. |
-| pay-central-observability | Amazon EKS, Amazon EC2 | 1 cluster. m7g.large x 3 and r7g.2xlarge x 4, with Compute Savings Plans 1 year No upfront in the committed view; m7g.2xlarge x 2 on Spot. gp3 3,156 GB, extra throughput 375 MB/s. |
-| pay-central-observability | Amazon S3, Amazon VPC, AWS Data Transfer | S3 Standard 1,700 GB; Transit Gateway 5,000 GB processed; intra-region 3,000 GB. |
+| pay-central-observability | Amazon EKS, Amazon EC2 | 1 cluster. m7g.large x 3 and r7g.2xlarge x 4, with Compute Savings Plans 1 year No upfront in the committed view; m7g.2xlarge x 2 on Spot. gp3 3,252 GB (with the Logstash queues), extra throughput 375 MB/s. |
+| pay-central-observability | Amazon OpenSearch Service | Domain `pay-shared-euc1-logs`: data nodes `r7g.xlarge.search` x 6, gp3 600 GB per node; dedicated master `m7g.large.search` x 3; UltraWarm `ultrawarm1.medium.search` x 8, managed storage 10,740 GB. Pricing: OnDemand (committed: Database Savings Plans, 1 year, No Upfront for data and master nodes). OpenSearch Ingestion: 2 pipelines x 1 OCU, 730 hours. |
+| pay-central-observability | Amazon S3, Amazon VPC, AWS Data Transfer | S3 Standard 800 GB; Transit Gateway 5,000 GB processed; intra-region 3,000 GB. |
 | pay-organization | Amazon CloudWatch, Amazon S3, AWS KMS | 50 GB log ingestion; S3 Standard 6,210 GB and Glacier Flexible 18,630 GB; 3 keys. |
 | pay-organization | AWS Security Hub, Amazon Macie, Amazon GuardDuty, AWS Config | 40,000 checks; 60 buckets and 20 GB discovery; 50 GB foundational analysis; 10,000 configuration items. |
 

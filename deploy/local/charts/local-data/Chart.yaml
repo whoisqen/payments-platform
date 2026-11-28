@@ -1,0 +1,6 @@
+apiVersion: v2
+name: local-data
+description: PostgreSQL, Redis and the schema Job of the kind stack, with credentials from Vault through External Secrets
+type: application
+version: 0.1.0
+appVersion: "16.8"

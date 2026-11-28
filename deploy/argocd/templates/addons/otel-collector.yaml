@@ -53,6 +53,10 @@ spec:
                 value: CENTRAL_METRICS_REMOTE_WRITE_URL
               - name: extraEnvs[4].value
                 value: {{ .Values.central.metricsRemoteWriteUrl | quote }}
+              - name: extraEnvs[5].name
+                value: PLATFORM_CLUSTER
+              - name: extraEnvs[5].value
+                value: '{{`{{ .name }}`}}'
         # The NetworkPolicy of the node-local receiver
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}

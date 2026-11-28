@@ -113,6 +113,17 @@ variable "ci_trusted_domains" {
   }
 }
 
+variable "platform_domains" {
+  type        = list(string)
+  default     = []
+  description = "Public domains that platform workloads of the private tier need at run time (for example grafana.com for the Grafana plugin install); passed by the same group as ci_trusted_domains."
+
+  validation {
+    condition     = length(var.platform_domains) <= 10 && alltrue([for d in var.platform_domains : can(regex("^\\.?[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", d))])
+    error_message = "platform_domains must be at most 10 lower-case domain names."
+  }
+}
+
 variable "ci_rule_group_capacity" {
   type        = number
   default     = 200

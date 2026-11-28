@@ -286,3 +286,14 @@ variable "tags" {
     error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
   }
 }
+
+variable "environment_role_arns" {
+  type        = list(string)
+  default     = []
+  description = "The read-only admin agent roles of the environments (admin-agent-env, <prefix>-<env>-admin-agent); the admin role may assume these and no other role."
+
+  validation {
+    condition     = alltrue([for a in var.environment_role_arns : can(regex("^arn:aws:iam::[0-9]{12}:role/[a-z0-9-]+-admin-agent$", a))])
+    error_message = "environment_role_arns are role ARNs ending in -admin-agent."
+  }
+}

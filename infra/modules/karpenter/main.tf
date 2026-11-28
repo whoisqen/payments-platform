@@ -8,9 +8,13 @@ locals {
   node_tags = merge(var.extra_node_tags, var.tags, { "karpenter.sh/discovery" = var.cluster_name })
 
   # Bottlerocket settings of section 26.1; the admin container stays off and the control container is the SSM path.
+  # kubelet rotates container logs at 50Mi and keeps 5 files, so a noisy pod cannot fill the data volume.
   user_data = <<-EOT
     [settings.kernel]
     lockdown = "integrity"
+    [settings.kubernetes]
+    container-log-max-size = "${var.container_log_max_size}"
+    container-log-max-files = ${var.container_log_max_files}
     [settings.host-containers.admin]
     enabled = false
     [settings.host-containers.control]

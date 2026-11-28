@@ -26,6 +26,27 @@ locals {
     Resource  = [local.bucket_arn, "${local.bucket_arn}/*"]
   }] : []
 
+  # Log ingestion into the central OpenSearch reads only the audit sources: the trail and the EKS export.
+  ingest_prefixes = [var.prefixes.cloudtrail, var.prefixes.eks]
+  ingest_statements = [
+    {
+      Sid       = "AllowIngestList"
+      Effect    = "Allow"
+      Principal = { AWS = var.ingest_reader_principal_arns }
+      Action    = ["s3:ListBucket", "s3:GetBucketLocation"]
+      Resource  = local.bucket_arn
+      Condition = { StringLike = { "s3:prefix" = [for p in local.ingest_prefixes : "${p}/*"] } }
+    },
+    {
+      Sid       = "AllowIngestRead"
+      Effect    = "Allow"
+      Principal = { AWS = var.ingest_reader_principal_arns }
+      Action    = ["s3:GetObject"]
+      Resource  = [for p in local.ingest_prefixes : "${local.bucket_arn}/${p}/*"]
+    },
+  ]
+  ingest_readers = [for s in local.ingest_statements : s if length(var.ingest_reader_principal_arns) > 0]
+
   bucket_policy = {
     Version = "2012-10-17"
     Statement = concat([
@@ -105,7 +126,7 @@ locals {
         Resource  = "${local.bucket_arn}/${var.prefixes.eks}/*"
         Condition = local.log_export_principal
       },
-    ], local.readers)
+    ], local.readers, local.ingest_readers)
   }
 
   access_policy = {
@@ -177,6 +198,13 @@ locals {
         Principal = { AWS = var.reader_principal_arns }
         Action    = ["kms:Decrypt", "kms:DescribeKey"]
         Resource  = "*"
+        }] : [], length(var.ingest_reader_principal_arns) > 0 ? [{
+        Sid       = "IngestReadersDecrypt"
+        Effect    = "Allow"
+        Principal = { AWS = var.ingest_reader_principal_arns }
+        Action    = "kms:Decrypt"
+        Resource  = "*"
+        Condition = { StringLike = { "kms:ViaService" = "s3.*.amazonaws.com" } }
     }] : [])
   }
 }
@@ -281,6 +309,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   }
 
   depends_on = [aws_s3_bucket_versioning.this]
+}
+
+# New objects of the audit sources are announced to the queues of the central log ingestion; the queues must exist first.
+resource "aws_s3_bucket_notification" "ingest" {
+  count = length(var.ingest_notifications) > 0 ? 1 : 0
+
+  bucket = aws_s3_bucket.this.id
+
+  dynamic "queue" {
+    for_each = var.ingest_notifications
+
+    content {
+      id            = "ingest-${queue.key}"
+      queue_arn     = queue.value.queue_arn
+      events        = ["s3:ObjectCreated:*"]
+      filter_prefix = queue.value.prefix
+    }
+  }
 }
 
 resource "aws_s3_bucket_logging" "this" {

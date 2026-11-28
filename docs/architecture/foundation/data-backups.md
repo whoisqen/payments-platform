@@ -19,7 +19,7 @@ The hot path must not wait for PostgreSQL, so the router writes to MemoryDB and 
 | DynamoDB global table | `merchant_id -> cell` | In prod, a replica in us-east-1, written only from Frankfurt (an IAM policy and an SCP deny writes there until a switch). |
 | MSK | Payment events | 9 brokers in prod, replication factor 3, `min.insync.replicas=2`, IAM auth only. An S3 sink keeps every event in the archive bucket. |
 | ClickHouse | Analytics | Runs on the analytics cluster (4 shards x 2 replicas in prod), fed from MSK. |
-| OpenSearch | Log search | VPC only, three masters, UltraWarm after 30 days. |
+| OpenSearch | Log search (central domain in shared-services, not on the analytics cluster) | One domain for every environment, VPC only, three dedicated masters, hot nodes over three AZs, UltraWarm. Application logs 7 days hot and 30 days in total, the audit trail 30 days hot and 365 in total ([Logging](../runtime/logging.md)). |
 | S3 | Backups, audit logs, event archive, Terraform state | Versioned, KMS, Object Lock, replicated with Replication Time Control. |
 
 ### Write-behind
@@ -65,7 +65,8 @@ Router, drainer and scheduler share the Aurora login `hs_app` through RDS Proxy;
 
 | Path | What |
 |---|---|
-| `infra/modules/memorydb`, `aurora-global`, `dynamodb-global`, `msk`, `clickhouse`, `opensearch` | Store modules |
+| `infra/modules/memorydb`, `aurora-global`, `dynamodb-global`, `msk`, `clickhouse` | Store modules |
+| `infra/modules/opensearch`, `opensearch-indices`, `infra/live/shared-services/eu-central-1/logs/` | Central log domain |
 | `infra/modules/backup`, `s3-backup`, `restore-automation`, `secrets-replica` | Backups, archives, restore tests, replicated secrets |
 | `infra/live/<env>/<region>/<cell>/aurora`, `memorydb`, `data-access` | Per-cell data stacks |
 | `infra/live/<env>/eu-central-1/analytics/` | Analytics cluster and stores |

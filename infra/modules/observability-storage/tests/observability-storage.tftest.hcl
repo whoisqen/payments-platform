@@ -23,7 +23,7 @@ run "names_and_encryption" {
   command = plan
 
   assert {
-    condition     = aws_s3_bucket.this["loki"].bucket == "pay-shared-services-euc1-loki" && aws_s3_bucket.this["tempo"].bucket == "pay-shared-services-euc1-tempo" && aws_s3_bucket.this["sentry"].bucket == "pay-shared-services-euc1-sentry"
+    condition     = !contains(keys(aws_s3_bucket.this), "loki") && aws_s3_bucket.this["tempo"].bucket == "pay-shared-services-euc1-tempo" && aws_s3_bucket.this["sentry"].bucket == "pay-shared-services-euc1-sentry"
     error_message = "bucket names follow pay-shared-services-<region-short>-<component>"
   }
 
@@ -40,11 +40,6 @@ run "names_and_encryption" {
 
 run "lifecycle_retention" {
   command = plan
-
-  assert {
-    condition     = contains([for r in aws_s3_bucket_lifecycle_configuration.this["loki"].rule : r.expiration[0].days], 30)
-    error_message = "loki expires after 30 days"
-  }
 
   assert {
     condition     = contains([for r in aws_s3_bucket_lifecycle_configuration.this["tempo"].rule : r.expiration[0].days], 14) && contains([for r in aws_s3_bucket_lifecycle_configuration.this["sentry"].rule : r.expiration[0].days], 90)
@@ -65,7 +60,7 @@ run "roles_are_scoped" {
   command = apply
 
   assert {
-    condition     = alltrue([for k, r in aws_iam_role.this : r.permissions_boundary == var.permissions_boundary_arn]) && aws_iam_role.this["loki"].name == "pay-shared-services-euc1-loki-pod"
+    condition     = alltrue([for k, r in aws_iam_role.this : r.permissions_boundary == var.permissions_boundary_arn]) && aws_iam_role.this["tempo"].name == "pay-shared-services-euc1-tempo-pod"
     error_message = "roles carry the boundary and are named after the bucket"
   }
 
@@ -91,8 +86,8 @@ run "roles_are_scoped" {
   }
 
   assert {
-    condition     = aws_eks_pod_identity_association.this["loki"].namespace == "monitoring" && aws_eks_pod_identity_association.this["loki"].service_account == "loki" && aws_eks_pod_identity_association.this["tempo"].service_account == "tempo" && aws_eks_pod_identity_association.this["sentry"].service_account == "sentry" && aws_eks_pod_identity_association.this["sentry"].cluster_name == "pay-shared-services-euc1-central"
-    error_message = "monitoring/loki, monitoring/tempo and monitoring/sentry on the central cluster"
+    condition     = aws_eks_pod_identity_association.this["tempo"].namespace == "monitoring" && aws_eks_pod_identity_association.this["tempo"].service_account == "tempo" && aws_eks_pod_identity_association.this["sentry"].service_account == "sentry" && aws_eks_pod_identity_association.this["sentry"].cluster_name == "pay-shared-services-euc1-central"
+    error_message = "monitoring/tempo and monitoring/sentry on the central cluster"
   }
 }
 
@@ -138,10 +133,6 @@ run "tiering_where_it_is_cheaper" {
   command = plan
 
   assert {
-    condition     = alltrue([for r in aws_s3_bucket_lifecycle_configuration.this["loki"].rule : length(r.transition) == 0])
-    error_message = "at a 30-day retention Standard-IA would cost more, so loki keeps Standard"
-  }
-  assert {
     condition     = alltrue([for r in aws_s3_bucket_lifecycle_configuration.this["tempo"].rule : length(r.transition) == 0])
     error_message = "tempo only expires"
   }
@@ -153,18 +144,18 @@ run "tiering_where_it_is_cheaper" {
   }
 }
 
-run "loki_chunks_go_to_standard_ia_when_the_retention_allows" {
+run "blocks_go_to_standard_ia_when_the_retention_allows" {
   command = plan
 
   variables {
     buckets = {
-      loki = { retention_days = 90, namespace = "monitoring", service_account = "loki", transition = { days = 30, storage_class = "STANDARD_IA" } }
+      tempo = { retention_days = 90, namespace = "monitoring", service_account = "tempo", transition = { days = 30, storage_class = "STANDARD_IA" } }
     }
   }
 
   assert {
     condition = anytrue([
-      for r in aws_s3_bucket_lifecycle_configuration.this["loki"].rule :
+      for r in aws_s3_bucket_lifecycle_configuration.this["tempo"].rule :
       length(r.transition) == 1 && one(r.transition).days == 30 && one(r.transition).storage_class == "STANDARD_IA" && r.expiration[0].days == 90 if r.id == "expire-objects"
     ])
     error_message = "Standard-IA after 30 days, deleted at the retention"
@@ -176,7 +167,7 @@ run "standard_ia_before_30_days_is_rejected" {
 
   variables {
     buckets = {
-      loki = { retention_days = 90, namespace = "monitoring", service_account = "loki", transition = { days = 7, storage_class = "STANDARD_IA" } }
+      tempo = { retention_days = 90, namespace = "monitoring", service_account = "tempo", transition = { days = 7, storage_class = "STANDARD_IA" } }
     }
   }
 

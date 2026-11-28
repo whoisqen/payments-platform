@@ -1,0 +1,87 @@
+# Central Logstash (shared-services, namespace monitoring). The add-on central/logstash passes the values that come from
+# config/platform.yaml and the infra outputs; the defaults below are the sizing and the pipeline contract.
+global:
+  # ECR host and repository prefix (registry.ecr_prefix/ecr_repo_prefix); images are copied there index-preserving
+  registry: ""
+
+image:
+  repository: opensearchproject/logstash-oss-with-opensearch-output-plugin
+  # Logstash 8.9.0 with logstash-input-http 3.7.2 and logstash-output-opensearch 2.0.1; Renovate bumps tag and digest together
+  tag: 8.9.0
+  digest: sha256:43b0cdaf26edca812a9eafb684ae6101d8f2fd27165345737c39c04a6c7430eb
+
+exporter:
+  image:
+    repository: kuskoman/logstash-exporter
+    tag: v1.9.3
+    digest: sha256:c5b4e2061392de5afa08477408eac482cfcf61382667e2160db1350f351c9809
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 64Mi}
+
+# Fixed size, no HPA: the persistent queue absorbs bursts and a scale-in would strand the queue of the removed pod
+replicas: 3
+
+serviceAccount:
+  name: logstash
+  # IRSA role <prefix>-shared-services-<region-short>-logstash (infra/modules/log-ingestion); the output plugin's AWS SDK
+  # reads the web identity token, it has no EKS Pod Identity support
+  roleArn: ""
+
+opensearch:
+  # VPC endpoint host of the domain (output endpoint of infra/modules/opensearch), no scheme
+  endpoint: ""
+  region: ""
+
+pipeline:
+  # Data stream of an event: <dataStreamPrefix><deployment.environment.name>; logs-app-* is the index template of infra/modules/opensearch-indices
+  dataStreamPrefix: logs-app-
+  # Records without the environment attribute land here instead of being dropped
+  fallbackEnvironment: unknown
+  # Debug and trace records of these environments are dropped; the others keep them with attributes.log.retention=debug
+  dropDebugEnvironments: [prod, cde-prod]
+  workers: 4
+  batchSize: 500
+  # Per pod: the queue holds about an hour of the busiest hour of all environments when OpenSearch is unreachable
+  queueMaxBytes: 24gb
+  deadLetterQueueMaxBytes: 4gb
+
+input:
+  port: 8443
+  threads: 8
+  maxPendingRequests: 400
+  # A collector batch of 5000 records with long bodies stays far below this
+  maxContentLength: 33554432
+  # Secret with tls.crt, tls.key (PKCS#8) and ca.crt; the ca.crt signs the client certificates of the node collectors
+  tlsSecretName: logstash-tls
+
+# Internal entry of the node collectors: TLS passthrough, so Logstash itself checks the client certificate
+gateway:
+  enabled: true
+  name: logs
+  # Host and port of central.logs_otlp_endpoint; the add-on derives both from the URL
+  hostname: ""
+  port: 4318
+
+heap: 2g
+resources:
+  requests: {cpu: "1", memory: 3Gi}
+  limits: {memory: 3584Mi}
+
+persistence:
+  storageClass: gp3-encrypted
+  # queueMaxBytes + deadLetterQueueMaxBytes + headroom for the page files
+  size: 32Gi
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+networkPolicy:
+  enabled: true
+  # Domain subnets of OpenSearch and the STS interface endpoint (443); empty means no egress to AWS
+  awsCidrs: []
+
+serviceMonitor:
+  enabled: true
+  interval: 30s

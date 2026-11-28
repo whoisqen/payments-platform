@@ -1,0 +1,19 @@
+# Optional in demo: the global limit service of the edge on the local Redis (ACL user ratelimit)
+global:
+  registry: docker.io
+  environment: dev
+redis:
+  endpoint: redis.payments-data.svc.cluster.local:6379
+  type: single
+  tls: false
+  secret:
+    store: vault
+autoscaling:
+  enabled: false
+pdb:
+  enabled: false
+serviceMonitor:
+  enabled: false
+resources:
+  requests: {cpu: 20m, memory: 32Mi}
+  limits: {memory: 128Mi}

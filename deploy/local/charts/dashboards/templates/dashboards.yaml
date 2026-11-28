@@ -1,0 +1,6 @@
+{{- range $path, $_ := .Files.Glob "files/dashboards-*.yaml" }}
+{{- $cm := $.Files.Get $path | fromYaml }}
+{{- $_ := set $cm.metadata "namespace" $.Values.namespace }}
+---
+{{ toYaml $cm }}
+{{- end }}

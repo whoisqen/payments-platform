@@ -20,6 +20,17 @@ sentry:
   existingSecret: sentry-secrets
   existingSecretKey: system-secret-key
   singleOrganization: true
+  # Event retention: the chart turns this into system.event-retention-days (SENTRY_EVENT_RETENTION_DAYS overrides it) and into the
+  # nightly `sentry cleanup --days`, so both stay at 30 days
+  cleanup:
+    enabled: true
+    days: 30
+    logLevel: WARNING
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    # The default 100 s ends a cleanup of a busy month halfway
+    activeDeadlineSeconds: 3600
+    concurrencyPolicy: Forbid
   features:
     # Replays record page content and can capture card data
     enableSessionReplay: false
@@ -96,7 +107,6 @@ ingress:
 # Data scrubbing for card data is set per organization (see README.md and pii-config.json); sensitive defaults of the server
 config:
   sentryConfPy: |
-    SENTRY_OPTIONS["system.event-retention-days"] = 30
     SENTRY_OPTIONS["auth.allow-registration"] = False
     SENTRY_OPTIONS["sentry:require-scrub-defaults"] = True
     SENTRY_OPTIONS["sentry:require-scrub-data"] = True

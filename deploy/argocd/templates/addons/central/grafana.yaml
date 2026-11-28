@@ -28,7 +28,7 @@ spec:
           chart: grafana
           targetRevision: 10.5.15
           helm:
-            # Fixed release name: the Services (loki-gateway, tempo-distributor) are what the front door and Grafana address
+            # Fixed release name: the admin gateway routes to the Service grafana by name
             releaseName: grafana
             valueFiles:
               - $values/deploy/platform/grafana/values.yaml
@@ -40,6 +40,11 @@ spec:
                 value: 'http://vm-victoria-metrics-cluster-vmselect.victoria-metrics.svc:8481/select/0/prometheus'
               - name: env.ALERTMANAGER_URL
                 value: 'http://alertmanager-{{`{{ .name }}`}}.monitoring.svc:9093'
+              # The OpenSearch data source: VPC endpoint of the central domain, SigV4 in the region of the central cluster
+              - name: env.OPENSEARCH_URL
+                value: {{ printf "https://%s" ((.Values.central.opensearch | default dict).endpoint | default "") | quote }}
+              - name: env.AWS_REGION
+                value: {{ .Values.cluster.region | quote }}
               - name: grafana\.ini.server.root_url
                 value: {{ .Values.observability.grafanaUrl | quote }}
         # The dashboards (one ConfigMap per folder) and the ExternalSecrets of the admin login and the OIDC client

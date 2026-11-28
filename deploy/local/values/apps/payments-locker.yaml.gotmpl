@@ -1,0 +1,62 @@
+# The shared locker on the real payments-locker umbrella, plain secrets (no KMS) and plain PostgreSQL in kind
+{{- $v := .Values }}
+{{- $img := $v.images.locker }}
+{{- $reg := dir $img.repository }}
+global:
+  localCluster: true
+  registry: {{ ternary $v.registry $reg (eq $reg ".") }}
+  environment: dev
+  region: eu-central-1
+  dataCidrs: [10.244.0.0/16]
+  endpointCidrs: [10.96.0.0/16]
+
+locker:
+  image:
+    repository: {{ base $img.repository }}
+    {{- if $img.digest }}
+    digest: {{ $img.digest }}
+    {{- else }}
+    tag: {{ $img.tag | quote }}
+    {{- end }}
+  workload:
+    kind: Deployment
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+  container:
+    env:
+      RUN_ENV: development
+    resources:
+      requests: {cpu: 50m, memory: 96Mi}
+      limits: {memory: 256Mi}
+  scheduling:
+    nodePool: ""
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
+  serviceMonitor:
+    enabled: {{ $v.monitoring.enabled }}
+  securityGroupPolicy:
+    enabled: false
+  networkPolicy:
+    extraEgress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: payments-data
+        ports:
+          - {protocol: TCP, port: 5432}
+  config:
+    database:
+      host: postgres.payments-data.svc.cluster.local
+      pool_size: 5
+    secrets_management:
+      secrets_manager: no_encryption
+  postgresTls:
+    mode: disable
+    rootCert: /etc/ssl/certs/ca-certificates.crt
+
+# The locker schema comes from the schema Job of local-data (vendor/card-vault/migrations)
+locker-migrations:
+  enabled: false

@@ -132,6 +132,39 @@
         "tracesOtlpEndpoint": {
           "type": "string",
           "pattern": "^[a-z0-9.-]+:[0-9]+$"
+        },
+        "opensearch": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The central OpenSearch (shared-services); empty strings until infra has applied the domain",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$",
+              "description": "VPC endpoint host of the domain (output endpoint of infra/modules/opensearch)"
+            },
+            "dashboardsHost": {
+              "type": "string",
+              "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$",
+              "description": "central.opensearch.dashboards_host; the custom endpoint of the domain"
+            },
+            "caBundle": {
+              "type": "string",
+              "description": "base64 PEM of the CA that signs the custom endpoint certificate (the admin private CA, vault.ca_bundle)"
+            },
+            "logstashRoleArn": {
+              "type": "string",
+              "pattern": "^(arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+)?$"
+            },
+            "awsCidrs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9.]+/[0-9]{1,2}$"
+              },
+              "description": "Domain subnets and the STS interface endpoint, port 443"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -207,6 +240,11 @@
           "pattern": "^[0-9]+(s|m|h)$"
         }
       }
+    },
+    "imageRegistry": {
+      "type": "string",
+      "pattern": "^([a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)*)?$",
+      "description": "registry.ecr_prefix/ecr_repo_prefix of config/platform.yaml"
     }
   }
 }

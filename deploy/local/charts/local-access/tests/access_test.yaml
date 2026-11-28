@@ -1,0 +1,29 @@
+suite: local-access
+templates:
+  - issuer.yaml
+  - nodeports.yaml
+tests:
+  - it: signs with a CA under the production issuer name
+    template: issuer.yaml
+    documentSelector: {path: metadata.name, value: payments-ca}
+    asserts:
+      - equal:
+          path: spec.ca.secretName
+          value: pay-local-ca
+  - it: pins the edge to node port 30443
+    template: nodeports.yaml
+    documentSelector: {path: metadata.name, value: payments-edge-nodeport}
+    asserts:
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30443
+      - equal:
+          path: spec.selector["gateway.networking.k8s.io/gateway-name"]
+          value: payments-edge
+  - it: renders no entry point when the list is empty
+    template: nodeports.yaml
+    set:
+      entries: []
+    asserts:
+      - hasDocuments:
+          count: 0

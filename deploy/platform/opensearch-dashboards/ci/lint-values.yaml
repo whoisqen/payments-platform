@@ -1,0 +1,4 @@
+# Offline lint only; the add-on passes the real values
+host: logs.example.test
+endpoint: vpc-acme-logs-abc123.eu-central-1.es.amazonaws.com
+caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJ0ZXN0Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K

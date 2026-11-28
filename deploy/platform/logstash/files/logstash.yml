@@ -1,0 +1,14 @@
+# Mounted read-only from the ConfigMap; no setting comes from the environment, so the entrypoint leaves this file alone
+api.http.host: 0.0.0.0
+api.http.port: 9600
+path.data: /usr/share/logstash/data
+path.logs: /tmp/logstash
+config.reload.automatic: false
+log.format: json
+pipeline.ecs_compatibility: disabled
+queue.type: persisted
+queue.max_bytes: {{ .Values.pipeline.queueMaxBytes }}
+queue.checkpoint.writes: 1024
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: {{ .Values.pipeline.deadLetterQueueMaxBytes }}
+dead_letter_queue.storage_policy: drop_older

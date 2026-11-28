@@ -1,0 +1,47 @@
+{{- if .Values.gateway.enabled }}
+# Internal NLB of the node collectors of every environment (through the transit gateway); TLS passes through to Logstash
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  listeners:
+    - name: otlp
+      port: {{ .Values.gateway.port }}
+      protocol: TLS
+      hostname: {{ .Values.gateway.hostname | quote }}
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: TLSRoute
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: TLSRoute
+metadata:
+  name: logstash
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name }}
+      sectionName: otlp
+  hostnames:
+    - {{ .Values.gateway.hostname | quote }}
+  rules:
+    - backendRefs:
+        - name: logstash
+          port: {{ .Values.input.port }}
+{{- end }}

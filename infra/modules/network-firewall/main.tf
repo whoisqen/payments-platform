@@ -4,7 +4,7 @@ locals {
   az_index     = { for i, id in var.nat_subnet_ids : tostring(i) => id }
 
   # Pass-only rules (no generated drop), so the CI allowlist after them still decides every other domain of these sources.
-  ci_trusted_rules = join("\n", [for i, d in var.ci_trusted_domains : startswith(d, ".") ?
+  ci_trusted_rules = join("\n", [for i, d in concat(var.ci_trusted_domains, var.platform_domains) : startswith(d, ".") ?
     "pass tls $HOME_NET any -> $EXTERNAL_NET 443 (tls.sni; dotprefix; content:\"${d}\"; nocase; endswith; flow:to_server,established; msg:\"ci trusted ${d}\"; sid:${920001 + i}; rev:1;)" :
     "pass tls $HOME_NET any -> $EXTERNAL_NET 443 (tls.sni; content:\"${d}\"; nocase; startswith; endswith; flow:to_server,established; msg:\"ci trusted ${d}\"; sid:${920001 + i}; rev:1;)"
   ])

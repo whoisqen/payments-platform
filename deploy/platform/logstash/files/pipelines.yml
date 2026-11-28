@@ -1,0 +1,4 @@
+- pipeline.id: otlp-logs
+  path.config: /usr/share/logstash/pipeline/otlp-logs.conf
+  pipeline.workers: {{ .Values.pipeline.workers }}
+  pipeline.batch.size: {{ .Values.pipeline.batchSize }}

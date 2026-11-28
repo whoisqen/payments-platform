@@ -1,0 +1,755 @@
+rule_files:
+- ../../alerts/data/logs.yaml
+evaluation_interval: 1m
+tests:
+- interval: 1m
+  external_labels: &id001
+    runbook_base_url: https://git.example.test/acme/platform/blob/main
+    grafana_url: https://grafana.example.test
+  input_series:
+  - series: aws_es_cluster_statusred_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogsOpenSearchClusterRed
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-cluster-red
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: 'The central OpenSearch is red: at least one primary shard is unassigned'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-cluster-red
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cluster_statusred_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 0x9 1x3
+  alert_rule_test:
+  - eval_time: 12m
+    alertname: LogsOpenSearchClusterRed
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cluster_statusyellow_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchClusterYellow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-cluster-yellow
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: 'The central OpenSearch is yellow: replica shards are unassigned'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-cluster-yellow
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cluster_statusyellow_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 0x9 1x11
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchClusterYellow
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_shards_unassigned_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 3x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchUnassignedShards
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-unassigned-shards
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: The central OpenSearch has unassigned shards for 15 minutes
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/opensearch-shards.md
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_shards_unassigned_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchUnassignedShards
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_node_shards_total{cluster="logs",node="node-1"}
+    values: 950x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchShardsPerNodeHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-shards-per-node-high
+        node: node-1
+      exp_annotations:
+        summary: A data node of the central OpenSearch holds more than 900 shards (limit 1000)
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/opensearch-shards.md
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_node_shards_total{cluster="logs",node="node-1"}
+    values: 500x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchShardsPerNodeHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_jvmmemory_pressure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 85x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchJvmPressureHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-jvm-pressure-high
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: JVM memory pressure of the central OpenSearch is above 80%
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-jvm-pressure-high
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_jvmmemory_pressure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 70x9 85x11
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchJvmPressureHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_jvmmemory_pressure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 95x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogsOpenSearchJvmPressureCritical
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-jvm-pressure-critical
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: 'JVM memory pressure of the central OpenSearch is above 92%: writes are about to be blocked'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-jvm-pressure-critical
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_jvmmemory_pressure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 85x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogsOpenSearchJvmPressureCritical
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cpuutilization_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 90x40
+  alert_rule_test:
+  - eval_time: 35m
+    alertname: LogsOpenSearchCpuHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-cpu-high
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: CPU of the busiest central OpenSearch data node is above 80% for 30 minutes
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-cpu-high
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cpuutilization_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 50x19 90x21
+  alert_rule_test:
+  - eval_time: 40m
+    alertname: LogsOpenSearchCpuHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_free_storage_space_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1000x20
+  - series: aws_es_cluster_used_space_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 9000x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsOpenSearchStorageLow
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-storage-low
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: The central OpenSearch has less than 20% free storage
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-storage-low
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_free_storage_space_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 5000x20
+  - series: aws_es_cluster_used_space_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 5000x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsOpenSearchStorageLow
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cluster_index_writes_blocked_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogsOpenSearchIndexWritesBlocked
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-index-writes-blocked
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: 'The central OpenSearch blocks writes: log ingestion fails'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-index-writes-blocked
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_cluster_index_writes_blocked_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 0x9 1x3
+  alert_rule_test:
+  - eval_time: 12m
+    alertname: LogsOpenSearchIndexWritesBlocked
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_5xx_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 50x20
+  - series: aws_es_open_search_requests_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1000x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsOpenSearchServerErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-server-errors
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: More than 1% of the requests to the central OpenSearch end with 5xx
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-server-errors
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_5xx_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 5x20
+  - series: aws_es_open_search_requests_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1000x20
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsOpenSearchServerErrors
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_threadpool_write_rejected_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 0+10x30
+  alert_rule_test:
+  - eval_time: 25m
+    alertname: LogsOpenSearchThrottled
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-throttled
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: The central OpenSearch rejects writes or its EBS volumes are throttled
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-throttled
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_iops_throttle_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 25m
+    alertname: LogsOpenSearchThrottled
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-throttled
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: The central OpenSearch rejects writes or its EBS volumes are throttled
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-throttled
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_threadpool_write_rejected_sum{domain_name="pay-shared-services-euc1-logs"}
+    values: 100x30
+  - series: aws_es_throughput_throttle_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: '0x30'
+  - series: aws_es_iops_throttle_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 25m
+    alertname: LogsOpenSearchThrottled
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_automated_snapshot_failure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchSnapshotFailing
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-open-search-snapshot-failing
+        domain_name: pay-shared-services-euc1-logs
+      exp_annotations:
+        summary: The automated snapshot of the central OpenSearch failed
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-open-search-snapshot-failing
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_es_automated_snapshot_failure_maximum{domain_name="pay-shared-services-euc1-logs"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsOpenSearchSnapshotFailing
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_osis_opensearch_document_errors_count_sum{pipeline_name="pay-audit-cloudtrail"}
+    values: 0x5 12x25
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsAuditIngestionErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-audit-ingestion-errors
+        pipeline_name: pay-audit-cloudtrail
+      exp_annotations:
+        summary: The audit ingestion pipeline pay-audit-cloudtrail fails to read the log archive or to write to OpenSearch
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-audit-ingestion-errors
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_osis_s3_objects_failed_count_sum{pipeline_name="pay-audit-cloudtrail"}
+    values: 0x5 2x25
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsAuditIngestionErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-audit-ingestion-errors
+        pipeline_name: pay-audit-cloudtrail
+      exp_annotations:
+        summary: The audit ingestion pipeline pay-audit-cloudtrail fails to read the log archive or to write to OpenSearch
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-audit-ingestion-errors
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: aws_osis_opensearch_document_errors_count_sum{pipeline_name="pay-audit-cloudtrail"}
+    values: '0x30'
+  - series: aws_osis_opensearch_bulk_request_failed_count_sum{pipeline_name="pay-audit-cloudtrail"}
+    values: '0x30'
+  - series: aws_osis_s3_objects_failed_count_sum{pipeline_name="pay-audit-cloudtrail"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogsAuditIngestionErrors
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_indices_indexing_index_total{index=".ds-logs-app-prod-000001"}
+    values: 100x30
+  - series: elasticsearch_indices_indexing_index_total{index=".ds-logs-app-stage-000001"}
+    values: 0+50x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsIngestionStopped
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-ingestion-stopped
+        environment: prod
+      exp_annotations:
+        summary: No new documents reached logs-app-prod for 10 minutes
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-ingestion-stopped
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_indices_indexing_index_total{index=".ds-logs-app-cde-prod-000002"}
+    values: 100x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsIngestionStopped
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: opensearch
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logs-ingestion-stopped
+        environment: cde-prod
+      exp_annotations:
+        summary: No new documents reached logs-app-cde-prod for 10 minutes
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logs-opensearch.md#logs-ingestion-stopped
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: elasticsearch_indices_indexing_index_total{index=".ds-logs-app-prod-000001"}
+    values: 0+50x30
+  - series: elasticsearch_indices_indexing_index_total{index=".ds-logs-app-unknown-000001"}
+    values: 3x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogsIngestionStopped
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_events_in{pod="logstash-0",pipeline="otlp-logs"}
+    values: 0+100x30
+  - series: logstash_stats_pipeline_events_out{pod="logstash-0",pipeline="otlp-logs"}
+    values: 500x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogstashPipelineStalled
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-pipeline-stalled
+        pod: logstash-0
+        pipeline: otlp-logs
+      exp_annotations:
+        summary: Logstash pipeline otlp-logs on logstash-0 receives events but sends none
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-pipeline-stalled
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_events_in{pod="logstash-0",pipeline="otlp-logs"}
+    values: 0+100x30
+  - series: logstash_stats_pipeline_events_out{pod="logstash-0",pipeline="otlp-logs"}
+    values: 0+100x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogstashPipelineStalled
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_events_in{pod="logstash-0",pipeline="otlp-logs"}
+    values: 500x30
+  - series: logstash_stats_pipeline_events_out{pod="logstash-0",pipeline="otlp-logs"}
+    values: 500x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: LogstashPipelineStalled
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_queue_events_queue_size{pod="logstash-0",pipeline="otlp-logs"}
+    values: 600x30
+  - series: logstash_stats_pipeline_queue_max_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1000x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashQueueBacklogHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-queue-backlog-high
+        pod: logstash-0
+        pipeline: otlp-logs
+      exp_annotations:
+        summary: The persistent queue of Logstash is more than half full
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-queue-backlog-high
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_queue_events_queue_size{pod="logstash-0",pipeline="otlp-logs"}
+    values: 100x30
+  - series: logstash_stats_pipeline_queue_max_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1000x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashQueueBacklogHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_queue_events_queue_size{pod="logstash-0",pipeline="otlp-logs"}
+    values: 900x20
+  - series: logstash_stats_pipeline_queue_max_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1000x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogstashQueueNearlyFull
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-queue-nearly-full
+        pod: logstash-0
+        pipeline: otlp-logs
+      exp_annotations:
+        summary: 'The persistent queue of Logstash is more than 80% full: inputs are about to be blocked'
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-queue-nearly-full
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_queue_events_queue_size{pod="logstash-0",pipeline="otlp-logs"}
+    values: 600x20
+  - series: logstash_stats_pipeline_queue_max_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1000x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogstashQueueNearlyFull
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_dead_letter_queue_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1+100x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashDeadLetterQueueEntries
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-dead-letter-queue-entries
+        pod: logstash-0
+        pipeline: otlp-logs
+      exp_annotations:
+        summary: Logstash writes events to its dead letter queue
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-dead-letter-queue-entries
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_dead_letter_queue_size_in_bytes{pod="logstash-0",pipeline="otlp-logs"}
+    values: 1x30
+  - series: logstash_stats_pipeline_dead_letter_queue_dropped_events{pod="logstash-0",pipeline="otlp-logs"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashDeadLetterQueueEntries
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_plugin_bulk_requests_errors{pod="logstash-0",pipeline="otlp-logs",plugin_type="output",plugin="opensearch",plugin_id="opensearch"}
+    values: 0+1x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashOutputErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-output-errors
+        pod: logstash-0
+        pipeline: otlp-logs
+        plugin_id: opensearch
+      exp_annotations:
+        summary: The OpenSearch output of Logstash has bulk request errors or rejected documents
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-output-errors
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_pipeline_plugin_bulk_requests_errors{pod="logstash-0",pipeline="otlp-logs",plugin_type="output",plugin="opensearch",plugin_id="opensearch"}
+    values: 5x30
+  - series: logstash_stats_pipeline_plugin_documents_non_retryable_failures{pod="logstash-0",pipeline="otlp-logs",plugin_type="output",plugin="opensearch",plugin_id="opensearch"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashOutputErrors
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_jvm_mem_heap_used_percent{pod="logstash-0"}
+    values: 90x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashJvmHeapHigh
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-jvm-heap-high
+        pod: logstash-0
+      exp_annotations:
+        summary: JVM heap of a Logstash pod is above 85%
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-jvm-heap-high
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: logstash_stats_jvm_mem_heap_used_percent{pod="logstash-0"}
+    values: 60x30
+  alert_rule_test:
+  - eval_time: 20m
+    alertname: LogstashJvmHeapHigh
+    exp_alerts: []
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: kube_statefulset_replicas{namespace="monitoring",statefulset="logstash"}
+    values: 3x20
+  - series: kube_statefulset_status_replicas_ready{namespace="monitoring",statefulset="logstash"}
+    values: 2x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogstashPodDown
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        team: observability
+        service: logstash
+        owner: observability-oncall
+        layer: data
+        failure_mode: data-logstash-pod-down
+      exp_annotations:
+        summary: At least one Logstash pod is not ready
+        runbook_url: https://git.example.test/acme/platform/blob/main/docs/runbooks/data/logstash.md#logstash-pod-down
+        dashboard_url: https://grafana.example.test/d/logs
+- interval: 1m
+  external_labels: *id001
+  input_series:
+  - series: kube_statefulset_replicas{namespace="monitoring",statefulset="logstash"}
+    values: 3x20
+  - series: kube_statefulset_status_replicas_ready{namespace="monitoring",statefulset="logstash"}
+    values: 3x20
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: LogstashPodDown
+    exp_alerts: []

@@ -169,6 +169,15 @@ resource "aws_iam_role_policy" "function" {
   })
 }
 
+# Created ahead of the function, which would otherwise create its group without a retention.
+resource "aws_cloudwatch_log_group" "function" {
+  count = var.image_uri == null ? 0 : 1
+
+  name              = "/aws/lambda/${local.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
 resource "aws_lambda_function" "copy" {
   # checkov:skip=CKV_AWS_116: the automation step is the only caller and reports the failure; a dead-letter queue would hide it
   # checkov:skip=CKV_AWS_173: the environment holds endpoints and secret ARNs, no secret values
@@ -197,6 +206,8 @@ resource "aws_lambda_function" "copy" {
   tracing_config {
     mode = "Active"
   }
+
+  depends_on = [aws_cloudwatch_log_group.function]
 
   tags = var.tags
 }

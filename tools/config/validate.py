@@ -63,6 +63,14 @@ def check(cfg):
     for key in ("metrics_remote_write_url", "alertmanager_url", "sentry_url"):
         if central.get(key) and not str(central[key]).startswith("https://"):
             errors.append(f"`central.{key}` must be an https:// URL")
+    domain = str((central.get("opensearch") or {}).get("domain_name", ""))
+    # Amazon OpenSearch Service: 3 to 28 characters, lower-case letter first, then lower-case letters, digits and hyphens
+    if not re.match(r"^[a-z][a-z0-9-]{2,27}$", domain):
+        errors.append("`central.opensearch.domain_name` must be 3 to 28 lower-case letters, digits or hyphens, starting with a letter")
+    if not str(central.get("sentry_slack_channel", "")).startswith("#"):
+        errors.append("`central.sentry_slack_channel` must be a Slack channel name starting with #")
+    if not re.match(r"^(REPLACE_[A-Z_]+|[A-Z0-9]{9,12})$", str(central.get("sentry_slack_workspace_id", ""))):
+        errors.append("`central.sentry_slack_workspace_id` must be the Slack workspace id (for example T0123ABCD)")
     if central.get("dedup_interval") and not re.match(r"^[0-9]+(s|m)$", str(central["dedup_interval"])):
         errors.append("`central.dedup_interval` must look like 30s")
     nets = {}

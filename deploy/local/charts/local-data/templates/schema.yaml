@@ -1,0 +1,120 @@
+{{- $s := .Values.schema }}
+{{- if or $s.hyperswitch $s.locker }}
+{{- $ctx := dict "root" . "name" "schema" }}
+{{- $sets := list }}
+{{- if $s.hyperswitch }}{{ $sets = append $sets (dict "name" "hyperswitch" "db" "hyperswitch" "user" "hs_migrator" "password" "HS_MIGRATOR_PASSWORD") }}{{ end }}
+{{- if $s.locker }}{{ $sets = append $sets (dict "name" "card-vault" "db" "locker" "user" "locker_migrator" "password" "LOCKER_MIGRATOR_PASSWORD") }}{{ end }}
+{{- range $sets }}
+{{- $dir := printf "files/%s" .name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: schema-{{ .name }}
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation
+# One key per migration: <version>.sql is up.sql, <version>.notx marks run_in_transaction = false
+data:
+  {{- range $path, $_ := $.Files.Glob (printf "%s/*/up.sql" $dir) }}
+  {{- $v := base (dir $path) }}
+  {{ $v }}.sql: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- if regexMatch "(?m)^run_in_transaction *= *false" ($.Files.Get (printf "%s/%s/metadata.toml" $dir $v)) }}
+  {{ $v }}.notx: "true"
+  {{- end }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: schema-script
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+  migrate.sh: |
+    {{- .Files.Get "files/migrate.sh" | nindent 4 }}
+  # Rebuilds the <version>/up.sql layout migrate.sh reads, then applies each set as the role that owns its database
+  run.sh: |
+    set -euo pipefail
+    until pg_isready -h "$PGHOST" -U postgres -q; do sleep 2; done
+    {{- range $sets }}
+    mkdir -p /tmp/{{ .name }}
+    for f in /src/{{ .name }}/*.sql; do
+      v=$(basename "$f" .sql)
+      mkdir -p "/tmp/{{ .name }}/$v"
+      cp "$f" "/tmp/{{ .name }}/$v/up.sql"
+      if [ -f "/src/{{ .name }}/$v.notx" ]; then echo "run_in_transaction = false" > "/tmp/{{ .name }}/$v/metadata.toml"; fi
+    done
+    PGUSER={{ .user }} PGPASSWORD="${{ .password }}" bash /scripts/migrate.sh {{ .db }}=/tmp/{{ .name }}
+    {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: schema
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+  annotations:
+    # After the StatefulSets are ready (helm --wait); idempotent, every upgrade applies only new migrations
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "local-data.labels" $ctx | nindent 8 }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: schema
+          image: {{ .Values.image.postgres | quote }}
+          command: ["bash", "/scripts/run.sh"]
+          env:
+            - {name: PGHOST, value: postgres}
+            {{- range $sets }}
+            - name: {{ .password }}
+              valueFrom:
+                secretKeyRef: {name: postgres-credentials, key: {{ .password }}}
+            {{- end }}
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            {{- include "local-data.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            {{- range $sets }}
+            - {name: {{ .name }}, mountPath: /src/{{ .name }}, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: scripts
+          configMap:
+            name: schema-script
+        - name: tmp
+          emptyDir: {}
+        {{- range $sets }}
+        - name: {{ .name }}
+          configMap:
+            name: schema-{{ .name }}
+        {{- end }}
+{{- end }}

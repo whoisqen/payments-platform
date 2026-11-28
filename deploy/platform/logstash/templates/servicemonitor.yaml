@@ -1,0 +1,19 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: logstash
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    matchLabels:
+      {{- include "logstash.selectorLabels" . | nindent 6 }}
+  endpoints:
+    # logstash-exporter sidecar: pipeline events in and out, queue and DLQ sizes, plugin failures, JVM heap
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

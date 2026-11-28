@@ -10,7 +10,14 @@ TITLES = {
     "locker": "L1 Locker (RED, CDE)", "drainer": "L1 Drainer (write-behind)", "scheduler": "L1 Scheduler (sync and webhooks)", "cells": "L2 Cells",
     "kubernetes": "L2 Kubernetes (USE)", "data-stores": "L3 Data stores", "backup": "L3 Backup and restore", "dr-switch": "L3 DR switch readiness",
     "edge": "L3 Edge and security", "cost": "FinOps: unit cost and spend", "slow-requests": "L1 Slow requests",
+    "logs": "L3 Logs (OpenSearch and Logstash)",
 }
+# The central log stack runs in shared-services: its series carry env="shared-services" whatever environment is selected.
+CENTRAL = 'env=~"shared-services|$env"'
+LOGSTASH_STS = 'namespace="monitoring",statefulset="logstash"'
+APP_INDEX = 'index=~".*logs-app-.+-[0-9]+"'
+# The environment of a logs-app-<env> data stream, from the name of its backing index
+INDEX_ENV = '"environment", "$1", "index", ".*logs-app-(.+)-[0-9]+"'
 # cAdvisor also exports a pod-level series with an empty container; counting it doubles the use.
 CADVISOR_CONTAINERS = 'container!="",container!="POD"'
 
@@ -341,8 +348,8 @@ def build_all():
     d.ts("nodes: clock offset (top 8 nodes), s", [(top(f'max by (node) (abs(node_timex_offset_seconds{{{F}}}))'), "{{node}}")], "s", thr=steps(T.CLOCK_DRIFT_S), decimals=3)
     out.append(("l2-platform", d))
 
-    d = Dashboard("data-stores", TITLES["data-stores"], "l3", ["data"], links=nav("platform-overview", "cells", "backup"), runbooks=["data"],
-                  description="Aurora, MemoryDB, ClickHouse, Kafka, DynamoDB and OpenSearch: where exactly is the bottleneck in the data tier?")
+    d = Dashboard("data-stores", TITLES["data-stores"], "l3", ["data"], links=nav("platform-overview", "cells", "backup", "logs"), runbooks=["data"],
+                  description="Aurora, MemoryDB, ClickHouse, Kafka and DynamoDB: where exactly is the bottleneck in the data tier?")
     conn = "100 * " + ratio(f'sum by (cell, instance) (pg_stat_database_numbackends{{{FC}}})', f'max by (cell, instance) (pg_settings_max_connections{{{FC}}})')
     mem = f'100 * max by (cell, instance) (redis_memory_used_bytes{{{FC}}} / redis_memory_max_bytes{{{FC}}})'
     kafka = f'sum by (consumergroup, topic) (kafka_consumergroup_lag{{{F}}})'
@@ -352,7 +359,6 @@ def build_all():
     d.stat("memorydb: worst memory use", f"max({mem})", "percent", hi=100, thr=steps(T.MEMORYDB_MEM_WARN * 100, T.MEMORYDB_MEM_CRIT * 100))
     d.stat("memorydb: evicted keys, 15 min", f'sum(increase(redis_evicted_keys_total{{{FC}}}[15m])) or vector(0)', "short", thr=steps(None, 1), desc="Any eviction is a fault: the policy is noeviction.")
     d.stat("kafka: worst consumer lag", f"max({kafka})", "short", thr=steps(T.KAFKA_LAG))
-    d.stat("opensearch: domains in red", f'count(max by (domain_name) (aws_es_cluster_statusred_maximum{{{F}}}) >= 1) or vector(0)', "short", thr=steps(None, 1))
     d.row("Aurora")
     d.ts("aurora: connections, % of the limit (top 8)", [(top(conn), "{{cell}} {{instance}}")], "percent", hi=100, thr=steps(T.AURORA_CONNECTIONS_RATIO * 100))
     d.ts("aurora: replica lag by cell, ms", [(f'max by (cell) (aws_rds_aurora_replica_lag_maximum{{{FC}}})', "{{cell}}")], "ms", thr=steps(T.AURORA_REPLICA_LAG_MS))
@@ -366,13 +372,63 @@ def build_all():
          desc="Any eviction is a fault: the policy is noeviction.")
     stream_ts(d)
     drain_lag_ts(d)
-    d.row("ClickHouse, Kafka, DynamoDB, OpenSearch")
+    d.row("ClickHouse, Kafka, DynamoDB")
     d.ts("clickhouse: replication delay by cluster, s", [(f'max by (cluster) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{{{F}}})', "{{cluster}}")], "s", thr=steps(T.CLICKHOUSE_DELAY_S))
     d.ts("clickhouse: free disk (lowest 8), %", [(bottom(f'100 * min by (cluster, instance) (ClickHouseAsyncMetrics_DiskAvailable_default{{{F}}} / ClickHouseAsyncMetrics_DiskTotal_default{{{F}}})'),
                                                   "{{cluster}} {{instance}}")], "percent", hi=100, thr=steps(T.CLICKHOUSE_DISK_FREE_RATIO * 100, invert=True))
     d.ts("kafka: consumer group lag (top 8), messages", [(top(kafka), "{{consumergroup}} {{topic}}")], "short", thr=steps(T.KAFKA_LAG))
     d.ts("dynamodb: throttled requests per second (top 8 tables)", [(top(f'sum by (table_name) (rate(aws_dynamodb_throttled_requests_sum{{{F}}}[5m]))'), "{{table_name}}")], "ops")
-    d.ts("opensearch: cluster status red, 1 = red", [(f'max by (domain_name) (aws_es_cluster_statusred_maximum{{{F}}})', "{{domain_name}}")], "short", hi=1, thr=steps(None, 1))
+    out.append(("l3-data", d))
+
+    d = Dashboard("logs", TITLES["logs"], "l3", ["logs", "opensearch", "logstash"], links=nav("platform-overview", "data-stores", "kubernetes"), runbooks=["data"],
+                  description="Do the logs of every environment arrive, and is the central OpenSearch healthy? Collectors -> Logstash -> OpenSearch (shared-services).")
+    status = f'2 * max(aws_es_cluster_statusred_maximum{{{CENTRAL}}}) + max(aws_es_cluster_statusyellow_maximum{{{CENTRAL}}})'
+    free = "100 * " + ratio(f'sum by (domain_name) (aws_es_free_storage_space_sum{{{CENTRAL}}})',
+                            f'(sum by (domain_name) (aws_es_free_storage_space_sum{{{CENTRAL}}}) + sum by (domain_name) (aws_es_cluster_used_space_maximum{{{CENTRAL}}}))')
+    # logstash-exporter v1.x puts queue.queue_size_in_bytes into queue_events_queue_size: bytes over bytes
+    queue = "100 * " + ratio(f'max by (pod) (logstash_stats_pipeline_queue_events_queue_size{{{CENTRAL}}})', f'max by (pod) (logstash_stats_pipeline_queue_max_size_in_bytes{{{CENTRAL}}})')
+    indexed = f'sum by (environment) (label_replace(rate(elasticsearch_indices_indexing_index_total{{{CENTRAL},{APP_INDEX}}}[5m]), {INDEX_ENV}))'
+    d.row("Overview")
+    d.stat("opensearch: cluster status", status, "short", hi=2, thr=steps(1, 2),
+           mappings=[{"type": "value", "options": {"0": {"text": "green", "color": "green", "index": 0}, "1": {"text": "yellow", "color": "yellow", "index": 1},
+                                                   "2": {"text": "red", "color": "red", "index": 2}}}], desc="Red pages; yellow for 15 minutes opens a ticket.")
+    d.stat("opensearch: JVM pressure", f'max(aws_es_jvmmemory_pressure_maximum{{{CENTRAL}}})', "percent", hi=100, thr=steps(T.OS_JVM_WARN_PCT, T.OS_JVM_CRIT_PCT),
+           desc="Writes are blocked at 92%.")
+    d.stat("opensearch: free storage", f"min({free})", "percent", hi=100, thr=steps(T.OS_FREE_PCT, invert=True))
+    d.stat("logs: $env documents, 10 min", f'sum(increase(elasticsearch_indices_indexing_index_total{{{CENTRAL},index=~".*logs-app-$env-[0-9]+"}}[10m])) or vector(0)', "short",
+           thr=steps(None, 1, invert=True), desc="Documents written to logs-app-<env> of the selected environment; 0 pages as LogsIngestionStopped.")
+    d.stat("logstash: worst queue fill", f"max({queue})", "percent", hi=100, thr=steps(T.LOGSTASH_QUEUE_WARN * 100, T.LOGSTASH_QUEUE_CRIT * 100))
+    d.stat("logstash: pods not ready", f'max(kube_statefulset_replicas{{{CENTRAL},{LOGSTASH_STS}}}) - max(kube_statefulset_status_replicas_ready{{{CENTRAL},{LOGSTASH_STS}}})',
+           "short", thr=steps(1))
+    d.row("Ingestion")
+    d.ts("logs: documents indexed per second by environment", [(indexed, "{{environment}}")], "ops", desc="Writes to the logs-app-<env> data streams, from the backing index counters.")
+    d.ts("logstash: events in and out per second by pipeline", [(f'sum by (pipeline) (rate(logstash_stats_pipeline_events_in{{{CENTRAL}}}[5m]))', "{{pipeline}} in"),
+                                                              (f'sum by (pipeline) (rate(logstash_stats_pipeline_events_out{{{CENTRAL}}}[5m]))', "{{pipeline}} out")], "ops",
+         desc="Out flat while in grows is LogstashPipelineStalled.")
+    d.row("Logstash")
+    d.ts("logstash: persistent queue fill (top 8 pods), %", [(top(queue), "{{pod}}")], "percent", hi=100, thr=steps(T.LOGSTASH_QUEUE_WARN * 100, T.LOGSTASH_QUEUE_CRIT * 100))
+    d.ts("logstash: dead letter queue size (top 8 pods)", [(top(f'max by (pod) (logstash_stats_pipeline_dead_letter_queue_size_in_bytes{{{CENTRAL}}})'), "{{pod}}")], "bytes",
+         desc="Rejected documents; any growth opens a ticket.")
+    d.ts("logstash: OpenSearch output errors per second by pipeline", [(f'sum by (pipeline) (rate(logstash_stats_pipeline_plugin_bulk_requests_errors{{{CENTRAL},plugin_type="output"}}[5m]))', "{{pipeline}} bulk errors"),
+                                                                     (f'sum by (pipeline) (rate(logstash_stats_pipeline_plugin_documents_non_retryable_failures{{{CENTRAL},plugin_type="output"}}[5m]))',
+                                                                      "{{pipeline}} rejected documents")], "ops",
+         desc="Any error or rejected document raises LogstashOutputErrors; rejected documents go to the dead letter queue.")
+    d.ts("logstash: JVM heap (top 8 pods), %", [(top(f'max by (pod) (logstash_stats_jvm_mem_heap_used_percent{{{CENTRAL}}})'), "{{pod}}")], "percent", hi=100, thr=steps(T.LOGSTASH_HEAP_PCT))
+    d.row("OpenSearch")
+    d.ts("opensearch: cluster status, 1 = set", [(f'max by (domain_name) (aws_es_cluster_statusred_maximum{{{CENTRAL}}})', "{{domain_name}} red"),
+                                                  (f'max by (domain_name) (aws_es_cluster_statusyellow_maximum{{{CENTRAL}}})', "{{domain_name}} yellow")], "short", hi=1)
+    d.ts("opensearch: unassigned shards", [(f'max by (domain_name) (aws_es_shards_unassigned_maximum{{{CENTRAL}}})', "{{domain_name}}")], "short", thr=steps(1))
+    d.ts("opensearch: JVM memory pressure, %", [(f'max by (domain_name) (aws_es_jvmmemory_pressure_maximum{{{CENTRAL}}})', "{{domain_name}}")], "percent", hi=100,
+         thr=steps(T.OS_JVM_WARN_PCT, T.OS_JVM_CRIT_PCT))
+    d.ts("opensearch: CPU of the busiest data node, %", [(f'max by (domain_name) (aws_es_cpuutilization_maximum{{{CENTRAL}}})', "{{domain_name}}")], "percent", hi=100, thr=steps(T.OS_CPU_PCT))
+    d.ts("opensearch: free storage, %", [(free, "{{domain_name}}")], "percent", hi=100, thr=steps(T.OS_FREE_PCT, invert=True))
+    d.ts("opensearch: shards per data node (top 8)", [(top(f'max by (node) (elasticsearch_node_shards_total{{{CENTRAL}}})'), "{{node}}")], "short", thr=steps(T.OS_SHARDS_PER_NODE),
+         desc="The service limit is 1000 shards per data node; see the shard operations runbook.")
+    d.ts("opensearch: write rejections and 5xx per minute", [(f'max by (domain_name) (delta(aws_es_threadpool_write_rejected_sum{{{CENTRAL}}}[10m])) / 10', "{{domain_name}} write rejections"),
+                                                            (f'sum by (domain_name) (aws_es_5xx_sum{{{CENTRAL}}})', "{{domain_name}} 5xx")], "short")
+    d.ts("opensearch: writes blocked and snapshot failure, 1 = set", [(f'max by (domain_name) (aws_es_cluster_index_writes_blocked_maximum{{{CENTRAL}}})', "{{domain_name}} writes blocked"),
+                                                                     (f'max by (domain_name) (aws_es_automated_snapshot_failure_maximum{{{CENTRAL}}})', "{{domain_name}} snapshot failed")],
+         "short", hi=1)
     out.append(("l3-data", d))
 
     d = Dashboard("backup", TITLES["backup"], "l3", ["backup", "dr"], links=nav("platform-overview", "data-stores", "dr-switch"), runbooks=["backup-dr"], time=("now-7d", "5m"),

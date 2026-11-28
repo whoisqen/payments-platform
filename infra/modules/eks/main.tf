@@ -316,9 +316,13 @@ resource "aws_launch_template" "bootstrap" {
 
   vpc_security_group_ids = [aws_security_group.node.id, aws_eks_cluster.this.vpc_config[0].cluster_security_group_id]
 
+  # Same container log rotation as the Karpenter node class; EKS merges its own [settings.kubernetes] keys with these.
   user_data = base64encode(<<-EOT
     [settings.kernel]
     lockdown = "integrity"
+    [settings.kubernetes]
+    container-log-max-size = "${var.container_log_max_size}"
+    container-log-max-files = ${var.container_log_max_files}
     [settings.host-containers.admin]
     enabled = false
   EOT

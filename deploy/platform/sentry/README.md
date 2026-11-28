@@ -28,6 +28,13 @@ Create one organization and one project per service (router, drainer, scheduler,
 
 Hyperswitch (`vendor/`) is not changed: it needs the Sentry SDK enabled in its code or through a setting of its own, if the release has one; until then the DSN secrets are unused.
 
+## Retention
+
+- Events: 30 days. `sentry.cleanup.days` sets `system.event-retention-days` (the chart lets `SENTRY_EVENT_RETENTION_DAYS` override it) and the nightly `sentry cleanup --days 30` CronJob.
+- Filestore: `cleanerfs` stays off. The chart warns that some files of the main filestore must never be deleted; event attachments go with their events through the cleanup above.
+- ClickHouse: the server logs to stdout only, and the system log tables (`query_log`, `part_log`, `trace_log`, `metric_log` and the like) keep 7 days (`configdFiles` in `clickhouse-values.yaml`). The chart's ClickHouse cleanup job stays off because the chart marks it not ready for production. The first start after a TTL change renames each old system table to `<name>_0`; drop those once.
+- Kafka logs to stdout (the chart's log4j default).
+
 ## Not covered
 
 Ingress class, TLS issuer and a shared `ReadWriteMany` storage class (`efs`) for the filestore are assumed for the central cluster. Images are the chart's tags, not digests. PostgreSQL and Redis replicas give read copies, not automatic failover.

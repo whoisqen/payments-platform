@@ -1,0 +1,16 @@
+{{- range .Values.namespaces }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    {{- if .mesh }}
+    istio-injection: enabled
+    {{- end }}
+  annotations:
+    # Kept on uninstall of this release so the data of the other releases survives a re-run
+    helm.sh/resource-policy: keep
+{{- end }}

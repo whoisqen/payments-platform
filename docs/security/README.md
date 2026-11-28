@@ -7,7 +7,7 @@ This page lists the controls of the platform, grouped by what they protect, and 
 - **Only the locker holds a PAN.** Every other component sees a token. The locker encrypts each record with keys protected by its own KMS key, which only the locker role may use. CVV is never stored.
 - **Small CDE.** Router, locker, drainer, scheduler and their stores make up the CDE; every resource carries a `pci-scope` tag. The organization layout gives the CDE its own OU (`Workloads/CDE`) with a resource control policy. Analytics runs on its own cluster, and the control center, CI and monitoring sit outside the CDE.
 - **Isolation inside a cluster.** CDE workloads run on their own tainted On-Demand node pool, the locker pods have their own pod security group, NetworkPolicies deny by default, and Istio requires mTLS (PeerAuthentication STRICT). The locker accepts only the router identity.
-- **No card data in telemetry.** `Secret<T>` in Rust code, Semgrep rule `no-pan-logging`, the OpenTelemetry collector in each cluster deletes and masks card fields before data leaves, Sentry scrubs on three layers, and Macie scans the S3 buckets of the CDE accounts every day.
+- **No card data in telemetry.** `Secret<T>` in Rust code, Semgrep rule `no-pan-logging`, the OpenTelemetry collector in each cluster deletes and masks card fields before data leaves, the central Logstash masks PAN-like numbers again before OpenSearch, Sentry scrubs on three layers, and Macie scans the S3 buckets of the CDE accounts every day.
 - **Evidence.** AWS Config runs the PCI DSS v4 conformance pack in every account; Security Hub runs PCI DSS v4.0.1, AWS FSBP and CIS v3.0.0.
 
 ## Zero trust
@@ -53,7 +53,7 @@ From `policy/scp/`: allowed regions only; CloudTrail, Config and GuardDuty canno
 ## Detection and incident response
 
 - GuardDuty in every account with S3, EKS audit logs, EBS malware protection, RDS login events, Lambda network logs and EKS Runtime Monitoring.
-- Organization CloudTrail and Config to the log-archive bucket under Object Lock (compliance mode, 365 days).
+- Organization CloudTrail and Config to the log-archive bucket under Object Lock (compliance mode, 365 days). OpenSearch Ingestion copies CloudTrail and EKS audit into `logs-audit` of the central log domain for search (365 days); members of the Okta security group read it in OpenSearch Dashboards ([logging](../architecture/runtime/logging.md)).
 - Security alerts in `observability/alerts/security-pci/` go to the security channel. Each has a runbook in `docs/runbooks/security-pci/`: root account login, break-glass role used, IAM change outside Terraform, SCP changed, GuardDuty high and CDE runtime findings, PAN found in logs, Vault sealed, Vault audit device failing.
 - Response: the on-call engineer acknowledges, follows the runbook and adds the incident commander. Evidence stays in the locked log archive. A postmortem goes to `docs/postmortems/`.
 

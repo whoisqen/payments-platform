@@ -19,9 +19,9 @@ BASE64_BLOB = re.compile(r"^\s*[A-Za-z0-9+/_-]{32,}={0,2}\s*$")
 LEVELS = ["debug", "info", "warn", "error", "fatal"]
 
 TOOL_SPECS = {
-    "query_logs": ("Search recent logs of one allowed namespace in Loki or CloudWatch Logs. Returns deduplicated templates with counts.", {
-        "source": {"type": "string", "enum": ["loki", "cloudwatch"]},
-        "namespace": {"type": "string", "description": "loki only; one of the allowed namespaces"},
+    "query_logs": ("Search recent logs of one allowed namespace in the central OpenSearch or CloudWatch Logs. Returns deduplicated templates with counts.", {
+        "source": {"type": "string", "enum": ["opensearch", "cloudwatch"]},
+        "namespace": {"type": "string", "description": "opensearch only; one of the allowed namespaces"},
         "app": {"type": "string", "description": "optional app label"},
         "level": {"type": "string", "enum": LEVELS},
         "text": {"type": "string", "description": "optional literal text the line must contain"},
@@ -38,6 +38,17 @@ TOOL_SPECS = {
     "propose_action": ("PROPOSE a named runbook action (one per turn). It does not run: a human must type a confirmation code to confirm.", {
         "action_id": {"type": "string"}, "params": {"type": "object"}, "reason": {"type": "string"}}, ["action_id", "params", "reason"]),
 }
+
+
+def field(doc, path):
+    """A field of an OpenSearch document by its dotted name: a flat key first, then nested objects."""
+    if isinstance(doc, dict) and path in doc:
+        return doc[path]
+    for part in path.split("."):
+        if not isinstance(doc, dict) or part not in doc:
+            return None
+        doc = doc[part]
+    return doc
 
 
 class ToolError(Exception):
@@ -143,6 +154,39 @@ class ToolLayer:
         m.append(f'{self.q["app_label"]}="{app}"' if app else f'{self.q["app_label"]}!~"{self.deny}"')
         return ",".join(m)
 
+    def _search_body(self, ns, app, level, text, minutes, limit):
+        """OpenSearch query from validated values only: exact terms, a literal phrase, never a query string; without an app the CDE
+        workloads are excluded by an anchored regexp on the keyword field."""
+        f = self.cfg["opensearch"]["fields"]
+        flt = [{"range": {f["timestamp"]: {"gte": f"now-{minutes}m"}}}, {"term": {f["namespace"]: ns}}]
+        must_not = []
+        if app:
+            flt.append({"term": {f["app"]: app}})
+        else:
+            must_not.append({"regexp": {f["app"]: {"value": self.deny}}})
+        if level:
+            flt.append({"terms": {f["level"]: [level, level.upper()]}})
+        if text:
+            flt.append({"match_phrase": {f["message"]: text}})
+        return {"size": limit, "sort": [{f["timestamp"]: {"order": "desc"}}], "_source": [f["message"], f["namespace"], f["app"]],
+                "query": {"bool": {"filter": flt, "must_not": must_not}}}
+
+    def _kept_messages(self, docs, ns, app):
+        """Fails closed when the index mapping lets a filter through: a hit of another namespace or app, without a valid app or of a CDE app
+        is dropped."""
+        f, out = self.cfg["opensearch"]["fields"], []
+        for doc in docs[:self.limits["max_log_lines"]]:
+            doc_app = field(doc, f["app"])
+            if field(doc, f["namespace"]) != ns or (app and doc_app != app) or not valid_label(doc_app, self.cfg):
+                continue
+            msg = field(doc, f["message"])
+            if msg is not None:
+                out.append(msg if isinstance(msg, str) else json.dumps(msg, sort_keys=True, default=str))
+        return out
+
+    def _index(self):
+        return f'{self.cfg["opensearch"]["index_prefix"]}{self.env_name}'
+
     # --- pipeline -----------------------------------------------------------------------------------------------
     def _clean_obj(self, o):
         if isinstance(o, str):
@@ -165,13 +209,11 @@ class ToolLayer:
         level = args.get("level")
         if level is not None and level not in LEVELS:
             raise ToolError(f"level must be one of {LEVELS}")
-        if source == "loki":
+        if source == "opensearch":
             ns = self._ns(args)
-            sel = self._selector(ns, self._app(args))
-            if level:
-                sel += f',{self.q["level_label"]}="{level}"'
-            query = "{" + sel + "}" + (f' |= "{text}"' if text else "")
-            lines = self.sources.loki(query, minutes, limit)
+            app = self._app(args)
+            docs = self.sources.opensearch(self._index(), self._search_body(ns, app, level, text, minutes, limit))
+            lines = self._kept_messages(docs, ns, app)
         elif source == "cloudwatch":
             group = args.get("log_group") or self.env_cfg["log_groups"][0]
             if group not in self.env_cfg["log_groups"] or is_denied(group, self.cfg):
@@ -179,7 +221,7 @@ class ToolLayer:
             pattern = " ".join(f'"{w}"' for w in [level.upper() if level else None, text] if w)
             lines = self.sources.cloudwatch(group, pattern, minutes, limit)
         else:
-            raise ToolError("source must be loki or cloudwatch")
+            raise ToolError("source must be opensearch or cloudwatch")
         text = self.redactor.redact("\n".join(str(l) for l in lines))
         return self._final(compress.compress_logs(text.split("\n"), self.limits))
 

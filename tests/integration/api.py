@@ -27,13 +27,17 @@ def check_url(url, compose_hosts=()):
 
 
 class Client:
-    def __init__(self, base, api_key=None, admin_key=None):
+    def __init__(self, base, api_key=None, admin_key=None, cell=None):
         self.base = base.rstrip("/")
         self.api_key, self.admin_key = api_key, admin_key
+        # the edge routes by cell and answers 503 without one; shared environments resolve it from the merchant
+        self.cell = cell
         self.opener = live._opener()
 
     def call(self, method, path, body=None, key="api", headers=None):
         h = {"Content-Type": "application/json", "Accept": "application/json", **(headers or {})}
+        if self.cell:
+            h.setdefault("x-payments-cell", self.cell)
         secret = {"api": self.api_key, "admin": self.admin_key}.get(key)
         if secret:
             h["api-key"] = secret

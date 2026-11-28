@@ -2,11 +2,13 @@
 #   platform.region  region of the cluster
 #   platform.cell    cell of the cluster (cell-N or spare); other clusters export no cell resources
 #   platform.shared  "enabled" on the one cluster per environment and region that exports the regional and global services
+#   platform.central "enabled" on the central cluster (shared-services): the central OpenSearch and its ingestion pipelines
 # GetMetricData is billed per metric and scrape: each resource is read by exactly one cluster, never by all of them.
 platform:
   region: ""
   cell: ""
   shared: ""
+  central: ""
 
 fullnameOverride: yace
 # The IAM role (Pod Identity association) is bound to this name in the namespace monitoring
@@ -53,6 +55,23 @@ serviceMonitor:
       regex: aws_es_cluster_status_?red_maximum
       targetLabel: __name__
       replacement: aws_es_cluster_statusred_maximum
+    - sourceLabels: [__name__]
+      regex: aws_es_cluster_status_?yellow_maximum
+      targetLabel: __name__
+      replacement: aws_es_cluster_statusyellow_maximum
+    # OpenSearch Ingestion: the dotted metric names, whichever way YACE splits them
+    - sourceLabels: [__name__]
+      regex: aws_osis_.*opensearch_?document_?errors_?count_sum
+      targetLabel: __name__
+      replacement: aws_osis_opensearch_document_errors_count_sum
+    - sourceLabels: [__name__]
+      regex: aws_osis_.*opensearch_?bulk_?request_?failed_?count_sum
+      targetLabel: __name__
+      replacement: aws_osis_opensearch_bulk_request_failed_count_sum
+    - sourceLabels: [__name__]
+      regex: aws_osis_.*s3_?s3_?objects_?failed_?count_sum
+      targetLabel: __name__
+      replacement: aws_osis_s3_objects_failed_count_sum
     # Only the WebACL total (Rule="ALL"); the per-rule series would be counted twice by sum by (web_acl)
     - sourceLabels: [__name__, dimension_Rule]
       regex: aws_wafv2_.+;([^A].*|A|A[^L].*|AL|AL[^L].*|ALL.+)
@@ -64,6 +83,7 @@ serviceMonitor:
     - {sourceLabels: [dimension_TableName], regex: (.+), targetLabel: table_name}
     - {sourceLabels: [dimension_ReceivingRegion], regex: (.+), targetLabel: receiving_region}
     - {sourceLabels: [dimension_DomainName], regex: (.+), targetLabel: domain_name}
+    - {sourceLabels: [dimension_PipelineName], regex: (.+), targetLabel: pipeline_name}
     - {sourceLabels: [dimension_Broker_ID], regex: (.+), targetLabel: broker_id}
     - {sourceLabels: [dimension_Accelerator], regex: (.+), targetLabel: accelerator}
     - {sourceLabels: [dimension_EndpointGroup], regex: (.+), targetLabel: endpoint_group}
@@ -86,9 +106,12 @@ serviceMonitor:
 config: |-
   apiVersion: v1alpha1
   discovery:
+  {{- if regexMatch "^(cell-[0-9]+|spare)$" .Values.platform.cell }}
+    # Only with the cell jobs: YACE rejects a tag export for a namespace no job reads
     exportedTagsOnMetrics:
       AWS/RDS: [cell]
       AWS/MemoryDB: [cell]
+  {{- end }}
     jobs:
   {{- if regexMatch "^(cell-[0-9]+|spare)$" .Values.platform.cell }}
       # Cell resources: the Aurora cluster and the MemoryDB cluster tagged with the cell of this cluster
@@ -127,12 +150,6 @@ config: |-
         nilToZero: false
         metrics:
           - {name: KafkaDataLogsDiskUsed, statistics: [Average], period: 300, length: 600}
-      - type: AWS/ES
-        regions: [{{ .Values.platform.region }}]
-        nilToZero: false
-        metrics:
-          - {name: ClusterStatus.red, statistics: [Maximum], period: 60, length: 300}
-          - {name: FreeStorageSpace, statistics: [Minimum], period: 60, length: 300}
       - type: AWS/NATGateway
         regions: [{{ .Values.platform.region }}]
         nilToZero: false
@@ -184,4 +201,43 @@ config: |-
         nilToZero: false
         metrics:
           - {name: HealthyEndpointCount, statistics: [Minimum], period: 60, length: 300}
+  {{- end }}
+  {{- if eq .Values.platform.central "enabled" }}
+      # The central OpenSearch domain (pay-shared-services-euc1-logs): the shared-services account holds no other domain
+      - type: AWS/ES
+        regions: [{{ .Values.platform.region }}]
+        nilToZero: false
+        metrics:
+          - {name: ClusterStatus.red, statistics: [Maximum], period: 60, length: 300}
+          - {name: ClusterStatus.yellow, statistics: [Maximum], period: 60, length: 300}
+          - {name: Shards.unassigned, statistics: [Maximum], period: 60, length: 300}
+          - {name: JVMMemoryPressure, statistics: [Maximum], period: 60, length: 300}
+          - {name: CPUUtilization, statistics: [Maximum], period: 60, length: 300}
+          - {name: ClusterIndexWritesBlocked, statistics: [Maximum], period: 60, length: 300}
+          - {name: ThroughputThrottle, statistics: [Maximum], period: 60, length: 300}
+          - {name: IopsThrottle, statistics: [Maximum], period: 60, length: 300}
+          - {name: AutomatedSnapshotFailure, statistics: [Maximum], period: 60, length: 300}
+          - {name: ClusterUsedSpace, statistics: [Maximum], period: 60, length: 300}
+          - {name: FreeStorageSpace, statistics: [Sum], period: 60, length: 300}
+          - {name: 5xx, statistics: [Sum], period: 60, length: 300}
+          - {name: OpenSearchRequests, statistics: [Sum], period: 60, length: 300}
+          - {name: ThreadpoolWriteRejected, statistics: [Sum], period: 60, length: 300}
+  # OpenSearch Ingestion is no discovery namespace of YACE: the pipelines audit-cloudtrail and audit-eks are read by dimension
+  customNamespace:
+    - name: osis
+      namespace: AWS/OSIS
+      regions: [{{ .Values.platform.region }}]
+      nilToZero: false
+      dimensionNameRequirements: [PipelineName]
+      # OSIS names a metric <sub-pipeline>.<plugin>.<metric>; the unprefixed names are kept for a pipeline without that prefix
+      metrics:
+        - {name: opensearch.documentErrors.count, statistics: [Sum], period: 300, length: 600}
+        - {name: opensearch.bulkRequestFailed.count, statistics: [Sum], period: 300, length: 600}
+        - {name: s3.s3ObjectsFailed.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-cloudtrail.opensearch.documentErrors.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-cloudtrail.opensearch.bulkRequestFailed.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-cloudtrail.s3.s3ObjectsFailed.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-eks.opensearch.documentErrors.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-eks.opensearch.bulkRequestFailed.count, statistics: [Sum], period: 300, length: 600}
+        - {name: audit-eks.s3.s3ObjectsFailed.count, statistics: [Sum], period: 300, length: 600}
   {{- end }}
