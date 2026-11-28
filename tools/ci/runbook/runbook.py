@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 ENVS = ("dev", "stage", "prod")
-REGIONS = ("eu-central-1", "us-east-1", "us-east-2")
+REGIONS = ("eu-central-1", "us-east-1")
 DIAG = re.compile(r"input `alert=([A-Za-z0-9]+)`\) runs the read-only step of SSM document `(pay-runbook-[a-z0-9-]+)`")
 DOC = re.compile(r"`(pay-runbook-[a-z0-9-]+)`")
 STEP = re.compile(r"document step `([a-z0-9-]+)`")

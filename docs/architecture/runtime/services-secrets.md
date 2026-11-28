@@ -21,6 +21,8 @@ Settings in Git are reviewed and versioned. Secrets never enter Git: only their 
 | migrations | Schema change Job before a rollout | yes | `migrations` in both umbrellas |
 | control-center | Merchant dashboard | no | `control-center` |
 
+Each service, its calls, data, secrets, scaling and alerts are described in [services and stores](../services/README.md).
+
 All service charts build on the `platform-common` library: probes, PodDisruptionBudget, NetworkPolicy default deny, Istio sidecar, ServiceMonitor, restricted security context.
 
 Rules the services follow:

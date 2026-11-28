@@ -10,9 +10,9 @@ flowchart LR
   R53 --> NLB["Regional NLB"]
   NLB --> EDGE["payments-edge Gateway (Istio, Gateway API)"]
   EDGE -->|"rate limit and class"| RL["ratelimit service"]
-  EDGE -->|"x-payments-cell"| ROUTER["router of the merchant's cell"]
+  EDGE -->|"x-payments-cell, mutual TLS to the cell's router gateway"| ROUTER["router of the merchant's cell"]
   ROUTER --> MDB[("MemoryDB: state and stream")]
-  ROUTER -->|"mTLS, router identity only"| LOCKER["locker (card vault)"]
+  ROUTER -->|"mutual TLS to the locker gateway, router identity only"| LOCKER["locker (card vault)"]
   LOCKER --> LDB[("Locker Aurora")]
   ROUTER -->|"egress firewall, static IPs"| PSP["PSP"]
   MDB --> DRAINER["drainer"] --> ADB[("Cell Aurora")]
@@ -22,7 +22,7 @@ flowchart LR
 ```
 
 1. The merchant calls `api.<zone>`. Route 53 answers with the ingress name of the working region (Frankfurt, `eu-central-1`) while its health check passes, and with us-east-1 only when that check fails and the us-east-1 ingress passes its own check (prod only).
-2. A network load balancer passes the TCP connection to the `payments-edge` Gateway. Its Envoy proxies terminate TLS, give the request a request class (payments, read or list), apply the local and global rate limits and send the request to the router of the cell named in the `x-payments-cell` header. A request whose cell header is missing or unknown gets 503. The router of that cell authenticates the merchant's API key against its own database.
+2. A network load balancer passes the TCP connection to the `payments-edge` Gateway. Its Envoy proxies terminate TLS, give the request a request class (payments, read or list), apply the local and global rate limits and send the request to the router of the cell named in the `x-payments-cell` header. The edge and every cell run in separate clusters: the edge reaches the cell through an internal load balancer and the cell's router gateway, which admits only the edge client certificate. A request whose cell header is missing or unknown gets 503. The router of that cell authenticates the merchant's API key against its own database.
 3. The router keeps the payment state in MemoryDB and appends it to a Redis stream. It never writes PostgreSQL on the hot path (write-behind).
 4. When the payment carries card data, the router asks the locker for a token. The locker is the only place a PAN lives.
 5. The router calls the PSP through the egress path: transit gateway, Network Firewall that admits only PSP domains, NAT with static Elastic IPs that the PSPs allowlist.
@@ -41,6 +41,7 @@ flowchart LR
 | Analytics | MSK and ClickHouse on their own cluster outside the CDE. | [Data and backups](foundation/data-backups.md) |
 | Control center | The merchant dashboard and the browser payment SDK, behind CloudFront and AWS WAF. | [Edge](runtime/edge.md) |
 | Admin entry | Argo CD, Vault, Grafana, Alertmanager, VictoriaMetrics, Prometheus, Sentry and OpenSearch Dashboards behind one internal Gateway, a private DNS zone and Okta sign-in. | [Edge](runtime/edge.md) |
+| Central cluster | Argo CD, the one Vault of the platform and the observability stack in the shared-services account; every cluster registers with Argo CD and gets its own Vault auth mount from the live tree. | [Kubernetes and Argo CD delivery](foundation/kubernetes-delivery.md), [Secrets](infrastructure/platform/secrets.md) |
 | Central observability | Metrics, logs, traces, alerts and error tracking in the shared-services account. | [Observability](runtime/observability.md) |
 | Logging | One OpenSearch domain for the application logs of every environment and the audit trail, fed by Logstash and OpenSearch Ingestion. | [Logging](runtime/logging.md) |
 
@@ -48,7 +49,7 @@ flowchart LR
 
 - `eu-central-1` is the working region and the only one that writes. It runs in three Availability Zones, so losing one zone loses no data.
 - The platform has two regions. `us-east-1` is the hot standby of prod: its cells run at the working size all the time, with one Aurora instance per global secondary, and take the whole load at any moment. A switch fences Frankfurt, promotes Aurora, warms the cache and moves traffic within the 60-minute RTO ([ADR-0019](../adr/0019-hot-standby-recovery-region.md)). See [disaster recovery](../dr/README.md).
-- Stage and dev run in eu-central-1 alone. dev runs `cell-0` and the spare. In both, us-east-1 holds only the panel edge and its KMS keys.
+- Stage and dev run in eu-central-1 alone. dev runs `cell-0` and the spare. In both, us-east-1 holds only `panel-edge`, `waf-edge` and the `logs` KMS key.
 
 ## Pages
 
@@ -72,12 +73,27 @@ Runtime:
 - [Edge with Gateway API](runtime/edge.md)
 - [Rate limiting and load shedding](runtime/rate-limiting.md)
 - [Observability and alerting](runtime/observability.md)
+- [Logging](runtime/logging.md)
+
+Services (what each service and store does):
+
+- [Services and stores](services/README.md), with a [walkthrough of one card payment](services/card-payment-walkthrough.md) and [data stores](services/data-stores.md)
+
+Infrastructure (what is built in AWS and how to change it):
+
+- [Infrastructure](infrastructure/README.md): infrastructure as code, organization, network, compute, data, edge, secrets, observability, CI runners, regions and disaster recovery
 
 Delivery and verification:
 
 - [CI/CD stages and security scans](delivery/cicd-security.md)
 - [AI review and the admin AI agent](delivery/ai.md)
 - [Chaos and load testing](delivery/chaos-load.md)
+
+Operations:
+
+- [Deploying from an empty AWS organization](operations/deploy.md)
+- [Day-2 operations](operations/day-2.md)
+- Local cluster: `make up` runs the platform on a kind cluster ([scripts/kind](../../scripts/kind/README.md), [deploy/local](../../deploy/local/README.md))
 
 Related: [cost and FinOps](cost/README.md), [security controls](../security/README.md), [threat model](../security/threat-model.md), [disaster recovery](../dr/README.md).
 

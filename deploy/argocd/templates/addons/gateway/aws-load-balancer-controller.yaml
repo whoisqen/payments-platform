@@ -12,9 +12,6 @@ spec:
           # Every cluster that serves a Gateway: central, edge, control-center, cells and locker
           matchLabels:
             payments-platform/gateway: enabled
-          # The pods cannot reach the instance metadata (hop limit 1), so the VPC id must be on the cluster
-          matchExpressions:
-            - {key: payments-platform/vpc-id, operator: Exists}
   template:
     metadata:
       name: 'aws-load-balancer-controller-{{`{{ .name }}`}}'
@@ -41,9 +38,11 @@ spec:
               - name: clusterName
                 value: '{{`{{ or (index .metadata.annotations "payments-platform/eks-cluster-name") .name }}`}}'
               - name: region
-                value: {{ .Values.cluster.region | quote }}
-              - name: vpcId
-                value: '{{`{{ index .metadata.labels "payments-platform/vpc-id" }}`}}'
+                value: '{{`{{ index .metadata.labels "payments-platform/region" }}`}}'
+              # The pods cannot reach the instance metadata (hop limit 1): the controller finds its VPC by the Name tag the vpc module
+              # sets, <prefix>-<environment>-<region short>-vpc
+              - name: vpcTags.Name
+                value: '{{ .Values.cluster.namePrefix }}-{{`{{ index .metadata.labels "payments-platform/environment" }}-{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .metadata.labels "payments-platform/region") "${1}${2}${3}" }}`}}-vpc'
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}
           ref: values
