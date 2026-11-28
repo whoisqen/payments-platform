@@ -39,7 +39,9 @@ jobs:
           input_sha=$(git log -1 --format=%H "$SHA" -- "${paths[@]}")
           epoch=$(git log -1 --format=%ct "$input_sha")
           mapfile -t common < <(sed 's/^/--build-arg=/' docker/_common/build-args.env)
-          docker buildx build "${common[@]}" \
+          # anonymous pulls from Docker Hub share the runner IP limit: retry a 429 with a growing pause
+          for attempt in 1 2 3 4 5; do
+          if docker buildx build "${common[@]}" \
             --file "docker/${SERVICE}/Dockerfile" \
             --platform "linux/${ARCH}" \
             --provenance=false --sbom=false \
@@ -48,7 +50,12 @@ jobs:
             --build-arg "CREATED=$(date -u -d "@${epoch}" +%Y-%m-%dT%H:%M:%SZ)" \
             --build-arg "SOURCE_URL=${REPO_URL}" \
             --output "type=oci,dest=${RUNNER_TEMP}/oci,tar=false,rewrite-timestamp=true,oci-mediatypes=true" \
-            .
+            . 2>&1 | tee "$RUNNER_TEMP/build.log"; [ "${PIPESTATUS[0]}" -eq 0 ]; then exit 0; fi
+          grep -q "429 Too Many Requests" "$RUNNER_TEMP/build.log" || exit 1
+          echo "::warning::registry rate limit, attempt ${attempt}; retrying"
+          sleep $((attempt * 90))
+          done
+          exit 1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ghcr-${{ matrix.service }}-${{ matrix.arch }}
