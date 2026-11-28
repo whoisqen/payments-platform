@@ -479,4 +479,15 @@ Every item is one unit of work for one agent and one GitHub issue. The `id` beco
   requires: ["baseline"]
   acceptance: `tools/lint/srs-lint` exits 0 with the addendum; every changed or withdrawn requirement ID names its reason
   issue: "#199"
+
+- id: T42
+  title: Write the SRS addendum for the central OpenSearch logs
+  agent: docs-writer
+  milestone: M7 Verification and release readiness
+  paths: ["docs/requirements/addenda/002-central-logs.md"]
+  depends_on: ["T41"]
+  provides: central logs addendum
+  requires: ["two-region addendum"]
+  acceptance: `tools/lint/srs-lint` exits 0 with the addendum; FR-INF-24 and FR-OBS-1 name the central OpenSearch
+  issue: "#205"
 ```
