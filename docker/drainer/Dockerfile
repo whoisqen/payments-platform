@@ -41,7 +41,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     # without a bucket (local builds) sccache caches on the build-cache mount instead of S3
     { [ -n "${SCCACHE_BUCKET}" ] || unset SCCACHE_BUCKET SCCACHE_REGION; } && cargo build --locked --profile "${CARGO_PROFILE}" --features release --features v1 \
     && install -D "target/${CARGO_PROFILE}/drainer" /out/drainer
-COPY docker/_common/collect-libs.sh /usr/local/bin/collect-libs.sh
+COPY --chmod=0755 docker/_common/collect-libs.sh /usr/local/bin/collect-libs.sh
 RUN /usr/local/bin/collect-libs.sh /out/drainer /out/rootfs
 
 # distroless cc-debian12 nonroot (manifest list, arm64 and amd64)
