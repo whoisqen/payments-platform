@@ -45,7 +45,7 @@ def main(argv=None, environ=None, out=None):
     except ValueError as err:
         log(f"integration refused: {err}")
         return 2
-    client = api.Client(url, api_key=e.get("INTEGRATION_API_KEY"), admin_key=e.get("INTEGRATION_ADMIN_API_KEY"))
+    client = api.Client(url, api_key=e.get("INTEGRATION_API_KEY"), admin_key=e.get("INTEGRATION_ADMIN_API_KEY"), cell=e.get("INTEGRATION_CELL") or None)
     try:
         if client.admin_key:
             ctx = api.bootstrap(client, connector)

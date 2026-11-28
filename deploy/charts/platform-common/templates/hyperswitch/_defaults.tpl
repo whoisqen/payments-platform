@@ -22,6 +22,8 @@ redis:
   clusterEnabled: true
   tls: true
 kms:
+  # false only on a local cluster (global.localCluster): data keys stay unencrypted because there is no KMS
+  enabled: true
   # Empty: alias/<namePrefix>-<env>-<region short>-<cell>, the cell key of the kms-set stack
   keyAlias: ""
   region: ""

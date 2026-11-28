@@ -1,0 +1,10 @@
+# Local demo: panel, Prometheus and Grafana with the repository dashboards, PostgreSQL on a volume
+monitoring:
+  enabled: true
+panel:
+  enabled: true
+persistence:
+  enabled: true
+# --state-values-set ratelimit.enabled=true adds the global rate limit service behind the edge
+ratelimit:
+  enabled: false

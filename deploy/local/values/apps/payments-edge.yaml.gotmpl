@@ -1,0 +1,29 @@
+# Gateway API on Istio with the production filters; clients send x-payments-cell: cell-0 because the cell lookup is not local
+{{- $v := .Values }}
+global:
+  environment: dev
+  region: eu-central-1
+
+gateway:
+  hosts:
+    - {{ $v.hosts.api }}
+  # The NodePort of charts/local-access exposes the proxies; the Istio Service stays inside the cluster
+  serviceAnnotations:
+    networking.istio.io/service-type: ClusterIP
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 70
+
+routing:
+  cells:
+    - name: cell-0
+      host: router.payments.svc.cluster.local
+
+rateLimit:
+  global:
+    enabled: {{ $v.ratelimit.enabled }}
+
+# Below the proxy memory limit of the istiod values (global.proxy)
+overload:
+  maxHeapBytes: 167772160

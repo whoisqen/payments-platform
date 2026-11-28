@@ -26,8 +26,11 @@ areas:
     - docker/control-center/
   alerts:
     - observability/
-  compose:
-    - docker/compose/
+  # the local kind stack and the commit stage that installs it
+  kind:
+    - scripts/kind/
+    - tools/ci/kind/
+    - deploy/local/
     - tests/integration/
     - tests/component/
   workflows:

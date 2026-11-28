@@ -1,0 +1,73 @@
+suite: local-data
+templates:
+  - secrets.yaml
+  - postgres.yaml
+  - redis.yaml
+  - schema.yaml
+tests:
+  - it: builds the Redis ACL with one user per cell service and the default user off
+    template: secrets.yaml
+    documentSelector: {path: metadata.name, value: redis-acl}
+    asserts:
+      - matchRegex:
+          path: spec.target.template.data["users.acl"]
+          pattern: "user default off\nuser ratelimit on"
+      - matchRegex:
+          path: spec.target.template.data["users.acl"]
+          pattern: "user cell-0-drainer on >\\{\\{ .cell_0_drainer \\}\\}"
+      - contains:
+          path: spec.data
+          content:
+            secretKey: cell_0_router
+            remoteRef: {key: dev/cell-0/router/redis, property: password}
+  - it: gives PostgreSQL the application password the router reads
+    template: secrets.yaml
+    documentSelector: {path: metadata.name, value: postgres-credentials}
+    asserts:
+      - contains:
+          path: spec.data
+          content:
+            secretKey: HS_APP_PASSWORD
+            remoteRef: {key: dev/cell-0/router/database, property: password}
+      - equal:
+          path: spec.secretStoreRef.name
+          value: vault
+  - it: keeps PostgreSQL in an emptyDir when persistence is off
+    template: postgres.yaml
+    set:
+      postgres.persistence: false
+    documentSelector: {path: kind, value: StatefulSet}
+    asserts:
+      - notExists:
+          path: spec.volumeClaimTemplates
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: data, emptyDir: {}}
+  - it: applies every vendored migration from a hook Job
+    template: schema.yaml
+    documentSelector: {path: kind, value: Job}
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: hyperswitch, configMap: {name: schema-hyperswitch}}
+  - it: leaves the Hyperswitch schema to the chart Job when it is off
+    template: schema.yaml
+    set:
+      schema.hyperswitch: false
+    documentSelector: {path: kind, value: Job}
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content: {name: hyperswitch, configMap: {name: schema-hyperswitch}}
+  - it: creates the migrator password Secret in the cell namespace on request
+    template: secrets.yaml
+    set:
+      chartMigrations.enabled: true
+    documentSelector: {path: metadata.name, value: migrator-db}
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: payments

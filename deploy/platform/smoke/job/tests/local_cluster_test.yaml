@@ -1,0 +1,23 @@
+suite: smoke on a local cluster
+templates:
+  - job.yaml
+set:
+  global.registry: localhost/payments
+  global.environment: dev
+  global.cell: cell-0
+release:
+  namespace: payments
+tests:
+  - it: runs the image by tag when global.localCluster is true
+    set:
+      global.localCluster: true
+      smoke.image.tag: dev
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: localhost/payments/smoke:dev
+  - it: rejects a tag outside a local cluster
+    set:
+      smoke.image.tag: dev
+    asserts:
+      - failedTemplate: {}

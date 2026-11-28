@@ -19,12 +19,27 @@
             "IfNotPresent",
             "Never"
           ]
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$"
         }
       },
       "additionalProperties": false,
       "required": [
-        "repository",
-        "digest"
+        "repository"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "digest"
+          ]
+        },
+        {
+          "required": [
+            "tag"
+          ]
+        }
       ]
     },
     "workload": {
@@ -323,7 +338,8 @@
           "enum": [
             "system",
             "payments",
-            "workers"
+            "workers",
+            ""
           ]
         },
         "tolerations": {
@@ -616,6 +632,9 @@
               "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
             }
           }
+        },
+        "localCluster": {
+          "type": "boolean"
         }
       }
     },
@@ -679,5 +698,35 @@
     "networkPolicy",
     "serviceAccount",
     "panel"
-  ]
+  ],
+  "if": {
+    "not": {
+      "properties": {
+        "global": {
+          "properties": {
+            "localCluster": {
+              "const": true
+            }
+          },
+          "required": [
+            "localCluster"
+          ]
+        }
+      },
+      "required": [
+        "global"
+      ]
+    }
+  },
+  "then": {
+    "properties": {
+      "image": {
+        "not": {
+          "required": [
+            "tag"
+          ]
+        }
+      }
+    }
+  }
 }

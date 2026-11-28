@@ -1,0 +1,2 @@
+# Namespace the Grafana sidecar watches (values/platform/kube-prometheus.yaml)
+namespace: monitoring

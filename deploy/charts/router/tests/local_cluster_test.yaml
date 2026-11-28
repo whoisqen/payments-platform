@@ -1,0 +1,65 @@
+suite: router on a local cluster
+templates:
+  - workload.yaml
+set:
+  global.registry: localhost/payments
+  global.environment: dev
+  global.region: eu-central-1
+  global.cell: cell-0
+  workload.kind: Deployment
+tests:
+  - it: names the image by tag when global.localCluster is true
+    set:
+      global.localCluster: true
+      image.tag: dev
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: localhost/payments/router:dev
+  - it: rejects a tag outside a local cluster
+    set:
+      image.tag: dev
+    asserts:
+      - failedTemplate: {}
+  - it: turns the KMS encryption manager off only on a local cluster
+    set:
+      global.localCluster: true
+      global.hyperswitch.kms.enabled: false
+      image.tag: dev
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER, value: no_encryption}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__ENCRYPTION_MANAGEMENT__AWS_KMS__REGION, value: eu-central-1}
+  - it: rejects KMS off outside a local cluster
+    set:
+      global.hyperswitch.kms.enabled: false
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: global.localCluster
+  - it: rejects plain PostgreSQL and Redis outside a local cluster
+    set:
+      global.hyperswitch.database.sslMode: disable
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: global.localCluster
+  - it: passes plain PostgreSQL and Redis to the process on a local cluster
+    set:
+      global.localCluster: true
+      global.hyperswitch.database.sslMode: disable
+      global.hyperswitch.redis.tls: false
+      image.tag: dev
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PGSSLMODE, value: disable}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ROUTER__REDIS__TLS_ENABLED, value: "false"}

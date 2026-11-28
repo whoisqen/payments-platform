@@ -1,0 +1,6 @@
+apiVersion: v2
+name: namespaces
+description: Namespaces of the kind stack with the labels the mesh and the charts expect
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

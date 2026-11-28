@@ -15,6 +15,9 @@
 {{- if and $c.requireEndpoints (or (hasSuffix ".invalid" $db) (hasSuffix ".invalid" $redis) (hasSuffix ".invalid" $base)) -}}
 {{- fail (printf "%s: set global.hyperswitch.database.host, redis.host and tenant.baseUrl in the cell layer" .name) -}}
 {{- end -}}
+{{- if ne $c.database.sslMode "verify-full" }}{{ include "platform-common.requireLocal" (dict "root" .root "what" "global.hyperswitch.database.sslMode other than verify-full") }}{{ end -}}
+{{- if not $c.redis.tls }}{{ include "platform-common.requireLocal" (dict "root" .root "what" "global.hyperswitch.redis.tls false") }}{{ end -}}
+{{- if not $c.kms.enabled }}{{ include "platform-common.requireLocal" (dict "root" .root "what" "global.hyperswitch.kms.enabled false") }}{{ end -}}
 {{- $rs := regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" ($g.region | default "eu-central-1") "${1}${2}${3}" -}}
 {{- $alias := $c.kms.keyAlias | default (printf "alias/%s-%s-%s-%s" $c.namePrefix ($g.environment | default "dev") $rs ($g.cell | default "cell-0")) -}}
 {{- $l := $c.locker -}}
@@ -47,9 +50,13 @@
 {{- $_ := set $e (printf "%s__REDIS__USERNAME" $p) (printf "%s-%s" ($g.cell | default "cell-0") $hs.redisUser) -}}
 {{- /* Secrets arrive decrypted from Vault, so the secrets manager is off; KMS still encrypts data keys */ -}}
 {{- $_ := set $e (printf "%s__SECRETS_MANAGEMENT__SECRETS_MANAGER" $p) "no_encryption" -}}
+{{- if $c.kms.enabled }}
 {{- $_ := set $e (printf "%s__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER" $p) "aws_kms" -}}
 {{- $_ := set $e (printf "%s__ENCRYPTION_MANAGEMENT__AWS_KMS__KEY_ID" $p) $alias -}}
 {{- $_ := set $e (printf "%s__ENCRYPTION_MANAGEMENT__AWS_KMS__REGION" $p) ($c.kms.region | default $g.region | default "eu-central-1") -}}
+{{- else }}
+{{- $_ := set $e (printf "%s__ENCRYPTION_MANAGEMENT__ENCRYPTION_MANAGER" $p) "no_encryption" -}}
+{{- end -}}
 {{- $_ := set $e (printf "%s__MULTITENANCY__ENABLED" $p) "false" -}}
 {{- $t := printf "%s__MULTITENANCY__TENANTS__PUBLIC" $p -}}
 {{- $_ := set $e (printf "%s__BASE_URL" $t) $base -}}

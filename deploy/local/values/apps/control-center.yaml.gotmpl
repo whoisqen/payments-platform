@@ -1,0 +1,42 @@
+# The panel; the browser calls the edge with the router JWT, so the panel needs no secret
+{{- $v := .Values }}
+{{- $img := index $v.images "control-center" }}
+{{- $reg := dir (index $img "repository") }}
+global:
+  localCluster: true
+  registry: {{ ternary $v.registry $reg (eq $reg ".") }}
+  environment: dev
+
+image:
+  repository: {{ base (index $img "repository") }}
+  {{- if index $img "digest" }}
+  digest: {{ index $img "digest" }}
+  {{- else }}
+  tag: {{ index $img "tag" | quote }}
+  {{- end }}
+
+workload:
+  replicas: 1
+
+container:
+  env:
+    default__endpoints__api_url: https://{{ $v.hosts.api }}:{{ $v.ports.edge }}
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 192Mi}
+
+scheduling:
+  nodePool: ""
+
+autoscaling:
+  enabled: false
+
+pdb:
+  enabled: false
+
+panel:
+  enabled: {{ $v.panel.enabled }}
+  hostname: {{ $v.hosts.panel }}
+  certificate:
+    issuerKind: ClusterIssuer
+    issuerName: payments-ca

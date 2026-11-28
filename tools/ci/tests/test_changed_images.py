@@ -55,9 +55,9 @@ class ChangedImagesTest(unittest.TestCase):
     def test_docs_and_readme_build_nothing(self):
         self.assertEqual(ci.images_for(["docs/a.md", "docker/README.md", "infra/x.tf"], CFG), ([], False))
 
-    def test_compose_stack_builds_nothing(self):
-        self.assertEqual(ci.images_for(["docker/compose/compose.yaml", "docker/compose/migrate.sh"], CFG), ([], False))
-        self.assertTrue(areas(["docker/compose/compose.yaml"])[0]["compose"])
+    def test_kind_stage_builds_nothing(self):
+        self.assertEqual(ci.images_for(["scripts/kind/up.sh", "tools/ci/kind/kind_images.py"], CFG), ([], False))
+        self.assertTrue(areas(["scripts/kind/cluster.yaml", "deploy/local/helmfile.yaml"])[0]["kind"])
 
     def test_node_and_workflows_areas(self):
         a = areas(["tests/load/lib/run.js", ".github/workflows/images.yml"])[0]
