@@ -114,6 +114,11 @@ gateway:
   hosts:
     - {d['gateway_host']}
 
+# Client certificate of the edge for the router gateways of the cells, from the central Vault (vault.host of config/platform.yaml)
+edgeClient:
+  pki:
+    vaultServer: https://{cfg['vault']['host']}
+
 routing:
   cells:
 {edge}"""

@@ -1,0 +1,53 @@
+suite: the cell admits the edge only through its mutual-TLS router gateway
+templates:
+  - router-gateway.yaml
+set:
+  global.registry: registry.example.test/acme
+  global.dataCidrs: ["10.151.96.0/22"]
+  global.endpointCidrs: ["10.151.0.0/18"]
+  global.hyperswitch.database.host: pay-prod-use1-aurora-cell-2.proxy-example.us-east-1.rds.amazonaws.com
+  global.hyperswitch.redis.host: clustercfg.pay-prod-use1-memorydb-cell-2.example.memorydb.us-east-1.amazonaws.com
+  global.hyperswitch.tenant.baseUrl: https://api.payments.example.com
+  router.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  drainer.image.digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  scheduler.image.digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  migrations.image.digest: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  global.cell: cell-2
+  global.environment: prod
+  global.region: us-east-1
+  routerGateway.clusterDomain: prod.example.internal
+  routerGateway.targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:444444444444:targetgroup/pay-prod-use1-cell-2-rtr/abc
+  routerGateway.pki.vaultServer: https://vault.payments.internal
+tests:
+  - it: terminates mutual TLS for the cell host on the gateway port
+    documentSelector: {path: kind, value: Gateway}
+    asserts:
+      - equal:
+          path: spec.listeners[0].hostname
+          value: router.payments.svc.cell-2.prod.example.internal
+      - equal:
+          path: spec.listeners[0].tls.options
+          value: {gateway.istio.io/tls-terminate-mode: MUTUAL}
+      - equal:
+          path: spec.listeners[0].port
+          value: 8443
+  - it: admits only the edge SPIFFE ID
+    documentSelector: {path: kind, value: AuthorizationPolicy}
+    asserts:
+      - equal:
+          path: spec.rules[0].from[0].source.principals
+          value: [payments-platform/ns/payments-edge/sa/edge]
+  - it: issues its server certificate on the jwt mount of its own cell cluster
+    documentSelector: {path: kind, value: VaultDynamicSecret}
+    asserts:
+      - equal:
+          path: spec.path
+          value: pki-mesh/issue/cell-gateway
+      - equal:
+          path: spec.provider.auth.kubernetes
+          value: {mountPath: k8s-pay-prod-use1-cell-2, role: router-gateway, serviceAccountRef: {name: router-gateway-pki, audiences: [vault]}}
+  - it: renders nothing without a cluster domain
+    set:
+      routerGateway.clusterDomain: ""
+    asserts:
+      - hasDocuments: {count: 0}

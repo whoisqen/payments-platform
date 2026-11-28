@@ -386,6 +386,51 @@
                       "pattern": "^[a-z0-9.-]+$"
                     }
                   }
+                },
+                "cellGateway": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "namespace",
+                    "serviceAccount",
+                    "domain"
+                  ],
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "serviceAccount": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "edgeClient": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "namespace",
+                    "serviceAccount",
+                    "uriSans"
+                  ],
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "serviceAccount": {
+                      "type": "string"
+                    },
+                    "uriSans": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^spiffe://[a-z0-9.-]+/ns/[a-z0-9-]+/sa/[a-z0-9-]+$"
+                      }
+                    }
+                  }
                 }
               }
             },

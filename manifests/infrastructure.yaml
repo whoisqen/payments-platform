@@ -23,6 +23,7 @@ modules:
   admin-agent-env: {purpose: read-only role of the admin AI agent in an environment (OpenSearch search on its own stream, named log groups, namespace-scoped kubectl view), out: [role_arn]}
   sentry-alerts: {purpose: Sentry issue alert rules that post high and critical issues to the Slack channel, out: []}
   cell-migration: {purpose: SSM documents and the cell-copy function that move a merchant between cells, out: []}
+  cell-endpoint: {purpose: internal NLB and private zone of the mutual-TLS router gateway of a cell for the edge, out: [host, target_group_arn]}
   secrets-replica: {purpose: Secrets Manager multi-Region replicas, out: [secret_arns]}
 stacks:
   bootstrap: infra/bootstrap (state bucket, lockfile, KMS, CI roles; apply with local state first)
