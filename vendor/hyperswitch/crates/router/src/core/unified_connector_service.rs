@@ -2458,7 +2458,7 @@ pub fn build_unified_connector_service_payment_method(
                     source_bank_account_id: source_bank_account_id.map(|v| v.expose_inner()),
                     destination_bank_account_id: destination_bank_account_id.map(|v| v.expose_inner()),
                     expiry_date: expiry_date.map(|dt| {
-                        dt.format(&time::format_description::well_known::Iso8601::DEFAULT)
+                        dt.assume_utc().format(&time::format_description::well_known::Iso8601::DEFAULT)
                             .unwrap_or_default()
                     }),
                 })),
