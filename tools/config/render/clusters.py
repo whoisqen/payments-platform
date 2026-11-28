@@ -20,9 +20,15 @@ def clusters(cfg, live=None):
              "name": f"{prefix}-{env}-{SHORT[region]}-{component}"}
         if component == "central":
             # Argo CD and Vault run here; the cluster Secret needs no credentials
-            c.update(inCluster=True, eksName=f"{prefix}-{env}-{SHORT[region]}-central", labels={"payments-platform/central": "enabled", "payments-platform/vault": "enabled"})
+            # Argo CD, Vault and the CloudWatch exporter (YACE) of the platform run here
+            c.update(inCluster=True, eksName=f"{prefix}-{env}-{SHORT[region]}-central",
+                     labels={"payments-platform/central": "enabled", "payments-platform/vault": "enabled",
+                             "payments-platform/argocd": "enabled", "payments-platform/cloudwatch": "enabled"})
         elif component == "analytics":
-            c["labels"] = {"payments-platform/kafka": "enabled"}
+            c["labels"] = {"payments-platform/kafka": "enabled", "payments-platform/clickhouse": "enabled"}
+        elif env == "stage" and region == "eu-central-1" and component == "cell-0":
+            # The k6 Operator runs the load tests of stage from this cell (tests/load)
+            c["labels"] = {"payments-platform/loadgen": "enabled"}
         out.append(c)
     return out
 

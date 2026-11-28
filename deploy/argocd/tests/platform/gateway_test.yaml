@@ -54,12 +54,10 @@ tests:
           path: spec.template.spec.sources[0].helm.parameters
           content:
             name: region
-            value: eu-central-1
+            value: '{{ index .metadata.labels "payments-platform/region" }}'
       - contains:
           path: spec.template.spec.sources[0].helm.parameters
           content:
-            name: vpcId
-            value: '{{ index .metadata.labels "payments-platform/vpc-id" }}'
-      - contains:
-          path: spec.generators[0].clusters.selector.matchExpressions
-          content: {key: payments-platform/vpc-id, operator: Exists}
+            name: vpcTags.Name
+            value: 'acme-{{ index .metadata.labels "payments-platform/environment" }}-{{ regexReplaceAll "^([a-z]{2})-([a-z])[a-z]*-([0-9])$" (index .metadata.labels "payments-platform/region") "${1}${2}${3}" }}-vpc'
+

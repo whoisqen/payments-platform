@@ -172,7 +172,7 @@ lockerClient:
   secretName: locker-client-tls
   # https://vault.<zone>:8200, set by the environment layer
   vaultServer: ""
-  # Empty: kubernetes for cell-0 (the cluster Vault runs in), kubernetes-<cell> otherwise, as deploy/platform/vault/config
+  # Empty: k8s-<prefix>-<env>-<region short>-<cell>, the jwt mount of this cell cluster in the central Vault (deploy/platform/vault/config)
   authMount: ""
   pkiMount: pki-mesh
   uriSan: spiffe://payments-platform/ns/payments/sa/router
