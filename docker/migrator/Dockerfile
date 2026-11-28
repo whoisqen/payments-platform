@@ -32,7 +32,7 @@ RUN curl -fsSLo awscli.zip "https://awscli.amazonaws.com/awscli-exe-linux-aarch6
     && unzip -q awscli.zip \
     && ./aws/install --install-dir /out/aws-cli --bin-dir /out/aws-bin
 COPY --from=diesel /out/bin/diesel /out/bin/diesel
-COPY docker/_common/collect-libs.sh /usr/local/bin/collect-libs.sh
+COPY --chmod=0755 docker/_common/collect-libs.sh /usr/local/bin/collect-libs.sh
 # The entrypoints are bash (the D3 snapshot script, the advisory lock of migrate.sh), so exactly the programs they call
 # are copied onto distroless with their libraries; Debian's /usr/bin/psql is a perl wrapper, the real binary is taken.
 RUN set -eu; \
