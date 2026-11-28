@@ -1,0 +1,126 @@
+name: publish-images
+
+on:
+  push:
+    branches: [tmp/publish-images]
+
+permissions: {}
+
+jobs:
+  # one native runner per architecture: hyperswitch release builds under QEMU do not fit any timeout
+  ghcr-build:
+    runs-on: ${{ matrix.arch == 'arm64' && (vars.RUNNER_GHCR_ARM64 || 'ubuntu-24.04-arm') || (vars.RUNNER_GHCR_AMD64 || 'ubuntu-latest') }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [router, drainer, scheduler, locker, control-center, vault-snapshot, smoke]
+        arch: [amd64, arm64]
+    env:
+      SERVICE: ${{ matrix.service }}
+      ARCH: ${{ matrix.arch }}
+      SHA: ${{ github.sha }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: free disk for the Rust release build
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: build the same reproducible image as images.yml
+        run: |
+          # the last commit that touched the image inputs fixes timestamps, as in images.yml
+          mapfile -t paths < <(python3 tools/ci/changed_images.py --paths "$SERVICE")
+          input_sha=$(git log -1 --format=%H "$SHA" -- "${paths[@]}")
+          epoch=$(git log -1 --format=%ct "$input_sha")
+          mapfile -t common < <(sed 's/^/--build-arg=/' docker/_common/build-args.env)
+          docker buildx build "${common[@]}" \
+            --file "docker/${SERVICE}/Dockerfile" \
+            --platform "linux/${ARCH}" \
+            --provenance=false --sbom=false \
+            --build-arg "SOURCE_DATE_EPOCH=${epoch}" \
+            --build-arg "REVISION=${input_sha}" \
+            --build-arg "CREATED=$(date -u -d "@${epoch}" +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg "SOURCE_URL=${REPO_URL}" \
+            --output "type=oci,dest=${RUNNER_TEMP}/oci,tar=false,rewrite-timestamp=true,oci-mediatypes=true" \
+            .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ghcr-${{ matrix.service }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/oci
+          retention-days: 1
+
+  # the only job that writes packages: it pushes both architectures, joins them in one index, signs and attests
+  ghcr-publish:
+    needs: [ghcr-build]
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [router, drainer, scheduler, locker, control-center, vault-snapshot, smoke]
+    env:
+      SERVICE: ${{ matrix.service }}
+      VERSION: v1.0.0
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          install_args: cosign syft crane
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: ghcr-${{ matrix.service }}-*
+          path: ${{ runner.temp }}/oci
+      - name: push both architectures and the index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad version"; exit 1; }
+          image="ghcr.io/${REPO,,}/${SERVICE}"
+          crane auth login ghcr.io -u "$ACTOR" --password-stdin <<<"$GH_TOKEN"
+          # a published version is never overwritten; a re-run only completes signing and attestation
+          if digest=$(crane digest "${image}:${VERSION}" 2>/dev/null); then
+            echo "${image}:${VERSION} exists"
+          else
+            refs=()
+            for arch in amd64 arm64; do
+              crane push "${RUNNER_TEMP}/oci/ghcr-${SERVICE}-${arch}" "${image}:${VERSION}-${arch}"
+              refs+=(--manifest "${image}@$(crane digest "${image}:${VERSION}-${arch}")")
+            done
+            crane index append "${refs[@]}" --tag "${image}:${VERSION}"
+            digest=$(crane digest "${image}:${VERSION}")
+          fi
+          echo "IMAGE=${image}" >>"$GITHUB_ENV"
+          echo "DIGEST=${digest}" >>"$GITHUB_ENV"
+      - name: already signed by this workflow
+        id: signed
+        run: |
+          if cosign verify --certificate-identity-regexp "^https://github.com/${REPO}/.github/workflows/publish-images.yml@.*$" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "${IMAGE}@${DIGEST}" >/dev/null 2>&1; then
+            echo "done=true" >>"$GITHUB_OUTPUT"
+          fi
+      - name: sbom of each architecture
+        if: steps.signed.outputs.done != 'true'
+        run: |
+          for arch in amd64 arm64; do
+            platform_digest=$(crane digest --platform "linux/${arch}" "${IMAGE}@${DIGEST}")
+            syft "registry:${IMAGE}@${platform_digest}" -o "cyclonedx-json=${RUNNER_TEMP}/sbom-${arch}.cdx.json"
+            cosign attest --yes --type cyclonedx --predicate "${RUNNER_TEMP}/sbom-${arch}.cdx.json" "${IMAGE}@${platform_digest}"
+          done
+      - name: sign the index and both images
+        if: steps.signed.outputs.done != 'true'
+        run: cosign sign --yes --recursive "${IMAGE}@${DIGEST}"
