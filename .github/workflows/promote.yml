@@ -139,11 +139,23 @@ jobs:
           PERF_MAX_FAILED_RATE: ${{ vars.PERF_MAX_FAILED_RATE }}
         run: python3 tools/ci/promote/perf_gate.py
 
+  # The promotion pull request is opened by the promotion GitHub App; until its id and key are set the run only reports that
+  app-missing:
+    needs: [plan]
+    if: needs.plan.result == 'success' && needs.plan.outputs.hold != 'true' && vars.PROMOTE_APP_ID == ''
+    runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - env:
+          TARGET: ${{ needs.plan.outputs.env }}
+        run: echo "::notice::promotion to ${TARGET} skipped; set the variable PROMOTE_APP_ID and the secret PROMOTE_APP_PRIVATE_KEY (docs/architecture/operations/deploy.md)"
+
   pr:
     needs: [plan, stage-integration, perf-gate]
     # dev, stage and hotfix promotions skip the stage checks; a planned prod promotion needs both green
     if: >-
-      always() && needs.plan.result == 'success' && needs.plan.outputs.hold != 'true' &&
+      always() && needs.plan.result == 'success' && needs.plan.outputs.hold != 'true' && vars.PROMOTE_APP_ID != '' &&
       ((needs.stage-integration.result == 'success' && needs.perf-gate.result == 'success') ||
       (needs.plan.outputs.env != 'prod' || needs.plan.outputs.mode != 'copy'))
     runs-on: ${{ vars.RUNNER_LIGHT || 'ubuntu-latest' }}

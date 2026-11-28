@@ -68,8 +68,10 @@ jobs:
 
   build:
     if: github.event_name == 'push' && !github.event.created && startsWith(github.ref, 'refs/heads/release/')
+    # the same permissions images.yml asks for; a missing one fails the whole workflow at startup
     permissions:
       contents: read
+      actions: read
       id-token: write
       attestations: write
     uses: ./.github/workflows/images.yml
