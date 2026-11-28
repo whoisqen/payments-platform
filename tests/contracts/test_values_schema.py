@@ -66,7 +66,9 @@ class SchemaValidatorItself(unittest.TestCase):
 
     def test_missing_digest_is_reported(self):
         vals = model.load_yaml(model.CHARTS / "router" / "values.yaml")
-        self.assertTrue(any("missing required digest" in e for e in minischema.errors(vals, schema("router"))))
+        # an image needs a digest, or a tag on a local cluster: without both the schema reports the anyOf
+        found = minischema.errors(vals, schema("router"))
+        self.assertTrue(any("missing required digest" in e or "matches none of anyOf" in e for e in found), found)
 
     def test_unexpected_property_and_wrong_type_are_reported(self):
         vals = model.with_digest(model.load_yaml(model.CHARTS / "router" / "values.yaml"))
