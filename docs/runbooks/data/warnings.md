@@ -287,31 +287,6 @@ Ticket to data-platform; analytics are outside the payment path.
 
 `pay-runbook-click-house-disk-low`
 
-## open-search-disk-low
-
-Alert `OpenSearchDiskLow`, severity warning, owner security-oncall, dashboard https://grafana.payments.internal/d/data-stores.
-
-### Symptom
-
-Free storage (in MB) of a data node dropped below 20480.
-
-### Diagnostics
-
-1. Collect one report: GitHub Actions `runbook-diagnose` (`workflow_dispatch`, input `alert=OpenSearchDiskLow`) runs the read-only step of SSM document `pay-runbook-open-search-disk-low`.
-2. Check the index lifecycle: hot retention is 3 months.
-
-### Actions
-
-1. Delete expired indices through the lifecycle policy or add storage through Terraform.
-
-### Escalation
-
-Ticket to security and data-platform.
-
-### SSM document
-
-`pay-runbook-open-search-disk-low`
-
 ## kafka-consumer-lag-high
 
 Alert `KafkaConsumerLagHigh`, severity warning, owner data-platform-oncall, dashboard https://grafana.payments.internal/d/data-stores.

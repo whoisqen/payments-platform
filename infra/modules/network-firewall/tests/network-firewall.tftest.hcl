@@ -199,3 +199,19 @@ run "one_firewall_az_rejected_outside_dev" {
 
   expect_failures = [var.firewall_subnet_ids]
 }
+
+run "platform_domains_join_the_private_tier_group" {
+  command = plan
+
+  variables {
+    psp_domains             = []
+    ci_source_cidrs         = ["10.140.0.0/16"]
+    ci_trusted_source_cidrs = ["10.140.0.0/19", "10.140.32.0/19", "10.140.64.0/19"]
+    platform_domains        = ["grafana.com"]
+  }
+
+  assert {
+    condition     = can(regex("tls.sni; content:\"grafana.com\"; nocase; startswith; endswith", aws_networkfirewall_rule_group.ci_trusted[0].rule_group[0].rules_source[0].rules_string))
+    error_message = "grafana.com is passed exactly, without subdomains"
+  }
+}

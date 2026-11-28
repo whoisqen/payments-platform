@@ -1,0 +1,12 @@
+# logstash
+
+Central log pipeline (shared-services, namespace `monitoring`): the node collectors of every environment send OTLP/HTTP JSON to `central.logs_otlp_endpoint`; Logstash writes one document per log record into the data stream `logs-app-<env>` of the central OpenSearch.
+
+- Entry: Gateway `logs` (internal NLB) with a TLS listener in Passthrough mode on the host and port of `central.logs_otlp_endpoint`, TLSRoute to the `http` input on 8443. Logstash terminates TLS and requires the client certificate; Secret `logstash-tls` (add-on source `central-tls`, `<prefix>/shared-services/logstash/tls`) holds `tls.crt`, `tls.key` (PKCS#8) and `ca.crt`, the CA of the collector client certificates.
+- Filter (`files/otlp_logs.rb`, with its own tests run at pipeline start): one event per `resourceLogs/scopeLogs/logRecords`; `@timestamp`, `body` (string, a structured body as JSON), `severity.text` and `.number` (from the record, else the level in the body, else `UNSPECIFIED`), `resource.<attribute>` (environment, region, cluster, namespace, pod, container, service), `attributes.<attribute>`, `traceId`, `spanId`, `instrumentationScope`. Luhn-valid numbers of 13-19 digits are masked to the first 6 and last 4 digits, after the collector's redaction. Debug and trace records of `pipeline.dropDebugEnvironments` are dropped; elsewhere they keep `attributes.log.retention: debug`.
+- Data stream `logs-app-<deployment.environment.name>`, `unknown` without the attribute. Records without `resource.service.name`, other paths and bodies that are not JSON go to the dead letter queue, as do the mapping rejections (400 and 404) of OpenSearch.
+- Output: `opensearch` plugin, `action => create`, `auth_type => aws_iam` (service `es`). The plugin's AWS SDK has no EKS Pod Identity support, so the role comes through IRSA (`serviceAccount.roleArn`, `infra/modules/log-ingestion`). Index templates and ISM belong to `infra/modules/opensearch-indices`.
+- StatefulSet of 3 pods, fixed size (a scale-in would strand a persistent queue), PDB of one, anti-affinity by host, spread by zone. Persistent queue (`queue.max_bytes`) and dead letter queue on a gp3 PVC per pod; Logstash refuses to start when the queue would not fit the volume.
+- Logs: console only (log4j2 JSON); read-only root filesystem, `/tmp` an emptyDir capped at 512 MiB.
+- Metrics: `logstash-exporter` sidecar on 9198 reads the monitoring API (9600), ServiceMonitor `logstash`.
+- Images: copy both index-preserving into the platform ECR (`global.registry`); Renovate bumps tag and digest together.

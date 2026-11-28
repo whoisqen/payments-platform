@@ -38,6 +38,7 @@ locals {
 
   kms_keys = {
     "ebs-nodes" = { user_role_arns = [local.autoscaling_slr_arn] }
+    "logs"      = { service_principals = ["logs.amazonaws.com"] }
     "shared"    = {}
   }
 
@@ -57,6 +58,8 @@ locals {
     "ecr-public" = { upstream_registry_url = "public.ecr.aws" }
     "k8s"        = { upstream_registry_url = "registry.k8s.io" }
     "quay"       = { upstream_registry_url = "quay.io" }
+    # Logstash (opensearchproject/logstash-oss-with-opensearch-output-plugin) and kuskoman/logstash-exporter exist only on Docker Hub
+    "docker-hub" = { upstream_registry_url = "registry-1.docker.io", credentials = true }
   }
 
   # Central observability cluster (outside the CDE): same cluster build as a cell, without the cde pool.
@@ -66,7 +69,7 @@ locals {
   central_cpu_limits     = { workers = 200, stateful = 200, "ci-build" = 64 }
   # ci-build: BuildKit pods of the image builds (Spot, arm64, label pay.io/pool=ci-build, taint workload=ci-build).
   central_enabled_pools = ["workers", "stateful", "ci-build"]
-  # Spot only for ci-build (central_spot_pools lists none); the stateful pool (VictoriaMetrics, Loki, Tempo, Sentry stores) stays on demand.
+  # Spot only for ci-build (central_spot_pools lists none); the stateful pool (VictoriaMetrics, Tempo, Logstash, Sentry stores) stays on demand.
   central_spot_pools = []
   # Argo CD manages its own cluster in-cluster through its service accounts, so the central cluster has no argocd entry (argocd-access depends on this cluster).
   access_entries = {
@@ -77,4 +80,17 @@ locals {
   }
 
   deletion_protection = true
+
+  # Central log domain (central.opensearch). Volume from docs/architecture/cost: application logs about 30 GB a day (the 900 GB-month
+  # of 30-day log storage), audit about 30 GB a day (EKS control plane 870 GB a month over prod, stage and dev, plus 50 GB of CloudTrail).
+  # Hot with one replica: app 30 x 7 x 2 = 420 GB, audit 30 x 30 x 2 = 1,800 GB; with 25% free for the disk watermarks, 3,000 GB on 6 x 600 GB.
+  # UltraWarm (no replica): app 30 x 23 = 690 GB, audit 30 x 335 = 10 TB; 8 x ultrawarm1.medium hold 12 TiB.
+  logs_domain = {
+    data_instance_type = "r7g.xlarge.search"
+    data_node_count    = 6
+    volume_size_gb     = 600
+    warm_instance_type = "ultrawarm1.medium.search"
+    warm_node_count    = 8
+    log_retention_days = 90
+  }
 }

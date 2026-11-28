@@ -1,0 +1,29 @@
+{{- $host := required "host is required (central.opensearch.dashboards_host)" .Values.host }}
+{{- $labels := include "platform-common.labels" (dict "root" . "cfg" .Values "name" "opensearch-dashboards" "component" "opensearch-dashboards") }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: opensearch-dashboards
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      sectionName: {{ .Values.gateway.sectionName }}
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    # Only Dashboards; the REST API of the domain is not published on this host
+    - matches:
+        - path: {type: PathPrefix, value: /_dashboards}
+      backendRefs:
+        - name: opensearch-dashboards
+          port: 443
+    - matches:
+        - path: {type: Exact, value: /}
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            path: {type: ReplaceFullPath, replaceFullPath: /_dashboards/}
+            statusCode: 302

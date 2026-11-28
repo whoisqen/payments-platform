@@ -36,7 +36,16 @@ envFromSecrets:
   - name: grafana-oidc
   - name: grafana-database
 
+# Data source plugin of the central OpenSearch, pinned; installed at start from grafana.com (the egress allow list must admit it)
+plugins:
+  - grafana-opensearch-datasource 2.34.7
+
 grafana.ini:
+  # SigV4 for the OpenSearch data source with the default AWS chain (the Pod Identity credentials of the grafana service account)
+  aws:
+    allowed_auth_providers: default
+  auth:
+    sigv4_auth_enabled: true
   database:
     type: postgres
     ssl_mode: require
@@ -83,17 +92,28 @@ datasources:
         jsonData:
           httpMethod: POST
           timeInterval: 30s
-      - name: Loki
-        uid: loki
-        type: loki
+      # The central OpenSearch (data streams logs-app-<env>), signed with SigV4 by the Grafana Pod Identity role
+      - name: OpenSearch
+        uid: opensearch
+        type: grafana-opensearch-datasource
         access: proxy
-        url: http://loki-gateway.monitoring.svc
+        url: ${OPENSEARCH_URL}
         jsonData:
-          derivedFields:
-            # OTLP logs carry the trace id as structured metadata
-            - name: trace_id
-              matcherType: label
-              matcherRegex: trace_id
+          flavor: opensearch
+          version: 2.17.0
+          database: logs-app-*
+          timeField: "@timestamp"
+          logMessageField: body
+          logLevelField: severity.text
+          maxConcurrentShardRequests: 5
+          pplEnabled: true
+          serverless: false
+          sigV4Auth: true
+          sigV4AuthType: default
+          sigV4Region: ${AWS_REGION}
+          dataLinks:
+            # traceId of a record opens the trace in Tempo
+            - field: traceId
               datasourceUid: tempo
               url: $${__value.raw}
       - name: Tempo
@@ -103,12 +123,11 @@ datasources:
         url: http://tempo-query-frontend.monitoring.svc:3200
         jsonData:
           tracesToLogsV2:
-            datasourceUid: loki
+            datasourceUid: opensearch
             spanStartTimeShift: -5m
             spanEndTimeShift: 5m
-            filterByTraceID: true
-            tags:
-              - {key: service.name, value: service_name}
+            customQuery: true
+            query: 'traceId:"$${__span.traceId}"'
           tracesToMetrics:
             datasourceUid: victoriametrics
             spanStartTimeShift: -5m
@@ -126,8 +145,6 @@ datasources:
             datasourceUid: victoriametrics
           nodeGraph:
             enabled: true
-          lokiSearch:
-            datasourceUid: loki
       - name: Alertmanager
         uid: alertmanager
         type: alertmanager

@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "global",
+    "image",
+    "exporter",
+    "replicas",
+    "serviceAccount",
+    "opensearch",
+    "pipeline",
+    "input",
+    "gateway",
+    "heap",
+    "resources",
+    "persistence",
+    "pdb",
+    "networkPolicy",
+    "serviceMonitor"
+  ],
+  "$defs": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag",
+        "digest"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._/-]*$"
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "required": [
+            "cpu",
+            "memory"
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "required": [
+            "memory"
+          ]
+        }
+      }
+    },
+    "host": {
+      "type": "string",
+      "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$"
+    },
+    "size": {
+      "type": "string",
+      "pattern": "^[0-9]+(kb|mb|gb)$"
+    }
+  },
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "pattern": "^([a-z0-9.-]+(:[0-9]+)?(/[a-z0-9._-]+)*)?$"
+        }
+      }
+    },
+    "image": {
+      "$ref": "#/$defs/image"
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "resources"
+      ],
+      "properties": {
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
+      }
+    },
+    "replicas": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "roleArn"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "logstash"
+        },
+        "roleArn": {
+          "type": "string",
+          "pattern": "^(arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+)?$"
+        }
+      }
+    },
+    "opensearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "region"
+      ],
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/host"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^([a-z]{2}(-[a-z]+)+-[0-9])?$"
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataStreamPrefix",
+        "fallbackEnvironment",
+        "dropDebugEnvironments",
+        "workers",
+        "batchSize",
+        "queueMaxBytes",
+        "deadLetterQueueMaxBytes"
+      ],
+      "properties": {
+        "dataStreamPrefix": {
+          "type": "string",
+          "pattern": "^logs-[a-z0-9-]+-$"
+        },
+        "fallbackEnvironment": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "dropDebugEnvironments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          }
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "queueMaxBytes": {
+          "$ref": "#/$defs/size"
+        },
+        "deadLetterQueueMaxBytes": {
+          "$ref": "#/$defs/size"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port",
+        "threads",
+        "maxPendingRequests",
+        "maxContentLength",
+        "tlsSecretName"
+      ],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPendingRequests": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxContentLength": {
+          "type": "integer",
+          "minimum": 1048576
+        },
+        "tlsSecretName": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "name",
+        "hostname",
+        "port"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "$ref": "#/$defs/host"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "heap": {
+      "type": "string",
+      "pattern": "^[0-9]+[mg]$"
+    },
+    "resources": {
+      "$ref": "#/$defs/resources"
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storageClass",
+        "size"
+      ],
+      "properties": {
+        "storageClass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+        }
+      }
+    },
+    "pdb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "maxUnavailable": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "awsCidrs"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "awsCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9.]+/[0-9]{1,2}$"
+          }
+        }
+      }
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "interval"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m)$"
+        }
+      }
+    },
+    "platform-common": {
+      "type": "object"
+    }
+  }
+}

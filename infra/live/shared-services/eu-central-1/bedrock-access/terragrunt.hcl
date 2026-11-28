@@ -4,7 +4,7 @@ include "root" {
 }
 
 include "envcommon" {
-  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/security/bedrock-access.hcl"
+  path   = "${dirname(find_in_parent_folders("terragrunt.hcl"))}/_envcommon/ai/bedrock-access.hcl"
   expose = true
 }
 

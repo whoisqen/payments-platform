@@ -59,7 +59,21 @@ tests:
           path: spec.template.spec.sources[0].helm.parameters
           content:
             name: replicaCount
-            value: '{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") }}1{{ else }}0{{ end }}'
+            value: '{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") (eq (index .metadata.labels "payments-platform/central") "enabled") }}1{{ else }}0{{ end }}'
+  - it: lets YACE read the central OpenSearch and its ingestion pipelines on the central cluster
+    template: addons/exporters/yace.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content:
+            name: platform.central
+            value: '{{ index .metadata.labels "payments-platform/central" }}'
+  - it: gives the node collectors the cluster name for the resource of every record
+    template: addons/otel-collector.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.sources[0].helm.parameters
+          content: {name: "extraEnvs[5].value", value: '{{ .name }}'}
   - it: layers the container log and event overlay after the generated collector values
     template: addons/otel-collector.yaml
     asserts:

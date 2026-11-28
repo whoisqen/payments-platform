@@ -28,14 +28,12 @@ class RenderGrafanaTest(unittest.TestCase):
         self.assertEqual(render_grafana.region_short("eu-central-1"), "euc1")
         self.assertEqual(render_grafana.region_short("us-east-2"), "use2")
 
-    def test_buckets_follow_the_naming_contract(self):
+    def test_the_bucket_follows_the_naming_contract(self):
         prefix, region = CFG["naming"]["prefix"], CFG["regions"]["working"]
         short = render_grafana.region_short(region)
-        loki = load(PLATFORM / "loki" / "storage.yaml")["loki"]["storage"]
-        self.assertEqual(set(loki["bucketNames"].values()), {f"{prefix}-shared-services-{short}-loki"})
-        self.assertEqual(loki["s3"]["region"], region)
         tempo = load(PLATFORM / "tempo" / "storage.yaml")["storage"]["trace"]["s3"]
         self.assertEqual(tempo["bucket"], f"{prefix}-shared-services-{short}-tempo")
+        self.assertEqual(tempo["region"], region)
 
     def test_every_dashboard_is_provisioned_in_a_folder(self):
         sources = {p.name for p in render_grafana.DASHBOARDS.glob("*/*.json")}
@@ -65,9 +63,6 @@ class RenderGrafanaTest(unittest.TestCase):
                 self.assertEqual(item["remoteRef"]["key"], f"{prefix}/shared-services/grafana/{secret}")
 
     def test_sizing_of_the_stores(self):
-        loki = yaml.safe_load((PLATFORM / "loki" / "values.yaml").read_text(encoding="utf-8"))
-        self.assertEqual(loki["loki"]["limits_config"]["retention_period"], "720h")
-        self.assertEqual((loki["write"]["replicas"], loki["read"]["replicas"], loki["backend"]["replicas"]), (3, 3, 3))
         tempo = yaml.safe_load((PLATFORM / "tempo" / "values.yaml").read_text(encoding="utf-8"))
         self.assertEqual(tempo["compactor"]["config"]["compaction"]["block_retention"], "336h")
         self.assertTrue(tempo["traces"]["otlp"]["grpc"]["enabled"])

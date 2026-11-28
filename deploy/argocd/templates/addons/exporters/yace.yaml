@@ -40,9 +40,12 @@ spec:
               # One cluster per environment and region carries this label and reads the regional and global services
               - name: platform.shared
                 value: '{{`{{ index .metadata.labels "payments-platform/cloudwatch" }}`}}'
-              # A cluster with neither a cell nor the label has no job: no pod, no API calls
+              # The central cluster reads the central OpenSearch domain and its ingestion pipelines
+              - name: platform.central
+                value: '{{`{{ index .metadata.labels "payments-platform/central" }}`}}'
+              # A cluster with neither a cell nor one of the labels has no job: no pod, no API calls
               - name: replicaCount
-                value: '{{`{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") }}1{{ else }}0{{ end }}`}}'
+                value: '{{`{{ if or (regexMatch "-(cell-[0-9]+|spare)$" .name) (eq (index .metadata.labels "payments-platform/cloudwatch") "enabled") (eq (index .metadata.labels "payments-platform/central") "enabled") }}1{{ else }}0{{ end }}`}}'
         # The NetworkPolicy of the exporter
         - repoURL: {{ .Values.repo.url }}
           targetRevision: {{ .Values.repo.revision }}

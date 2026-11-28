@@ -20,7 +20,7 @@ The organization layout:
 |---|---|---|
 | Root | management | Organizations, billing, SCPs, IAM Identity Center; no workloads |
 | Security | log-archive, audit | Organization trail, AWS Config and flow logs in an Object Lock bucket; delegated admin of GuardDuty, Security Hub, Inspector, Macie |
-| Infrastructure | network, shared-services, backup | Transit gateway and egress, ECR, CI runners, central observability, Vault snapshots, locked backup vaults |
+| Infrastructure | network, shared-services, backup | Transit gateway and egress, ECR, CI runners, central observability and the central log domain, Vault snapshots, locked backup vaults |
 | Workloads/CDE | cde-dev, cde-stage, cde-prod | Router, locker, drainer, scheduler and their data stores |
 | Workloads/NonCDE | platform-dev, platform-stage, platform-prod | Control center, analytics |
 | Sandbox | sandbox-preview | Short-lived preview environments without card data |

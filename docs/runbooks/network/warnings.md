@@ -40,7 +40,7 @@ The WAF has been blocking over 100 requests per second for 10 minutes.
 ### Diagnostics
 
 1. Collect one report: GitHub Actions `runbook-diagnose` (`workflow_dispatch`, input `alert=WafBlockedRequestsHigh`) runs the read-only step of SSM document `pay-runbook-waf-blocked-requests-high`.
-2. Check the top rules and source ASNs in the WAF logs (OpenSearch dashboard).
+2. Check the top rules and source ASNs in the WAF logs (CloudWatch Logs Insights on the WAF log group).
 3. Check the authorization rate: a drop with high blocks suggests false positives.
 
 ### Actions

@@ -28,7 +28,7 @@ spec:
           chart: tempo-distributed
           targetRevision: 1.61.3
           helm:
-            # Fixed release name: the Services (loki-gateway, tempo-distributor) are what the front door and Grafana address
+            # Fixed release name: Grafana addresses the Services of the release (tempo-query-frontend, tempo-distributor) by name
             releaseName: tempo
             valueFiles:
               - $values/deploy/platform/tempo/values.yaml

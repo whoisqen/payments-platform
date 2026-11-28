@@ -15,7 +15,7 @@ set:
   central.alertmanagerHost: alertmanager.example.test
   central.dedupInterval: 30s
   central.sentryUrl: https://sentry.example.test
-  central.logsOtlpEndpoint: https://logs.example.test:4318/otlp
+  central.logsOtlpEndpoint: https://logs.example.test:4318
   central.tracesOtlpEndpoint: tempo.example.test:4317
 tests:
   - it: runs the database exporters in every cluster with add-ons

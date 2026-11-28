@@ -27,6 +27,14 @@ KAFKA_LAG = 100000
 CLICKHOUSE_DELAY_S = 300
 CLICKHOUSE_DISK_FREE_RATIO = 0.15
 SUBNET_FREE_IP_RATIO = 0.2
+OS_JVM_WARN_PCT = 80
+OS_JVM_CRIT_PCT = 92
+OS_CPU_PCT = 80
+OS_FREE_PCT = 20
+OS_SHARDS_PER_NODE = 900
+LOGSTASH_QUEUE_WARN = 0.5
+LOGSTASH_QUEUE_CRIT = 0.8
+LOGSTASH_HEAP_PCT = 85
 CLOCK_DRIFT_S = 0.1
 CERT_EXPIRY_CRIT_D = 14
 WAF_BLOCKED_RPS = 100
@@ -65,4 +73,12 @@ ALERT_LINKS = {
     "WafBlockedRequestsHigh": "WAF_BLOCKED_RPS",
     "NetworkFirewallDropsHigh": "FIREWALL_DROPS_PPS",
     "CloudFront5xxHigh": "CLOUDFRONT_5XX_PCT",
+    "LogsOpenSearchJvmPressureHigh": "OS_JVM_WARN_PCT",
+    "LogsOpenSearchJvmPressureCritical": "OS_JVM_CRIT_PCT",
+    "LogsOpenSearchCpuHigh": "OS_CPU_PCT",
+    "LogsOpenSearchStorageLow": "OS_FREE_PCT",
+    "LogsOpenSearchShardsPerNodeHigh": "OS_SHARDS_PER_NODE",
+    "LogstashQueueBacklogHigh": "LOGSTASH_QUEUE_WARN",
+    "LogstashQueueNearlyFull": "LOGSTASH_QUEUE_CRIT",
+    "LogstashJvmHeapHigh": "LOGSTASH_HEAP_PCT",
 }

@@ -100,3 +100,12 @@ class ConfigTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CentralLogsTest(unittest.TestCase):
+    def test_domain_name_longer_than_28_characters_is_rejected(self):
+        import copy
+        cfg = copy.deepcopy(yaml.safe_load((ROOT / "config" / "platform.yaml").read_text()))
+        self.assertEqual(validate.check(cfg), [])
+        cfg["central"]["opensearch"]["domain_name"] = "pay-shared-services-euc1-logs"
+        self.assertTrue(any("domain_name" in e for e in validate.check(cfg)))

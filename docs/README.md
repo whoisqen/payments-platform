@@ -23,7 +23,7 @@ The payments platform is a multi-tenant payment orchestrator on Hyperswitch, run
 
 **Operator** (on call):
 
-1. [Observability and alerting](architecture/runtime/observability.md), including the slow requests view.
+1. [Observability and alerting](architecture/runtime/observability.md), including the slow requests view, and [logging](architecture/runtime/logging.md): where logs are and how to read them.
 2. Runbooks in `runbooks/`, one per alert, grouped by layer.
 3. [Edge](architecture/runtime/edge.md) and [rate limiting and load shedding](architecture/runtime/rate-limiting.md).
 4. [Failover and failback](dr/failover.md), [drills](dr/drills.md).

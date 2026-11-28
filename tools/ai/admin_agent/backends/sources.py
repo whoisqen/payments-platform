@@ -1,13 +1,17 @@
 """Read-only data sources. Raw output only: nothing here is trusted or sent to the model; tools.py runs it through the pipeline."""
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.parse
 import urllib.request
 
-from .awsctx import ScopeError
 from ..config import check_https_host
+from . import sigv4
+from .awsctx import ScopeError
+
+INDEX = re.compile(r"^[a-z0-9][a-z0-9-]{0,200}$")
 
 
 class Sources:
@@ -24,11 +28,22 @@ class Sources:
         with urllib.request.urlopen(req, timeout=self.timeout) as r:  # noqa: S310 - https and host allow-list checked above
             return json.loads(r.read().decode("utf-8", "replace"))
 
-    def loki(self, query, minutes, limit):
-        now = time.time_ns()
-        qs = urllib.parse.urlencode({"query": query, "limit": limit, "direction": "backward", "start": now - minutes * 60 * 10**9, "end": now})
-        data = self._get_json(f"{self.env['loki_url']}/loki/api/v1/query_range?{qs}")
-        return [line for stream in data.get("data", {}).get("result", []) for _ts, line in stream.get("values", [])]
+    def opensearch(self, index, body):
+        """SigV4-signed `_search` on one index of the central OpenSearch; returns the `_source` of each hit."""
+        if not isinstance(index, str) or not INDEX.match(index):
+            raise ValueError("invalid OpenSearch index")
+        os_cfg = self.cfg["opensearch"]
+        # each environment reaches the central domain through its own managed VPC endpoint (infra <env>/eu-central-1/logs-endpoint)
+        base = self.env.get("opensearch_url") or os_cfg["url"]
+        url = f"{base.rstrip('/')}/{index}/_search"
+        check_https_host(url, self.hosts, "request URL")
+        data = json.dumps(body, sort_keys=True).encode("utf-8")
+        headers = {"Accept": "application/json", "Content-Type": "application/json",
+                   **sigv4.sign("POST", url, data, self.aws.creds, os_cfg["region"], "es")}
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=self.timeout) as r:  # noqa: S310 - https and host allow-list checked above
+            result = json.loads(r.read().decode("utf-8", "replace"))
+        return [hit.get("_source") or {} for hit in (result.get("hits") or {}).get("hits") or [] if isinstance(hit, dict)]
 
     def cloudwatch(self, group, filter_pattern, minutes, limit):
         now = int(time.time() * 1000)

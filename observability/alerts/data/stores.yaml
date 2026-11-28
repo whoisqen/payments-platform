@@ -70,33 +70,3 @@ spec:
         summary: ClickHouse disk has less than 15% free
         runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/data/warnings.md#click-house-disk-low'
         dashboard_url: '{{ $externalLabels.grafana_url }}/d/data-stores'
-    - alert: OpenSearchClusterRed
-      expr: max by (domain_name) (aws_es_cluster_statusred_maximum) >= 1
-      for: 5m
-      keep_firing_for: 5m
-      labels:
-        severity: critical
-        team: security
-        service: opensearch
-        owner: security-oncall
-        layer: data
-        failure_mode: data-open-search-cluster-red
-      annotations:
-        summary: OpenSearch domain status is red
-        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/data/open-search-cluster-red.md'
-        dashboard_url: '{{ $externalLabels.grafana_url }}/d/data-stores'
-    - alert: OpenSearchDiskLow
-      expr: min by (domain_name) (aws_es_free_storage_space_minimum) < 20480
-      for: 10m
-      keep_firing_for: 10m
-      labels:
-        severity: warning
-        team: security
-        service: opensearch
-        owner: security-oncall
-        layer: data
-        failure_mode: data-open-search-disk-low
-      annotations:
-        summary: OpenSearch has less than 20 GiB free per node
-        runbook_url: '{{ $externalLabels.runbook_base_url }}/docs/runbooks/data/warnings.md#open-search-disk-low'
-        dashboard_url: '{{ $externalLabels.grafana_url }}/d/data-stores'

@@ -1,0 +1,48 @@
+{{- $host := required "host is required (central.opensearch.dashboards_host)" .Values.host }}
+{{- $endpoint := required "endpoint is required (VPC endpoint host of the domain)" .Values.endpoint }}
+{{- $ca := required "caBundle is required (base64 PEM of the CA of the custom endpoint certificate)" .Values.caBundle }}
+{{- $labels := include "platform-common.labels" (dict "root" . "cfg" .Values "name" "opensearch-dashboards" "component" "opensearch-dashboards") }}
+# The VPC endpoint resolves to the domain's network interfaces; the gateway connects there by DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-dashboards
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ $endpoint }}
+  ports:
+    # Plain HTTP for the route; the BackendTLSPolicy turns it into TLS to the domain
+    - name: http
+      port: 443
+      appProtocol: http
+---
+# TLS from the gateway to the domain: SNI and certificate check on the custom endpoint, whose certificate the admin private CA signs
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: opensearch-dashboards
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: opensearch-dashboards
+  validation:
+    hostname: {{ $host | quote }}
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: opensearch-dashboards-ca
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-dashboards-ca
+  labels:
+    {{- $labels | nindent 4 }}
+data:
+  ca.crt: |
+    {{- $ca | b64dec | trim | nindent 4 }}

@@ -28,7 +28,7 @@ All findings except 2 are adopted: the owner rejected finding 2 and keeps a hot 
 | | Follow-on lines: fewer clusters and nodes lower CloudWatch, GuardDuty and Inspector, net of the Firehose export | | | 2,633 | | |
 | | **Total realized (finding 4 is avoided cost, not counted)** | | **201,588** | **153,796** | | |
 
-After the findings and the owner decisions, the estimate is **170,662 USD/month on demand** and **139,898 USD/month committed**: 0.412 and 0.337 USD per 1,000 payments ([README.md](README.md)).
+After the findings and the owner decisions, the estimate was 170,662 USD/month on demand and 139,898 USD/month committed. The central log domain, added after the audit, brings it to **173,570 USD/month on demand** and **142,618 USD/month committed**: 0.419 and 0.344 USD per 1,000 payments ([README.md](README.md)).
 The committed total also includes the new commitment model: Database Savings Plans replace the RDS and OpenSearch Reserved Instances. That model saves 1,353 USD/month less on prod than the reservations did, and it follows class changes.
 
 Where the realized figure differs from the audit estimate:
@@ -83,6 +83,7 @@ Where the realized figure differs from the audit estimate:
 - Change: in `config/environments/prod.yaml` set `msk` (3 x `kafka.m7g.large`, 1,000 GB), `opensearch` (3 data nodes) and `analytics_eks`, and halve the ClickHouse shards. Saving: MSK 4,461, ClickHouse 1,890, OpenSearch 1,386.
 - Risk: size from 30 days of `BytesInPerSec`, ClickHouse CPU and OpenSearch JVM pressure in CloudWatch and VictoriaMetrics. Resharding ClickHouse needs a planned copy.
 - Adopted: the analytics defaults in `infra/live/prod/env.hcl`: MSK 3 x `kafka.m7g.large` with 1,000 GB, 3 OpenSearch data nodes, and a 48 vCPU stateful cap for ClickHouse at 2 shards x 2 replicas.
+- Superseded for OpenSearch: the per-environment domains are removed. Logs of every environment go to the central domain in shared-services, priced in [central-observability.md](central-observability.md); the MSK and ClickHouse part stands.
 
 ### 6. Locker writer at db.r7g.12xlarge (prod)
 
@@ -147,8 +148,8 @@ Where the realized figure differs from the audit estimate:
 | gp3 against io2 | No io2 or io1 volume exists. Node, OpenSearch, ClickHouse and observability volumes are gp3; vmstorage buys 125 MB/s extra throughput for 18 USD/month. |
 | NAT gateways | NAT hours and GB are waived behind the Network Firewall endpoints. S3 and DynamoDB use gateway endpoints, and the AWS APIs use interface endpoints. |
 | Cross-AZ traffic | 307 USD/month in prod. Istio topology-aware routing keeps service-to-service calls in the AZ; cache and database traffic to the primary node crosses by design. |
-| Log retention elsewhere | Loki 30 days, Tempo 14 days, Sentry 90 days, MSK logs 30 days. Object backups go to Glacier Instant Retrieval after 7 days and Glacier Flexible Retrieval after 14 (D5). |
-| Observability storage | 2,887 USD/month for the central cluster, mostly nodes. Storage is under 400 USD/month. |
+| Log retention elsewhere | Application logs 30 days (7 hot, then UltraWarm), audit trail in OpenSearch 365 days (30 hot), Tempo 14 days, Sentry events 30 days and its file store 90 days, MSK logs 30 days. Object backups go to Glacier Instant Retrieval after 7 days and Glacier Flexible Retrieval after 14 (D5). |
+| Observability storage | 8,021 USD/month for the central cluster and the central log domain. The domain is 5,156 of it, mostly data and UltraWarm nodes; the cluster storage is under 400 USD/month. |
 | MemoryDB working cells | 2 shards x 3 nodes per cell match section 12 and the 3-AZ rule of the module. Cost moves only through reserved nodes. |
 | Shield Advanced | Not subscribed. Enabling it in `config/platform.yaml` adds 3,000 USD/month (one subscription per organization). |
 | Router autoscaling | The HPA targets 10 RPS per pod until the breakpoint test confirms 60. That adds about 2,300 USD/month on demand at the average load. |

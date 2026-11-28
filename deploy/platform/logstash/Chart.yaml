@@ -1,0 +1,10 @@
+apiVersion: v2
+name: logstash
+description: Central log pipeline of the platform - OTLP/HTTP from the node collectors of every environment into the data streams logs-app-<env> of the central OpenSearch
+type: application
+version: 0.1.0
+appVersion: "8.9.0"
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../../charts/platform-common

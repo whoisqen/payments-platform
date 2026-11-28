@@ -30,7 +30,7 @@ flowchart LR
 | `render_standby.py` | `deploy/envs/<env>/<standby region>/**` from the working region's cell list |
 | `render_vault.py` | Vault and External Secrets values per environment and region |
 | `render_central.py` | Alertmanager values from `observability/alertmanager` |
-| `render_grafana.py` | Grafana, Loki and Tempo files, dashboards ConfigMaps, organizations from `access.grafana_orgs` |
+| `render_grafana.py` | Grafana (with the OpenSearch data source) and Tempo files, dashboards ConfigMaps, organizations from `access.grafana_orgs` |
 | `render_victoria.py`, `render/render_vmalert.py` | Metrics store storage, backups and rule loading |
 | `render_otel.py` | OpenTelemetry collector values from the tested `observability/otel/collector.yaml` |
 | `render_exporters.py` | Exporter manifests from `observability/exporters` |

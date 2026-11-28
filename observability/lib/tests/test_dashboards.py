@@ -23,8 +23,10 @@ WIDE_LABELS = re.compile(r"by \((?:[a-z_]+, )*(pod|node|instance|namespace|horiz
 FILES = sorted((OBS / "dashboards").rglob("*.json"))
 DOCS = {p: json.loads(p.read_text()) for p in FILES}
 COUNTER = re.compile(r"(?:_total|_count|_sum|_bucket)$")
-# postgres_exporter names this counter without the suffix
-COUNTER_WITHOUT_SUFFIX = {"pg_stat_database_deadlocks"}
+# postgres_exporter and logstash-exporter name these counters without the suffix
+COUNTER_WITHOUT_SUFFIX = {"pg_stat_database_deadlocks", "logstash_stats_pipeline_events_in", "logstash_stats_pipeline_events_out",
+                          "logstash_stats_pipeline_plugin_bulk_requests_errors",
+                          "logstash_stats_pipeline_plugin_documents_non_retryable_failures"}
 FORBIDDEN =("payment_id", "customer_id", "token", "pan", "card")
 
 
@@ -44,7 +46,7 @@ def tempo_panels(doc):
 class DashboardStandardTest(unittest.TestCase):
     def test_all_levels_present(self):
         uids = {d["uid"] for d in DOCS.values()}
-        wanted = {"platform-overview", "slo-overview", "payments", "router", "locker", "drainer", "scheduler", "cells", "data-stores", "backup", "dr-switch", "cost", "kubernetes", "edge", "slow-requests"}
+        wanted = {"platform-overview", "slo-overview", "payments", "router", "locker", "drainer", "scheduler", "cells", "data-stores", "backup", "dr-switch", "cost", "kubernetes", "edge", "slow-requests", "logs"}
         self.assertEqual(wanted, uids)
 
     def test_committed_json_matches_generator(self):

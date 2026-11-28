@@ -128,11 +128,17 @@ run "pull_through_cache_rules_and_templates" {
     pull_through_cache = {
       "ecr-public" = { upstream_registry_url = "public.ecr.aws" }
       "quay"       = { upstream_registry_url = "quay.io" }
+      "docker-hub" = { upstream_registry_url = "registry-1.docker.io", credentials = true }
     }
   }
 
   assert {
-    condition     = length(aws_ecr_pull_through_cache_rule.this) == 2 && aws_ecr_pull_through_cache_rule.this["quay"].upstream_registry_url == "quay.io"
+    condition     = keys(aws_secretsmanager_secret.pull_through) == ["docker-hub"] && aws_secretsmanager_secret.pull_through["docker-hub"].name == "ecr-pullthroughcache/docker-hub"
+    error_message = "a registry with a login gets its credential secret under the name ECR reads"
+  }
+
+  assert {
+    condition     = length(aws_ecr_pull_through_cache_rule.this) == 3 && aws_ecr_pull_through_cache_rule.this["quay"].upstream_registry_url == "quay.io"
     error_message = "one rule per upstream registry"
   }
   assert {

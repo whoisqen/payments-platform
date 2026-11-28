@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["host", "endpoint", "caBundle", "gateway"],
+  "properties": {
+    "host": {"type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$"},
+    "endpoint": {"type": "string", "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)?$"},
+    "caBundle": {"type": "string", "pattern": "^[A-Za-z0-9+/=]*$"},
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "namespace", "sectionName"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "namespace": {"type": "string", "minLength": 1},
+        "sectionName": {"type": "string", "minLength": 1}
+      }
+    },
+    "platform-common": {"type": "object"}
+  }
+}

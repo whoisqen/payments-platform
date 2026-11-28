@@ -41,4 +41,6 @@ inputs = {
   nat_subnet_ids          = dependency.egress_vpc.outputs.subnet_ids["public"]
   ci_source_cidrs         = [dependency.vpc.outputs.vpc_cidr_block]
   ci_trusted_source_cidrs = dependency.vpc.outputs.private_cidr_blocks
+  # Grafana of the central cluster installs its OpenSearch data source plugin from grafana.com at start (deploy/platform/grafana)
+  platform_domains = ["grafana.com"]
 }

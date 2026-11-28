@@ -21,7 +21,7 @@ variable "environment" {
 
 variable "region_short" {
   type        = string
-  description = "Short region code of the provider region, for example euc1 (bucket pay-shared-services-euc1-loki)."
+  description = "Short region code of the provider region, for example euc1 (bucket pay-shared-services-euc1-tempo)."
 
   validation {
     condition     = can(regex("^[a-z]{2,3}[0-9]$", var.region_short))
@@ -56,8 +56,6 @@ variable "buckets" {
   }))
   description = "Stores by component: days until objects expire (null keeps them), an optional tiering transition and the service account of the one role of the bucket. A Standard-IA transition applies only when objects stay 30 days past it."
   default = {
-    # Chunks go to Standard-IA after 30 days; at a 30-day retention the rule stays inactive until the retention exceeds 60 days.
-    loki  = { retention_days = 30, namespace = "monitoring", service_account = "loki", transition = { days = 30, storage_class = "STANDARD_IA" } }
     tempo = { retention_days = 14, namespace = "monitoring", service_account = "tempo" }
     # Attachments and debug files are read unpredictably: Intelligent-Tiering moves cold ones without retrieval fees.
     sentry = { retention_days = 90, namespace = "monitoring", service_account = "sentry", transition = { days = 0, storage_class = "INTELLIGENT_TIERING" } }

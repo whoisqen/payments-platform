@@ -1,4 +1,4 @@
-# Overlay on the generated values.yaml (same DaemonSet): container logs from the node and the Kubernetes events, shipped to the central Loki
+# Overlay on the generated values.yaml (same DaemonSet): container logs from the node and the Kubernetes events, shipped to the central Logstash
 # through the masking processors of the tested config (attributes/drop-secret-keys, transform/redact, redaction), referenced by name.
 # Bodies stay strings: transform/redact skips map bodies, so nothing here parses JSON into the body.
 clusterRole:
@@ -122,7 +122,23 @@ config:
       attributes:
         - {key: deployment.environment.name, value: "${env:PLATFORM_ENV}", action: upsert}
         - {key: cloud.region, value: "${env:PLATFORM_REGION}", action: upsert}
-    # The file path repeats the resource labels; debug and trace lines get the short-retention marker that Loki indexes
+        - {key: k8s.cluster.name, value: "${env:PLATFORM_CLUSTER}", action: upsert}
+    # Logstash indexes only records that name their service: the workload, else the container, stands in for a missing service.name
+    transform/service-name:
+      error_mode: ignore
+      log_statements:
+        - context: resource
+          statements:
+            - set(attributes["service.name"], attributes["k8s.deployment.name"]) where attributes["service.name"] == nil
+            - set(attributes["service.name"], attributes["k8s.statefulset.name"]) where attributes["service.name"] == nil
+            - set(attributes["service.name"], attributes["k8s.daemonset.name"]) where attributes["service.name"] == nil
+            - set(attributes["service.name"], attributes["k8s.job.name"]) where attributes["service.name"] == nil
+            - set(attributes["service.name"], attributes["k8s.container.name"]) where attributes["service.name"] == nil
+    resource/events:
+      attributes:
+        - {key: service.name, value: k8s-events, action: insert}
+    # The file path repeats the resource labels; debug and trace lines keep the record attribute log.retention=debug, which Logstash
+    # drops in production and the other environments keep for the short ISM retention
     transform/containers:
       error_mode: ignore
       log_statements:
@@ -132,9 +148,10 @@ config:
             - delete_key(attributes, "log.iostream")
             - set(attributes["log.retention"], "debug") where severity_number > 0 and severity_number < 9
             - set(attributes["log.retention"], "debug") where IsMatch(body, "(?i)(\"level\"\\s*:\\s*\"(debug|trace)\"|\\blevel=(debug|trace)\\b|^\\S+\\s+(DEBUG|TRACE)\\s)")
-    # Moves the marker into the resource, where Loki can make it a stream label
-    groupbyattrs/retention:
-      keys: [log.retention]
+  exporters:
+    # Logstash's http input decodes JSON, not protobuf; gzip stays on
+    otlphttp/central-logs:
+      encoding: json
   service:
     extensions: [health_check, file_storage/checkpoints, k8s_leader_elector/events]
     pipelines:
@@ -153,12 +170,25 @@ config:
           - attributes/drop-secret-keys
           - transform/redact
           - redaction
+          - transform/service-name
           - transform/containers
-          - groupbyattrs/retention
           - batch
         exporters: [otlphttp/central-logs]
       logs/events:
         receivers: [k8s_events]
+        processors:
+          - memory_limiter
+          - resource/platform
+          - resource/events
+          - attributes/drop-secret-keys
+          - transform/redact
+          - redaction
+          - batch
+        exporters: [otlphttp/central-logs]
+      # Replaces the list of the generated values.yaml to add the environment, region and cluster of the node: Logstash picks the data stream
+      # logs-app-<env> from deployment.environment.name
+      logs/ship:
+        receivers: [otlp]
         processors:
           - memory_limiter
           - resource/platform

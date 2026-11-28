@@ -3,8 +3,8 @@ variable "env" {
   type        = string
 
   validation {
-    condition     = contains(["dev", "stage", "prod"], var.env)
-    error_message = "env must be dev, stage or prod."
+    condition     = contains(["dev", "stage", "prod", "shared-services"], var.env)
+    error_message = "env must be dev, stage, prod or shared-services."
   }
 }
 
@@ -22,6 +22,38 @@ variable "component" {
   description = "Component segment of the domain name; the whole name is limited to 28 characters."
   type        = string
   default     = "opensearch"
+}
+
+variable "domain_name" {
+  description = "Domain name instead of <prefix>-<env>-<region-short>-<component>, for example central.opensearch.domain_name; 3-28 characters."
+  type        = string
+  default     = null
+}
+
+variable "custom_endpoint" {
+  description = "Custom endpoint of the domain and Dashboards (central.opensearch.dashboards_host) with an ACM certificate issued by the private CA of shared-services (admin-edge ca_arn)."
+  type = object({
+    host                      = string
+    certificate_authority_arn = string
+  })
+  default = null
+
+  validation {
+    condition     = var.custom_endpoint == null || can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", var.custom_endpoint.host))
+    error_message = "custom_endpoint.host must be a lower-case DNS name."
+  }
+}
+
+variable "saml" {
+  description = "Dashboards sign-in through a SAML identity provider (Okta); null leaves Dashboards without SSO until the metadata exists."
+  type = object({
+    entity_id               = string
+    metadata_content        = string
+    master_backend_role     = string
+    roles_key               = optional(string, "groups")
+    session_timeout_minutes = optional(number, 60)
+  })
+  default = null
 }
 
 variable "tags" {
@@ -74,9 +106,32 @@ variable "subnet_ids" {
   }
 }
 
-variable "security_group_ids" {
-  description = "Security groups of the domain endpoint."
+variable "vpc_id" {
+  description = "VPC of the domain; the module creates the domain and client security groups in it."
+  type        = string
+}
+
+variable "endpoint_account_ids" {
+  description = "Accounts allowed to create an OpenSearch-managed VPC endpoint of the domain in their VPC, for example the admin agent path of dev, stage and prod."
   type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for a in var.endpoint_account_ids : can(regex("^[0-9]{12}$", a))])
+    error_message = "endpoint_account_ids must be 12-digit account ids."
+  }
+}
+
+variable "client_cidr_blocks" {
+  description = "CIDRs admitted on 443, for example the environment VPCs whose admin agent reads its logs through the transit gateway."
+  type        = list(string)
+  default     = []
+}
+
+variable "client_security_group_ids" {
+  description = "Security groups admitted on 443 besides the client group of the module, for example the node group of the central cluster."
+  type        = list(string)
+  default     = []
 }
 
 variable "engine_version" {
@@ -159,7 +214,7 @@ variable "master_user_arn" {
 }
 
 variable "access_principal_arns" {
-  description = "IAM principals that may call the domain endpoint."
+  description = "IAM principals the access policy admits; [\"*\"] with SAML, where fine-grained access control decides."
   type        = list(string)
 }
 
@@ -169,14 +224,20 @@ variable "logs_kms_key_arn" {
 }
 
 variable "log_retention_days" {
-  description = "Days the application and slow logs stay in CloudWatch."
+  description = "Days the error and slow logs stay in CloudWatch."
   type        = number
   default     = 30
+
+  validation {
+    condition     = var.log_retention_days >= 1
+    error_message = "log_retention_days must be at least 1."
+  }
 }
 
 variable "snapshot_bucket_arn" {
-  description = "Bucket of the Snapshot Management repository, created by s3-backup."
+  description = "Bucket of the Snapshot Management repository; null creates no snapshot role (the service keeps its automated hourly snapshots)."
   type        = string
+  default     = null
 }
 
 variable "snapshot_prefix" {
@@ -186,8 +247,14 @@ variable "snapshot_prefix" {
 }
 
 variable "snapshot_kms_key_arn" {
-  description = "Key of the snapshot bucket."
+  description = "Key of the snapshot bucket; required with snapshot_bucket_arn."
   type        = string
+  default     = null
+
+  validation {
+    condition     = var.snapshot_bucket_arn == null || var.snapshot_kms_key_arn != null
+    error_message = "snapshot_kms_key_arn must be set with snapshot_bucket_arn."
+  }
 }
 
 variable "name_prefix" {

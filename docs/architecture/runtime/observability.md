@@ -17,7 +17,7 @@ flowchart LR
     PROM["Prometheus (kube-prometheus)"]
     EXP["Exporters: postgres, redis, kafka, clickhouse, blackbox, yace"]
   end
-  OTEL -->|"logs"| LOKI["Loki"]
+  OTEL -->|"logs, OTLP/JSON"| LS["Logstash"] -->|"logs-app-env"| OS["OpenSearch (central domain)"]
   OTEL -->|"traces, tail-sampled"| TEMPO["Tempo"]
   OTEL -->|"span metrics"| VM["VictoriaMetrics"]
   PROM -->|"remote write"| VM
@@ -25,14 +25,23 @@ flowchart LR
   VM --> VMALERT["vmalert: SLO and alert rules"] --> AM["Alertmanager (3 replicas)"]
   AM --> SLACK["Slack: critical, alerts, security"]
   VM --> GRAFANA["Grafana"]
-  LOKI --> GRAFANA
+  OS --> GRAFANA
+  OS --> DASH["OpenSearch Dashboards"]
   TEMPO --> GRAFANA
-  APP -->|"errors"| SENTRY["Sentry"]
+  APP -->|"errors"| SENTRY["Sentry"] -->|"high and critical issues"| SLACK
 ```
 
 ### Card data stays in the CDE
 
 The collector runs inside each cluster and cleans telemetry before it leaves: it deletes attributes such as `card_number`, `pan` and `card_expiry`, replaces digit runs that look like a PAN with `[REDACTED-PAN]` in log bodies and span attributes, and deletes identifiers that must not become labels. Sentry scrubs on three layers: SDK settings, server defaults and an organization-wide PII config.
+
+### Logs
+
+Application logs of every environment and the audit trail live in one OpenSearch domain in shared-services, `pay-shared-euc1-logs`. Logstash receives the collector output, masks PANs again and writes `logs-app-<env>`; OpenSearch Ingestion writes `logs-audit` from the log archive. People read logs in OpenSearch Dashboards at `logs.payments.internal` (Okta) or in Grafana. Flow, shards, retention and rotation: [Logging](logging.md).
+
+### Errors
+
+Sentry keeps events 30 days. Two issue alert rules on every project, `critical` (level fatal) and `high` (level error, high priority), post to the Slack channel `#payments-sentry-critical` through Sentry's Slack integration. The rules are Terraform (`infra/modules/sentry-alerts`); the integration needs a one-time Slack OAuth install in Sentry, and its workspace id goes to `central.sentry_slack_workspace_id`.
 
 ### SLOs
 
@@ -59,7 +68,7 @@ The collector runs inside each cluster and cleans telemetry before it leaves: it
 | L0 | `l0-overview` | Platform overview, SLO overview |
 | L1 | `l1-services` | Payments, router, drainer, scheduler, locker, slow requests |
 | L2 | `l2-platform` | Cells, Kubernetes |
-| L3 | `l3-data`, `l3-edge` | Data stores, backup, DR switch; edge |
+| L3 | `l3-data`, `l3-edge` | Data stores, central logs (OpenSearch and Logstash), backup, DR switch; edge |
 | FinOps | `finops` | Cost |
 
 Dashboards are built by `observability/lib/build.py` and cannot be changed in the UI. Grafana access is split by organization: on-call, security and admins see everything; engineering, finance and audit see only their folders.
@@ -77,10 +86,12 @@ The L1 dashboard "Slow requests" answers three questions: which requests are slo
 
 | Path | What |
 |---|---|
-| `observability/slo/`, `observability/alerts/`, `observability/alertmanager/` | SLOs, rules, routing |
+| `observability/slo/`, `observability/alerts/`, `observability/alertmanager/` | SLOs, rules, routing; `alerts/data/logs.yaml` for the log domain and Logstash |
 | `observability/dashboards/`, `observability/lib/` | Dashboards and their builder |
 | `observability/otel/collector.yaml` | Collector pipeline, redaction, span metrics, tail sampling (tested) |
 | `observability/exporters/`, `observability/coverage/` | Exporters, alert coverage |
-| `deploy/platform/` (`victoria-metrics`, `vmalert`, `alertmanager`, `grafana`, `loki`, `tempo`, `sentry`, `otel-collector`, `kube-prometheus`, `exporters`) | Deployment |
-| `infra/modules/observability-storage` | Buckets: Loki 30 days, Tempo 14 days, Sentry 90 days |
+| `deploy/platform/` (`victoria-metrics`, `vmalert`, `alertmanager`, `grafana`, `logstash`, `opensearch-dashboards`, `tempo`, `sentry`, `otel-collector`, `kube-prometheus`, `exporters`) | Deployment |
+| `infra/modules/observability-storage` | Buckets: Tempo 14 days, Sentry file store 90 days, vmbackup |
+| `infra/modules/opensearch`, `opensearch-indices`, `log-ingestion` | Central log domain, data streams and ISM, writers ([Logging](logging.md)) |
+| `infra/modules/sentry-alerts` | Sentry issue alert rules to Slack |
 | `docs/runbooks/` | One runbook per alert |

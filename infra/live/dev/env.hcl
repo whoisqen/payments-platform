@@ -84,22 +84,14 @@ locals {
   standby_compute_enabled = false
   standby_enabled         = false
 
-  # Analytics outside the CDE: MSK, OpenSearch and ClickHouse on its own cluster. config/environments may set msk, opensearch and
-  # analytics_eks (prod.yaml is the reference, so dev.yaml must lower them); until then these defaults hold, the lowest sizes (one OpenSearch node, three small brokers).
+  # Analytics outside the CDE: MSK and ClickHouse on its own cluster (logs go to the central OpenSearch of shared-services). config/environments may set msk and
+  # analytics_eks (prod.yaml is the reference, so dev.yaml must lower them); until then these defaults hold, the lowest sizes (three small brokers).
   analytics = {
     msk = {
       broker_count        = try(local.sizing.msk.broker_count, 3)
       instance_type       = try(local.sizing.msk.instance_type, "kafka.m7g.large")
       volume_size_gb      = try(local.sizing.msk.volume_size_gb, 100)
       enhanced_monitoring = try(local.sizing.msk.enhanced_monitoring, "DEFAULT")
-    }
-    opensearch = {
-      availability_zone_count = try(local.sizing.opensearch.availability_zone_count, 1)
-      data_node_count         = try(local.sizing.opensearch.data_node_count, 1)
-      data_instance_type      = try(local.sizing.opensearch.data_instance_type, "m7g.medium.search")
-      dedicated_master_count  = try(local.sizing.opensearch.dedicated_master_count, 0)
-      warm_node_count         = try(local.sizing.opensearch.warm_node_count, 0)
-      volume_size_gb          = try(local.sizing.opensearch.volume_size_gb, 20)
     }
     # ClickHouse (1 shard, 1 replica) runs in the stateful pool; Spot only where the cells allow it.
     cpu_limits = try(local.sizing.analytics_eks.cpu_limits, { stateful = 16, workers = 8 })

@@ -124,3 +124,31 @@ run "lock_shorter_than_a_year_fails" {
 
   expect_failures = [var.object_lock_days]
 }
+
+run "ingestion_reads_only_the_audit_prefixes" {
+  command = plan
+
+  variables {
+    ingest_reader_principal_arns = ["arn:aws:iam::222222222222:role/pay-shared-services-euc1-audit-ingest"]
+    ingest_notifications = {
+      cloudtrail = { prefix = "cloudtrail/AWSLogs/", queue_arn = "arn:aws:sqs:eu-central-1:222222222222:pay-shared-services-euc1-audit-cloudtrail" }
+      eks        = { prefix = "eks/", queue_arn = "arn:aws:sqs:eu-central-1:222222222222:pay-shared-services-euc1-audit-eks" }
+    }
+  }
+
+  assert {
+    condition     = toset([for q in aws_s3_bucket_notification.ingest[0].queue : q.filter_prefix]) == toset(["cloudtrail/AWSLogs/", "eks/"])
+    error_message = "new objects of both audit sources are announced"
+  }
+
+  assert {
+    condition = (
+      one([for s in local.bucket_policy.Statement : s.Resource if s.Sid == "AllowIngestRead"]) == [
+        "arn:aws:s3:::pay-security-euc1-log-archive/cloudtrail/*",
+        "arn:aws:s3:::pay-security-euc1-log-archive/eks/*",
+      ] &&
+      one([for s in local.key_policy.Statement : s.Action if s.Sid == "IngestReadersDecrypt"]) == "kms:Decrypt"
+    )
+    error_message = "the ingestion role reads cloudtrail/ and eks/ and decrypts through S3 only"
+  }
+}

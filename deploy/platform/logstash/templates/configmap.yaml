@@ -1,0 +1,28 @@
+{{- include "logstash.required" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+data:
+  logstash.yml: |
+    {{- tpl (.Files.Get "files/logstash.yml") . | nindent 4 }}
+  pipelines.yml: |
+    {{- tpl (.Files.Get "files/pipelines.yml") . | nindent 4 }}
+  jvm.options: |
+    {{- tpl (.Files.Get "files/jvm.options") . | nindent 4 }}
+  log4j2.properties: |
+    {{- .Files.Get "files/log4j2.properties" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-pipeline
+  labels:
+    {{- include "logstash.labels" . | nindent 4 }}
+data:
+  otlp-logs.conf: |
+    {{- tpl (.Files.Get "files/otlp-logs.conf") . | nindent 4 }}
+  otlp_logs.rb: |
+    {{- .Files.Get "files/otlp_logs.rb" | nindent 4 }}

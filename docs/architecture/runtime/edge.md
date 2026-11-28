@@ -34,7 +34,7 @@ Gateway API is the standard, role-split model for traffic entry; the repository 
 ### Admin entry
 
 - `infra/modules/admin-edge` creates the private zone `payments.internal` (resolvable only inside the platform VPCs), a wildcard record to the internal NLB and an AWS Private CA for the certificates.
-- `deploy/platform/admin-gateway` holds the Gateway, the routes and oauth2-proxy. Argo CD, Vault, Grafana and Sentry sign in with Okta directly; Alertmanager, VictoriaMetrics and Prometheus sit behind oauth2-proxy.
+- `deploy/platform/admin-gateway` holds the Gateway, the routes and oauth2-proxy. Argo CD, Vault, Grafana, Sentry and OpenSearch Dashboards (`logs.payments.internal`, SAML) sign in with Okta directly; Alertmanager, VictoriaMetrics and Prometheus sit behind oauth2-proxy.
 - Okta (`infra/modules/okta-sso`) requires two factors on every sign-in, a phishing-resistant factor for administrators and re-authentication every 2 hours for them.
 
 ## Where in the repo

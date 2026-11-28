@@ -44,8 +44,18 @@ def values(cfg):
             "dedupInterval": cfg["central"]["dedup_interval"],
             "logsOtlpEndpoint": cfg["central"]["logs_otlp_endpoint"],
             "tracesOtlpEndpoint": cfg["central"]["traces_otlp_endpoint"],
+            # The central OpenSearch (infra/live/shared-services/eu-central-1/logs): endpoint, the Logstash IRSA role named by the
+            # opensearch module, the private CA of the internal gateways and the shared-services VPC that holds the AWS endpoints
+            "opensearch": {
+                "endpoint": cfg["central"]["opensearch"]["endpoint"],
+                "dashboardsHost": cfg["central"]["opensearch"]["dashboards_host"],
+                "caBundle": (cfg.get("vault") or {}).get("ca_bundle", ""),
+                "logstashRoleArn": f"arn:aws:iam::{cfg['accounts']['shared_services']}:role/{cfg['naming']['prefix']}-shared-services-euc1-logstash",
+                "awsCidrs": [cfg["network"]["shared_services"][working]],
+            },
         },
         "pilotLight": pilot_light(cfg),
+        "imageRegistry": f"{cfg['registry']['ecr_prefix']}/{cfg['registry']['ecr_repo_prefix']}",
         # One Argo CD cluster Secret per eks unit of infra/live (tools/config/clusters.py)
         "clusters": [{k: v for k, v in c.items() if k != "name"} for c in clusters.clusters(cfg)],
     }

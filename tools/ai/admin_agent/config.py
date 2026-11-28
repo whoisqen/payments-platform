@@ -14,8 +14,12 @@ SAFE_ENVS = {"dev", "stage"}  # while prod_in_cde_scope is true nothing else is 
 ENDPOINT = re.compile(r"^https://vpce-[a-z0-9-]+\.bedrock-runtime\.eu-[a-z0-9-]+\.vpce\.amazonaws\.com$")
 ROLE_ARN = re.compile(r"^arn:aws:iam::(\d{12}):role/[A-Za-z0-9+=,.@_/-]+$")
 ACCOUNT = re.compile(r"^\d{12}$")
+REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
+INDEX_PREFIX = re.compile(r"^[a-z0-9][a-z0-9-]*-$")
+OPENSEARCH_FIELDS = ("timestamp", "namespace", "app", "level", "message")
+FIELD = re.compile(r"^[@A-Za-z0-9_.]{1,100}$")
 LABEL_VALUE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
-REQUIRED_ENV_KEYS = ("kube_context", "kube_cluster_arn", "role_arn", "account_id", "tenant_id", "namespaces", "loki_url", "victoria_url",
+REQUIRED_ENV_KEYS = ("kube_context", "kube_cluster_arn", "role_arn", "account_id", "tenant_id", "namespaces", "victoria_url",
                      "alertmanager_url", "log_groups", "ssm_region")
 
 
@@ -106,7 +110,7 @@ def _walk(node):
 
 def load(path=CONFIG, policy=CDE_PATHS):
     cfg = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
-    for key in ("bedrock", "models", "environments", "cde_scope", "kubectl", "limits", "actions", "queries", "allowed_hosts", "audit"):
+    for key in ("bedrock", "models", "environments", "cde_scope", "kubectl", "limits", "actions", "queries", "allowed_hosts", "audit", "opensearch"):
         if not cfg.get(key):
             raise ConfigError(f"missing section: {key}")
     if not isinstance(cfg.get("prod_in_cde_scope"), bool):
@@ -125,6 +129,19 @@ def load(path=CONFIG, policy=CDE_PATHS):
     except re.error as e:
         raise ConfigError(f"kubectl.secret_key_pattern is invalid: {e}") from e
     hosts = cfg["allowed_hosts"]
+    o = cfg["opensearch"]
+    check_https_host(o.get("url"), hosts, "opensearch.url")
+    for name, env in (cfg.get("environments") or {}).items():
+        if env.get("opensearch_url") is not None:
+            check_https_host(env["opensearch_url"], hosts, f"environments.{name}.opensearch_url")
+    if not REGION.match(str(o.get("region", ""))):
+        raise ConfigError("opensearch.region must be an AWS region")
+    if not INDEX_PREFIX.match(str(o.get("index_prefix", ""))):
+        raise ConfigError("opensearch.index_prefix must be lower-case letters, digits and dashes ending in a dash")
+    fields = o.get("fields") or {}
+    for key in OPENSEARCH_FIELDS:
+        if not FIELD.match(str(fields.get(key, ""))):
+            raise ConfigError(f"opensearch.fields.{key} must be a field name")
     cde_accounts = [str(a) for a in cfg.get("cde_account_ids") or []]
     if any(not ACCOUNT.match(a) for a in cde_accounts):
         raise ConfigError("cde_account_ids must be 12-digit account ids")
@@ -147,7 +164,7 @@ def load(path=CONFIG, policy=CDE_PATHS):
             raise ConfigError(f"environments {seen[account]} and {env} share account {account}")
         seen[account] = env
         e["account_id"] = account
-        for key in ("loki_url", "victoria_url", "alertmanager_url"):
+        for key in ("victoria_url", "alertmanager_url"):
             check_https_host(e[key], hosts, f"environment {env}: {key}")
         for ns in e["namespaces"]:
             if not valid_label(ns, cfg):

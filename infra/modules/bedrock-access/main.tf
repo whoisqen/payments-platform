@@ -16,7 +16,7 @@ locals {
   admin_role   = "${local.name_prefix}-bedrock-admin-agent"
   admin_actions = concat(local.invoke_actions, [
     "logs:StartQuery", "logs:GetQueryResults", "logs:FilterLogEvents", "cloudwatch:GetMetricData",
-  ])
+  ], length(var.environment_role_arns) > 0 ? ["sts:AssumeRole"] : [])
 
   admin_trust_conditions = merge(
     { ArnLike = { "aws:PrincipalArn" = var.admin_principal_arns } },
@@ -43,6 +43,10 @@ locals {
     ],
     length(local.log_group_arns) == 0 ? [] : [
       { Sid = "ReadNamedLogGroups", Effect = "Allow", Action = ["logs:StartQuery", "logs:FilterLogEvents"], Resource = local.log_group_arns },
+      ], length(var.environment_role_arns) == 0 ? [] : [
+      # The agent reads each environment through its read-only role (admin-agent-env); no other role may be assumed
+      { Sid = "AssumeEnvironmentReadRoles", Effect = "Allow", Action = ["sts:AssumeRole"], Resource = var.environment_role_arns },
+      ], [
     ],
     [
       {

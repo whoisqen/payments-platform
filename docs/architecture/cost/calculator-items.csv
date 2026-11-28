@@ -61,14 +61,10 @@ prod,us-east-1,EKS nodes,Amazon EC2,"cde pool, standby locker","m7g.xlarge, Linu
 prod,us-east-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 36 nodes x 84 GB",3024,,GB-month,0.08,241.92,on-demand,241.92
 prod,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.large, 3 AZ",3,730,broker-hour,0.2445,535.46,on-demand,535.46
 prod,eu-central-1,Analytics,Amazon MSK,broker storage,"3 x 1,000 GB",3000,,GB-month,0.119,357.0,on-demand,357.0
-prod,eu-central-1,Analytics,Amazon OpenSearch Service,data nodes,"r7g.xlarge.search, 3 AZ",3,730,instance-hour,0.429,939.51,Database SP 1yr no upfront,751.61
-prod,eu-central-1,Analytics,Amazon OpenSearch Service,dedicated masters,m7g.large.search,3,730,instance-hour,0.162,354.78,Database SP 1yr no upfront,283.82
-prod,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm nodes,ultrawarm1.medium.search,2,730,instance-hour,0.284,414.64,on-demand,414.64
-prod,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 3 x 1,024 GB",3072,,GB-month,0.1452,446.05,on-demand,446.05
-prod,eu-central-1,Analytics,Amazon OpenSearch Service,UltraWarm managed storage,indices older than 30 days,1000,,GB-month,0.026,26.0,on-demand,26.0
 prod,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
 prod,us-east-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.01,197.1,on-demand,197.1
 prod,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,2000,,GB,0.01,20.0,on-demand,20.0
+prod,eu-central-1,Network,Amazon VPC,VPC endpoint of the central log domain,"OpenSearch-managed endpoint, 3 AZ",3,730,endpoint-hour,0.012,26.28,on-demand,26.28
 prod,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
 prod,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
 prod,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
@@ -151,10 +147,9 @@ stage,eu-central-1,EKS nodes,Amazon EBS,ClickHouse data volumes,"gp3, 2 x 1,000 
 stage,eu-central-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 38 nodes x 84 GB",3192,,GB-month,0.0952,303.88,on-demand,303.88
 stage,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.large, 3 AZ",3,730,broker-hour,0.2445,535.46,on-demand,535.46
 stage,eu-central-1,Analytics,Amazon MSK,broker storage,3 x 500 GB,1500,,GB-month,0.119,178.5,on-demand,178.5
-stage,eu-central-1,Analytics,Amazon OpenSearch Service,data nodes,"m7g.medium.search, 1 AZ",1,730,instance-hour,0.081,59.13,on-demand,59.13
-stage,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 20 GB",20,,GB-month,0.1452,2.9,on-demand,2.9
 stage,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
 stage,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,500,,GB,0.01,5.0,on-demand,5.0
+stage,eu-central-1,Network,Amazon VPC,VPC endpoint of the central log domain,"OpenSearch-managed endpoint, 3 AZ",3,730,endpoint-hour,0.012,26.28,on-demand,26.28
 stage,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",3 AZ,3,730,endpoint-hour,0.395,865.05,on-demand,865.05
 stage,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
 stage,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
@@ -214,10 +209,9 @@ dev,eu-central-1,EKS nodes,Amazon EBS,ClickHouse data volume,"gp3, 1 x 100 GB",1
 dev,eu-central-1,EKS nodes,Amazon EBS,node volumes (4 GiB OS + 80 GiB data),"gp3, 16 nodes x 84 GB",1344,,GB-month,0.0952,127.95,on-demand,127.95
 dev,eu-central-1,Analytics,Amazon MSK,brokers,"kafka.m7g.large, 3 AZ",3,730,broker-hour,0.2445,535.46,on-demand,535.46
 dev,eu-central-1,Analytics,Amazon MSK,broker storage,3 x 100 GB,300,,GB-month,0.119,35.7,on-demand,35.7
-dev,eu-central-1,Analytics,Amazon OpenSearch Service,data node,"m7g.medium.search, 1 AZ",1,730,instance-hour,0.081,59.13,on-demand,59.13
-dev,eu-central-1,Analytics,Amazon OpenSearch Service,data node storage,"gp3, 20 GB",20,,GB-month,0.1452,2.9,on-demand,2.9
 dev,eu-central-1,Network,Amazon VPC,"interface endpoints, workload VPC",9 services x 3 AZ,27,730,endpoint-hour,0.012,236.52,on-demand,236.52
 dev,eu-central-1,Network,Amazon VPC,interface endpoint data processed,AWS API traffic kept off NAT,200,,GB,0.01,2.0,on-demand,2.0
+dev,eu-central-1,Network,Amazon VPC,VPC endpoint of the central log domain,"OpenSearch-managed endpoint, 3 AZ",3,730,endpoint-hour,0.012,26.28,on-demand,26.28
 dev,eu-central-1,Network,AWS Network Firewall,"firewall endpoints, egress VPC",1 AZ,1,730,endpoint-hour,0.395,288.35,on-demand,288.35
 dev,eu-central-1,Network,Amazon VPC,NAT gateways behind the firewall,3 AZ; hours and GB waived by the firewall endpoints,3,730,gateway-hour,0.0,0.0,on-demand,0.0
 dev,eu-central-1,Network,Amazon VPC,public IPv4 of the NAT gateways,3 addresses,3,730,address-hour,0.005,10.95,on-demand,10.95
@@ -272,16 +266,22 @@ shared-services,eu-central-1,Access,AWS KMS,customer managed keys,"ebs-nodes, sh
 shared-services,global,Access,Amazon Route 53,private admin zone,,1,,zone-month,0.5,0.5,on-demand,0.5
 central-observability,eu-central-1,EKS,Amazon EKS,control plane,central cluster,1,730,cluster-hour,0.1,73.0,on-demand,73.0
 central-observability,eu-central-1,EKS nodes,Amazon EC2,bootstrap node group,"m7g.large, Linux, shared tenancy",3,730,instance-hour,0.0978,214.18,"Compute SP 1yr no upfront, 80% covered",173.36
-central-observability,eu-central-1,EKS nodes,Amazon EC2,"stateful pool: VictoriaMetrics, Loki, Tempo, Sentry stores","r7g.2xlarge, Linux, shared tenancy",4,730,instance-hour,0.5168,1509.06,"Compute SP 1yr no upfront, 80% covered",1176.41
+central-observability,eu-central-1,EKS nodes,Amazon EC2,"stateful pool: VictoriaMetrics, Tempo, Logstash, Sentry stores","r7g.2xlarge, Linux, shared tenancy",4,730,instance-hour,0.5168,1509.06,"Compute SP 1yr no upfront, 80% covered",1176.41
 central-observability,eu-central-1,EKS nodes,Amazon EC2,"workers pool: Grafana, Alertmanager, vmalert, Sentry web and workers","m7g.2xlarge, Linux, Spot",2,730,instance-hour,0.391,570.86,Spot at 40% of on-demand,228.34
 central-observability,eu-central-1,Storage,Amazon EBS,node volumes,"gp3, 9 nodes x 84 GB",756,,GB-month,0.0952,71.97,on-demand,71.97
 central-observability,eu-central-1,Storage,Amazon EBS,persistent volumes,"vmstorage 3 x 500, Sentry ClickHouse 3 x 200, Kafka, Postgres, WAL",2400,,GB-month,0.0952,228.48,on-demand,228.48
 central-observability,eu-central-1,Storage,Amazon EBS,vmstorage throughput above 125 MB/s,3 volumes x 125 MB/s,0.3662,,GiBps-month,48.7424,17.85,on-demand,17.85
-central-observability,eu-central-1,Storage,Amazon S3,Loki chunks,30-day retention,900,,GB-month,0.0245,22.05,on-demand,22.05
 central-observability,eu-central-1,Storage,Amazon S3,Tempo blocks,"14-day retention, tail sampling",300,,GB-month,0.0245,7.35,on-demand,7.35
 central-observability,eu-central-1,Storage,Amazon S3,Sentry files and vmbackup,"Intelligent-Tiering, frequent tier",500,,GB-month,0.0245,12.25,on-demand,12.25
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,pay-shared-euc1-logs data nodes,"r7g.xlarge.search, 3 AZ",6,730,instance-hour,0.429,1879.02,Database SP 1yr no upfront,1503.22
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,pay-shared-euc1-logs dedicated masters,m7g.large.search,3,730,instance-hour,0.162,354.78,Database SP 1yr no upfront,283.82
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,pay-shared-euc1-logs UltraWarm nodes,ultrawarm1.medium.search,8,730,instance-hour,0.284,1658.56,on-demand,1658.56
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,pay-shared-euc1-logs data node storage,"gp3, 6 x 600 GB",3600,,GB-month,0.1452,522.72,on-demand,522.72
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,pay-shared-euc1-logs UltraWarm managed storage,"application logs days 8-30, audit days 31-365",10740,,GB-month,0.026,279.24,on-demand,279.24
+central-observability,eu-central-1,Logs,Amazon OpenSearch Service,"OpenSearch Ingestion, audit pipelines",2 pipelines at the minimum of 1 OCU each (up to 4),2,730,OCU-hour,0.31,452.6,on-demand,452.6
+central-observability,eu-central-1,Logs,Amazon EBS,Logstash persistent queues,"gp3, 3 x 32 GB",96,,GB-month,0.0952,9.14,on-demand,9.14
 central-observability,eu-central-1,Network,AWS Transit Gateway,telemetry from the environments,"metrics, logs, traces",5000,,GB,0.02,100.0,on-demand,100.0
-central-observability,eu-central-1,Network,AWS Data Transfer,cross-AZ inside the cluster,"replication of VictoriaMetrics, Loki, Tempo",3000,,GB,0.02,60.0,on-demand,60.0
+central-observability,eu-central-1,Network,AWS Data Transfer,cross-AZ inside the cluster,"replication of VictoriaMetrics and Tempo, Logstash to OpenSearch",3000,,GB,0.02,60.0,on-demand,60.0
 organization,eu-central-1,Audit and logs,Amazon CloudWatch,organization trail log group,"management events, ingestion",50,,GB,0.63,31.5,on-demand,31.5
 organization,eu-central-1,Audit and logs,Amazon S3,"log-archive, days 0-90, Standard","trails, flow logs, firewall logs, EKS control plane logs",6210,,GB-month,0.0245,152.15,on-demand,152.15
 organization,eu-central-1,Audit and logs,Amazon S3,"log-archive, days 90-400, Glacier Flexible",Object Lock 365 days,18630,,GB-month,0.00405,75.45,on-demand,75.45
