@@ -41,7 +41,7 @@ Application logs of every environment and the audit trail live in one OpenSearch
 
 ### Errors
 
-Sentry keeps events 30 days. Two issue alert rules on every project, `critical` (level fatal) and `high` (level error, high priority), post to the Slack channel `#payments-sentry-critical` through Sentry's Slack integration. The rules are Terraform (`infra/modules/sentry-alerts`); the integration needs a one-time Slack OAuth install in Sentry, and its workspace id goes to `central.sentry_slack_workspace_id`.
+Sentry keeps events 30 days. Two alerts on the default error monitor of every project, `critical` (level fatal) and `high` (level error, priority high), fire on a new, regressed or escalating issue and post to the Slack channel `#payments-sentry-critical` through Sentry's Slack integration. The rules are Terraform (`infra/modules/sentry-alerts`); the integration needs a one-time Slack OAuth install in Sentry, and its workspace id goes to `central.sentry_slack_workspace_id`.
 
 ### SLOs
 
