@@ -114,6 +114,21 @@ class StacksTest(unittest.TestCase):
                 st.validate_stack(bad, self.root)
 
 
+class RepoRootDependencyTest(unittest.TestCase):
+    def test_a_path_from_the_repository_root_is_kept_as_is(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unit = root / "infra/live/dev/eu-central-1/spoke"
+            unit.mkdir(parents=True)
+            (unit / "terragrunt.hcl").write_text(
+                'dependency "hub" {\n  config_path = "${get_repo_root()}/infra/live/shared-services/eu-central-1/hub"\n}\n')
+            (root / "infra/live/dev").mkdir(parents=True, exist_ok=True)
+            (root / "infra/live/dev/env.hcl").write_text("")
+            (root / "infra/live/terragrunt.hcl").write_text("")
+            out = st.parse_stack(root, "infra/live/dev/eu-central-1/spoke", {})
+            self.assertEqual(out["deps"], ["infra/live/shared-services/eu-central-1/hub"])
+
+
 class RealRepositoryTest(unittest.TestCase):
     def test_every_dependency_of_the_live_tree_resolves_and_is_acyclic(self):
         cfg = st.load_cfg(st.ROOT)

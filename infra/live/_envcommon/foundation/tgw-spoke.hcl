@@ -11,7 +11,7 @@ terraform {
 }
 
 dependency "tgw" {
-  config_path = "${get_terragrunt_dir()}/../tgw"
+  config_path = "../tgw"
 
   mock_outputs = {
     transit_gateway_id = "tgw-00000000"
@@ -22,7 +22,7 @@ dependency "tgw" {
 }
 
 dependency "vpc" {
-  config_path = "${get_terragrunt_dir()}/../vpc"
+  config_path = "../vpc"
 
   mock_outputs = {
     vpc_id = "vpc-00000000"
