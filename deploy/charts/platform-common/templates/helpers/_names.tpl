@@ -15,15 +15,34 @@ payments-platform/cell: {{ . | quote }}
 {{- end }}
 {{- end }}
 
-{{/* The digest is the only way to name an image; the schema enforces the pattern, this guards renders that bypass it */}}
+{{/* The digest names an image; a tag is accepted only on a local cluster, whose images are loaded without a registry digest */}}
 {{- define "platform-common.image" -}}
 {{- $img := .cfg.image | default .root.Values.image -}}
+{{- $registry := required "global.registry is required (registry host and repository prefix, no trailing slash)" (.root.Values.global | default dict).registry -}}
+{{- if and (not $img.digest) $img.tag (not (include "platform-common.localCluster" .root)) -}}
+{{- fail "image.tag without a digest is accepted only with global.localCluster: true; name the image by digest" -}}
+{{- end -}}
+{{- if and (not $img.digest) $img.tag -}}
+{{- printf "%s/%s:%s" $registry $img.repository $img.tag -}}
+{{- else -}}
 {{- $digest := required "image.digest is required (sha256:<64 hex>)" $img.digest -}}
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
 {{- fail "image.digest must match ^sha256:[a-f0-9]{64}$" -}}
 {{- end -}}
-{{- $registry := required "global.registry is required (registry host and repository prefix, no trailing slash)" (.root.Values.global | default dict).registry -}}
 {{- printf "%s/%s@%s" $registry $img.repository $digest -}}
+{{- end -}}
+{{- end }}
+
+{{/* Non-empty when global.localCluster is true: the kind stack of deploy/local, which has no AWS behind it */}}
+{{- define "platform-common.localCluster" -}}
+{{- if (.Values.global | default dict).localCluster }}true{{ end -}}
+{{- end }}
+
+{{/* Fails unless global.localCluster is true; guards settings that only a local cluster may relax */}}
+{{- define "platform-common.requireLocal" -}}
+{{- if not (include "platform-common.localCluster" .root) -}}
+{{- fail (printf "%s is allowed only with global.localCluster: true" .what) -}}
+{{- end -}}
 {{- end }}
 
 {{- define "platform-common.serviceAccountName" -}}

@@ -1,0 +1,9 @@
+# Ephemeral CI cluster: no monitoring, no panel, no rate limit service, data in emptyDir
+monitoring:
+  enabled: false
+panel:
+  enabled: false
+persistence:
+  enabled: false
+ratelimit:
+  enabled: false

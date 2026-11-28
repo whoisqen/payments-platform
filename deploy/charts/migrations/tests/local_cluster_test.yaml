@@ -1,0 +1,50 @@
+suite: migrations on a local cluster
+templates:
+  - job.yaml
+set:
+  global.registry: localhost/payments
+  global.region: eu-central-1
+  global.dataCidrs: ["10.244.0.0/16"]
+  global.endpointCidrs: ["10.96.0.0/16"]
+  database.host: postgres.payments-data.svc.cluster.local
+  snapshot.enabled: false
+tests:
+  - it: reads the password from a Secret and connects without TLS on a local cluster
+    set:
+      global.localCluster: true
+      image.tag: dev
+      database.sslMode: disable
+      database.passwordSecret: {name: migrator-db, key: password}
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: localhost/payments/migrator:dev
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PGSSLMODE, value: disable}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGPASSWORD
+            valueFrom:
+              secretKeyRef: {name: migrator-db, key: password}
+  - it: rejects a password Secret outside a local cluster
+    set:
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      database.passwordSecret: {name: migrator-db, key: password}
+    asserts:
+      - failedTemplate:
+          errorPattern: global.localCluster
+  - it: keeps verify-full and IAM authentication by default
+    set:
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PGSSLMODE, value: verify-full}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGPASSWORD
+            valueFrom:
+              secretKeyRef: {name: migrator-db, key: password}

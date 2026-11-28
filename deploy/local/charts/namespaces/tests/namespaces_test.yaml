@@ -1,0 +1,15 @@
+suite: namespaces
+templates:
+  - namespaces.yaml
+tests:
+  - it: turns on sidecar injection only for mesh namespaces
+    asserts:
+      - hasDocuments:
+          count: 6
+      - equal:
+          path: metadata.labels.istio-injection
+          value: enabled
+        documentSelector: {path: metadata.name, value: payments}
+      - notExists:
+          path: metadata.labels.istio-injection
+        documentSelector: {path: metadata.name, value: payments-data}

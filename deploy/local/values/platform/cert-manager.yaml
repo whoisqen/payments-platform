@@ -1,0 +1,18 @@
+# Layered on deploy/platform/cert-manager/values.yaml
+replicaCount: 1
+# ClusterIssuer CA secrets are read from here; the local CA lives in istio-system/pay-local-ca, where the scripts read ca.crt
+clusterResourceNamespace: istio-system
+prometheus:
+  servicemonitor:
+    enabled: false
+resources:
+  requests: {cpu: 10m, memory: 48Mi}
+  limits: {memory: 128Mi}
+webhook:
+  resources:
+    requests: {cpu: 10m, memory: 24Mi}
+    limits: {memory: 64Mi}
+cainjector:
+  resources:
+    requests: {cpu: 10m, memory: 48Mi}
+    limits: {memory: 128Mi}

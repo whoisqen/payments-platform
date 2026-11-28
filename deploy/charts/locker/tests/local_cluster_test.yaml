@@ -1,0 +1,45 @@
+suite: locker on a local cluster
+templates:
+  - workload.yaml
+  - securitygrouppolicy.yaml
+set:
+  global.registry: localhost/payments
+  global.environment: dev
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+tests:
+  - it: renders no SecurityGroupPolicy when it is off on a local cluster
+    template: securitygrouppolicy.yaml
+    set:
+      global.localCluster: true
+      securityGroupPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: rejects a missing SecurityGroupPolicy outside a local cluster
+    template: securitygrouppolicy.yaml
+    set:
+      securityGroupPolicy.enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: global.localCluster
+  - it: reads plain secrets and plain PostgreSQL on a local cluster
+    template: workload.yaml
+    set:
+      global.localCluster: true
+      config.secrets_management.secrets_manager: no_encryption
+      postgresTls.mode: disable
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: LOCKER__SECRETS_MANAGEMENT__SECRETS_MANAGER, value: no_encryption}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PGSSLMODE, value: disable}
+  - it: rejects plain secrets outside a local cluster
+    template: workload.yaml
+    set:
+      config.secrets_management.secrets_manager: no_encryption
+    asserts:
+      - failedTemplate:
+          errorPattern: global.localCluster

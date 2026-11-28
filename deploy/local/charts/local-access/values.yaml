@@ -1,0 +1,20 @@
+# ClusterIssuer name the payments-edge chart uses by default; here it signs with a CA generated in the cluster
+issuer:
+  name: payments-ca
+  # ca.crt of this Secret is the trust anchor clients of the edge use (the scripts read istio-system/pay-local-ca)
+  caSecret: pay-local-ca
+  # cert-manager clusterResourceNamespace, where a CA ClusterIssuer reads its Secret
+  certManagerNamespace: istio-system
+
+# Each entry selects the proxy pods Istio creates for a Gateway; nodePort matches extraPortMappings in scripts/kind/cluster.yaml
+entries:
+  - name: payments-edge
+    namespace: payments-edge
+    gateway: payments-edge
+    port: 443
+    nodePort: 30443
+  - name: panel
+    namespace: control-center
+    gateway: panel
+    port: 443
+    nodePort: 30444

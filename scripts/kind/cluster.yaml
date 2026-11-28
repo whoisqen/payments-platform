@@ -1,0 +1,22 @@
+# Local and CI cluster for deploy/local: one node running Kubernetes 1.36, the same version as production (kind v0.33.0 node image).
+# kubectl context: kind-pay-local. Only the loopback of the host reaches the mapped ports.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pay-local
+networking:
+  # dataCidrs of the local values open the PostgreSQL and Redis ports to this range
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/16
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+    # the pod template spreads by zone with DoNotSchedule, so the node must carry a zone
+    labels:
+      topology.kubernetes.io/zone: eu-central-1a
+    extraPortMappings:
+      # payments-edge Gateway (HTTPS) through the NodePort of deploy/local/charts/local-access
+      - {containerPort: 30443, hostPort: 8443, listenAddress: 127.0.0.1, protocol: TCP}
+      # panel Gateway of control-center (demo)
+      - {containerPort: 30444, hostPort: 8444, listenAddress: 127.0.0.1, protocol: TCP}
+      # Grafana (demo)
+      - {containerPort: 30300, hostPort: 8300, listenAddress: 127.0.0.1, protocol: TCP}

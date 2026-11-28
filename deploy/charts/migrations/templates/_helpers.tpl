@@ -43,8 +43,20 @@ securityContext:
   value: {{ .Values.database.name | quote }}
 - name: PGUSER
   value: {{ .Values.database.user | quote }}
+{{- $db := .Values.database }}
+{{- if ne ($db.sslMode | default "verify-full") "verify-full" }}{{ include "platform-common.requireLocal" (dict "root" . "what" "database.sslMode other than verify-full") }}{{ end }}
 - name: PGSSLMODE
-  value: verify-full
+  value: {{ $db.sslMode | default "verify-full" | quote }}
+{{- with $db.passwordSecret }}
+{{- if .name }}
+{{- include "platform-common.requireLocal" (dict "root" $ "what" "database.passwordSecret") }}
+- name: PGPASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .name }}
+      key: {{ required "database.passwordSecret.key is required" .key }}
+{{- end }}
+{{- end }}
 - name: AWS_REGION
   value: {{ required "global.region is required (IAM authentication and the snapshot)" ((.Values.global | default dict).region) | quote }}
 {{- end }}

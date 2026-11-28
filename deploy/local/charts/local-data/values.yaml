@@ -1,0 +1,38 @@
+# The digests of docker/compose/compose.yaml: PostgreSQL 16.8 like Aurora, Redis 7.4 like MemoryDB
+image:
+  postgres: postgres:16.8@sha256:301bcb60b8a3ee4ab7e147932723e3abd1cef53516ce5210b39fd9fe5e3602ae
+  redis: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+
+# Vault paths follow the chart layout: <environment>/<cell>/<service>/..., <environment>/locker/..., <environment>/local/...
+environment: dev
+cells: [cell-0]
+secretStore: vault
+
+postgres:
+  # false keeps the data in an emptyDir (CI); the roles are recreated from the same Vault values at every start
+  persistence: true
+  storage: 2Gi
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {memory: 384Mi}
+
+redis:
+  maxMemory: 96mb
+  resources:
+    requests: {cpu: 50m, memory: 48Mi}
+    limits: {memory: 128Mi}
+
+# Vendored Diesel migrations applied by docker/compose/migrate.sh, as in the commit stage
+schema:
+  # false when the migrations chart Job of payments-cell runs with a migrator image
+  hyperswitch: true
+  locker: true
+  resources:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {memory: 192Mi}
+
+# Password Secret for the migrations chart Job (database.passwordSecret) in the namespace of the cells
+chartMigrations:
+  enabled: false
+  namespace: payments
+  secretName: migrator-db

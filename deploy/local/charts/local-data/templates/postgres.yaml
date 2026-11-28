@@ -1,0 +1,120 @@
+{{- $ctx := dict "root" . "name" "postgres" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+data:
+  # Roles of the charts: migrators own the databases, applications get DML through default privileges
+  10-roles.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+      -v hs_app="$HS_APP_PASSWORD" -v hs_migrator="$HS_MIGRATOR_PASSWORD" \
+      -v locker_app="$LOCKER_APP_PASSWORD" -v locker_migrator="$LOCKER_MIGRATOR_PASSWORD" <<'SQL'
+    CREATE ROLE hs_migrator LOGIN PASSWORD :'hs_migrator';
+    CREATE ROLE hs_app LOGIN PASSWORD :'hs_app';
+    CREATE ROLE locker_migrator LOGIN PASSWORD :'locker_migrator';
+    CREATE ROLE locker_app LOGIN PASSWORD :'locker_app';
+    CREATE DATABASE hyperswitch OWNER hs_migrator;
+    CREATE DATABASE locker OWNER locker_migrator;
+    \connect hyperswitch
+    GRANT USAGE ON SCHEMA public TO hs_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE hs_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO hs_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE hs_migrator IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO hs_app;
+    \connect locker
+    GRANT USAGE ON SCHEMA public TO locker_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE locker_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO locker_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE locker_migrator IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO locker_app;
+    SQL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    {{- include "local-data.selector" $ctx | nindent 4 }}
+  ports:
+    - name: tcp-postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "local-data.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "local-data.labels" $ctx | nindent 8 }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: {{ .Values.image.postgres | quote }}
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          env:
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+          securityContext:
+            {{- include "local-data.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: run, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: init
+          configMap:
+            name: postgres-init
+            # Executable, so the entrypoint runs the script in its own shell instead of sourcing it
+            defaultMode: 0555
+        {{- if not .Values.postgres.persistence }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgres.persistence }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}
+  {{- end }}

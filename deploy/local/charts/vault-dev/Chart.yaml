@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vault-dev
+description: Vault in dev mode for the kind stack, seeded with generated keys in the production KV layout
+type: application
+version: 0.1.0
+appVersion: "2.0.4"

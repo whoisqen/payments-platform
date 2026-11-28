@@ -1,0 +1,27 @@
+# Same Vault build as deploy/platform/vault; node runs the seed because it can generate RSA pairs without extra packages
+image:
+  vault: hashicorp/vault:2.0.4@sha256:5be49781ecf78bfe775c5309c6a4d9f4e9e040b6c885c99eb2b12fb69855e1a2
+  node: node:22.12.0-alpine@sha256:51eff88af6dff26f59316b6e356188ffa2c422bd3c3b76f2556a2e7e89d080bd
+
+# KV v2 paths <environment>/<cell>/..., <environment>/locker/... as the charts read them
+environment: dev
+cells: [cell-0]
+kvMount: secret
+
+# Generated once and kept in this Secret, so a Vault restart re-seeds the same values the data stores already use
+materialSecret: vault-seed-material
+
+externalSecrets:
+  role: external-secrets
+  serviceAccount: external-secrets
+  namespace: external-secrets
+  # Default audience of a TokenRequest without audiences, which is what External Secrets sends
+  audience: https://kubernetes.default.svc.cluster.local
+
+resources:
+  vault:
+    requests: {cpu: 50m, memory: 96Mi}
+    limits: {memory: 256Mi}
+  seed:
+    requests: {cpu: 20m, memory: 48Mi}
+    limits: {memory: 128Mi}

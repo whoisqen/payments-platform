@@ -100,6 +100,8 @@ istio:
 
 # Per-cluster locker_pod security group (Terraform output locker_pod_security_group_id), attached to the pod ENI
 securityGroupPolicy:
+  # false only with global.localCluster: kind has no VPC CNI
+  enabled: true
   securityGroupIds:
     - REPLACE_LOCKER_POD_SG_ID
 

@@ -5,18 +5,20 @@ SHELL := bash
 # Terraform roots with their own tests; infra/modules does not exist yet and is skipped while empty.
 TF_MODULES := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/modules/*/main.tf)))
 CHARTS := $(sort $(dir $(wildcard deploy/charts/*/Chart.yaml deploy/argocd/Chart.yaml)))
-PY_TESTS := $(sort $(wildcard services/cell-copy/tests tools/ci/tests tools/ci/rust/tests tools/ci/compose/tests tools/ci/promote/tests tools/ci/infra/tests tools/ci/runbook/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
+PY_TESTS := $(sort $(wildcard infra/tests/log-retention services/cell-copy/tests tools/ci/tests tools/ci/rust/tests tools/ci/kind/tests tools/ci/promote/tests tools/ci/infra/tests tools/ci/runbook/tests tools/ai/tests tools/lint/tests scripts/*/tests tests/smoke tests/e2e tests/contracts tests/component tests/integration observability/tests observability/slo/tests observability/lib/tests policy/scp/tests) tools/config/tests)
 WORKFLOWS := $(wildcard .github/workflows/*.yml)
 ENV ?= dev
 # New linters start in report mode; LINT_STRICT=1 (CI: repository variable LINT_STRICT=true) makes their findings block.
 LINT_STRICT ?= 0
+# helmfile apply diffs through this helm plugin; Renovate does not see it, bump by hand
+HELM_DIFF_VERSION := 3.15.15
 export LINT_STRICT
 REPORT := tools/ci/lint/report.sh
 TF_ROOTS := $(sort $(dir $(wildcard infra/modules/*/main.tf infra/github/main.tf infra/github/modules/*/main.tf)))
 
 .PHONY: help bootstrap lint test plan render image-amd64 lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-repo \
 	lint-report lint-ruff lint-yaml lint-tflint lint-kube test-python test-terraform test-helm test-policy test-alerts test-node \
-	component integration
+	component integration up down status logs demo prereqs
 
 help:
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -24,6 +26,7 @@ help:
 bootstrap: ## install the pinned tools from mise.toml and the git hooks
 	command -v mise >/dev/null || { echo "install mise first: https://mise.jdx.dev"; exit 1; }
 	mise install
+	helm plugin list | grep -q '^diff ' || helm plugin install https://github.com/databus23/helm-diff --version v$(HELM_DIFF_VERSION)
 	git config core.hooksPath tools/scripts/git-hooks
 
 lint: lint-repo lint-workflows lint-migrations lint-docker lint-terraform lint-helm lint-python lint-secrets lint-report ## every static check CI runs
@@ -49,7 +52,7 @@ lint-migrations: ## migrations added or changed against origin/main
 lint-docker:
 	python3 tools/ci/dockerfile_check.py
 	python3 tools/ci/buildkit/buildkit_pin_check.py
-	shellcheck docker/_common/collect-libs.sh docker/migrator/*.sh scripts/*/*.sh tools/ci/runbook/*.sh
+	shellcheck -x docker/_common/collect-libs.sh docker/migrator/*.sh tools/ci/migrations/migrate.sh scripts/*/*.sh tools/ci/runbook/*.sh
 	@if command -v hadolint >/dev/null; then hadolint --failure-threshold warning --ignore DL3008 docker/*/Dockerfile; else echo "skip hadolint: not installed"; fi
 	@if [ -d policy/opa/docker ]; then conftest test --policy policy/opa/docker docker/*/Dockerfile; else echo "skip conftest: policy/opa/docker does not exist"; fi
 
@@ -124,8 +127,31 @@ test-node:
 component: ## component check of built binaries in COMPONENT_<NAME>_BIN; e.g. make component SERVICES="router drainer"
 	python3 tests/component/run.py $(or $(SERVICES),router drainer scheduler locker) --logs $(or $(LOGS),component-logs)
 
-integration: ## API scenarios against INTEGRATION_API_URL (docker/compose for a local stack)
+integration: ## API scenarios against INTEGRATION_API_URL (make up for a local stack)
 	python3 tests/integration/run.py
+
+# Local platform on kind (scripts/kind/README.md); DRY_RUN=1 prints the commands, BUILD=1 builds the images from this checkout.
+KIND_FLAGS := $(if $(filter 1,$(DRY_RUN)),--dry-run)
+UP_FLAGS := $(KIND_FLAGS) $(if $(filter 1,$(BUILD)),--build) $(if $(VERSION),--version $(VERSION)) --env $(or $(LOCAL_ENV),demo)
+
+prereqs: ## tools, memory and disk the local cluster needs (BUILD=1: thresholds of local builds)
+	scripts/kind/prereqs.sh $(if $(filter 1,$(BUILD)),--build)
+
+up: ## platform on a local kind cluster from ghcr.io images of the latest v* tag (VERSION=vX.Y.Z); BUILD=1 builds locally
+	@if [ "$(BUILD)" = 1 ]; then echo "BUILD=1: four Rust release builds, 30-60 min each and up to 10 GiB of memory, one at a time"; fi
+	scripts/kind/up.sh $(UP_FLAGS)
+
+down: ## delete the local kind cluster
+	scripts/kind/down.sh $(KIND_FLAGS)
+
+status: ## nodes, releases, pods and edge health of the local cluster
+	scripts/kind/status.sh $(KIND_FLAGS)
+
+logs: ## logs of SERVICE (e.g. make logs SERVICE=router); EXPORT=dir exports every log of the cluster
+	scripts/kind/logs.sh $(KIND_FLAGS) $(if $(EXPORT),--export $(EXPORT),$(SERVICE))
+
+demo: ## sample merchant and payment through the local edge (tests/integration)
+	scripts/kind/demo.sh $(KIND_FLAGS)
 
 plan: ## terraform plan of every component of ENV (default dev); needs AWS credentials of the plan role
 	@if [ ! -d infra/live/$(ENV) ]; then echo "skip plan: infra/live/$(ENV) does not exist"; exit 0; fi

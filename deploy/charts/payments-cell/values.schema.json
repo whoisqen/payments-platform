@@ -171,7 +171,11 @@
                   "minLength": 1
                 },
                 "sslMode": {
-                  "const": "verify-full"
+                  "const": "verify-full",
+                  "enum": [
+                    "verify-full",
+                    "disable"
+                  ]
                 },
                 "sslRootCert": {
                   "type": "string",
@@ -201,7 +205,8 @@
                   "type": "boolean"
                 },
                 "tls": {
-                  "const": true
+                  "const": true,
+                  "type": "boolean"
                 }
               }
             },
@@ -215,6 +220,9 @@
                 },
                 "region": {
                   "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
                 }
               }
             },
@@ -338,6 +346,9 @@
               "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
             }
           }
+        },
+        "localCluster": {
+          "type": "boolean"
         }
       }
     },

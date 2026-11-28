@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "environment", "cells", "secretStore", "postgres", "redis", "schema", "chartMigrations"],
+  "properties": {
+    "global": { "type": "object" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["postgres", "redis"],
+      "properties": {
+        "postgres": { "type": "string", "pattern": "@sha256:[a-f0-9]{64}$" },
+        "redis": { "type": "string", "pattern": "@sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "environment": { "enum": ["dev", "stage", "prod"] },
+    "cells": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^(cell-[0-3]|spare)$" } },
+    "secretStore": { "type": "string", "minLength": 1 },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persistence", "storage", "resources"],
+      "properties": {
+        "persistence": { "type": "boolean" },
+        "storage": { "type": "string", "pattern": "^[0-9]+(Mi|Gi)$" },
+        "resources": { "type": "object" }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxMemory", "resources"],
+      "properties": {
+        "maxMemory": { "type": "string", "pattern": "^[0-9]+(mb|gb)$" },
+        "resources": { "type": "object" }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hyperswitch", "locker", "resources"],
+      "properties": {
+        "hyperswitch": { "type": "boolean" },
+        "locker": { "type": "boolean" },
+        "resources": { "type": "object" }
+      }
+    },
+    "chartMigrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "namespace", "secretName"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "secretName": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# Renders nothing until images.smoke has a tag or digest; the dummy merchant credentials are read from Vault at pay/dev/smoke/dummy-connector
+{{- $v := .Values }}
+{{- $img := $v.images.smoke }}
+{{- $reg := dir $img.repository }}
+global:
+  localCluster: true
+  registry: {{ ternary $v.registry $reg (eq $reg ".") }}
+  environment: dev
+  cell: cell-0
+
+{{- if $img.digest }}
+images:
+  smoke: {{ $img.digest }}
+{{- end }}
+
+smoke:
+  image:
+    repository: {{ base $img.repository }}
+    {{- if $img.tag }}
+    tag: {{ $img.tag | quote }}
+    {{- end }}
+
+credentials:
+  secretStore: vault
