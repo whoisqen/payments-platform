@@ -105,7 +105,7 @@ Every item is one unit of work for one agent and one GitHub issue. The `id` beco
   issue: "#51"
 
 - id: T10
-  title: Write the ADR of the region model (data replicated, compute from Terraform, plan B)
+  title: Write the ADR of the region model (data replicated to the recovery region, promotion and fencing)
   agent: docs-writer
   milestone: M1 Requirements baseline
   paths: ["docs/adr/0017-recovery-region-data-replication.md"]
@@ -260,14 +260,14 @@ Every item is one unit of work for one agent and one GitHub issue. The `id` beco
   issue: "#64"
 
 - id: T23
-  title: Write the us-east-2 recovery stacks and the restore automation
+  title: Write the restore automation of the recovery region
   agent: terraform-engineer
   milestone: M4 Data stores and recovery
-  paths: ["infra/live/dev/us-east-2/**", "infra/live/stage/us-east-2/**"]
+  paths: ["infra/modules/restore-automation/**"]
   depends_on: ["T20", "T22"]
   provides: recovery region
   requires: ["data stores", "backups"]
-  acceptance: `terragrunt validate` passes for every us-east-2 stack; `backup_restore_duration_seconds` alert at 80% of 30 minutes exists in `observability/alerts` (cross-check with T33)
+  acceptance: `terraform test` passes for `infra/modules/restore-automation`; `backup_restore_duration_seconds` alert at 80% of 30 minutes exists in `observability/alerts` (cross-check with T33)
   issue: "#65"
 ```
 

@@ -8,7 +8,7 @@ Nine requirement files under `docs/requirements/`, one ADR under `docs/adr/`, an
 - ID areas: functional `INF`, `DAT`, `SEC`, `DEL`, `OBS`, `COST`; `NFR-` only in `nfr.md` with the areas `SLO`, `CAP`, `REC`, `COST`, `COV`; the area files cite them.
 - File map:
   - `nfr.md` (T2): all numeric targets (sections 1, 2, 8 thresholds, 12 limits, 13, 21.5 capacity, 25.2, 25.4, D2 to D8).
-  - `infrastructure.md` (T3): sections 2 (cells, edge path, graceful shutdown, load shedding, MSK settings), 3, 4 (clusters), 17, 20.8, 21.1, 26; D6; the infrastructure part of D7 (non-compute prepared in advance, compute from Terraform at the switch, RTO budget, plan B).
+  - `infrastructure.md` (T3): sections 2 (cells, edge path, graceful shutdown, load shedding, MSK settings), 3, 4 (clusters), 17, 20.8, 21.1, 26; D6; the infrastructure part of D7 (resources prepared in us-east-1, the prod hot standby of ADR-0019, RTO budget).
   - `data-and-recovery.md` (T4): sections 5, 19, 24, 21.2, 21.3, backup tiers of 21.5; from section 2 the write path through Redis streams and drainer, PSP interaction timings, patterns, CAP/PACELC; D2 to D5 and the data part of D7; D8. It cites the infrastructure requirements of T3 and the policies of T7.
   - `security-and-access.md` (T5): sections 6 (platform controls), 16, 20.1, 20.3, 20.4, 20.12, 23 including 23.5, break-glass access from 14.
   - `delivery.md` (T6): sections 4 (delivery), 9, 14 zero manual actions, 18 infrastructure autotests, 27.5, 27.6; D1; the migration Job snapshot step of D3 (section 17), the only place that defines it.
@@ -31,7 +31,7 @@ Nine requirement files under `docs/requirements/`, one ADR under `docs/adr/`, an
 
 ## ADRs
 
-One new ADR (T11) records the region model of D6 and D7 and supersedes the warm standby of ADR-004 and section 3; other ADR numbers are cited as "ADR-0NN (architecture section 13)" until their files exist.
+One new ADR (T11) records the region model of D6 and D7 and supersedes the eu-west-1 standby of ADR-004 and section 3 (ADR-0017, itself superseded by ADR-0019); other ADR numbers are cited as "ADR-0NN (architecture section 13)" until their files exist.
 
 ## Rollout and rollback
 

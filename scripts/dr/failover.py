@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Failover and failback of the standby region (warm standby or pilot light).
+"""Failover and failback of the hot standby region (ADR-0019).
 
 failover (--mode failover): fences the working region as far as it answers, promotes the Aurora global clusters and lets the standby region
-write to DynamoDB. Pilot light (--writer-class, --compute-build-url): the run first dispatches the CI build of the standby compute, adds a writer
-to each headless secondary and waits for it before the promotion; with --await-build it waits for the compute build as well.
+write to DynamoDB. Fallback for a standby that has lost its compute (--writer-class, --compute-build-url): the run first dispatches the CI
+build of the standby compute, adds a writer to each secondary without an instance and waits for it before the promotion; with --await-build
+it waits for the compute build as well.
 failback (--mode failback): planned return to the working region after it is rebuilt; always needs --confirmed-by (a human approves, a person
 or an agent may run the command).
 """
@@ -98,7 +99,7 @@ class Switch:
 
     def confirm(self):
         if self.a.auto:
-            # the Route 53 health check alarm of the working region is the confirmation (owner decision for the warm standby)
+            # the Route 53 health check alarm of the working region is the confirmation (owner decision for the hot standby)
             log("confirmed", confirmed_by="route53-health-check", run_id=self.a.run_id)
             return
         if not self.a.confirmed_by:
@@ -159,7 +160,7 @@ class Switch:
         member = self.member(rds, self.a.target_region)
         return member, member["DBClusterArn"].split(":")[-1]
 
-    # pilot light ------------------------------------------------------------------------------------------------------------------------
+    # compute fallback -------------------------------------------------------------------------------------------------------------------
     @property
     def build_lock(self):
         return {"pk": {"S": f"dr-compute-build#{self.a.build_id}"}}
@@ -379,7 +380,7 @@ class Switch:
 
 
 def parse_args(argv):
-    ap = argparse.ArgumentParser(description="Failover or failback of one cell or the locker of the warm standby region")
+    ap = argparse.ArgumentParser(description="Failover or failback of one cell or the locker of the hot standby region")
     ap.add_argument("--mode", choices=["failover", "failback"], default="failover")
     ap.add_argument("--cell", required=True)
     ap.add_argument("--run-id", required=True, help="stable per incident, so a re-run resumes the same switch")
@@ -393,8 +394,8 @@ def parse_args(argv):
     ap.add_argument("--global-cluster", help="default: <prefix>-<env>-<source short>-aurora-<cell>")
     ap.add_argument("--fence-rule-group", help="default: <prefix>-<env>-<source short>-psp-fence")
     ap.add_argument("--deny-policy-arn", default="", help="IAM policy that denies DynamoDB writes in the standby region")
-    ap.add_argument("--writer-class", default="", help="pilot light: instance class of the writer added to a headless secondary")
-    ap.add_argument("--compute-build-url", default="", help="pilot light: GitHub workflow dispatch URL of dr-compute-build.yml")
+    ap.add_argument("--writer-class", default="", help="compute fallback: instance class of the writer added to a secondary without an instance")
+    ap.add_argument("--compute-build-url", default="", help="compute fallback: GitHub workflow dispatch URL of dr-compute-build.yml")
     ap.add_argument("--compute-build-secret", default="", help="Secrets Manager ARN of the token for the compute build dispatch")
     ap.add_argument("--compute-build-ref", default="main", help="git ref the compute build runs from")
     ap.add_argument("--build-id", default="", help="incident id shared by all cells, one compute build per id (default: --run-id)")
