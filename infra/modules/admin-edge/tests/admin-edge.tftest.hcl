@@ -39,8 +39,8 @@ run "first_step_has_zone_ca_and_roles_but_no_record" {
   command = apply
 
   assert {
-    condition     = aws_route53_zone.admin.name == "admin.example.test" && length(aws_route53_zone.admin.vpc) == 2
-    error_message = "private zone attached to both VPCs"
+    condition     = aws_route53_zone.admin.name == "admin.example.test" && length(aws_route53_zone.admin.vpc) == 1 && length(aws_route53_zone_association.extra) == 1
+    error_message = "private zone attached to both VPCs, the second through an association"
   }
 
   assert {
@@ -125,4 +125,66 @@ run "zone_must_have_a_vpc" {
   }
 
   expect_failures = [var.vpc_ids]
+}
+
+run "spoke_vpcs_are_authorized_and_nlbs_admit_only_the_listed_ports" {
+  command = plan
+
+  variables {
+    spoke_vpcs = {
+      dev-euc1  = { vpc_id = "vpc-0dev", region = "eu-central-1" }
+      prod-use1 = { vpc_id = "vpc-0use1", region = "us-east-1" }
+    }
+    nlb_security_group = {
+      vpc_id      = "vpc-0aaa"
+      spoke_cidrs = ["10.120.0.0/16", "10.151.0.0/16"]
+      local_cidrs = ["10.140.0.0/16"]
+    }
+  }
+
+  assert {
+    condition     = length(aws_route53_vpc_association_authorization.spoke) == 2 && aws_route53_vpc_association_authorization.spoke["prod-use1"].vpc_region == "us-east-1"
+    error_message = "each environment VPC is authorized in its own region"
+  }
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.nlb) == 7 && alltrue([for r in values(aws_vpc_security_group_ingress_rule.nlb) : contains([443, 4317, 8443], r.from_port) && r.from_port == r.to_port])
+    error_message = "two environments on three ports plus the local VPC on 443, nothing else"
+  }
+  assert {
+    condition     = alltrue([for r in values(aws_vpc_security_group_ingress_rule.nlb) : r.cidr_ipv4 != "10.140.0.0/16" || r.from_port == 443])
+    error_message = "the local VPC reaches only the gateway listener"
+  }
+}
+
+run "nlb_ports_are_limited" {
+  command = plan
+
+  variables {
+    nlb_security_group = {
+      vpc_id      = "vpc-0aaa"
+      spoke_cidrs = ["10.120.0.0/16"]
+      spoke_ports = [22]
+      local_cidrs = ["10.140.0.0/16"]
+    }
+  }
+
+  expect_failures = [var.nlb_security_group]
+}
+
+run "ingest_records_point_to_their_own_nlb" {
+  command = plan
+
+  variables {
+    nlb_lookup_enabled = true
+    nlb_stack_tag      = "istio-ingress-admin/admin"
+    ingest_records = {
+      "metrics-ingest" = "istio-ingress-admin/ingest"
+      "logs-ingest"    = "monitoring/logs"
+    }
+  }
+
+  assert {
+    condition     = aws_route53_record.ingest["metrics-ingest"].name == "metrics-ingest.admin.example.test" && length(data.aws_lb.ingest) == 2
+    error_message = "every ingest host needs its record and one NLB lookup per distinct stack"
+  }
 }

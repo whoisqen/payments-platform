@@ -17,7 +17,7 @@ REQUIRED = {
     "dns": ["dev_zone", "stage_zone", "prod_zone", "psp_domains", "grafana_url", "admin_zone"],
     "storage": ["state_bucket_prefix"],
     "runners": ["version", "sha256"],
-    "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval"],
+    "central": ["metrics_remote_write_url", "alertmanager_url", "sentry_url", "logs_otlp_endpoint", "traces_otlp_endpoint", "dedup_interval", "ingest_client_ca"],
 }
 STANDBY_ENVS = ("prod",)  # only prod has a standby region
 GRAFANA_GROUPS = ("admin", "sre", "security", "engineering", "finance", "audit")

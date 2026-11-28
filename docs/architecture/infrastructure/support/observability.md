@@ -70,7 +70,18 @@ flowchart LR
   sentry -- "high and critical issues" --> slack
 ```
 
-Endpoints come from `config/platform.yaml` (`central`): metrics remote write, Alertmanager, Sentry, logs (`central.logs_otlp_endpoint`, the Logstash HTTP input on port 8443, client certificate required) and traces OTLP (port 4317). The two Prometheus replicas scrape the same targets; VictoriaMetrics drops duplicates with `dedup.minScrapeInterval` = `central.dedup_interval` (30s).
+Endpoints come from `config/platform.yaml` (`central`): metrics remote write, Alertmanager, Sentry, logs (`central.logs_otlp_endpoint`, the Logstash HTTP input on port 8443, client certificate required) and traces OTLP (port 4317).
+
+The environment clusters reach the central cluster through the transit gateway hub and resolve the hosts in the private zone `payments.internal`, which every environment VPC shares. Two internal NLBs take their traffic:
+
+| Host | Gateway | What passes |
+|---|---|---|
+| `metrics-ingest` | `istio-ingress-admin/ingest` | `POST /insert/0/prometheus/api/v1/write` to vminsert |
+| `alertmanager-ingest` | `istio-ingress-admin/ingest` | `POST /api/v2/alerts` to Alertmanager |
+| `tempo-ingest` (port 4317) | `istio-ingress-admin/ingest` | gRPC `TraceService/Export` to the Tempo distributor |
+| `logs-ingest` (port 8443) | `monitoring/logs` | TLS passthrough to Logstash, which checks the client certificate itself |
+
+The ingest Gateway terminates TLS with the wildcard certificate of the zone and requires a client certificate signed by `central.ingest_client_ca`, the CA of the client identity that Prometheus and the node collectors mount (`deploy/platform/central-tls`). Its NLB admits only the VPC ranges of the environments (`network` in `config/platform.yaml`), and its routes match only the write calls above: any other path or method returns 404. The admin tools stay on the separate `admin` Gateway. `tools/config/render/render_admin_gateway.py` writes both Gateways; `infra/modules/admin-edge` adds the DNS records of the ingest hosts (`ingest_records`) in its second apply step. The two Prometheus replicas scrape the same targets; VictoriaMetrics drops duplicates with `dedup.minScrapeInterval` = `central.dedup_interval` (30s).
 
 ## Retention and storage
 

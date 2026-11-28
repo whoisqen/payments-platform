@@ -1,6 +1,7 @@
 locals {
   env_cfg = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals
   cfg     = local.env_cfg.cfg
+  hub     = read_terragrunt_config("${get_repo_root()}/infra/live/_envcommon/hub-network.hcl").locals
   region  = regex("/live/[^/]+/(?P<region>[^/]+)/", get_terragrunt_dir()).region
   # Control-plane logs stream to the log archive (Object Lock, one year) from the working region, where the archive bucket is.
   log_archive = local.region == local.cfg.regions.working ? {
@@ -28,6 +29,9 @@ inputs = {
   access_entries           = local.env_cfg.analytics_access_entries
   log_retention_days       = local.log_retention_days
   log_archive              = local.log_archive
+  # Argo CD and Vault of the central cluster reach the private endpoint; nodes send traces and logs to shared-services.
+  api_ingress_cidrs = local.hub.central_cidrs
+  central_egress    = { cidrs = local.hub.central_cidrs, ports = local.hub.telemetry_ports }
   tags = {
     team        = "data"
     owner       = local.env_cfg.owner

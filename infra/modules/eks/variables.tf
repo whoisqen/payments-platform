@@ -201,3 +201,28 @@ variable "container_log_max_files" {
     error_message = "container_log_max_files must be at least 2."
   }
 }
+
+variable "api_ingress_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "CIDRs outside the VPC admitted to the private API endpoint on 443: the node and pod subnets of the central cluster (Argo CD, Vault)."
+
+  validation {
+    condition     = alltrue([for c in var.api_ingress_cidrs : can(cidrhost(c, 0)) && c != "0.0.0.0/0"])
+    error_message = "api_ingress_cidrs must hold valid IPv4 CIDRs other than 0.0.0.0/0."
+  }
+}
+
+variable "central_egress" {
+  type = object({
+    cidrs = list(string)
+    ports = list(number)
+  })
+  default     = { cidrs = [], ports = [] }
+  description = "Node egress to shared-services beyond HTTPS: the hub CIDRs and the ports of Tempo OTLP (4317) and Logstash (8443)."
+
+  validation {
+    condition     = alltrue([for c in var.central_egress.cidrs : can(cidrhost(c, 0)) && c != "0.0.0.0/0"]) && alltrue([for p in var.central_egress.ports : p >= 1 && p <= 65535])
+    error_message = "central_egress needs valid IPv4 CIDRs other than 0.0.0.0/0 and ports between 1 and 65535."
+  }
+}

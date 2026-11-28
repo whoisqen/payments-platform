@@ -56,6 +56,18 @@ variable "nlb_stack_tag" {
   }
 }
 
+variable "ingest_records" {
+  type        = map(string)
+  default     = {}
+  description = "Ingest hosts of the zone (label to the service.k8s.aws/stack tag namespace/name of the NLB that serves it), for example metrics-ingest = istio-ingress-admin/ingest; added with the second step."
+
+  validation {
+    condition = alltrue([for label, stack in var.ingest_records :
+    can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", label)) && can(regex("^[a-z0-9-]+/[a-z0-9.-]+$", stack))])
+    error_message = "ingest_records keys must be DNS labels and values must look like namespace/name."
+  }
+}
+
 variable "cluster_name" {
   type        = string
   description = "Central EKS cluster that runs the controllers; the load balancer controller policy is scoped to resources tagged with it."
@@ -118,5 +130,33 @@ variable "tags" {
   validation {
     condition     = alltrue([for k in ["team", "owner", "pci-scope", "data-class", "backup-tier"] : contains(keys(var.tags), k)])
     error_message = "tags must contain team, owner, pci-scope, data-class and backup-tier."
+  }
+}
+
+variable "spoke_vpcs" {
+  type = map(object({
+    vpc_id = string
+    region = string
+  }))
+  default     = {}
+  description = "Environment VPCs by name (<env>-<region-short>) that may associate with the zone from their own account."
+}
+
+variable "nlb_security_group" {
+  type = object({
+    vpc_id      = string
+    spoke_cidrs = list(string)
+    spoke_ports = optional(list(number), [443, 4317, 8443])
+    local_cidrs = list(string)
+  })
+  default     = null
+  description = "Security group of the internal NLBs: spoke_cidrs (environment VPCs) on spoke_ports (gateway 443, Tempo 4317, Logstash 8443), local_cidrs (this VPC) on 443. Null skips it."
+
+  validation {
+    condition = var.nlb_security_group == null || (
+      alltrue([for c in concat(var.nlb_security_group.spoke_cidrs, var.nlb_security_group.local_cidrs) : can(cidrhost(c, 0)) && c != "0.0.0.0/0"]) &&
+      alltrue([for p in var.nlb_security_group.spoke_ports : contains([443, 4317, 8443], p)])
+    )
+    error_message = "nlb_security_group needs valid CIDRs other than 0.0.0.0/0 and spoke_ports from 443, 4317 and 8443."
   }
 }

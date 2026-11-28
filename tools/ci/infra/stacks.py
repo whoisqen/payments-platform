@@ -113,6 +113,10 @@ def parse_stack(root, stack, cfg):
         for m in DEPS_PATHS.finditer(t):
             raw += re.findall(r"\"([^\"]+)\"", m.group(1))
         for r in raw:
+            # A path from the repository root names a stack of another root (for example the hub of shared-services)
+            if r.startswith("${get_repo_root()}/"):
+                deps.add(posixpath.normpath(resolve(r[len("${get_repo_root()}/"):], own, cfg)))
+                continue
             deps.add(posixpath.normpath(posixpath.join(stack, resolve(r, own, cfg))))
     return {"dir": stack, "inputs": sorted(inputs), "deps": sorted(deps)}
 

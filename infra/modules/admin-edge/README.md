@@ -2,7 +2,8 @@
 
 Internal entry to the admin tools (Argo CD, Vault, Alertmanager, VictoriaMetrics, Prometheus, Sentry, Grafana) in the shared-services account.
 
-- Private Route 53 zone `zone_name` (`dns.admin_zone`) attached to every VPC in `vpc_ids`. Nothing outside those VPCs resolves it.
+- Private Route 53 zone `zone_name` (`dns.admin_zone`) attached to every VPC in `vpc_ids`; `spoke_vpcs` authorizes the environment VPCs, which associate from their own account (`transit-gateway-spoke`). Nothing else resolves it.
+- `nlb_security_group`: security group of the internal NLBs, environment CIDRs on 443, 4317 and 8443 only, this VPC on 443; output `nlb_security_group_id` goes into the Gateway annotation `aws-load-balancer-security-groups`.
 - Wildcard alias `*.<zone>` to the internal NLB. The AWS Load Balancer Controller builds the NLB from the Gateway, so Terraform finds it by the tag `service.k8s.aws/stack` (`nlb_stack_tag`, `namespace/gateway-name`). Apply in two steps: first with `nlb_lookup_enabled = false` (zone, CA, roles), then, once the Gateway has a load balancer, with `true` and `nlb_stack_tag` set.
 - AWS Private CA, root, short-lived certificates, revocation off (certificates are renewed by cert-manager before they matter). The CA key is held by the service in its HSM; Private CA does not take a customer managed KMS key. The root certificate is issued and installed by this module.
 - Pod Identity roles, both under the permissions boundary:
