@@ -20,10 +20,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* Renders "true" only for a real digest: a missing, malformed or all-zero value yields no objects at all, so the cell syncs as before and no PostSync hook exists */}}
 {{- define "smoke.enabled" -}}
 {{- $d := include "smoke.digest" . -}}
-{{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $d) (ne $d (printf "sha256:%s" (repeat 64 "0"))) -}}true{{- end -}}
+{{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $d) (ne $d (printf "sha256:%s" (repeat 64 "0"))) -}}true{{- else if include "smoke.tag" . -}}true{{- end -}}
+{{- end }}
+
+{{/* A tag only on a local cluster (global.localCluster), whose images are loaded without a registry digest */}}
+{{- define "smoke.tag" -}}
+{{- if .Values.global.localCluster }}{{ .Values.smoke.image.tag | default "" }}{{ end -}}
 {{- end }}
 
 {{- define "smoke.image" -}}
 {{- $d := include "smoke.digest" . -}}
-{{- printf "%s/%s@%s" (required "global.registry is required" .Values.global.registry) .Values.smoke.image.repository $d -}}
+{{- $r := required "global.registry is required" .Values.global.registry -}}
+{{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $d) (ne $d (printf "sha256:%s" (repeat 64 "0"))) -}}
+{{- printf "%s/%s@%s" $r .Values.smoke.image.repository $d -}}
+{{- else -}}
+{{- printf "%s/%s:%s" $r .Values.smoke.image.repository (include "smoke.tag" .) -}}
+{{- end -}}
 {{- end }}

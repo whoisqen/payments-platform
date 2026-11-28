@@ -1,4 +1,5 @@
 {{- $cfg := .Values.securityGroupPolicy -}}
+{{- if ne $cfg.enabled false }}
 {{- $ctx := dict "root" . "cfg" .Values "name" "locker" "component" "locker" -}}
 apiVersion: vpcresources.k8s.aws/v1beta1
 kind: SecurityGroupPolicy
@@ -13,3 +14,6 @@ spec:
   securityGroups:
     groupIds:
       {{- toYaml $cfg.securityGroupIds | nindent 6 }}
+{{- else }}
+{{- include "platform-common.requireLocal" (dict "root" . "what" "securityGroupPolicy.enabled false") }}
+{{- end }}

@@ -1,0 +1,26 @@
+# State values shared by demo and ci; images: --state-values-set images.<service>.repository=<registry>/<name>,images.<service>.tag=<tag> (or .digest)
+# The part of repository before the last slash becomes global.registry of the chart; a bare name falls back to registry
+registry: pay.local
+images:
+  router: {repository: pay.local/router, tag: "", digest: ""}
+  drainer: {repository: pay.local/drainer, tag: "", digest: ""}
+  scheduler: {repository: pay.local/scheduler, tag: "", digest: ""}
+  locker: {repository: pay.local/locker, tag: "", digest: ""}
+  control-center: {repository: pay.local/control-center, tag: "", digest: ""}
+  smoke: {repository: pay.local/smoke, tag: "", digest: ""}
+  # Optional: with a migrator image the migrations chart Job of payments-cell replaces the local schema Job for Hyperswitch
+  migrator: {repository: pay.local/migrator, tag: "", digest: ""}
+hosts:
+  api: api.payments.localhost
+  panel: panel.payments.localhost
+ports:
+  edge: 8443
+  panel: 8444
+monitoring:
+  enabled: false
+ratelimit:
+  enabled: false
+panel:
+  enabled: false
+persistence:
+  enabled: false

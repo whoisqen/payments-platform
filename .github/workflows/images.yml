@@ -229,18 +229,18 @@ jobs:
   # (workflow_run on a green images run) never writes deploy/envs/dev/images.yaml for these digests ----
 
   integration:
-    # image smoke, API scenarios and contract tests; pulls the arm64 images from ECR with the read role
-    # and needs a Docker host of that architecture (RUNNER_COMMIT)
+    # image smoke, API scenarios and contract tests on a kind cluster (scripts/kind/cluster.yaml) installed by
+    # deploy/local; pulls the arm64 images from ECR with the read role, so it needs an arm64 Docker host (RUNNER_COMMIT)
     needs: collect
     if: vars.AWS_ROLE_ECR_READ != '' && vars.ECR_REPO_PREFIX != ''
     runs-on: ${{ vars.RUNNER_COMMIT || 'ubuntu-24.04-arm' }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write
     env:
-      COMPOSE_FILE: docker/compose/compose.yaml
-      COMPOSE_PROJECT_NAME: pay-ci
+      KIND_CLUSTER: pay-local
+      HELM_DIFF_VERSION: 3.15.15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -255,57 +255,77 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
       - id: ecr
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
-      - name: images by digest and per-run keys
+      - name: images by digest
         id: env
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           PREFIX: ${{ vars.ECR_REPO_PREFIX }}
         run: |
-          umask 077
-          if ! python3 tools/ci/compose/compose_env.py --registry "${REGISTRY}/${PREFIX}" \
-            --digests "$RUNNER_TEMP/digests/digests.json" --images deploy/envs/dev/images.yaml --keys >docker/compose/.env; then
+          if [ ! -f deploy/local/helmfile.yaml ]; then
+            echo "::notice::deploy/local/helmfile.yaml does not exist; the commit stage is skipped"
+            echo "ready=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          args=(--registry "${REGISTRY}/${PREFIX}" --digests "$RUNNER_TEMP/digests/digests.json" --images deploy/envs/dev/images.yaml)
+          if ! python3 tools/ci/kind/kind_images.py "${args[@]}" >"$RUNNER_TEMP/images.txt"; then
             echo "::notice::not every service has a digest yet; the commit stage is skipped"
             echo "ready=false" >>"$GITHUB_OUTPUT"
             exit 0
           fi
-          admin=$(grep '^ADMIN_API_KEY=' docker/compose/.env | cut -d= -f2)
-          echo "::add-mask::${admin}"
-          echo "::add-mask::$(grep '^LOCKER_MASTER_KEY=' docker/compose/.env | cut -d= -f2)"
-          echo "INTEGRATION_ADMIN_API_KEY=${admin}" >>"$GITHUB_ENV"
+          python3 tools/ci/kind/kind_images.py "${args[@]}" --values >"$RUNNER_TEMP/values.txt"
           echo "ready=true" >>"$GITHUB_OUTPUT"
-      - name: start the stack
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
         if: steps.env.outputs.ready == 'true'
-        run: docker compose up -d --wait --wait-timeout 300 router drainer scheduler locker mock-psp
-      - name: image smoke, every service answers /health
+        with:
+          install_args: kubectl helm helmfile
+      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+        if: steps.env.outputs.ready == 'true'
+        with:
+          version: v0.33.0
+          config: scripts/kind/cluster.yaml
+          cluster_name: ${{ env.KIND_CLUSTER }}
+          kubectl_version: v1.37.3
+          wait: 180s
+      - name: load the images into the nodes
         if: steps.env.outputs.ready == 'true'
         run: |
-          for port in 8080 8081 3000 3001; do
-            ok=false
-            for _ in $(seq 60); do
-              if curl -fsS -o /dev/null "http://127.0.0.1:${port}/health"; then ok=true; break; fi
-              sleep 2
-            done
-            [ "$ok" = true ] || { echo "::error::port ${port} has no healthy service"; exit 1; }
-          done
-      - name: API scenarios with the dummy connector
+          # kind load goes through docker save, so pods name a local tag and never pull from ECR
+          while read -r svc ref repo tag; do
+            echo "::group::${svc}"
+            docker pull --quiet "$ref"
+            docker tag "$ref" "${repo}:${tag}"
+            kind load docker-image --name "$KIND_CLUSTER" "${repo}:${tag}"
+            echo "::endgroup::"
+          done <"$RUNNER_TEMP/images.txt"
+      - name: install deploy/local (environment ci)
         if: steps.env.outputs.ready == 'true'
-        env:
-          INTEGRATION_API_URL: http://127.0.0.1:8080
-          INTEGRATION_HEALTH_URLS: http://127.0.0.1:8081/health,http://127.0.0.1:3000/health,http://127.0.0.1:3001/health
-        run: python3 tests/integration/run.py
+        run: |
+          helm plugin install https://github.com/databus23/helm-diff --version "v${HELM_DIFF_VERSION}"
+          helmfile --kube-context "kind-${KIND_CLUSTER}" -f deploy/local/helmfile.yaml -e ci apply --wait --suppress-diff \
+            --state-values-set "$(cat "$RUNNER_TEMP/values.txt")"
+      - name: image smoke, every pod ready and the edge answers /health
+        if: steps.env.outputs.ready == 'true'
+        run: |
+          kubectl --context "kind-${KIND_CLUSTER}" wait pods --all --all-namespaces --for=condition=Ready \
+            --field-selector=status.phase!=Succeeded --timeout=300s
+          scripts/kind/status.sh
+      - name: API scenarios through the edge with the dummy connector
+        if: steps.env.outputs.ready == 'true'
+        run: scripts/kind/demo.sh
       - name: contract tests
         if: steps.env.outputs.ready == 'true'
         run: |
           python3 -m pip install --quiet pyyaml==6.0.2
           python3 -m unittest discover -s tests/contracts
-      - name: service logs
+      - name: cluster logs
         if: failure() && steps.env.outputs.ready == 'true'
-        run: docker compose logs --no-color --tail 200 router drainer scheduler locker migrate
-      - name: stop the stack
-        if: always() && steps.env.outputs.ready == 'true'
-        run: |
-          docker compose down -v --remove-orphans
-          rm -f docker/compose/.env
+        run: scripts/kind/logs.sh --export "$RUNNER_TEMP/kind-logs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure() && steps.env.outputs.ready == 'true'
+        with:
+          name: kind-logs
+          path: ${{ runner.temp }}/kind-logs
+          retention-days: 7
 
   terraform-plan:
     # read-only plan of the stacks this push changed; cde-* stacks are planned by their own Atlantis

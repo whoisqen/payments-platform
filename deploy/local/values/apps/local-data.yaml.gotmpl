@@ -1,0 +1,8 @@
+{{- $v := .Values }}
+{{- $migrator := or $v.images.migrator.digest $v.images.migrator.tag }}
+postgres:
+  persistence: {{ $v.persistence.enabled }}
+schema:
+  hyperswitch: {{ ternary "false" "true" (ne $migrator "") }}
+chartMigrations:
+  enabled: {{ ternary "true" "false" (ne $migrator "") }}

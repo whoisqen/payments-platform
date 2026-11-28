@@ -1,0 +1,10 @@
+namespaces:
+  - {name: vault, mesh: false}
+  - {name: payments-data, mesh: false}
+  - {name: mock-psp, mesh: false}
+  - {name: payments, mesh: true}
+  - {name: payments-edge, mesh: false}
+  - {name: control-center, mesh: true}
+  {{- if .Values.ratelimit.enabled }}
+  - {name: ratelimit, mesh: true}
+  {{- end }}

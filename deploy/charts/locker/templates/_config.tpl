@@ -13,6 +13,8 @@
 
 {{/* Non-secret settings as env; secret settings come from the ExternalSecret "locker.secretName" */}}
 {{- define "locker.configEnv" -}}
+{{- if ne .Values.config.secrets_management.secrets_manager "aws_kms" }}{{ include "platform-common.requireLocal" (dict "root" . "what" "config.secrets_management.secrets_manager other than aws_kms") }}{{ end -}}
+{{- if ne .Values.postgresTls.mode "verify-full" }}{{ include "platform-common.requireLocal" (dict "root" . "what" "postgresTls.mode other than verify-full") }}{{ end -}}
 {{- $config := deepCopy .Values.config -}}
 {{- $_ := set $config.server "port" .Values.container.port -}}
 {{- if eq $config.metrics.mode "prometheus" }}

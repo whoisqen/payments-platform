@@ -21,8 +21,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "repository",
-        "digest"
+        "repository"
       ],
       "properties": {
         "repository": {
@@ -39,8 +38,24 @@
             "IfNotPresent",
             "Never"
           ]
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$"
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "digest"
+          ]
+        },
+        {
+          "required": [
+            "tag"
+          ]
+        }
+      ]
     },
     "database": {
       "type": "object",
@@ -71,6 +86,26 @@
         "user": {
           "type": "string",
           "minLength": 1
+        },
+        "sslMode": {
+          "enum": [
+            "verify-full",
+            "disable"
+          ]
+        },
+        "passwordSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9.-]*$"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            }
+          }
         }
       }
     },
@@ -238,6 +273,39 @@
         },
         "mountPath": {
           "const": "/etc/ssl/rds"
+        }
+      }
+    },
+    "enabled": {
+      "type": "boolean"
+    }
+  },
+  "if": {
+    "not": {
+      "properties": {
+        "global": {
+          "properties": {
+            "localCluster": {
+              "const": true
+            }
+          },
+          "required": [
+            "localCluster"
+          ]
+        }
+      },
+      "required": [
+        "global"
+      ]
+    }
+  },
+  "then": {
+    "properties": {
+      "image": {
+        "not": {
+          "required": [
+            "tag"
+          ]
         }
       }
     }

@@ -1,0 +1,20 @@
+suite: mock-psp
+templates:
+  - mock-psp.yaml
+tests:
+  - it: ships the server and its model from tests/load/mock-psp
+    documentSelector: {path: kind, value: ConfigMap}
+    asserts:
+      - exists:
+          path: data["server.mjs"]
+      - exists:
+          path: data["psp-model.mjs"]
+  - it: runs as a non-root user on the commit-stage latency
+    documentSelector: {path: kind, value: Deployment}
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PSP_LATENCY_MAX_MS, value: "50"}

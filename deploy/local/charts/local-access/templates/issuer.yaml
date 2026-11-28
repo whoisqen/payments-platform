@@ -1,0 +1,40 @@
+{{- $i := .Values.issuer }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $i.name }}-bootstrap
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $i.caSecret }}
+  namespace: {{ $i.certManagerNamespace }}
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  isCA: true
+  commonName: payments-platform local CA
+  secretName: {{ $i.caSecret }}
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ $i.name }}-bootstrap
+---
+# Same name as the production private CA issuer, so the edge and panel charts need no issuer change
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $i.name }}
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  ca:
+    secretName: {{ $i.caSecret }}

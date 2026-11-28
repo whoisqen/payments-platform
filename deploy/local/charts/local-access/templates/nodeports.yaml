@@ -1,0 +1,20 @@
+{{- range .Values.entries }}
+---
+# Istio keeps its own ClusterIP Service for the Gateway; this one only pins the node port kind forwards to
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}-nodeport
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/part-of: payments-platform
+spec:
+  type: NodePort
+  selector:
+    gateway.networking.k8s.io/gateway-name: {{ .gateway }}
+  ports:
+    - name: https
+      port: {{ .port }}
+      targetPort: {{ .port }}
+      nodePort: {{ .nodePort }}
+{{- end }}

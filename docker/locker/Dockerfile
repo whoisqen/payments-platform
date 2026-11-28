@@ -25,17 +25,21 @@ ARG SCCACHE_BUCKET=""
 ARG SCCACHE_REGION=""
 # build.rs runs vergen, which must not fail when .git is absent from the context
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} RUSTFLAGS=${RUSTFLAGS} CARGO_INCREMENTAL=0 VERGEN_IDEMPOTENT=true \
-    RUSTC_WRAPPER=sccache SCCACHE_BUCKET=${SCCACHE_BUCKET} SCCACHE_REGION=${SCCACHE_REGION}
+    RUSTC_WRAPPER=sccache SCCACHE_BUCKET=${SCCACHE_BUCKET} SCCACHE_REGION=${SCCACHE_REGION} SCCACHE_DIR=/sccache
 WORKDIR /src
 COPY --from=chef /recipe.json /recipe.json
 # the AWS credentials for the sccache bucket come from a build secret, never from ARG or ENV
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo chef cook --locked --profile "${CARGO_PROFILE}" --features release --recipe-path /recipe.json
+    --mount=type=cache,target=/sccache \
+    # without a bucket (local builds) sccache caches on the build-cache mount instead of S3
+    { [ -n "${SCCACHE_BUCKET}" ] || unset SCCACHE_BUCKET SCCACHE_REGION; } && cargo chef cook --locked --profile "${CARGO_PROFILE}" --features release --recipe-path /recipe.json
 COPY vendor/card-vault/ ./
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --locked --profile "${CARGO_PROFILE}" --features release --bin locker \
+    --mount=type=cache,target=/sccache \
+    # without a bucket (local builds) sccache caches on the build-cache mount instead of S3
+    { [ -n "${SCCACHE_BUCKET}" ] || unset SCCACHE_BUCKET SCCACHE_REGION; } && cargo build --locked --profile "${CARGO_PROFILE}" --features release --bin locker \
     && install -D "target/${CARGO_PROFILE}/locker" /out/locker
 COPY docker/_common/collect-libs.sh /usr/local/bin/collect-libs.sh
 RUN /usr/local/bin/collect-libs.sh /out/locker /out/rootfs

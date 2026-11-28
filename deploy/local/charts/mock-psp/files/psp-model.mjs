@@ -1,0 +1,1 @@
+../../../../../tests/load/mock-psp/psp-model.mjs

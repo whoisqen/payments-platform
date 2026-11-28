@@ -1,0 +1,126 @@
+{{- $existing := lookup "v1" "Secret" .Release.Namespace "vault-dev-root-token" }}
+{{- $token := "" }}
+{{- if $existing }}{{ $token = index $existing.data "token" | b64dec }}{{ else }}{{ $token = randAlphaNum 40 }}{{ end }}
+# Generated at the first install and kept on upgrades, because a new token restarts the in-memory Vault
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-dev-root-token
+  labels:
+    {{- include "vault-dev.labels" . | nindent 4 }}
+type: Opaque
+data:
+  token: {{ $token | b64enc | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-seed
+  labels:
+    {{- include "vault-dev.labels" . | nindent 4 }}
+data:
+  seed.mjs: |
+    {{- .Files.Get "files/seed.mjs" | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels:
+    {{- include "vault-dev.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "vault-dev.selector" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 8200
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels:
+    {{- include "vault-dev.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Dev mode keeps everything in memory; two pods would be two different Vaults
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "vault-dev.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vault-dev.labels" . | nindent 8 }}
+      annotations:
+        checksum/seed: {{ .Files.Get "files/seed.mjs" | sha256sum }}
+    spec:
+      serviceAccountName: vault
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vault
+          image: {{ .Values.image.vault | quote }}
+          command: ["vault", "server", "-dev", "-dev-listen-address=0.0.0.0:8200", "-dev-no-store-token"]
+          env:
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              valueFrom:
+                secretKeyRef: {name: vault-dev-root-token, key: token}
+            - name: SKIP_SETCAP
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8200
+          readinessProbe:
+            httpGet: {path: /v1/sys/health, port: http}
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources.vault | nindent 12 }}
+          securityContext:
+            {{- include "vault-dev.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+        # Ready only after the seed, so a release waiting on this Deployment waits for the keys
+        - name: seed
+          image: {{ .Values.image.node | quote }}
+          command: ["node", "/seed/seed.mjs"]
+          env:
+            - {name: VAULT_ADDR, value: "http://127.0.0.1:8200"}
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef: {name: vault-dev-root-token, key: token}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef: {fieldPath: metadata.namespace}
+            - {name: NODE_EXTRA_CA_CERTS, value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
+            - {name: SEED_ENVIRONMENT, value: {{ .Values.environment | quote }}}
+            - {name: SEED_CELLS, value: {{ join "," .Values.cells | quote }}}
+            - {name: SEED_KV_MOUNT, value: {{ .Values.kvMount | quote }}}
+            - {name: SEED_MATERIAL_SECRET, value: {{ .Values.materialSecret | quote }}}
+            - {name: SEED_ESO_ROLE, value: {{ .Values.externalSecrets.role | quote }}}
+            - {name: SEED_ESO_SERVICE_ACCOUNT, value: {{ .Values.externalSecrets.serviceAccount | quote }}}
+            - {name: SEED_ESO_NAMESPACE, value: {{ .Values.externalSecrets.namespace | quote }}}
+            - {name: SEED_ESO_AUDIENCE, value: {{ .Values.externalSecrets.audience | quote }}}
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/seeded"]
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources.seed | nindent 12 }}
+          securityContext:
+            {{- include "vault-dev.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: seed, mountPath: /seed, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: seed
+          configMap:
+            name: vault-seed
+        - name: tmp
+          emptyDir: {}

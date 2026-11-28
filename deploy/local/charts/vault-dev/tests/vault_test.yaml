@@ -1,0 +1,50 @@
+suite: vault-dev
+templates:
+  - vault.yaml
+  - rbac.yaml
+tests:
+  - it: runs Vault in dev mode with a generated root token
+    template: vault.yaml
+    documentSelector: {path: kind, value: Deployment}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: -dev
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: vault-dev-root-token
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+  - it: never writes a fixed token
+    template: vault.yaml
+    documentSelector: {path: kind, value: Secret}
+    asserts:
+      - matchRegex:
+          path: data.token
+          pattern: ^[A-Za-z0-9+/=]{40,}$
+      - notEqual:
+          path: data.token
+          value: cm9vdA==
+  - it: seeds the external-secrets role with the default token audience
+    template: vault.yaml
+    documentSelector: {path: kind, value: Deployment}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content: {name: SEED_ESO_AUDIENCE, value: "https://kubernetes.default.svc.cluster.local"}
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content: {name: SEED_CELLS, value: cell-0}
+  - it: lets Vault review service account tokens
+    template: rbac.yaml
+    documentSelector: {path: kind, value: ClusterRoleBinding}
+    asserts:
+      - equal:
+          path: roleRef.name
+          value: system:auth-delegator
+  - it: rejects an image without a digest
+    set:
+      image.vault: hashicorp/vault:2.0.4
+    asserts:
+      - failedTemplate: {}

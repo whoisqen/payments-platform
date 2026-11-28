@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issuer", "entries"],
+  "properties": {
+    "global": { "type": "object" },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "caSecret", "certManagerNamespace"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "caSecret": { "type": "string", "minLength": 1 },
+        "certManagerNamespace": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "namespace", "gateway", "port", "nodePort"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "namespace": { "type": "string", "minLength": 1 },
+          "gateway": { "type": "string", "minLength": 1 },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "nodePort": { "type": "integer", "minimum": 30000, "maximum": 32767 }
+        }
+      }
+    }
+  }
+}

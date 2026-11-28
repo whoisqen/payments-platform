@@ -1,0 +1,14 @@
+suite: dashboards
+templates:
+  - dashboards.yaml
+tests:
+  - it: ships every generated dashboard ConfigMap to the sidecar label
+    asserts:
+      - hasDocuments:
+          count: 6
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+      - equal:
+          path: metadata.namespace
+          value: monitoring

@@ -1,0 +1,72 @@
+# Lite demo monitoring: Prometheus, kube-state-metrics and Grafana with the repository dashboards (charts/dashboards)
+defaultRules:
+  create: false
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+prometheusOperator:
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 160Mi}
+kube-state-metrics:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 96Mi}
+prometheus:
+  prometheusSpec:
+    retention: 12h
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: {cpu: 100m, memory: 320Mi}
+      limits: {memory: 768Mi}
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: false
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  service:
+    type: NodePort
+    nodePort: 30300
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folderAnnotation: grafana_folder
+      searchNamespace: monitoring
+      provider:
+        foldersFromFilesStructure: true
+    resources:
+      requests: {cpu: 10m, memory: 48Mi}
+      limits: {memory: 96Mi}
+# The admin login from Vault (seeded by charts/vault-dev)
+extraManifests:
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: grafana-admin
+    spec:
+      refreshInterval: 1h
+      secretStoreRef: {kind: ClusterSecretStore, name: vault}
+      target: {name: grafana-admin, creationPolicy: Owner}
+      data:
+        - secretKey: admin-user
+          remoteRef: {key: dev/local/grafana, property: admin-user}
+        - secretKey: admin-password
+          remoteRef: {key: dev/local/grafana, property: admin-password}

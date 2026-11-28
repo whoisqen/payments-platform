@@ -1,0 +1,184 @@
+# kind stack of the platform: helmfile -f deploy/local/helmfile.yaml -e <demo|ci> apply --wait (README.md lists namespaces and ports)
+environments:
+  demo:
+    values:
+      - environments/defaults.yaml
+      - environments/demo.yaml
+  ci:
+    values:
+      - environments/defaults.yaml
+      - environments/ci.yaml
+
+---
+# Same upstream charts and versions as deploy/argocd/templates/addons
+repositories:
+  - name: istio
+    url: https://istio-release.storage.googleapis.com/charts
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: external-secrets
+    url: https://charts.external-secrets.io
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+
+helmDefaults:
+  wait: true
+  timeout: 600
+  createNamespace: true
+
+releases:
+  # Cluster base: Gateway API CRDs before istiod, which watches them from its start
+  - name: gateway-api-crds
+    namespace: kube-system
+    chart: ../platform/gateway-api-crds
+    labels: {tier: base}
+
+  - name: namespaces
+    namespace: kube-system
+    chart: ./charts/namespaces
+    labels: {tier: base}
+    values:
+      - values/apps/namespaces.yaml.gotmpl
+
+  - name: istio-base
+    namespace: istio-system
+    chart: istio/base
+    version: 1.30.8
+    labels: {tier: base}
+    needs: [kube-system/gateway-api-crds]
+
+  - name: istiod
+    namespace: istio-system
+    chart: istio/istiod
+    version: 1.30.8
+    labels: {tier: base}
+    needs: [istio-system/istio-base]
+    values:
+      - ../platform/istio/values-istiod.yaml
+      - values/platform/istiod.yaml
+
+  - name: cert-manager
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: v1.21.3
+    labels: {tier: base}
+    needs: [istio-system/istio-base]
+    values:
+      - ../platform/cert-manager/values.yaml
+      - values/platform/cert-manager.yaml
+
+  - name: external-secrets
+    namespace: external-secrets
+    chart: external-secrets/external-secrets
+    version: 2.15.0
+    labels: {tier: base}
+    values:
+      - ../platform/external-secrets/values.yaml
+      - values/platform/external-secrets.yaml
+
+  # Secrets flow as in production: Vault -> ClusterSecretStore vault -> ExternalSecret per service
+  - name: vault-dev
+    namespace: vault
+    chart: ./charts/vault-dev
+    labels: {tier: secrets}
+    needs: [kube-system/namespaces]
+
+  - name: external-secrets-config
+    namespace: external-secrets
+    chart: ../platform/external-secrets/config
+    labels: {tier: secrets}
+    needs: [external-secrets/external-secrets, vault/vault-dev]
+    values:
+      - values/platform/external-secrets-config.yaml
+
+  - name: local-access
+    namespace: istio-system
+    chart: ./charts/local-access
+    labels: {tier: base}
+    needs: [cert-manager/cert-manager, kube-system/namespaces]
+    values:
+      - values/apps/local-access.yaml.gotmpl
+
+  # Data stores and the PSP
+  - name: local-data
+    namespace: payments-data
+    chart: ./charts/local-data
+    labels: {tier: data}
+    needs: [external-secrets/external-secrets-config]
+    values:
+      - values/apps/local-data.yaml.gotmpl
+
+  - name: mock-psp
+    namespace: mock-psp
+    chart: ./charts/mock-psp
+    labels: {tier: data}
+    needs: [kube-system/namespaces]
+
+  # Demo monitoring; before the services so their ServiceMonitor CRD exists
+  - name: kube-prometheus-stack
+    namespace: monitoring
+    chart: prometheus-community/kube-prometheus-stack
+    version: 93.6.1
+    condition: monitoring.enabled
+    labels: {tier: monitoring}
+    needs: [external-secrets/external-secrets-config]
+    values:
+      - values/platform/kube-prometheus.yaml
+
+  - name: dashboards
+    namespace: monitoring
+    chart: ./charts/dashboards
+    condition: monitoring.enabled
+    labels: {tier: monitoring}
+    needs: [monitoring/kube-prometheus-stack]
+
+  - name: ratelimit
+    namespace: ratelimit
+    chart: ../platform/ratelimit
+    condition: ratelimit.enabled
+    labels: {tier: apps}
+    needs: [payments-data/local-data, istio-system/istiod]
+    values:
+      - values/platform/ratelimit.yaml
+
+  # The services on their real charts
+  - name: payments-locker
+    namespace: payments
+    chart: ../charts/payments-locker
+    labels: {tier: apps}
+    needs: [payments-data/local-data, istio-system/istiod, monitoring/kube-prometheus-stack]
+    values:
+      - values/apps/payments-locker.yaml.gotmpl
+
+  - name: cell-0
+    namespace: payments
+    chart: ../charts/payments-cell
+    labels: {tier: apps}
+    needs: [payments/payments-locker, monitoring/kube-prometheus-stack]
+    values:
+      - values/apps/payments-cell.yaml.gotmpl
+
+  - name: control-center
+    namespace: control-center
+    chart: ../charts/control-center
+    labels: {tier: apps}
+    needs: [istio-system/local-access, istio-system/istiod]
+    values:
+      - values/apps/control-center.yaml.gotmpl
+
+  - name: payments-edge
+    namespace: payments-edge
+    chart: ../charts/payments-edge
+    labels: {tier: apps}
+    needs: [payments/cell-0, istio-system/local-access, ratelimit/ratelimit]
+    values:
+      - values/apps/payments-edge.yaml.gotmpl
+
+  - name: smoke
+    namespace: payments
+    chart: ../platform/smoke/job
+    labels: {tier: apps}
+    needs: [payments-edge/payments-edge]
+    values:
+      - values/apps/smoke.yaml.gotmpl
+

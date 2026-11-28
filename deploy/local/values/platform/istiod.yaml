@@ -1,0 +1,16 @@
+# Layered on deploy/platform/istio/values-istiod.yaml: one istiod and small proxies (sidecars and Gateway proxies)
+pilot:
+  autoscaleEnabled: false
+  autoscaleMin: 1
+  replicaCount: 1
+  resources:
+    requests: {cpu: 100m, memory: 160Mi}
+    limits: {memory: 384Mi}
+global:
+  proxy:
+    resources:
+      requests: {cpu: 10m, memory: 40Mi}
+      limits: {memory: 192Mi}
+meshConfig:
+  # No collector in kind
+  enableTracing: false

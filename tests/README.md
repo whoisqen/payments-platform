@@ -13,8 +13,8 @@ Each stage runs only after the previous one is green; within a stage the rows ru
 | 1 pull request | `pull_request`, `ci.yml`, gate `ci-gate` | static | `lint-fast` (actionlint, repo lint, gitleaks), `commitlint`, `spec-gate`, `security.yml`, `lint-report` (ruff, yamllint, tflint, kube-linter) | yes; `lint-report` only with `LINT_STRICT` |
 | | | unit | Rust nextest of the changed crates, Python (incl. offline `component/`, `integration/`), `helm unittest`, `terraform test`, promtool, OPA, Kyverno, node tests of `load/` | yes |
 | | | component | router, drainer, scheduler and locker as binaries against Postgres and Redis (`component/run.py`), migration round trip, `helm template` + kubeconform, `terraform validate` | yes |
-| 2 commit | push to `main`, jobs of `images.yml` after the build | image smoke | the built images in `docker/compose` start and answer `/health` | yes |
-| | | integration | `integration/run.py` on the compose stack (dummy connector), `contracts/`, read-only `terraform plan` of changed stacks | yes; a red run stops the dev promotion |
+| 2 commit | push to `main`, jobs of `images.yml` after the build | image smoke | the built images, loaded into an ephemeral kind cluster (`scripts/kind`, `deploy/local` environment `ci`), start and answer `/health` | yes |
+| | | integration | `integration/run.py` against the edge of the kind cluster (dummy connector), `contracts/`, read-only `terraform plan` of changed stacks | yes; a red run stops the dev promotion |
 | 3 deploy | Argo CD sync | dev, stage | PostSync smoke (`smoke/live.py`) | yes, rollback |
 | | `smoke-green-stage`, jobs of `promote.yml` | stage verify | `integration/run.py` against `STAGE_API_URL`, perf gate on the latest k6 TestRun in VictoriaMetrics | yes; the prod pull request waits for it |
 | nightly | `nightly.yml` calls `ci.yml` with `full: true` | all except Rust | unit and component of every area | opens an incident issue |
@@ -30,7 +30,7 @@ ruff (`E9`, `F`, `B`), yamllint (relaxed, no line length), tflint (recommended p
 
 - `smoke/`: a synthetic payment (create, capture, read, refund) through a fake edge and test PSP for every cell, probe and port checks of every chart, and `live.py`, the PostSync smoke. Budget 90 seconds.
 - `component/`: `run.py router drainer scheduler locker` starts each binary from `COMPONENT_<NAME>_BIN` with generated keys, waits for its health endpoints and stops it with SIGTERM; `make component`. Offline tests use `fake_service.py`.
-- `integration/`: `run.py` bootstraps a merchant, API key and dummy connector through the admin API, then runs health, auth, create-get-cancel, duplicate id and unknown payment scenarios; the confirm and refund path reuses `smoke/live.py` when `INTEGRATION_PAYMENT_TOKEN` is set. Offline tests use `fake_router.py`. Local stack: `docker/compose/README.md`.
+- `integration/`: `run.py` bootstraps a merchant, API key and dummy connector through the admin API, then runs health, auth, create-get-cancel, duplicate id and unknown payment scenarios; the confirm and refund path reuses `smoke/live.py` when `INTEGRATION_PAYMENT_TOKEN` is set. Offline tests use `fake_router.py`. Local stack: `make up` (kind, see `scripts/kind/README.md`).
 - `contracts/`: environment values against `deploy/charts/*/values.schema.json`, and alert `failure_mode` and `runbook_url` against `observability/coverage` and `docs/runbooks`.
 - `e2e/`: promotion dev to stage by image digest through `tools/ci/images_yaml.py` and `tools/ci/digest_compare.py`.
 - `chaos/` and `load/` have their own READMEs.

@@ -10,6 +10,9 @@ database:
   name: hyperswitch
   # The only role with DDL rights, reached through EKS Pod Identity
   user: hs_migrator
+  sslMode: verify-full
+  # Only with global.localCluster, which has no IAM database authentication: {name, key} of a Secret holding the password
+  passwordSecret: {}
 
 # D3: the change starts only when the snapshot is available
 snapshot:

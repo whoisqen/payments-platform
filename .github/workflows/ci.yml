@@ -47,7 +47,7 @@ jobs:
       area_python: ${{ steps.paths.outputs.area_python }}
       area_node: ${{ steps.paths.outputs.area_node }}
       area_alerts: ${{ steps.paths.outputs.area_alerts }}
-      area_compose: ${{ steps.paths.outputs.area_compose }}
+      area_kind: ${{ steps.paths.outputs.area_kind }}
       area_workflows: ${{ steps.paths.outputs.area_workflows }}
       area_docker: ${{ steps.paths.outputs.area_docker }}
       area_migrations: ${{ steps.paths.outputs.area_migrations }}
@@ -410,7 +410,7 @@ jobs:
           save-if: ${{ github.event_name != 'pull_request' }}
       - name: schema
         if: needs.changes.outputs[matrix.area] == 'true'
-        run: docker/compose/migrate.sh hyperswitch_db=vendor/hyperswitch/migrations locker=vendor/card-vault/migrations
+        run: tools/ci/migrations/migrate.sh hyperswitch_db=vendor/hyperswitch/migrations locker=vendor/card-vault/migrations
       - name: build the binaries (debug profile)
         if: needs.changes.outputs[matrix.area] == 'true'
         working-directory: ${{ matrix.dir }}

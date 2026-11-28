@@ -1,0 +1,74 @@
+{{- $ctx := dict "root" . "name" "redis" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    {{- include "local-data.selector" $ctx | nindent 4 }}
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  labels:
+    {{- include "local-data.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "local-data.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "local-data.labels" $ctx | nindent 8 }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: {{ .Values.image.redis | quote }}
+          # ACL users only (the default user is off), no persistence: the drainer empties the streams into PostgreSQL
+          args:
+            - --aclfile
+            - /etc/redis/users.acl
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --maxmemory
+            - {{ .Values.redis.maxMemory | quote }}
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            {{- include "local-data.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: acl, mountPath: /etc/redis, readOnly: true}
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: acl
+          secret:
+            secretName: redis-acl
+        - name: data
+          emptyDir: {}

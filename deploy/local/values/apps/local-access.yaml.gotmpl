@@ -1,0 +1,5 @@
+entries:
+  - {name: payments-edge, namespace: payments-edge, gateway: payments-edge, port: 443, nodePort: 30443}
+  {{- if .Values.panel.enabled }}
+  - {name: panel, namespace: control-center, gateway: panel, port: 443, nodePort: 30444}
+  {{- end }}

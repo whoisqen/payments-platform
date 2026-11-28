@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mock-psp
+description: tests/load/mock-psp as an in-cluster PSP for load and chaos runs against the kind stack
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
